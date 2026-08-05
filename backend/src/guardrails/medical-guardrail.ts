@@ -45,7 +45,7 @@ const TREATMENT_PATTERNS = [
 
 // Symptom queries that might lead to diagnosis
 const SYMPTOM_PATTERNS = [
-  /\b(triệu chứng|biểu hiện|dấu hiệu)\b.*\b(gì| gì?)\b/iu,
+  /\b(triệu chứng|biểu hiện|dấu hiệu)\b/iu,
   /\b(symptom(s)?|signs?)\b.*\b(mean|indicate|suggest)\b/iu,
   /\b(tại sao|vì sao|nguyên nhân là)\b.*\b(đau|sốt|ho|khó)\b/iu,
 ];

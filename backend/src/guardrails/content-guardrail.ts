@@ -22,12 +22,12 @@ const HARMFUL_PATTERNS = {
     /\b(violence|killing|harm)\b/i,
   ],
   selfHarm: [
-    /\b(tự tử|tự hại|tự làm đau)\b/iu,
+    /(tự\s*tử|tự\s*hại|tự\s*làm\s*đau)/iu,
     /\b(suicide|self-harm|self harm)\b/i,
   ],
   illegal: [
     /\b(bom|explosive|weapon)\b/i,
-    /\b(đánh cắp|trộm|cướp)\b/iu,
+    /(đánh\s*cắp|trộm|cướp)/iu,
   ],
 };
 

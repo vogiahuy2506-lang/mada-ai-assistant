@@ -1,10 +1,10 @@
 // Guardrail Tests
 
 import { describe, it, expect } from 'vitest';
-import { MedicalGuardrail } from '../src/guardrails/medical-guardrail.js';
-import { ScopeGuardrail } from '../src/guardrails/scope-guardrail.js';
-import { ContentGuardrail } from '../src/guardrails/content-guardrail.js';
-import { GuardrailsOrchestrator } from '../src/guardrails/index.js';
+import { MedicalGuardrail } from '../../src/guardrails/medical-guardrail';
+import { ScopeGuardrail } from '../../src/guardrails/scope-guardrail';
+import { ContentGuardrail } from '../../src/guardrails/content-guardrail';
+import { GuardrailsOrchestrator } from '../../src/guardrails';
 
 describe('MedicalGuardrail', () => {
   const guardrail = new MedicalGuardrail();

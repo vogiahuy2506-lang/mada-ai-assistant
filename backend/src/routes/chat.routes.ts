@@ -119,7 +119,7 @@ chatRouter.post('/', chatRateLimiter.middleware(), async (req: Request, res: Res
         metadata: {
           tokensUsed: 0,
           processingTimeMs: Date.now() - new Date(session.createdAt).getTime(),
-          model: 'gemini-2.0-flash',
+          model: 'gemini-2.5-flash',
         },
       },
     });

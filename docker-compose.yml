@@ -1,0 +1,60 @@
+# MADA AI - Docker Compose Configuration
+
+services:
+  # Frontend & Backend Server
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mada-ai-app
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+    volumes:
+      - app-data:/app/data
+    networks:
+      - mada-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  # Nginx Reverse Proxy (Optional - for production)
+  nginx:
+    image: nginx:alpine
+    container_name: mada-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - app
+    networks:
+      - mada-network
+    profiles:
+      - with-proxy
+
+networks:
+  mada-network:
+    driver: bridge
+
+volumes:
+  app-data:
+    driver: local

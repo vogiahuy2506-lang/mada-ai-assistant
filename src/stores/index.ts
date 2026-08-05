@@ -1,0 +1,558 @@
+import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
+import type { User, UserRole, UserPlan, ChatMessage, Language, Notification, ViewMode } from '@/types';
+import { authApi, setTokens, clearTokens, getAccessToken, type ApiUser } from '@/lib/api';
+
+// Limits per plan (admin có thể override trong system settings)
+// -1 = unlimited
+export const PLAN_LIMITS: Record<UserPlan, number> = {
+  free: -1,  // Mặc định không giới hạn
+  pro: -1,
+  enterprise: -1,
+};
+
+// Giới hạn mặc định cho anonymous users (admin có thể set lại)
+export const ANONYMOUS_LIMIT = -1; // -1 = không giới hạn mặc định
+
+function apiUserToUser(u: ApiUser): User {
+  return {
+    id: u.id,
+    email: u.email,
+    name: u.name,
+    role: u.role,
+    plan: u.plan,
+    avatar: u.avatar ?? undefined,
+    quotaUsed: u.quotaUsed,
+    quotaLimit: u.quotaLimit,
+    provider: u.provider as 'email' | 'google',
+    createdAt: new Date(u.createdAt),
+    lastLogin: u.lastLogin ? new Date(u.lastLogin) : undefined,
+  };
+}
+
+// Auth Store
+interface AuthState {
+  user: User | null;
+  isAuthenticated: boolean;
+  isLoading: boolean;
+  login: (user: User) => void;
+  logout: () => Promise<void>;
+  updateUser: (updates: Partial<User>) => void;
+  hasRole: (role: UserRole) => boolean;
+  setPlan: (plan: UserPlan) => void;
+  incrementQuota: () => void;
+  decrementQuota: () => void;
+  resetQuota: () => void;
+  canSendMessage: () => boolean;
+  getRemainingQuota: () => number;
+
+  // API actions
+  loginWithEmail: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  registerWithEmail: (email: string, password: string, name: string) => Promise<{ success: boolean; error?: string }>;
+  refreshUser: () => Promise<void>;
+}
+
+export const useAuthStore = create<AuthState>()(
+  persist(
+    (set, get) => ({
+      user: null,
+      isAuthenticated: false,
+      isLoading: false,
+      login: (user) => set({ user, isAuthenticated: true }),
+      logout: async () => {
+        try {
+          await authApi.logout();
+        } catch {
+          // ignore
+        }
+        clearTokens();
+        set({ user: null, isAuthenticated: false });
+      },
+      updateUser: (updates) => set((state) => ({
+        user: state.user ? { ...state.user, ...updates } : null,
+      })),
+      hasRole: (role) => {
+        const u = get().user;
+        if (!u) return false;
+        return u.role === role || u.role === 'admin';
+      },
+      setPlan: (plan) => set((state) => {
+        if (!state.user) return state;
+        const limit = PLAN_LIMITS[plan];
+        return {
+          user: {
+            ...state.user,
+            plan,
+            quotaLimit: limit,
+            quotaUsed: plan === 'free' ? 0 : state.user.quotaUsed,
+          },
+        };
+      }),
+      incrementQuota: () => set((state) => {
+        if (!state.user) return state;
+        return {
+          user: { ...state.user, quotaUsed: state.user.quotaUsed + 1 },
+        };
+      }),
+      decrementQuota: () => set((state) => {
+        if (!state.user || state.user.quotaUsed <= 0) return state;
+        return {
+          user: { ...state.user, quotaUsed: state.user.quotaUsed - 1 },
+        };
+      }),
+      resetQuota: () => set((state) => {
+        if (!state.user) return state;
+        return {
+          user: { ...state.user, quotaUsed: 0 },
+        };
+      }),
+      canSendMessage: () => {
+        const { user } = get();
+        if (!user) return false;
+        if (user.quotaLimit === -1) return true;
+        return user.quotaUsed < user.quotaLimit;
+      },
+      getRemainingQuota: () => {
+        const { user } = get();
+        if (!user) return 0;
+        if (user.quotaLimit === -1) return Infinity;
+        return Math.max(0, user.quotaLimit - user.quotaUsed);
+      },
+
+      loginWithEmail: async (email, password) => {
+        set({ isLoading: true });
+        const res = await authApi.login(email, password);
+        if (!res.success) {
+          set({ isLoading: false });
+          return { success: false, error: res.error };
+        }
+        setTokens(res.data.accessToken, res.data.refreshToken);
+        const user = apiUserToUser(res.data.user);
+        set({ user, isAuthenticated: true, isLoading: false });
+        return { success: true };
+      },
+
+      registerWithEmail: async (email, password, name) => {
+        set({ isLoading: true });
+        const res = await authApi.register(email, password, name);
+        if (!res.success) {
+          set({ isLoading: false });
+          return { success: false, error: res.error };
+        }
+        setTokens(res.data.accessToken, res.data.refreshToken);
+        const user = apiUserToUser(res.data.user);
+        set({ user, isAuthenticated: true, isLoading: false });
+        return { success: true };
+      },
+
+      refreshUser: async () => {
+        if (!getAccessToken()) return;
+        const res = await authApi.me();
+        if (res.success) {
+          const user = apiUserToUser(res.data.user);
+          set({ user, isAuthenticated: true });
+        }
+      },
+    }),
+    {
+      name: 'mada-auth',
+      partialize: (state) => ({
+        user: state.user
+          ? {
+              ...state.user,
+              createdAt: state.user.createdAt.toISOString(),
+              lastLogin: state.user.lastLogin?.toISOString(),
+            }
+          : null,
+        isAuthenticated: state.isAuthenticated,
+      }),
+      merge: (persisted, current) => {
+        const persistedAny = persisted as Partial<{ user: Record<string, unknown> | null; isAuthenticated: boolean }> | undefined;
+        if (!persistedAny) return current;
+        const persistedUser = persistedAny.user;
+        return {
+          ...current,
+          isAuthenticated: persistedAny.isAuthenticated ?? false,
+          user: persistedUser
+            ? {
+                ...persistedUser,
+                createdAt: new Date(persistedUser.createdAt as string),
+                lastLogin: persistedUser.lastLogin ? new Date(persistedUser.lastLogin as string) : undefined,
+              } as User
+            : null,
+        };
+      },
+    }
+  )
+);
+
+// Anonymous quota store (for non-logged-in users)
+interface AnonQuotaState {
+  used: number;
+  limit: number;
+  increment: () => void;
+  decrement: () => void;
+  reset: () => void;
+  canSend: () => boolean;
+  remaining: () => number;
+}
+
+export const useAnonQuotaStore = create<AnonQuotaState>()(
+  persist(
+    (set, get) => ({
+      used: 0,
+      limit: -1, // Sẽ được kiểm tra từ system settings
+      increment: () => set((s) => ({ used: s.used + 1 })),
+      decrement: () => set((s) => ({ used: Math.max(0, s.used - 1) })),
+      reset: () => set({ used: 0 }),
+      canSend: () => {
+        const limit = useSystemSettingsStore.getState().anonymousLimit;
+        if (limit === -1) return true; // Không giới hạn
+        return get().used < limit;
+      },
+      remaining: () => {
+        const limit = useSystemSettingsStore.getState().anonymousLimit;
+        if (limit === -1) return -1; // Không giới hạn
+        return Math.max(0, limit - get().used);
+      },
+    }),
+    { name: 'mada-anon-quota' }
+  )
+);
+
+// Auth Modal Store (global control)
+interface AuthModalState {
+  isOpen: boolean;
+  mode: 'login' | 'register';
+  open: (mode?: 'login' | 'register') => void;
+  close: () => void;
+  switchMode: () => void;
+}
+
+export const useAuthModalStore = create<AuthModalState>((set, get) => ({
+  isOpen: false,
+  mode: 'login',
+  open: (mode = 'login') => set({ isOpen: true, mode }),
+  close: () => set({ isOpen: false }),
+  switchMode: () => set({ mode: get().mode === 'login' ? 'register' : 'login' }),
+}));
+
+// Paywall Modal Store
+interface PaywallModalState {
+  isOpen: boolean;
+  reason: 'anonymous_exhausted' | 'user_exhausted';
+  open: (reason?: 'anonymous_exhausted' | 'user_exhausted') => void;
+  close: () => void;
+}
+
+export const usePaywallModalStore = create<PaywallModalState>((set) => ({
+  isOpen: false,
+  reason: 'user_exhausted',
+  open: (reason = 'user_exhausted') => set({ isOpen: true, reason }),
+  close: () => set({ isOpen: false }),
+}));
+
+// Language Store
+interface LanguageState {
+  language: Language;
+  setLanguage: (lang: Language) => void;
+}
+
+export const useLanguageStore = create<LanguageState>()(
+  persist(
+    (set) => ({
+      language: 'vi',
+      setLanguage: (language) => set({ language }),
+    }),
+    { name: 'mada-language' }
+  )
+);
+
+// Chat Store
+interface ChatState {
+  messages: ChatMessage[];
+  isLoading: boolean;
+  conversationId: string | null;
+  addMessage: (message: Omit<ChatMessage, 'id' | 'timestamp'>) => void;
+  setMessages: (messages: ChatMessage[]) => void;
+  clearMessages: () => void;
+  setLoading: (loading: boolean) => void;
+  setConversationId: (id: string | null) => void;
+}
+
+// Conversation history entry (for sidebar recent list)
+export interface HistoryConversation {
+  id: string;
+  title: string;
+  date: string; // ISO yyyy-mm-dd
+  preview: string; // last user message
+  messages: number;
+  pinned?: boolean;
+  category?: string | null;
+  createdAt: number; // unix ms
+  updatedAt: number;
+  messagesData?: string; // JSON stringified ChatMessage[] để persist
+}
+
+interface ChatHistoryState {
+  conversations: HistoryConversation[];
+  searchQuery: string;
+  addOrUpdateConversation: (conv: HistoryConversation) => void;
+  touchConversation: (id: string, preview: string) => void;
+  pinConversation: (id: string) => void;
+  removeConversation: (id: string) => void;
+  clearAll: () => void;
+  setSearchQuery: (q: string) => void;
+  filteredConversations: () => HistoryConversation[];
+  getMessagesForConversation: (id: string) => ChatMessage[];
+  saveConversationMessages: (id: string, messages: ChatMessage[]) => void;
+}
+
+export const useChatStore = create<ChatState>((set) => ({
+  messages: [],
+  isLoading: false,
+  conversationId: null,
+  addMessage: (message) => set((state) => ({
+    messages: [...state.messages, {
+      ...message,
+      id: crypto.randomUUID(),
+      timestamp: new Date(),
+    }],
+  })),
+  setMessages: (messages) => set({ messages }),
+  clearMessages: () => set({ messages: [] }),
+  setLoading: (isLoading) => set({ isLoading }),
+  setConversationId: (conversationId) => set({ conversationId }),
+}));
+
+// Conversation history store (persisted)
+export const useChatHistoryStore = create<ChatHistoryState>()(
+  persist(
+    (set, get) => ({
+      conversations: [],
+      searchQuery: '',
+      addOrUpdateConversation: (conv) => set((state) => {
+        const existing = state.conversations.find((c) => c.id === conv.id);
+        const now = conv.updatedAt || Date.now();
+        if (existing) {
+          return {
+            conversations: state.conversations.map((c) =>
+              c.id === conv.id
+                ? { ...c, ...conv, updatedAt: now }
+                : c
+            ),
+          };
+        }
+        return {
+          conversations: [
+            { ...conv, createdAt: conv.createdAt || now, updatedAt: now },
+            ...state.conversations,
+          ],
+        };
+      }),
+      touchConversation: (id, preview) => set((state) => ({
+        conversations: state.conversations.map((c) =>
+          c.id === id
+            ? { ...c, preview, messages: c.messages + 1, updatedAt: Date.now() }
+            : c
+        ),
+      })),
+      pinConversation: (id) => set((state) => ({
+        conversations: state.conversations.map((c) =>
+          c.id === id ? { ...c, pinned: !c.pinned } : c
+        ),
+      })),
+      removeConversation: (id) => set((state) => ({
+        conversations: state.conversations.filter((c) => c.id !== id),
+      })),
+      clearAll: () => set({ conversations: [] }),
+      setSearchQuery: (searchQuery) => set({ searchQuery }),
+      filteredConversations: () => {
+        const { conversations, searchQuery } = get();
+        const q = searchQuery.trim().toLowerCase();
+        const filtered = q
+          ? conversations.filter(
+              (c) =>
+                c.title.toLowerCase().includes(q) ||
+                (c.preview ?? '').toLowerCase().includes(q)
+            )
+          : conversations;
+        // pinned first, then sorted by updatedAt desc
+        return [...filtered].sort((a, b) => {
+          if (!!b.pinned !== !!a.pinned) return b.pinned ? 1 : -1;
+          return b.updatedAt - a.updatedAt;
+        });
+      },
+      getMessagesForConversation: (id) => {
+        const conv = get().conversations.find((c) => c.id === id);
+        if (!conv || !conv.messagesData) return [];
+        try {
+          return JSON.parse(conv.messagesData) as ChatMessage[];
+        } catch {
+          return [];
+        }
+      },
+      saveConversationMessages: (id, messages) => set((state) => ({
+        conversations: state.conversations.map((c) =>
+          c.id === id ? { ...c, messagesData: JSON.stringify(messages) } : c
+        ),
+      })),
+    }),
+    {
+      name: 'mada-chat-history',
+      partialize: (state) => ({ conversations: state.conversations }),
+    }
+  )
+);
+
+// Theme Store
+interface ThemeState {
+  isDark: boolean;
+  toggleTheme: () => void;
+  setTheme: (dark: boolean) => void;
+}
+
+export const useThemeStore = create<ThemeState>()(
+  persist(
+    (set) => ({
+      isDark: false,
+      toggleTheme: () => set((state) => ({ isDark: !state.isDark })),
+      setTheme: (isDark) => set({ isDark }),
+    }),
+    { name: 'mada-theme' }
+  )
+);
+
+// Notification Store
+interface NotificationState {
+  notifications: Notification[];
+  unreadCount: number;
+  addNotification: (notification: Omit<Notification, 'id' | 'createdAt' | 'read'>) => void;
+  markAsRead: (id: string) => void;
+  markAllAsRead: () => void;
+  removeNotification: (id: string) => void;
+  clearAll: () => void;
+}
+
+export const useNotificationStore = create<NotificationState>((set) => ({
+  notifications: [],
+  unreadCount: 0,
+  addNotification: (notification) => {
+    const newNotification: Notification = {
+      ...notification,
+      id: crypto.randomUUID(),
+      createdAt: new Date(),
+      read: false,
+    };
+    set((state) => ({
+      notifications: [newNotification, ...state.notifications],
+      unreadCount: state.unreadCount + 1,
+    }));
+  },
+  markAsRead: (id) => set((state) => {
+    const notification = state.notifications.find((n) => n.id === id);
+    if (notification && !notification.read) {
+      return {
+        notifications: state.notifications.map((n) =>
+          n.id === id ? { ...n, read: true } : n
+        ),
+        unreadCount: Math.max(0, state.unreadCount - 1),
+      };
+    }
+    return state;
+  }),
+  markAllAsRead: () => set((state) => ({
+    notifications: state.notifications.map((n) => ({ ...n, read: true })),
+    unreadCount: 0,
+  })),
+  removeNotification: (id) => set((state) => {
+    const notification = state.notifications.find((n) => n.id === id);
+    return {
+      notifications: state.notifications.filter((n) => n.id !== id),
+      unreadCount: notification && !notification.read
+        ? Math.max(0, state.unreadCount - 1)
+        : state.unreadCount,
+    };
+  }),
+  clearAll: () => set({ notifications: [], unreadCount: 0 }),
+}));
+
+// Consultation Store
+interface ConsultationState {
+  isModalOpen: boolean;
+  openModal: () => void;
+  closeModal: () => void;
+}
+
+export const useConsultationStore = create<ConsultationState>((set) => ({
+  isModalOpen: false,
+  openModal: () => set({ isModalOpen: true }),
+  closeModal: () => set({ isModalOpen: false }),
+}));
+
+// Sidebar Store
+interface SidebarState {
+  isCollapsed: boolean;
+  activeCategory: string | null;
+  toggleCollapse: () => void;
+  setActiveCategory: (category: string | null) => void;
+}
+
+export const useSidebarStore = create<SidebarState>((set) => ({
+  isCollapsed: false,
+  activeCategory: null,
+  toggleCollapse: () => set((state) => ({ isCollapsed: !state.isCollapsed })),
+  setActiveCategory: (activeCategory) => set({ activeCategory }),
+}));
+
+// View Mode Store - End-User vs AT Specialist Mode
+interface ViewModeState {
+  viewMode: ViewMode;
+  setViewMode: (mode: ViewMode) => void;
+  toggleViewMode: () => void;
+}
+
+export const useViewModeStore = create<ViewModeState>()(
+  persist(
+    (set, get) => ({
+      viewMode: 'end_user',
+      setViewMode: (viewMode) => set({ viewMode }),
+      toggleViewMode: () => set({ viewMode: get().viewMode === 'end_user' ? 'at_specialist' : 'end_user' }),
+    }),
+    { name: 'mada-view-mode' }
+  )
+);
+
+// System Settings Store (Admin-configurable)
+interface SystemSettingsState {
+  // AI Limits
+  anonymousLimit: number; // -1 = unlimited
+  defaultPlanLimit: number; // -1 = unlimited for default free plan
+  
+  // Website URL for data collection
+  websiteUrl: string;
+  
+  // Actions
+  setAnonymousLimit: (limit: number) => void;
+  setDefaultPlanLimit: (limit: number) => void;
+  setWebsiteUrl: (url: string) => void;
+}
+
+export const useSystemSettingsStore = create<SystemSettingsState>()(
+  persist(
+    (set) => ({
+      anonymousLimit: -1, // Mặc định không giới hạn
+      defaultPlanLimit: -1, // Mặc định không giới hạn cho plan
+      websiteUrl: '',
+
+      setAnonymousLimit: (limit) => set({ anonymousLimit: limit }),
+      setDefaultPlanLimit: (limit) => set({ defaultPlanLimit: limit }),
+      setWebsiteUrl: (url) => set({ websiteUrl: url }),
+    }),
+    { name: 'mada-system-settings' }
+  )
+);
+
+// Re-export agent stores
+export { useAgentStore, useSelectedAgentStore } from './agentStore';
+export type { Agent } from './agentStore';

@@ -1,7 +1,88 @@
 # MADA AI - Docker Compose Configuration
 
 services:
-  # Frontend & Backend Server
+  # ============== Milvus Vector DB ==============
+  etcd:
+    container_name: mada-etcd
+    image: quay.io/coreos/etcd:v3.5.5
+    environment:
+      - ETCD_AUTO_COMPACTION_MODE=revision
+      - ETCD_AUTO_COMPACTION_RETENTION=1000
+      - ETCD_QUOTA_BACKEND_BYTES=4294967296
+      - ETCD_SNAPSHOT_COUNT=50000
+    volumes:
+      - etcd_data:/etcd
+    command: etcd -advertise-client-urls=http://127.0.0.1:2379 -listen-client-urls http://0.0.0.0:2379 --data-dir /etcd
+    networks:
+      - mada-network
+    profiles:
+      - with-vector
+
+  minio:
+    container_name: mada-minio
+    image: minio/minio:RELEASE.2023-03-20T20-16-18Z
+    environment:
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+    volumes:
+      - minio_data:/minio_data
+    command: minio server /minio_data --console-address ":9001"
+    networks:
+      - mada-network
+    profiles:
+      - with-vector
+
+  milvus:
+    container_name: mada-milvus
+    image: milvusdb/milvus:v2.3.3
+    command: ["milvus", "run", "standalone"]
+    security_opt:
+      - seccomp:unconfined
+    environment:
+      ETCD_ENDPOINTS: etcd:2379
+      MINIO_ADDRESS: minio:9000
+    volumes:
+      - milvus_data:/var/lib/milvus
+    depends_on:
+      - etcd
+      - minio
+    networks:
+      - mada-network
+    profiles:
+      - with-vector
+
+  # ============== ChromaDB (Alternative Vector DB) ==============
+  chromadb:
+    container_name: mada-chromadb
+    image: chromadb/chroma:latest
+    environment:
+      - IS_PERSISTENT=TRUE
+      - ANONYMIZED_TELEMETRY=FALSE
+    volumes:
+      - chroma_data:/chroma/chroma
+    ports:
+      - "8000:8000"
+    networks:
+      - mada-network
+    profiles:
+      - with-chroma
+
+  # ============== Attractiveness Service (Milvus UI) ==============
+  attractiveness:
+    container_name: mada-attractiveness
+    image: milvusdb/attu:v2.3
+    environment:
+      - MILVUS_URL=milvus:19530
+    depends_on:
+      - milvus
+    ports:
+      - "3000:3000"
+    networks:
+      - mada-network
+    profiles:
+      - with-vector
+
+  # ============== Frontend & Backend Server ==============
   app:
     build:
       context: .
@@ -14,6 +95,9 @@ services:
       - NODE_ENV=production
       - PORT=3001
       - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - VECTOR_DB_PROVIDER=${VECTOR_DB_PROVIDER:-none}
+      - MILVUS_HOST=milvus
+      - CHROMADB_URL=http://chromadb:8000
     volumes:
       - app-data:/app/data
     networks:
@@ -33,7 +117,7 @@ services:
           cpus: '0.5'
           memory: 512M
 
-  # Nginx Reverse Proxy (Optional - for production)
+  # ============== Nginx Reverse Proxy (Optional - for production) ==============
   nginx:
     image: nginx:alpine
     container_name: mada-nginx
@@ -58,3 +142,7 @@ networks:
 volumes:
   app-data:
     driver: local
+  etcd_data:
+  minio_data:
+  milvus_data:
+  chroma_data:

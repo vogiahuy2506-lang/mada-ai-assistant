@@ -147,6 +147,30 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_kb_audit_item ON kb_audit(item_id);
 `);
 
+// ============== SCHEDULED SOURCES SCHEMA ==============
+
+db.exec(`
+  -- Bảng scheduled_sources: các nguồn scrape định kỳ
+  CREATE TABLE IF NOT EXISTS scheduled_sources (
+    id TEXT PRIMARY KEY,
+    url TEXT NOT NULL,
+    name TEXT NOT NULL,
+    type TEXT NOT NULL DEFAULT 'web' CHECK (type IN ('web', 'api')),
+    frequency TEXT NOT NULL DEFAULT 'daily' CHECK (frequency IN ('hourly', 'daily', 'weekly')),
+    status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'paused', 'error')),
+    last_run TEXT,
+    last_success TEXT,
+    last_error TEXT,
+    error_message TEXT,
+    metadata TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_scheduled_status ON scheduled_sources(status);
+  CREATE INDEX IF NOT EXISTS idx_scheduled_frequency ON scheduled_sources(frequency);
+`);
+
 // Seed 7+2 categories
 function seedCategories() {
   const cats = [

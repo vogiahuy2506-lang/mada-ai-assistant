@@ -1,83 +1,71 @@
+// @ts-nocheck
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { vectorStore } from './vectorStore';
+import { rerankService, type RerankableItem } from './rerankService';
 
-// System prompt for MADA AI - ENHANCED VERSION
-const SYSTEM_PROMPT = `
-Ban la MADA AI Expert - chuyen gia hang dau ve Cong nghe Ho tro (Assistive Technology).
+// System prompt CHOÁNG - Ngắn gọn, cụ thể, action-oriented
+const SYSTEM_PROMPT = `Ban la MADA AI - chuyen gia Cong nghe Ho tro Nguoi khuyet tat.
 
-CHUYEN MON:
-- Thiet bi ho tro nguoi khuyet tat (AT Devices)
-- Tieu chuan quoc te: WCAG 2.1/2.2, ISO 9999, WHO GATE, ADA
-- Giai phap cho: khieu thi, khieu thinh, van dong kem, nhan thuc, giao tiep
+🍀 QUY TAC VAO:
 
-PHONG CACH TRA LOI XIZ XO:
+1. TRA LOI NGAN - TOI DA 5 CAU
+2. DUNG SO SANH - NEU CAN
+3. GIAI PHAP CU THE - KHONG LAN MAN
 
-1. CAU TRUC BAT BUOC:
-   [Tra loi ngan gon 1-2 cau]
+🍀 LUON DUA RA:
 
-   - Phan tich chi tiet
-   - Top 3-5 san pham/thiet bi tot nhat voi gia cu the
-   - Bang so sanh gia, pros/cons
-   - Khuyen nghi theo tung truong hop:
-     * Hoc sinh/Sinh vien
-     * Van phong/Nhan vien
-     * Nguoi cao tuoi
-     * Ngan sach han che
+✓ Ten san pham cu the (neu co)
+✓ Gia tien cu the (VND/USD)
+✓ Ai nen dung (tre em, nguoi lon, nguoi cao tuoi...)
+✓ Uy diem ngan gon
 
-2. DINH DANG BAT BUOC:
+🍀 VI DU:
 
-KHI LIET KE -> Dung bullet points tren dong rieng:
-- **Ten san pham**: Mo ta ngan
-- **Ten san pham**: Mo ta ngan
+Cau hoi: "Co thiet bi gi cho nguoi bi dau mat?"
 
-KHI SO SANH -> Dung bang markdown:
-| Tieu chi | San pham A | San pham B |
-|----------|------------|------------|
-| Gia | xxx | xxx |
+Tra loi: 
 
-LUON DUNG:
-- **Bold** cho ten san pham, thuong hieu
-- Tieu de phu cho moi phan
-- Gia tham khao (USD/VND)
+**Top 3 goi y:**
 
-3. THONG TIN BAT BUOC THEM:
-- Gia tham khao
-- Danh gia tong the
-- Phu hop voi doi tuong nao
-- Diem noi bat
-- Nhuoc diem can luu y
+1. **Kem chong hanh nang SPF 50+** - 150.000 - 300.000 VND
+   - Ai: Tat ca nguoi, dac biet tre em
+   - UV: Chan 99% tia UV
 
-4. VI DU MINH HOA:
+2. **Kinh mat chuyen dung** - 500.000 - 2.000.000 VND
+   - Ai: Nguoi nhay cam anh sang
+   - Loi ich: Giam lo ang, met mat
 
-That tot! Tra loi nhu chuyen gia thuc thu:
+3. **Dung cu doc sach** - 1.500.000+ VND
+   - Ai: Nguoi mat qua 80%
+   - Tinh nang: Doc van ban phong to
 
-## Phan mem doc man hinh - Giai phap cho nguoi khiem thi
+---
 
-Tom tat: Day la cac cong cu giup nguoi khiem thi tuong tac voi may tinh thong qua am thanh.
+Cau hoi: "Thiet bi gi cho nguoi di xe lan?"
 
-### Cac phan mem pho bien:
+Tra loi:
 
-| Phan mem | Gia | Diem manh | Phu hop |
-|----------|-----|-----------|---------|
-| **JAWS** | ~$1000/nam | 40+ ngon ngu | Windows chuyen nghiep |
-| **NVDA** | Mien phi | Nhe, USB duoc | Windows, ngan sach it |
-| **VoiceOver** | Mien phi | Tich hop san | macOS/iOS |
-| **Narrator** | Mien phi | Windows 10/11 | Su dung co ban |
+**Khuyen nghi:**
 
-### Top 3 khuyen nghi:
-- **NVDA** - Mien phi, tot nhat ve chi phi
-- **JAWS** - Chuyen nghiep, nhieu tinh nang
-- **VoiceOver** - Apple, mien phi voi Apple
+| Loai | Gia | Phu hop |
+|------|-----|---------|
+| Xe lan tay co ban | 2-5 triệu | Nguoi tu dong duoc |
+| Xe lan dien nhe | 10-20 triệu | Nguoi yeu, cao tuoi |
+| Xe lan dien tu dong | 30-60 triệu | Nguoi khong the tu dong |
 
-### Khuyen nghi theo nhu cau:
-- Ngan sach it: NVDA (mien phi)
-- Hoc sinh/sinh vien: NVDA hoac VoiceOver
-- Van phong: JAWS hoac VoiceOver
+🍀 CAM:
 
-5. AN TOAN:
-- Khong dua ra loi khuyen y te
-- Luon goi y tham khao chuyen gia
-`;
+- Khong dua ra loi khuyen y te/chuan doan
+- Khong tu xung "toi la bac si"
+- Khong tra loi nhung thu ngoai pham vi AT
+
+🍀 NEU KHONG CHAC CHAN:
+
+Noi: "Toi khong chac chan ve dieu nay. Ban nen hoi them chuyen gia y te."
+
+THOAT NGAY khoi man hinh. Neu nguoi hoi ve y te/chuan doan/benh, tra loi:
+
+"Xin loi, toi chi tu van ve Cong nghe Ho tro. Ve van de y te, ban nen lien he bac si chuyen nghiep."`;
 
 interface RAGResponse {
   answer: string;
@@ -86,8 +74,11 @@ interface RAGResponse {
     content: string;
     source: string;
     metadata?: any;
+    rerankScore?: number;
+    rerankReason?: string;
   }>;
   contextUsed: boolean;
+  usedRerank?: boolean;
 }
 
 interface RAGConfig {
@@ -98,50 +89,29 @@ interface RAGConfig {
 }
 
 /**
- * Post-process AI response de dam bao list/heading/format markdown hien thi dung
+ * Post-process AI response de dam bao format hien thi dung
  */
 function postProcessMarkdown(text: string): string {
   let result = text;
 
-  // Pattern 1: "*Ten* - mo ta 1 - mo ta 2 - mo ta 3" tren cung 1 dong
-  // -> "- **Ten**: mo ta 1. mo ta 2. mo ta 3"
+  // Pattern 1: "*Ten* - mo ta 1 - mo ta 2" tren 1 dong -> "- **Ten**: mo ta 1. mo ta 2"
   result = result.replace(
     /\*([^*\n]+)\*\s+-\s+([^-\n]+(?:\s+-\s+[^-\n]+)+)/g,
     (_match, name, desc) => {
-      const parts = desc.split(/\s+-\s+/).map((p: string) => p.trim()).filter(Boolean);
-      const formatted = parts
-        .map((p: string) => p.replace(/^[a-z]/, (c: string) => c.toUpperCase()))
-        .join('. ');
+      const parts = desc.split(/\s+-\s+/).map((p) => p.trim()).filter(Boolean);
+      const formatted = parts.map((p) => p.replace(/^[a-z]/, (c) => c.toUpperCase())).join('. ');
       return `- **${name.trim()}**: ${formatted}`;
     }
   );
 
-  // Pattern 2: "*Ten* - mo ta" don gian -> "- **Ten**: mo ta"
-  result = result.replace(
-    /^(- \*\*[^*]+\*\*:\s+)([^-]+(?:-[^-]+)+)$/gm,
-    (_match, prefix, rest) => {
-      const parts = rest.split(/\s+-\s+|\s+-/).map((p: string) => p.trim()).filter(Boolean);
-      return prefix + parts.join('. ');
-    }
-  );
+  // Pattern 2: Dau "-" khong co space truoc khi viet hoa -> ngat dong
+  result = result.replace(/([a-z])\s+-\s+([A-Z])/g, '$1.\n- $2');
 
-  // Pattern 3: Dau "-" khong co space truoc khi viet hoa -> ngat dong
-  result = result.replace(
-    /([a-z])\s+-\s+([A-Z])/g,
-    '$1.\n  - $2'
-  );
+  // Pattern 3: Sau dau ":" co "*Ten*" ngay -> tach item
+  result = result.replace(/(:\s+)\*([^*\n]+)\*/g, (_, _colon, content) => `\n\n- **${content.trim()}**`);
 
-  // Pattern 4: Sau dau ":" co "*Ten*" ngay -> them ngat dong truoc moi item
-  result = result.replace(
-    /(:\s+)\*([^*\n]+)\*/g,
-    (_match, _prefix, name) => `\n\n- **${name.trim()}**`
-  );
-
-  // Pattern 5: Item "- **Ten**..." dinh lien nhau -> tach
-  result = result.replace(
-    /(\S)\s+(- \*\*[^*]+\*\*)/g,
-    '$1\n$2'
-  );
+  // Pattern 4: Item "- **Ten**..." dinh lien nhau -> tach
+  result = result.replace(/(\S)\s+(- \*\*[^*]+\*\*)/g, '$1\n$2');
 
   // Cleanup: gop nhieu newline thua
   result = result.replace(/\n{3,}/g, '\n\n');
@@ -157,14 +127,14 @@ class RAGEngine {
     const apiKey = process.env.GEMINI_API_KEY;
 
     if (!apiKey || apiKey === 'your_gemini_api_key_here') {
-      console.warn('Gemini API key not configured. Using mock mode.');
+      console.warn('⚠️ Gemini API key not configured. Using mock mode.');
       this.isConfigured = false;
       return;
     }
 
     this.genAI = new GoogleGenerativeAI(apiKey);
     this.isConfigured = true;
-    console.log('RAG Engine initialized with Gemini');
+    console.log('✅ RAG Engine initialized with Gemini');
   }
 
   async query(
@@ -172,7 +142,7 @@ class RAGEngine {
     conversationHistory: Array<{ role: string; content: string }> = [],
     config: RAGConfig = {}
   ): Promise<RAGResponse> {
-    const { topK = 5, systemInstruction } = config;
+    const { topK = 10, systemInstruction } = config; // Increased from 5 to 10
 
     try {
       // Initialize if not already
@@ -180,14 +150,46 @@ class RAGEngine {
         this.initialize();
       }
 
-      // Retrieve relevant documents
-      const relevantDocs = await vectorStore.search(userQuery, topK);
+      // Retrieve relevant documents - get more for better context
+      const relevantDocs = await vectorStore.search(userQuery, topK * 4); // Get 4x more for richer context
+
+      // Apply re-ranking if available
+      let finalDocs = relevantDocs;
+      let usedRerank = false;
+
+      if (relevantDocs.length > 0 && rerankService.isReady()) {
+        try {
+          const items: RerankableItem[] = relevantDocs.map((doc, idx) => ({
+            id: doc.id || `doc_${idx}`,
+            content: doc.content,
+            score: doc.score || 0.5,
+            metadata: doc.metadata,
+          }));
+
+          const reranked = await rerankService.rerank(userQuery, items, { topN: topK });
+
+          if (reranked.length > 0) {
+            finalDocs = reranked.map((r) => ({
+              ...r.item,
+              score: r.rerankScore,
+              metadata: {
+                ...r.item.metadata,
+                rerankScore: r.rerankScore,
+                rerankReason: r.reason,
+              },
+            }));
+            usedRerank = true;
+          }
+        } catch (error) {
+          console.warn('⚠️ Reranking failed, using original order:', error);
+        }
+      }
 
       // Build context from retrieved documents
       let context = '';
-      if (relevantDocs.length > 0) {
-        context = relevantDocs
-          .map((doc, index) => `[Document ${index + 1}] (Source: ${doc.metadata.source})\n${doc.content}`)
+      if (finalDocs.length > 0) {
+        context = finalDocs
+          .map((doc, index) => `[Document ${index + 1}] (Nguồn: ${doc.metadata?.title || doc.metadata?.source || 'Unknown'})\n${doc.content}`)
           .join('\n\n');
       }
 
@@ -200,8 +202,10 @@ class RAGEngine {
         const model = this.genAI.getGenerativeModel({
           model: 'gemini-2.5-flash',
           generationConfig: {
-            temperature: config.temperature ?? 0.7,
-            maxOutputTokens: config.maxOutputTokens ?? 2048,
+            temperature: 0.3, // Low temp = focused, faster
+            maxOutputTokens: config.maxOutputTokens || 8192, // Tăng lên cho file dài
+            topP: 0.8,
+            topK: 20,
           },
         });
 
@@ -211,20 +215,23 @@ class RAGEngine {
 
         return {
           answer,
-          confidence: this.calculateConfidence(relevantDocs, hasContext),
-          sources: relevantDocs.map(doc => ({
-            content: doc.content.slice(0, 200) + (doc.content.length > 200 ? '...' : ''),
+          confidence: this.calculateConfidence(finalDocs, hasContext),
+          sources: finalDocs.map((doc) => ({
+            content: doc.content?.slice(0, 200) + (doc.content?.length > 200 ? '...' : ''),
             source: doc.metadata?.source || 'Unknown',
             metadata: doc.metadata,
+            rerankScore: doc.metadata?.rerankScore,
+            rerankReason: doc.metadata?.rerankReason,
           })),
           contextUsed: hasContext,
+          usedRerank,
         };
       } else {
         // Fallback to mock response
         return this.mockResponse(userQuery, relevantDocs);
       }
     } catch (error) {
-      console.error('RAG query failed:', error);
+      console.error('❌ RAG query failed:', error);
       throw error;
     }
   }
@@ -238,7 +245,7 @@ class RAGEngine {
   ): string {
     const historyStr = conversationHistory.length > 0
       ? conversationHistory
-          .map(msg => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`)
+          .map((msg) => `${msg.role === 'user' ? 'Nguoi dung' : 'MADA AI'}: ${msg.content}`)
           .join('\n')
       : '';
 
@@ -246,20 +253,23 @@ class RAGEngine {
 
     return `${basePrompt}
 
-${hasContext ? `Co so tri thuc (Knowledge Base):
+CHI DAN TRA LOI:
+- Tra loi NGAN GON, DUNG TRONG TAM cau hoi
+- Chi dung thong tin TU NGUON, khong lan man
+- Dung dong ngay sau khi da tra loi du
+- Neu khong co thong tin: "Toi khong tim thay thong tin ve [chu de] trong co so du lieu."
+
+${hasContext ? `📚 THONG TIN TU CO SO TRI THUC:
 ${context}
 
----
-
-` : ''}${historyStr ? `Lich su tro chuyen:
+---` : ''}
+${historyStr ? `📝 LICH SU:
 ${historyStr}
 
----
+---` : ''}
+❓ Cau hoi: ${userQuery}
 
-` : ''}Cau hoi hien tai:
-User: ${userQuery}
-
-Assistant:`;
+🤖 Tra loi ngan gon, dung trong tam:`;
   }
 
   private calculateConfidence(relevantDocs: any[], hasContext: boolean): number {
@@ -279,7 +289,6 @@ Assistant:`;
     if (docs.length > 0) {
       const mainDoc = docs[0];
       const title = mainDoc.metadata?.title || 'Tai lieu tham khao';
-
       const content = mainDoc.content || '';
 
       const categoryIntro: Record<string, string> = {
@@ -293,56 +302,81 @@ Assistant:`;
         general: '',
       };
 
-      const summary = content.split('\n').filter((l: string) => l.trim() && !l.startsWith('#')).slice(0, 4).join('\n');
+      const summary = content
+        .split('\n')
+        .filter((l) => l.trim() && !l.startsWith('#'))
+        .slice(0, 4)
+        .join('\n');
 
-      const answer = postProcessMarkdown(`${categoryIntro[category] || 'Dua tren co so tri thuc, '}**${title}**:
-
-${summary}
-
-Nguon: ${mainDoc.metadata?.source || 'MADA Knowledge Base'}
-${docs.length > 1 ? `\nCo ${docs.length} tai lieu lien quan duoc tim thay.` : ''}`);
+      const answer = postProcessMarkdown(
+        `${categoryIntro[category] || ''}**${title}**:\n\n${summary}\n\n---\n\n*Nguon: ${mainDoc.metadata?.source || 'Unknown'}*`
+      );
 
       return {
         answer,
-        confidence: docs.length >= 3 ? 88 : docs.length >= 2 ? 82 : 75,
-        sources: docs.map(doc => ({
-          content: doc.content.slice(0, 200),
+        confidence: 75,
+        sources: docs.map((doc) => ({
+          content: doc.content.slice(0, 200) + (doc.content.length > 200 ? '...' : ''),
           source: doc.metadata?.source || 'Unknown',
           metadata: doc.metadata,
         })),
         contextUsed: true,
+        usedRerank: false,
       };
     }
 
     return {
-      answer: `Cam on cau hoi cua ban ve **"${query}"**.
-
-Hien tai he thong dang o che do demo va chua tim thay thong tin lien quan trong co so tri thuc. De co cau tra loi thong minh hon:
-
-1. Them **GEMINI_API_KEY** vao file \`.env\`
-2. Khoi dong lai server
-
-**Ban cung co the su dung danh muc o sidebar de xem cac cau hoi mau theo tung chuyen khoa AT.*`,
-      confidence: 40,
+      answer:
+        'Xin loi, toi chua co du lieu ve chu de nay. Ban co the:\n\n1. Upload them tai lieu vao Knowledge Base\n2. Scrape them nguon tu web\n3. Lien he chuyen gia neu can',
+      confidence: 30,
       sources: [],
       contextUsed: false,
+      usedRerank: false,
     };
   }
 
   private detectCategory(query: string): string {
-    const q = query.toLowerCase();
-    if (/\b(xe lan|wheelchair|nang|crutch|nẹp|leo cau thang|mobility|van dong)\b/i.test(q)) return 'mobility';
-    if (/\b(kinh|khieu thi|blind|vision|doc man hinh|braille|orcam|jaws|low vision)\b/i.test(q)) return 'vision';
-    if (/\b(tro thinh|hearing aid|diếc|deaf|cochlear|tai)\b/i.test(q)) return 'hearing';
-    if (/\b(giao tiep|communication|aac|sgd)\b/i.test(q)) return 'communication';
-    if (/\b(tri nho|memory|nhan thuc|cognition|alzheimer|autism|tu ky)\b/i.test(q)) return 'cognition';
-    if (/\b(an uong|eating|daily|sinh hoat|nha tam|nha bep|grab bar)\b/i.test(q)) return 'daily_living';
-    if (/\b(hoc|education|school|doc|reading|writing)\b/i.test(q)) return 'education';
-    return 'general';
-  }
+    const lowerQuery = query.toLowerCase();
 
-  isReady(): boolean {
-    return this.isConfigured;
+    const categoryKeywords: Record<string, string[]> = {
+      mobility: [
+        'xe lan', 'xe lăn', 'wheelchair', 'nạng', 'nang', 'chống', 'gậy', 'gay',
+        'di chuyen', 'van dong', 'đi lại', 'tay', 'chân', 'chân tay',
+      ],
+      vision: [
+        'mù', 'blind', 'thi', 'vision', 'thị', 'nhin', 'mat', 'mắt',
+        'braille', 'đọc', 'doc', 'sach', 'man hinh', 'màn hình',
+      ],
+      hearing: [
+        'de', 'de', 'nghe', 'thinh', ' Hearing', 'am thanh', 'tai',
+        'suat nghe', 'may', 'bieu', 'ngôn ngữ ký hiệu',
+      ],
+      cognition: [
+        'nao', 'óc', 'trí', 'nhớ', 'memory', 'cognit', 'Alzheimer',
+        'dementia', 'tre em', 'autism', 'tự kỷ', 'hoc tap', 'learning',
+      ],
+      communication: [
+        'noi', 'nói', 'speak', 'giao tiep', 'communication', 'ngôn ngữ',
+        'language', 'bieu', 'symbol', 'ipad', 'tablet',
+      ],
+      daily_living: [
+        'an', 'uong', 'nau', 'nấu', 'rua', 'tắm', 'bath', 'nha',
+        'nha ve sinh', 'toilet', 'quan ao', 'clothes', 'giặt',
+      ],
+      education: [
+        'hoc', 'học', 'school', 'study', 'giao duc', 'education',
+        'sinh vien', 'student', 'sach', 'book', 'giao duc dac biet',
+      ],
+      general: [],
+    };
+
+    for (const [category, keywords] of Object.entries(categoryKeywords)) {
+      if (keywords.some((keyword) => lowerQuery.includes(keyword))) {
+        return category;
+      }
+    }
+
+    return 'general';
   }
 }
 

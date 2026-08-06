@@ -8,7 +8,7 @@ import compression from 'compression';
 import { appConfig } from './config/app.config.js';
 import { logger } from './utils/logger.js';
 import { errorHandler } from './middleware/error-handler.js';
-import { chatRouter, ragRouter, healthRouter } from './routes/index.js';
+import { chatRouter, ragRouter, healthRouter, scrapeRouter } from './routes/index.js';
 import { ragService } from './services/rag.service.js';
 
 const app: Express = express();
@@ -20,9 +20,17 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.set('trust proxy', 1);
 
+// Legacy route compatibility - redirect /api/chat to /api/v1/chat
+app.use('/api/chat', (req, res, next) => {
+  // Forward to the chat router
+  req.url = '/';
+  chatRouter(req, res, next);
+});
+
 app.use('/api/v1/chat', chatRouter);
 app.use('/api/v1/rag', ragRouter);
 app.use('/api/v1/health', healthRouter);
+app.use('/api/scrape', scrapeRouter);
 
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

@@ -12,7 +12,7 @@ import db from '../lib/db';
 import { dataIngestion, type DataSource } from '../lib/rag/dataIngestion';
 import { vectorStore } from '../lib/rag/vectorStore';
 import { AT_CATEGORIES, classifyContent } from '../lib/rag/taxonomy';
-import { detectFileType } from '../lib/rag/fileParsers';
+import { detectFileType, parsePDFFile, parseDocxFile } from '../lib/rag/fileParsers';
 import { logActivity } from '../index';
 
 const router = express.Router();
@@ -383,6 +383,59 @@ router.post('/upload-image', upload.single('file'), async (req, res) => {
       },
     });
   } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ============== EXTRACT TEXT FROM FILE (for chat attachments) ==============
+
+router.post('/extract-text', upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: 'Không có file nào được upload' });
+    }
+
+    const fileType = detectFileType(req.file.originalname);
+    let text = '';
+
+    try {
+      if (fileType === 'pdf') {
+        text = await parsePDFFile(req.file.path);
+      } else if (fileType === 'docx') {
+        text = await parseDocxFile(req.file.path);
+      } else if (fileType === 'txt') {
+        text = fs.readFileSync(req.file.path, 'utf-8');
+      } else if (fileType === 'image') {
+        text = '[Hình ảnh - cần OCR để đọc nội dung]';
+      } else {
+        text = fs.readFileSync(req.file.path, 'utf-8');
+      }
+    } catch (parseErr: any) {
+      console.error('Parse error:', parseErr);
+      text = `[Không thể đọc file: ${parseErr.message}]`;
+    }
+
+    // Clean up temp file
+    try {
+      fs.unlinkSync(req.file.path);
+    } catch {}
+
+    // Limit text to 50k chars
+    text = text.slice(0, 50000);
+
+    console.log(`📄 Extracted ${text.length} chars from ${req.file.originalname}`);
+
+    res.json({
+      success: true,
+      data: {
+        text,
+        fileName: req.file.originalname,
+        fileType,
+        charCount: text.length,
+      },
+    });
+  } catch (err: any) {
+    console.error('Extract text error:', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });

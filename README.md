@@ -4,88 +4,90 @@
 
 MADA AI Assistant là một ứng dụng web AI-powered được phát triển để hỗ trợ người khuyết tật và các chuyên gia tìm kiếm thông tin về thiết bị công nghệ hỗ trợ (AT).
 
-![MADA AI](https://img.shields.io/badge/Status-Production-blue)
-![React](https://img.shields.io/badge/React-18.2.0-61DAFB)
-![TypeScript](https://img.shields.io/badge/TypeScript-5.3.0-3178C6)
-![Tailwind](https://img.shields.io/badge/Tailwind-3.4.0-06B6D4)
-![Gemini](https://img.shields.io/badge/Gemini-2.5-FABB05)
+![Status](https://img.shields.io/badge/Status-Production-blue)
+![React](https://img.shields.io/badge/React-18.3.1-61DAFB)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.5.4-3178C6)
+![Tailwind](https://img.shields.io/badge/Tailwind-3.4.10-06B6D4)
+![Node](https://img.shields.io/badge/Node-18+-339933)
+
+---
 
 ## 🎯 Tính năng chính
 
-### 1. AI Agent Engine
-- Tích hợp **Gemini 2.5 Flash** cho phản hồi nhanh và chính xác
+### 1. AI Chat với RAG
+- Tích hợp **Gemini 2.5 Flash** cho phản hồi nhanh
 - **RAG (Retrieval-Augmented Generation)** với semantic search
-- **Confidence Score** 82-99% cho mỗi câu trả lời
+- **Confidence Score** hiển thị cho mỗi câu trả lời
 
-### 2. 7 Danh mục Công nghệ Hỗ trợ
-- 👁️ **Vision** - Thiết bị hỗ trợ thị giác
-- 👂 **Hearing** - Thiết bị hỗ trợ thính giác
-- 🦽 **Mobility** - Thiết bị vận động
-- 🧠 **Cognition** - Thiết bị hỗ trợ nhận thức
-- 💬 **Communication** - Thiết bị giao tiếp
-- 🏠 **Daily Living** - Hỗ trợ sinh hoạt
-- 📚 **Education** - Giáo dục
+### 2. Quản lý Knowledge Base
+- Upload file (PDF, DOCX, TXT, CSV)
+- Web scraping tự động
+- OCR cho hình ảnh
+- Auto-classification theo tiêu chuẩn ISO/WHO/WCAG
 
-### 3. Hai Chế độ Xem
-- **End-User Mode** - Giao diện thân thiện cho người dùng phổ thông
-- **AT Specialist Mode** - Chế độ chuyên sâu với tiêu chuẩn ISO/WCAG/WHO
+### 3. Auto Scraping
+- Cron job tự động scrape dữ liệu
+- Hỗ trợ 7 danh mục AT chính
 
-### 4. Đa ngôn ngữ
-- 🇻🇳 Tiếng Việt
-- 🇺🇸 English
-- 🇸🇦 العربية
-- 🇫🇷 Français
+### 4. Thanh toán (Stripe)
+- 3 gói subscription: Free, Pro, Enterprise
+- Quản lý quota và usage
+- Checkout và Portal integration
 
-### 5. Safety Guardrails
-- Tự động từ chối chẩn đoán y khoa
-- Chuyển hướng đến chuyên gia khi cần
-- Kiểm duyệt nội dung an toàn
+### 5. Multi-Vector Database
+- **Mock** - Development (không cần setup)
+- **Pinecone** - Cloud vector database
+- **Milvus** - Self-hosted vector database (Docker)
+
+---
 
 ## 🚀 Bắt đầu nhanh
 
-### Yêu cầu
-- Node.js 18+
-- npm 9+
-
-### Cài đặt
+### 1. Cài đặt
 
 ```bash
 # Clone repository
-git clone https://github.com/your-org/mada-ai-assistant.git
-cd mada-ai-assistant
+cd "/Users/vohuy/Downloads/MADA AI ASSISTANT/mada-ai-assistant"
 
 # Install dependencies
 npm install
 
 # Copy environment file
 cp .env.example .env
-
-# Edit .env and add your Gemini API key
-# GEMINI_API_KEY=your_api_key_here
-
-# Start development server
-npm run dev
 ```
 
-### Chạy Backend
+### 2. Cấu hình
+
+Chỉnh sửa file `.env`:
+
+```env
+# Gemini API Key (bắt buộc)
+GEMINI_API_KEY=your_gemini_api_key_here
+
+# Vector Database (tùy chọn)
+VECTOR_DB_PROVIDER=mock  # hoặc pinecone, milvus
+```
+
+### 3. Chạy ứng dụng
 
 ```bash
-# Terminal 1: Start backend
-npm run server
+# Chạy cả frontend + backend
+npm run dev:all
 
-# Terminal 2: Start frontend
-npm run dev
+# Hoặc chạy riêng:
+npm run server  # Backend (port 3001)
+npm run dev    # Frontend (port 5173)
 ```
 
-### Docker Deployment
+### 4. Truy cập
 
-```bash
-# Build and run with Docker
-docker-compose up -d
-
-# Or with custom environment
-GEMINI_API_KEY=your_key docker-compose up -d
 ```
+Frontend: http://localhost:5173
+Backend:  http://localhost:3001
+API:      http://localhost:3001/api/health
+```
+
+---
 
 ## 📁 Cấu trúc dự án
 
@@ -94,73 +96,290 @@ mada-ai-assistant/
 ├── src/
 │   ├── components/          # React components
 │   ├── pages/              # Page components
-│   ├── stores/             # Zustand state management
-│   ├── styles/              # CSS styles (Tailwind + accessibility)
-│   ├── types/              # TypeScript definitions
-│   └── App.tsx             # Main app component
+│   │   ├── ChatPage.tsx
+│   │   ├── DataManagerPage.tsx
+│   │   ├── PricingPage.tsx
+│   │   └── admin/          # Admin pages
+│   ├── stores/             # Zustand state
+│   ├── lib/                # Utilities
+│   └── App.tsx
 ├── server/
-│   ├── index.ts            # Express server
+│   ├── index.ts             # Express server
 │   ├── lib/
 │   │   ├── rag/            # RAG engine
 │   │   │   ├── ragEngine.ts
 │   │   │   ├── vectorStore.ts
-│   │   │   └── dataIngestion.ts
-│   │   └── guardrails.ts   # Safety guardrails
-│   └── tests/
-│       └── qa-test-suite.ts # QA test suite
-├── nginx/                   # Nginx config
-├── docker-compose.yml
-├── Dockerfile
-└── vercel.json
+│   │   │   ├── dataIngestion.ts
+│   │   │   ├── fileParsers.ts
+│   │   │   └── taxonomy.ts
+│   │   ├── scraper/        # Auto scraping
+│   │   │   └── scheduler.ts
+│   │   ├── payments/       # Stripe integration
+│   │   │   └── stripe.ts
+│   │   ├── guardrails.ts   # Safety
+│   │   └── auth.ts         # Auth utilities
+│   └── routes/
+│       ├── auth.ts
+│       ├── users.ts
+│       ├── knowledgeBase.ts
+│       ├── scraper.ts
+│       └── payments.ts
+├── scripts/
+│   └── setup-milvus.sh     # Milvus setup
+├── docs/
+│   ├── TECHNICAL_DOCUMENTATION.md
+│   ├── MILVUS_SETUP_GUIDE.md
+│   └── SCRAPING_GUIDE.md
+└── data/                   # SQLite DB, uploads
 ```
 
-## 🔧 API Endpoints
+---
+
+## 🗄️ Vector Database Options
+
+### Option 1: Mock (Mặc định)
+Không cần setup, chạy ngay.
+
+```env
+VECTOR_DB_PROVIDER=mock
+```
+
+### Option 2: Pinecone (Cloud)
+Cần tài khoản Pinecone.
+
+```env
+VECTOR_DB_PROVIDER=pinecone
+PINECONE_API_KEY=your_key_here
+PINECONE_INDEX_NAME=mada-knowledge-base
+```
+
+### Option 3: Milvus (Docker)
+Cần Docker Desktop.
+
+```bash
+# Khởi động Milvus
+./scripts/setup-milvus.sh start
+
+# Hoặc dùng npm script
+npm run milvus:start
+
+# Migration dữ liệu
+npm run milvus:migrate
+```
+
+Xem chi tiết: [docs/MILVUS_SETUP_GUIDE.md](docs/MILVUS_SETUP_GUIDE.md)
+
+---
+
+## 💳 Thanh toán Stripe
+
+### Setup
+
+1. Tạo tài khoản Stripe: https://dashboard.stripe.com/
+2. Lấy API keys từ Developers → API keys
+3. Tạo Products và Prices trong Stripe Dashboard
+4. Thêm vào .env:
+
+```env
+STRIPE_SECRET_KEY=sk_test_xxx
+STRIPE_WEBHOOK_SECRET=whsec_xxx
+STRIPE_PRICE_PRO=price_xxx
+STRIPE_PRICE_ENTERPRISE=price_xxx
+```
+
+### API Endpoints
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/health` | Health check |
+| GET | `/api/payments/plans` | Lấy danh sách gói |
+| POST | `/api/payments/checkout` | Tạo checkout session |
+| POST | `/api/payments/portal` | Tạo billing portal |
+| GET | `/api/payments/subscription/:userId` | Lấy subscription |
+| GET | `/api/payments/usage/:userId` | Lấy usage stats |
+| POST | `/api/payments/webhook` | Stripe webhook |
+
+---
+
+## 🔄 Auto Scraping
+
+### Setup
+
+Cron job chạy tự động scrape dữ liệu định kỳ.
+
+```bash
+# Chạy scheduler
+npx tsx server/lib/scraper/scheduler.ts start
+
+# Chạy scrape một lần
+npx tsx server/lib/scraper/scheduler.ts run
+
+# Xem status
+npx tsx server/lib/scraper/scheduler.ts status
+```
+
+### API Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/scraper/sources` | Lấy danh sách nguồn |
+| POST | `/api/scraper/sources` | Thêm nguồn mới |
+| POST | `/api/scraper/sources/:id/run` | Chạy scrape cho 1 nguồn |
+| POST | `/api/scraper/run-all` | Chạy tất cả nguồn |
+| GET | `/api/scraper/status` | Trạng thái scheduler |
+
+---
+
+## 📡 API Endpoints
+
+### Authentication
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/auth/register` | Đăng ký |
+| POST | `/api/auth/login` | Đăng nhập |
+| POST | `/api/auth/logout` | Đăng xuất |
+| GET | `/api/auth/me` | Lấy thông tin user |
+
+### Knowledge Base
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/kb/items` | Lấy danh sách items |
+| POST | `/api/kb/upload` | Upload file |
+| POST | `/api/kb/scrape` | Scrape URL |
+| POST | `/api/kb/text` | Thêm text |
+| GET | `/api/kb/stats` | Thống kê KB |
+
+### Chat
+| Method | Endpoint | Description |
+|--------|----------|-------------|
 | POST | `/api/chat` | Chat với AI |
+| GET | `/api/knowledge/search` | Semantic search |
 | POST | `/api/recommend` | Gợi ý sản phẩm |
-| POST | `/api/data/comprehensive` | Load knowledge base |
-| GET | `/api/knowledge/stats` | Knowledge base stats |
-| POST | `/api/consultations` | Gửi yêu cầu tư vấn |
+
+### Consultation
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/consultation` | Gửi yêu cầu tư vấn |
+| GET | `/api/consultation` | Lấy danh sách yêu cầu |
+
+---
+
+## 🔐 Default Users
+
+| Email | Password | Role |
+|-------|----------|------|
+| admin@mada.vn | Admin@123 | admin |
+| expert@mada.vn | Expert@123 | expert |
+| data@mada.vn | Data@123 | data_manager |
+| user@mada.vn | User@123 | user |
+
+**Thay đổi password trong production!**
+
+---
+
+## 🎛️ Scripts
+
+```bash
+# Development
+npm run dev           # Frontend (Vite)
+npm run server       # Backend (Express)
+npm run dev:all      # Cả hai
+
+# Build
+npm run build         # Production build
+npm run lint         # Check linting
+
+# Milvus
+npm run milvus:start    # Khởi động Milvus (Docker)
+npm run milvus:stop     # Dừng Milvus
+npm run milvus:status   # Kiểm tra trạng thái
+npm run milvus:logs     # Xem logs
+npm run milvus:health   # Health check
+
+# Data
+curl -X POST http://localhost:3001/api/data/sample    # Load sample data
+curl -X POST http://localhost:3001/api/data/seed      # Load seed data
+curl -X POST http://localhost:3001/api/data/comprehensive  # Load full KB
+```
+
+---
 
 ## 📊 Tiêu chuẩn tuân thủ
 
-- **WCAG 2.2 Level AA** - Web Accessibility
+- **WCAG 2.1 Level AA** - Web Accessibility
 - **ISO 9999:2022** - Assistive Products Classification
 - **WHO GATE** - Global Assistive Technology Initiative
+- **GDPR** - Data Protection (EU)
+
+---
+
+## 🐳 Docker Deployment
+
+### Full Stack với Milvus
+
+```bash
+# Khởi động Milvus
+./scripts/setup-milvus.sh start
+
+# Build và chạy app
+docker-compose up -d
+
+# Migration dữ liệu
+npm run milvus:migrate
+
+# Khởi động server
+npm run server
+```
+
+### Environment Variables
+
+```env
+# Server
+PORT=3001
+NODE_ENV=production
+
+# Gemini
+GEMINI_API_KEY=xxx
+
+# Vector DB
+VECTOR_DB_PROVIDER=pinecone
+PINECONE_API_KEY=xxx
+
+# Stripe
+STRIPE_SECRET_KEY=xxx
+STRIPE_WEBHOOK_SECRET=xxx
+
+# CORS
+CORS_ORIGINS=https://yourdomain.com
+```
+
+---
 
 ## 🧪 Testing
 
 ```bash
-# Run QA tests
+# Chạy QA tests
 npx tsx server/tests/run-tests.ts
 
-# Run with custom API
+# Custom API
 API_URL=https://your-api.com npx tsx server/tests/run-tests.ts
 ```
 
-## 🚢 Deployment
+---
 
-### Docker
-```bash
-./deploy.sh docker
-```
+## 📝 Changelog
 
-### Vercel
-```bash
-./deploy.sh vercel
-```
+### v1.0.0 (August 2026)
+- ✅ Multi-vector database support (Mock, Pinecone, Milvus)
+- ✅ Auto scraping với Cron
+- ✅ Stripe payment integration
+- ✅ Upload file (PDF, DOCX, TXT, CSV)
+- ✅ Web scraping
+- ✅ OCR cho hình ảnh
+- ✅ 7 danh mục AT
+- ✅ Safety guardrails
+- ✅ Multi-language (VI, EN, AR, FR)
 
-### Google Cloud Run
-```bash
-GCP_PROJECT_ID=your-project ./deploy.sh gcp
-```
-
-## 📝 License
-
-MIT License - xem [LICENSE](LICENSE) để biết thêm chi tiết.
+---
 
 ## 🤝 Contributing
 
@@ -170,10 +389,18 @@ MIT License - xem [LICENSE](LICENSE) để biết thêm chi tiết.
 4. Push to branch (`git push origin feature/amazing-feature`)
 5. Tạo Pull Request
 
+---
+
 ## 📧 Liên hệ
 
 - **MADA Center Qatar**: at.mada.org.qa
 - **Email**: info@mada.org.qa
+
+---
+
+## 📄 License
+
+MIT License - xem [LICENSE](LICENSE) để biết thêm chi tiết.
 
 ---
 

@@ -2,17 +2,10 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useLanguageStore, useThemeStore, useAuthStore, useAuthModalStore } from '@/stores';
 import { LANGUAGE_NAMES, type Language } from '@/types';
+import { t } from '@/lib/translations';
 import { Menu, X, Moon, Sun, LogIn, LogOut, User, ChevronDown, Sparkles } from 'lucide-react';
 import clsx from 'clsx';
 import { RobotLogo } from './icons/RobotLogo';
-
-const navLinks = [
-  { href: '#features', label: 'Mô hình' },
-  { href: '#how-it-works', label: 'Trí tuệ' },
-  { href: '#standards', label: 'Tiêu chuẩn' },
-  { href: '#ecosystem', label: 'Kết nối' },
-  { href: '/pricing', label: 'Bảng giá' },
-];
 
 export function Header() {
   const { language, setLanguage } = useLanguageStore();
@@ -31,6 +24,15 @@ export function Header() {
   }, [isDark]);
 
   const languages: Language[] = ['vi', 'en', 'ar', 'fr'];
+
+  // Navigation links với translation
+  const navLinks = [
+    { href: '#features', label: t('nav.model', language) },
+    { href: '#how-it-works', label: t('nav.intelligence', language) },
+    { href: '#standards', label: t('nav.standards', language) },
+    { href: '#ecosystem', label: t('nav.connect', language) },
+    { href: '/pricing', label: t('nav.pricing', language) },
+  ];
 
   const handleLogout = () => {
     logout();
@@ -85,7 +87,7 @@ export function Header() {
                     className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-surface-container text-sm transition-colors"
                   >
                     <User className="w-4 h-4" />
-                    Hồ sơ
+                    {t('auth.profile', language)}
                   </Link>
                   {isAdmin && (
                     <Link
@@ -94,7 +96,7 @@ export function Header() {
                       className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-primary/10 text-primary text-sm font-bold transition-colors"
                     >
                       <span className="material-symbols-outlined w-4 h-4 text-[16px]">admin_panel_settings</span>
-                      Trang quản trị
+                      {t('menu.admin', language)}
                     </Link>
                   )}
                   <Link
@@ -103,7 +105,7 @@ export function Header() {
                     className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-surface-container text-sm transition-colors"
                   >
                     <Sparkles className="w-4 h-4" />
-                    Nâng cấp gói
+                    {t('menu.upgrade', language)}
                   </Link>
                   <hr className="my-1 border-outline-variant" />
                   <button
@@ -111,7 +113,7 @@ export function Header() {
                     className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-red-50 text-red-600 text-sm font-bold transition-colors"
                   >
                     <LogOut className="w-4 h-4" />
-                    Đăng xuất
+                    {t('auth.logout', language)}
                   </button>
                 </div>
               </div>
@@ -131,7 +133,7 @@ export function Header() {
           )}
         >
           <LogIn className="w-3.5 h-3.5" />
-          Đăng nhập
+          {t('auth.login', language)}
         </button>
         <a
           href="/chat"
@@ -140,7 +142,7 @@ export function Header() {
             isMobile ? 'px-5 py-3 text-sm rounded-xl w-full' : 'px-8 py-2.5 text-xs font-mono uppercase tracking-widest rounded-full'
           )}
         >
-          {isMobile ? 'Thử miễn phí' : 'Terminal'}
+          {isMobile ? t('auth.tryFree', language) : 'Terminal'}
         </a>
       </>
     );
@@ -151,30 +153,30 @@ export function Header() {
       {/* Desktop Header */}
       <nav
         className={clsx(
-          'fixed top-6 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-48px)] max-w-7xl',
-          'hidden md:flex justify-between items-center px-8 py-5',
-          'bg-white/40 backdrop-blur-[40px]',
-          'rounded-full border-2 border-on-background',
-          'shadow-[12px_12px_0px_0px_rgba(0,0,0,0.1)]',
-          'transition-all duration-500'
+          'fixed top-4 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-48px)] max-w-6xl',
+          'hidden md:flex justify-between items-center px-6 py-3',
+          'bg-white/60 backdrop-blur-[30px]',
+          'rounded-2xl border-2 border-on-background',
+          'shadow-[8px_8px_0px_0px_rgba(0,0,0,0.08)]',
+          'transition-all duration-300'
         )}
       >
-        <Link to="/" className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-blue-500 flex items-center justify-center p-1.5">
+        <Link to="/" className="flex items-center gap-2">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-500 to-blue-500 flex items-center justify-center p-1.5">
             <RobotLogo variant="white" className="w-full h-full" />
           </div>
-          <div className="font-black text-2xl md:text-[32px] tracking-tight">
+          <div className="font-black text-xl tracking-tight">
             MADA AI
           </div>
         </Link>
 
-        <div className="hidden md:flex gap-10 items-center">
+        <div className="hidden lg:flex gap-8 items-center">
           {navLinks.map((link) => (
             link.href.startsWith('/') ? (
               <Link
                 key={link.href}
                 to={link.href}
-                className="text-xs font-mono uppercase tracking-widest text-on-surface-variant hover:text-primary transition-all duration-300"
+                className="text-xs font-medium uppercase tracking-wider text-on-surface-variant hover:text-primary transition-colors"
               >
                 {link.label}
               </Link>
@@ -182,7 +184,7 @@ export function Header() {
               <a
                 key={link.href}
                 href={link.href}
-                className="text-xs font-mono uppercase tracking-widest text-on-surface-variant hover:text-primary transition-all duration-300"
+                className="text-xs font-medium uppercase tracking-wider text-on-surface-variant hover:text-primary transition-colors"
               >
                 {link.label}
               </a>
@@ -190,10 +192,10 @@ export function Header() {
           ))}
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-4">
           <button
             onClick={toggleTheme}
-            className="p-2 rounded-full hover:bg-surface-container transition-colors"
+            className="p-2 rounded-lg hover:bg-surface-container transition-colors"
             aria-label="Toggle theme"
           >
             {isDark ? (
@@ -211,10 +213,10 @@ export function Header() {
       <nav
         className={clsx(
           'fixed top-3 left-3 right-3 z-50 md:hidden',
-          'flex justify-between items-center px-5 py-3',
-          'bg-white/40 backdrop-blur-[20px]',
-          'rounded-2xl border-2 border-on-background',
-          'shadow-[8px_8px_0px_0px_rgba(0,0,0,0.1)]'
+          'flex justify-between items-center px-4 py-2.5',
+          'bg-white/60 backdrop-blur-[20px]',
+          'rounded-xl border-2 border-on-background',
+          'shadow-[6px_6px_0px_0px_rgba(0,0,0,0.08)]'
         )}
       >
         <Link to="/" className="flex items-center gap-2">

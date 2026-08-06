@@ -1,11 +1,13 @@
 // Gemini Agent - AI Agent Engine using Google Gemini SDK
+// Enhanced with Intent-aware response generation
 
 import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold, GenerateContentResult } from '@google/generative-ai';
 import { geminiConfig } from '../config/app.config.js';
-import { getSystemInstruction } from './system-instructions.js';
+import { getSystemInstruction, getEnhancedSystemInstruction } from './system-instructions.js';
 import { createLogger } from '../utils/logger.js';
 import { aiConfidenceScores, aiTokensUsed, aiModelErrors } from '../utils/metrics.js';
 import { ChatMessage, SupportedLanguage } from '../models/index.js';
+import type { IntentType } from '../services/intent-detection.service.js';
 
 const logger = createLogger('GeminiAgent');
 
@@ -14,6 +16,12 @@ interface GeminiResponse {
   confidence: number;
   tokensUsed: number;
   finishReason: string;
+}
+
+interface IntentContext {
+  userIntent?: IntentType;
+  category?: string;
+  urgency?: 'low' | 'medium' | 'high';
 }
 
 interface ConversationTurn {
@@ -127,12 +135,99 @@ Hãy dựa trên thông tin sản phẩm trên để trả lời câu hỏi củ
         tokensUsed,
         finishReason: 'COMPLETE',
       };
-    } catch (error: any) {
-      logger.error('Error generating response', { error: error.message });
+    } catch (error: unknown) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      logger.error('Error generating response', { error: err.message });
 
-      aiModelErrors.inc({ error_type: error.status || 'unknown' });
+      aiModelErrors.inc({ error_type: (error as { status?: string }).status || 'unknown' });
 
       // Return error response
+      return {
+        text: this.getErrorMessage(language),
+        confidence: 0,
+        tokensUsed: 0,
+        finishReason: 'ERROR',
+      };
+    }
+  }
+
+  // NEW: Intent-aware response generation
+  async generateResponseWithIntent(
+    userMessage: string,
+    history: ChatMessage[],
+    language: SupportedLanguage = 'vi',
+    intentContext?: IntentContext
+  ): Promise<GeminiResponse> {
+    const startTime = Date.now();
+
+    try {
+      // Build conversation history
+      const conversationHistory: ConversationTurn[] = history.map(msg => ({
+        role: msg.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: msg.content }],
+      }));
+
+      // Get enhanced system instruction with intent context
+      const systemInstruction = getEnhancedSystemInstruction(language, {
+        userIntent: intentContext?.userIntent,
+        category: intentContext?.category,
+        urgency: intentContext?.urgency,
+      });
+
+      logger.debug('Generating response with intent', {
+        intent: intentContext?.userIntent,
+        category: intentContext?.category,
+      });
+
+      // Generate content with enhanced context
+      const result = await this.model.generateContent({
+        contents: [
+          ...conversationHistory,
+          { role: 'user', parts: [{ text: userMessage }] },
+        ],
+        systemInstruction: {
+          role: 'system',
+          parts: [{ text: systemInstruction }],
+        },
+        safetySettings: this.safetySettings,
+      });
+
+      const response = result.response;
+      const text = response.text();
+
+      // Calculate metrics
+      const usageMetadata = response.usageMetadata;
+      const tokensUsed = usageMetadata?.totalTokenCount || 0;
+
+      // Estimate confidence based on response characteristics
+      const confidence = this.estimateConfidence(result);
+
+      // Record metrics
+      aiConfidenceScores.observe(confidence);
+      if (tokensUsed > 0) {
+        aiTokensUsed.inc({ model: geminiConfig.model, type: 'total' }, tokensUsed);
+      }
+
+      const duration = Date.now() - startTime;
+      logger.info('Intent-aware response generated', {
+        intent: intentContext?.userIntent,
+        tokensUsed,
+        confidence,
+        durationMs: duration,
+      });
+
+      return {
+        text,
+        confidence,
+        tokensUsed,
+        finishReason: 'COMPLETE',
+      };
+    } catch (error: unknown) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      logger.error('Error generating intent-aware response', { error: err.message });
+
+      aiModelErrors.inc({ error_type: (error as { status?: string }).status || 'unknown' });
+
       return {
         text: this.getErrorMessage(language),
         confidence: 0,
@@ -179,8 +274,9 @@ Hãy dựa trên thông tin sản phẩm trên để trả lời câu hỏi củ
       });
 
       return result.response.text();
-    } catch (error: any) {
-      logger.error('Error in simple response generation', { error: error.message });
+    } catch (error: unknown) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      logger.error('Error in simple response generation', { error: err.message });
       return this.getErrorMessage(language);
     }
   }
@@ -215,8 +311,9 @@ Hãy dựa trên thông tin sản phẩm trên để trả lời câu hỏi củ
         tokensUsed: response.usageMetadata?.totalTokenCount || 0,
         finishReason: 'COMPLETE',
       };
-    } catch (error: any) {
-      logger.error('Error generating response with image', { error: error.message });
+    } catch (error: unknown) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      logger.error('Error generating response with image', { error: err.message });
       return {
         text: this.getErrorMessage(language),
         confidence: 0,

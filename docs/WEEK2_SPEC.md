@@ -1,5 +1,11 @@
 # TUẦN 2: Backend, AI Agent Core & RAG Retrieval Engine
 
+> **Status**: ✅ Implementation Complete (với một số notes)
+> **Last Updated**: 2026-08-05
+> **Production**: `server/` (port 3001)
+
+> ⚠️ **Note**: Week2 spec code đã được reference trong `backend/src/`, nhưng production sử dụng `server/`. Đã consolidate và update documentation.
+
 ## 📦 Tổng quan kiến trúc
 
 ```
@@ -896,7 +902,64 @@ backend/
 
 ---
 
-## 9. SUCCESS CRITERIA
+## 10. IMPLEMENTATION STATUS & NOTES
+
+### Current Architecture Status
+
+| Component | Status | Location | Notes |
+|-----------|--------|----------|-------|
+| **Production Server** | ✅ Active | `server/` (port 3001) | Đang chạy production |
+| **Week2 Spec Code** | 🔄 Reference | `backend/src/` | Chưa tích hợp vào production |
+| **Re-ranking Service** | ✅ Integrated | `server/lib/rag/rerankService.ts` | Đã tích hợp từ Week2 spec |
+| **Guardrails** | ✅ Enhanced | `server/lib/guardrails.ts` | Đã cập nhật với patterns từ Week2 |
+| **Logging** | ✅ Added | `server/lib/logger.ts` | Structured logging |
+| **Metrics** | ✅ Added | `server/lib/metrics.ts` | Basic metrics collection |
+
+### Integration Notes
+
+1. **Duplicate Code**: `backend/src/` và `server/` có duplicate logic
+   - Đã consolidate: giữ `server/` làm production
+   - Đã merge: re-ranking, guardrails patterns vào `server/`
+   - `backend/src/` vẫn giữ lại để reference
+
+2. **Frontend**: Sử dụng Vite (localhost:5173), KHÔNG phải Next.js
+   - Week2 spec ghi Next.js là outdated
+
+3. **Database**: SQLite (không phải Redis)
+   - Phù hợp cho development và small-scale production
+
+### File Structure (Actual)
+
+```
+server/
+├── index.ts                    # Main entry (production)
+├── lib/
+│   ├── rag/
+│   │   ├── ragEngine.ts       # RAG engine với Gemini
+│   │   ├── vectorStore.ts     # Vector store abstraction
+│   │   ├── rerankService.ts   # ✅ NEW: Re-ranking với Gemini
+│   │   ├── fileParsers.ts     # PDF/DOCX parsing
+│   │   ├── dataIngestion.ts   # Data loading
+│   │   └── taxonomy.ts        # Auto-classification
+│   ├── scraper/
+│   │   └── scheduler.ts       # Cron job scraping
+│   ├── payments/
+│   │   └── stripe.ts         # Stripe integration
+│   ├── guardrails.ts         # ✅ ENHANCED: Medical + Scope + Content
+│   ├── logger.ts             # ✅ NEW: Structured logging
+│   ├── metrics.ts            # ✅ NEW: Metrics collection
+│   └── db.ts                # SQLite database
+└── routes/
+    ├── auth.ts, users.ts, knowledgeBase.ts, scraper.ts, payments.ts
+
+backend/src/                   # Reference implementation
+├── agents/, services/, guardrails/, models/, routes/
+└── Chưa được tích hợp vào production
+```
+
+---
+
+## 11. SUCCESS CRITERIA
 
 ### AI Agent
 - [ ] Response time < 3 giây

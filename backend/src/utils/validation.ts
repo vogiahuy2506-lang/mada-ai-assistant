@@ -12,6 +12,9 @@ export const chatRequestSchema = z.object({
     name: z.string(),
     size: z.number().max(10 * 1024 * 1024),
   })).optional(),
+  // Legacy fields for compatibility
+  agentId: z.string().optional(),
+  agentPrompt: z.string().optional(),
 });
 
 export const ragSearchSchema = z.object({

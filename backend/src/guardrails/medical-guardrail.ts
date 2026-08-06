@@ -1,75 +1,69 @@
 // Medical Guardrail - Blocks medical diagnosis requests
+// Optimized to be more lenient with legitimate AT questions
 
 import { GuardrailResult } from '../models/session.model.js';
 import { createLogger } from '../utils/logger.js';
 
 const logger = createLogger('MedicalGuardrail');
 
-// Patterns that indicate medical diagnosis requests
+// Patterns that indicate CLEAR medical diagnosis requests - ONLY these are blocked
 const MEDICAL_DIAGNOSIS_PATTERNS = [
-  // Vietnamese patterns
-  /\b(chẩn đoán|chẩn đoán giúp|được chẩn đoán là|bị chẩn đoán)\b/iu,
-  /\b(bị mắc|phải mắc)\s+(?:bệnh|chứng|rối loạn)\b/iu,
-  /\b(tôi là|người bị)\s*(?:bệnh|gì|chứng)\b/iu,
-  /\b(xác định|biet|nhận biết)\s*(?:bệnh|tình trạng)\b/iu,
+  // Vietnamese patterns - more specific
+  /\b(chẩn đoán giúp|tôi bị\s+(?:bệnh|chứng)\s+\w+|được chẩn đoán là|bị chẩn đoán)\b/iu,
+  /\b(tôi nghĩ|tôi có phải|tôi là bệnh)\b.*\b(không|đúng không)\b/iu,
+  /\b(tôi bị|bệnh của tôi là|chứng của tôi là)\b/iu,
 
-  // English patterns
-  /\b(diagnos(is|ed|e|ing))\b/iu,
-  /\b(i have|i was diagnosed with|i suffer from)\b/iu,
-  /\b(what(?:'s| is) wrong with me|do i have)\b/iu,
+  // English patterns - more specific
+  /\b(diagnose me|can you diagnose|i need a diagnosis|what disease do i have)\b/iu,
+  /\b(do i have\s+(?:diabetes|cancer|hiv|any disease))\b/iu,
+  /\b(my diagnosis is|diagnostic)\s*(?:for|me|please)\b/iu,
 
   // Arabic patterns
-  /\b(تشخيص|مرض|أعاني من)\b/iu,
+  /\b(ماهو مرض|أعاني من مرض|مرضي هو)\b/iu,
 
   // French patterns
-  /\b(diagnostic|diagnostiqué|j(?:e |')ai\s+(?:été\s+)?diagnostiqué)\b/iu,
+  /\b(diagnostiquer|quel maladie|j'ai une maladie)\b/iu,
 ];
 
-// Patterns for treatment/medication requests
+// Patterns for treatment/medication requests - REDIRECT not block
 const TREATMENT_PATTERNS = [
   // Vietnamese
-  /\b(kê đơn|đơn thuốc|điều trị|chữa trị|uống thuốc|dùng thuốc)\b/iu,
-  /\b(thuốc gì|thuốc nào|tôi nên uống)\b/iu,
-  /\b(phẫu thuật|tiểu phẫu|can thiệp y khoa)\b/iu,
+  /\b(kê đơn thuốc|đơn thuốc cho|thuốc điều trị|bác sĩ kê)\b/iu,
+  /\b(uống thuốc gì|thuốc nào cho|dùng thuốc)\b.*\b(để|mà)\b/iu,
+  /\b(phẫu thuật cho|can thiệp y khoa cho)\b/iu,
 
   // English
-  /\b(prescri(be|ption|bing)|treatment|medication|medicine|drug)\b/iu,
-  /\b(should i take|what medicine|prescribe)\b/iu,
+  /\b(prescribe me|prescription for|what medication|what drug should i take)\b/iu,
+  /\b(medical treatment for|should i take.*medicine)\b/iu,
 
   // Arabic
-  /\b(وصفة|علاج|دواء|عملية)\b/iu,
+  /\b(وصفة طبية|دواء لهذا|علاج لهذا المرض)\b/iu,
 
   // French
-  /\b(médicament|ordonnance|traitement|prescription|opération)\b/iu,
+  /\b(ordonnance pour|médicament pour|quel médicament)\b/iu,
 ];
 
-// Symptom queries that might lead to diagnosis
-const SYMPTOM_PATTERNS = [
-  /\b(triệu chứng|biểu hiện|dấu hiệu)\b/iu,
-  /\b(symptom(s)?|signs?)\b.*\b(mean|indicate|suggest)\b/iu,
-  /\b(tại sao|vì sao|nguyên nhân là)\b.*\b(đau|sốt|ho|khó)\b/iu,
-];
-
-// Medical advice patterns
-const MEDICAL_ADVICE_PATTERNS = [
-  /\b(tư vấn|bác sĩ|chuyên gia y|tôi nên làm gì)\b/iu,
-  /\b(bác sĩ|coworking with|must see a doctor)\b/iu,
+// AT-related symptom queries that should be ALLOWED
+const AT_RELATED_PATTERNS = [
+  // These are legitimate AT questions
+  /\b(thiết bị|phần mềm|app|công nghệ)\b.*\b(cho|giúp)\b.*\b(khó khăn|vấn đề|tình trạng)\b/iu,
+  /\b(device|software|app|tool)\b.*\b(for|help|assist)\b.*\b(difficulty|problem|condition)\b/iu,
+  /\b(cần|hỗ trợ|help|need|support)\b.*\b(với|for|with)\b.*\b(hoạt động|functioning|moving|seeing|hearing)\b/iu,
+  /\b(gặp khó khăn|having trouble|difficulty with)\b/iu,
 ];
 
 export class MedicalGuardrail {
   private patterns: {
     diagnosis: RegExp[];
     treatment: RegExp[];
-    symptoms: RegExp[];
-    advice: RegExp[];
+    atRelated: RegExp[];
   };
 
   constructor() {
     this.patterns = {
       diagnosis: MEDICAL_DIAGNOSIS_PATTERNS,
       treatment: TREATMENT_PATTERNS,
-      symptoms: SYMPTOM_PATTERNS,
-      advice: MEDICAL_ADVICE_PATTERNS,
+      atRelated: AT_RELATED_PATTERNS,
     };
   }
 
@@ -85,7 +79,18 @@ export class MedicalGuardrail {
   async check(input: string): Promise<GuardrailResult> {
     logger.debug('Checking medical guardrail', { input: input.substring(0, 100) });
 
-    // Check for diagnosis requests
+    // FIRST: Check if it's an AT-related question - ALLOW these
+    const atRelatedMatch = this.matchPatterns(input, this.patterns.atRelated);
+    if (atRelatedMatch) {
+      logger.debug('AT-related question detected, allowing', { pattern: atRelatedMatch.source });
+      return {
+        passed: true,
+        action: 'ALLOW',
+        reason: 'AT-related question with potential symptom mention, allowed',
+      };
+    }
+
+    // SECOND: Check for clear diagnosis requests - BLOCK these
     const diagnosisMatch = this.matchPatterns(input, this.patterns.diagnosis);
     if (diagnosisMatch) {
       logger.info('Medical diagnosis pattern detected', { pattern: diagnosisMatch.source });
@@ -101,7 +106,7 @@ export class MedicalGuardrail {
       };
     }
 
-    // Check for treatment requests
+    // THIRD: Check for treatment requests - REDIRECT
     const treatmentMatch = this.matchPatterns(input, this.patterns.treatment);
     if (treatmentMatch) {
       logger.info('Treatment request pattern detected', { pattern: treatmentMatch.source });
@@ -117,39 +122,11 @@ export class MedicalGuardrail {
       };
     }
 
-    // Check for symptom queries
-    const symptomMatch = this.matchPatterns(input, this.patterns.symptoms);
-    if (symptomMatch) {
-      logger.info('Symptom query pattern detected', { pattern: symptomMatch.source });
-      return {
-        passed: false,
-        action: 'REDIRECT',
-        reason: 'Symptom analysis requires medical expertise',
-        triggeredRule: 'MEDICAL_SYMPTOMS',
-        suggestions: [
-          'Tôi không phân tích triệu chứng y khoa.',
-          'Vui lòng gặp bác sĩ để được tư vấn.',
-        ],
-      };
-    }
-
-    // Check for medical advice requests
-    const adviceMatch = this.matchPatterns(input, this.patterns.advice);
-    if (adviceMatch) {
-      logger.info('Medical advice request detected', { pattern: adviceMatch.source });
-      return {
-        passed: true,
-        action: 'ALLOW',
-        reason: 'Request may contain medical terms but is not seeking diagnosis',
-        triggeredRule: 'MEDICAL_ADVICE',
-      };
-    }
-
-    // No medical patterns detected
+    // DEFAULT: Allow through
     return {
       passed: true,
       action: 'ALLOW',
-      reason: 'No medical diagnosis patterns detected',
+      reason: 'No medical diagnosis or treatment patterns detected',
     };
   }
 

@@ -1,46 +1,155 @@
 /**
- * MADA AI Guardrails System
+ * MADA AI Guardrails System - Enhanced Version
  * 
  * Lớp kiểm duyệt nội dung để:
  * 1. Từ chối chẩn đoán y khoa
  * 2. Chuyển hướng câu hỏi về AT solutions
  * 3. Đảm bảo phạm vi hoạt động
+ * 4. Phát hiện PII và nội dung độc hại
  */
 
-import { GoogleGenerativeAI } from '@google/generative-ai';
+// ============================================================================
+// MEDICAL GUARDRAIL - Block medical diagnosis requests
+// ============================================================================
 
-// Medical-related patterns to detect and block
 const MEDICAL_DIAGNOSIS_PATTERNS = [
   // Vietnamese patterns
-  /\b(chẩn đoán|chuan đoán|bệnh|gây ra|bệnh lý|biến chứng|triệu chứng)\b.*\b(nặng|nhẹ|nguy hiểm|cấp tính|mãn tính)\b/i,
-  /\b(tôi bị|tôi có|dấu hiệu|có phải là|mắc)\b.*\b(bệnh|ung thư|tiểu đường|cao huyết áp|tim mạch)\b/i,
-  /\b(thuốc|điều trị|chữa trị|uống thuốc|liều lượng)\b.*\b(gì|không|nào|bao nhiêu)\b/i,
-  /\b(bác sĩ|bệnh viện|phẫu thuật|đi khám|xét nghiệm)\b/i,
-  /\b(máu|đường huyết|huyết áp|cholesterol|vitamin|khoáng chất)\b/i,
+  /\b(chẩn đoán|chẩn đoán giúp|được chẩn đoán là|bị chẩn đoán)\b/iu,
+  /\b(chẩn đoán|chuan đoán|bệnh|gây ra|bệnh lý|biến chứng|triệu chứng)\b.*\b(nặng|nhẹ|nguy hiểm|cấp tính|mãn tính)\b/iu,
+  /\b(tôi bị|tôi có|dấu hiệu|có phải là|mắc)\b.*\b(bệnh|ung thư|tiểu đường|cao huyết áp|tim mạch)\b/iu,
+  /\b(bị mắc|phải mắc)\s+(?:bệnh|chứng|rối loạn)\b/iu,
+  /\b(xác định|biet|nhận biết)\s*(?:bệnh|tình trạng)\b/iu,
+  /\b(tôi là|người bị)\s*(?:bệnh|gì|chứng)\b/iu,
   
   // English patterns
-  /\b(diagnos|diagnostic|medical|diagnosis|prognosis|disease|symptoms)\b.*\b(serious|severe|cancer|diabetes|heart|terminal)\b/i,
-  /\b(treatment|medication|prescription|dosage|surgery|chemotherapy)\b/i,
-  /\b(blood pressure|sugar|cholesterol|vitamin|deficiency)\b/i,
-  
+  /\b(diagnos(is|ed|e|ing))\b/iu,
+  /\b(i have|i was diagnosed with|i suffer from)\b/iu,
+  /\b(what(?:'s| is) wrong with me|do i have)\b/iu,
+  /\b(diagnosis|diagnostic|medical|prognosis|disease|symptoms)\b.*\b(serious|severe|cancer|diabetes|heart|terminal)\b/iu,
+  /\b(treatment|medication|prescription|dosage|surgery|chemotherapy)\b/iu,
+  /\b(blood pressure|sugar|cholesterol|vitamin|deficiency)\b/iu,
+  /\b(should i take|what medicine|prescribe)\b/iu,
+
   // Arabic patterns
-  /\b(تشخيص|مرض|علاج|دواء|عملية|سرطان|سكري)\b/i,
-  
+  /\b(تشخيص|مرض|أعاني من|علاج|وصفة|عملية|سرطان|سكري)\b/iu,
+
   // French patterns
-  /\b(diagnostic|médical|maladie|traitement|médicament|opération)\b/i,
+  /\b(diagnostic|diagnostiqué|j(?:e |')ai\s+(?:été\s+)?diagnostiqué)\b/iu,
+  /\b(médicament|ordonnance|traitement|prescription|opération)\b/iu,
 ];
 
-// AT-related keywords to identify user needs
-const AT_KEYWORDS = [
-  'thiết bị', 'công nghệ hỗ trợ', 'máy', 'dụng cụ', 'phần mềm', '工具', 'app', 'ứng dụng',
-  'đọc màn hình', 'phóng to', 'xe lăn', 'máy trợ thính', 'kính', 'màn hình braille',
-  'wheelchair', 'hearing aid', 'screen reader', 'magnifier', 'braille', 'prosthetic',
-  'khiếm thị', 'điếc', 'câm', 'liệt', 'tự kỷ', 'down syndrome', 'mù', 'điếc',
-  'blind', 'deaf', 'mute', 'paralyzed', 'autism', 'disability', 'handicap',
-  'người già', 'người cao tuổi', 'elderly', 'senior', 'aged',
+const TREATMENT_PATTERNS = [
+  // Vietnamese
+  /\b(kê đơn|đơn thuốc|điều trị|chữa trị|uống thuốc|dùng thuốc)\b/iu,
+  /\b(thuốc gì|thuốc nào|tôi nên uống)\b/iu,
+  /\b(phẫu thuật|tiểu phẫu|can thiệp y khoa)\b/iu,
+  
+  // English
+  /\b(prescri(be|ption|bing)|treatment|medication|medicine|drug)\b/iu,
 ];
 
-// Redirect responses for medical questions
+const SYMPTOM_PATTERNS = [
+  /\b(triệu chứng|biểu hiện|dấu hiệu)\b/iu,
+  /\b(symptom(s)?|signs?)\b.*\b(mean|indicate|suggest)\b/iu,
+  /\b(tại sao|vì sao|nguyên nhân là)\b.*\b(đau|sốt|ho|khó)\b/iu,
+];
+
+// ============================================================================
+// SCOPE GUARDRAIL - Ensure requests are within AT scope
+// ============================================================================
+
+const WITHIN_SCOPE_KEYWORDS = [
+  // Vietnamese
+  'thiết bị hỗ trợ', 'công nghệ hỗ trợ', 'hỗ trợ tiếp cận', 'mada',
+  'wheelchair', 'xe lăn', 'máy đọc', 'phần mềm hỗ trợ',
+  'chữ nổi', 'chữ Braille', 'khiếm thị', 'khiếm слух',
+  'tự kỷ', 'chậm phát triển', 'cognitive', 'mobility',
+  'blind', 'deaf', 'assistive', 'accessibility', 'a11y',
+
+  // English
+  'assistive technology', 'AT device', 'accessible', 'disability',
+  'screen reader', 'JAWS', 'NVDA', 'OrCam', 'hearing aid',
+  ' AAC ', 'augmentative communication', 'prosthetic',
+
+  // Arabic
+  'التكنولوجيا المساعدة', 'أجهزة مساعدة', 'إمكانية الوصول', 'إعاقة',
+
+  // French
+  'technologie d\'assistance', 'appareil d\'assistance', 'accessibilité',
+  'handicap', 'prothèse', 'appareillage',
+];
+
+const OUT_OF_SCOPE_MAP: Record<string, { keywords: string[]; redirect: string }> = {
+  legal_advice: {
+    keywords: [
+      'tư vấn pháp lý', 'luật sư', 'kiện tụng', 'quyền nuôi con',
+      'legal advice', 'lawyer', 'attorney', 'lawsuit', 'custody',
+      'مشورة قانونية', 'محام', 'قضية',
+      'conseil juridique', 'avocat', 'procès',
+    ],
+    redirect: 'Tôi không cung cấp tư vấn pháp lý. Tôi chuyên về Công nghệ Hỗ trợ.',
+  },
+  financial_advice: {
+    keywords: [
+      'đầu tư', 'chứng khoán', 'crypto', 'tiết kiệm', 'ngân hàng',
+      'investment', 'stock', 'crypto', 'savings', 'bank',
+      'استثمار', 'أسهم', 'توفير', 'بنك',
+      'investissement', 'bourse', 'épargne', 'banque',
+    ],
+    redirect: 'Tôi không tư vấn tài chính. Tôi có thể cung cấp thông tin về giá thiết bị AT.',
+  },
+  therapy: {
+    keywords: [
+      'liệu pháp', 'tâm lý trị liệu', 'hypnotherapy', '催眠',
+      'therapy', 'psychotherapy', 'hypnotherapy', 'counseling',
+      'علاج نفسي', 'تحليل نفسي',
+      'thérapie', 'psychothérapie', 'hypnose',
+    ],
+    redirect: 'Tôi không cung cấp liệu pháp điều trị. Tôi có thể giới thiệu giải pháp công nghệ phù hợp.',
+  },
+  insurance: {
+    keywords: [
+      'bảo hiểm', 'claim', 'indemnity', 'compensation',
+      'insurance', 'coverage', 'claim',
+      'تأمين', 'مطالبة',
+      'assurance', 'réclamation',
+    ],
+    redirect: 'Tôi không xử lý bảo hiểm. Tôi có thể giúp bạn tìm thiết bị AT phù hợp.',
+  },
+};
+
+// ============================================================================
+// CONTENT GUARDRAIL - PII detection and harmful content
+// ============================================================================
+
+const PII_PATTERNS = {
+  email: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/gi,
+  phone: /(?:\+?84|0)[3|5|7|8|9][0-9]{8}\b/g,
+  vietnamId: /\b\d{9,12}\b/g,
+  ssn: /\b\d{3}-\d{2}-\d{4}\b/g,
+  creditCard: /\b(?:\d{4}[-\s]?){3}\d{4}\b/g,
+  password: /\b(?:password|mật khẩu|pwd|pass)\s*[:=]\s*\S+/gi,
+};
+
+const HARMFUL_PATTERNS = {
+  violence: [
+    /\b(hack|crack|exploit|break in)\b/i,
+    /\b(violence|killing|harm)\b/i,
+  ],
+  selfHarm: [
+    /(tự\s*tử|tự\s*hại|tự\s*làm\s*đau)/iu,
+    /\b(suicide|self-harm|self harm)\b/i,
+  ],
+  illegal: [
+    /\b(bom|explosive|weapon)\b/i,
+    /(đánh\s*cắp|trộm|cướp)/iu,
+  ],
+};
+
+// ============================================================================
+// RESPONSES
+// ============================================================================
+
 const MEDICAL_REDIRECT_RESPONSES = {
   vi: `⚠️ **Lưu ý quan trọng**
 
@@ -115,14 +224,39 @@ Je suis **MADA AI Assistant** - expert en **Technologie d'Assistance (AT)**, pas
 Souhaitez-vous que je vous aide à trouver des **solutions de technologie d'assistance** adaptées à vos besoins?`,
 };
 
-// Out-of-scope patterns
-const OUT_OF_SCOPE_PATTERNS = [
-  /\b(hack|crack|pirate|illegal|crime|weapon)\b/i,
-  /\b(machine learning|train model|create ai|build chatbot)\b/i,
-  /\b(code|programming|software development|app development)\b/i,
-  /\b(finance|invest|stock|crypto|trading)\b/i,
-  /\b(gaming|gamble|casino|betting)\b/i,
-];
+const OUT_OF_SCOPE_RESPONSE_VI = `⚠️ **Câu hỏi nằm ngoài phạm vi tư vấn**
+
+Tôi là MADA AI Assistant chuyên về **Công nghệ Hỗ trợ**. Câu hỏi của bạn không thuộc lĩnh vực tôi có thể hỗ trợ.
+
+Vui lòng hỏi về:
+- Thiết bị AT cho người khuyết tật
+- Tiêu chuẩn accessibility
+- Giải pháp công nghệ hỗ trợ`;
+
+const OUT_OF_SCOPE_RESPONSE_EN = `⚠️ **Out of Scope**
+
+I'm MADA AI Assistant, specialized in **Assistive Technology**. Your question is outside my area of expertise.
+
+Please ask about:
+- AT devices for people with disabilities
+- Accessibility standards
+- Assistive technology solutions`;
+
+const HARMFUL_CONTENT_RESPONSE_VI = `⚠️ **Nội dung không phù hợp**
+
+Tôi không thể xử lý yêu cầu này vì nó chứa nội dung không phù hợp.
+
+Vui lòng hỏi về **thiết bị công nghệ hỗ trợ** hoặc các chủ đề liên quan đến MADA.`;
+
+const HARMFUL_CONTENT_RESPONSE_EN = `⚠️ **Inappropriate Content**
+
+I cannot process this request because it contains inappropriate content.
+
+Please ask about **assistive technology devices** or topics related to MADA.`;
+
+// ============================================================================
+// MAIN CLASS
+// ============================================================================
 
 export interface GuardrailsResult {
   isSafe: boolean;
@@ -130,52 +264,108 @@ export interface GuardrailsResult {
   redirectResponse?: string;
   detectedPattern?: string;
   suggestedTopic?: string;
+  piiDetected?: string[];
 }
 
 export class GuardrailsSystem {
-  private genAI: GoogleGenerativeAI | null = null;
-  private isConfigured = false;
-
   initialize(): void {
-    const apiKey = process.env.GEMINI_API_KEY;
-    
-    if (apiKey && apiKey !== 'your_gemini_api_key_here') {
-      this.genAI = new GoogleGenerativeAI(apiKey);
-      this.isConfigured = true;
-    }
+    console.log('🛡️ Guardrails system initialized');
   }
 
-  /**
-   * Check if the user query contains medical diagnosis requests
-   */
+  // ==========================================================================
+  // MEDICAL DETECTION
+  // ==========================================================================
+
   private containsMedicalDiagnosis(query: string): boolean {
     return MEDICAL_DIAGNOSIS_PATTERNS.some(pattern => pattern.test(query));
   }
 
-  /**
-   * Check if the user query is out of scope
-   */
-  private isOutOfScope(query: string): boolean {
-    return OUT_OF_SCOPE_PATTERNS.some(pattern => pattern.test(query));
+  private containsTreatmentRequest(query: string): boolean {
+    return TREATMENT_PATTERNS.some(pattern => pattern.test(query));
   }
 
-  /**
-   * Detect if user is asking about AT-related needs
-   */
-  detectATIntent(query: string): boolean {
+  private containsSymptomQuery(query: string): boolean {
+    return SYMPTOM_PATTERNS.some(pattern => pattern.test(query));
+  }
+
+  // ==========================================================================
+  // SCOPE DETECTION
+  // ==========================================================================
+
+  private detectATIntent(query: string): boolean {
     const queryLower = query.toLowerCase();
-    return AT_KEYWORDS.some(keyword => queryLower.includes(keyword.toLowerCase()));
+    return WITHIN_SCOPE_KEYWORDS.some(keyword => queryLower.includes(keyword.toLowerCase()));
   }
 
-  /**
-   * Analyze query and determine if it should be handled by guardrails
-   */
+  private checkOutOfScope(query: string): { type: string; redirect: string } | null {
+    const queryLower = query.toLowerCase();
+    
+    for (const [type, config] of Object.entries(OUT_OF_SCOPE_MAP)) {
+      for (const keyword of config.keywords) {
+        if (queryLower.includes(keyword.toLowerCase())) {
+          return { type, redirect: config.redirect };
+        }
+      }
+    }
+    return null;
+  }
+
+  // ==========================================================================
+  // CONTENT MODERATION
+  // ==========================================================================
+
+  private detectPII(query: string): string[] {
+    const detectedPII: string[] = [];
+
+    for (const [type, pattern] of Object.entries(PII_PATTERNS)) {
+      if (pattern.test(query)) {
+        detectedPII.push(type);
+      }
+    }
+
+    return detectedPII;
+  }
+
+  private detectHarmfulContent(query: string): string | null {
+    for (const [type, patterns] of Object.entries(HARMFUL_PATTERNS)) {
+      for (const pattern of patterns) {
+        if (pattern.test(query)) {
+          return type;
+        }
+      }
+    }
+    return null;
+  }
+
+  // ==========================================================================
+  // MAIN ANALYSIS
+  // ==========================================================================
+
   analyzeQuery(
     query: string,
     language: 'vi' | 'en' | 'ar' | 'fr' = 'vi'
   ): GuardrailsResult {
-    // Check for medical diagnosis requests
+    const result: GuardrailsResult = {
+      isSafe: true,
+      shouldRedirect: false,
+    };
+
+    // Step 1: Check for harmful content (block immediately)
+    const harmfulType = this.detectHarmfulContent(query);
+    if (harmfulType) {
+      console.warn(`⚠️ Guardrails: Harmful content detected (${harmfulType})`);
+      return {
+        isSafe: false,
+        shouldRedirect: true,
+        redirectResponse: language === 'vi' ? HARMFUL_CONTENT_RESPONSE_VI : HARMFUL_CONTENT_RESPONSE_EN,
+        detectedPattern: `harmful_content_${harmfulType}`,
+        suggestedTopic: 'assistive_technology',
+      };
+    }
+
+    // Step 2: Check for medical diagnosis (redirect)
     if (this.containsMedicalDiagnosis(query)) {
+      console.warn('⚠️ Guardrails: Medical diagnosis pattern detected');
       return {
         isSafe: false,
         shouldRedirect: true,
@@ -185,88 +375,58 @@ export class GuardrailsSystem {
       };
     }
 
-    // Check for out-of-scope requests
-    if (this.isOutOfScope(query)) {
+    // Step 3: Check for treatment requests (redirect)
+    if (this.containsTreatmentRequest(query)) {
+      console.warn('⚠️ Guardrails: Treatment request pattern detected');
       return {
         isSafe: false,
         shouldRedirect: true,
-        redirectResponse: language === 'vi' 
-          ? `⚠️ **Câu hỏi nằm ngoài phạm vi tư vấn**
-
-Tôi là MADA AI Assistant chuyên về **Công nghệ Hỗ trợ**. Câu hỏi của bạn không thuộc lĩnh vực tôi có thể hỗ trợ.
-
-Vui lòng hỏi về:
-- Thiết bị AT cho người khuyết tật
-- Tiêu chuẩn accessibility
-- Giải pháp công nghệ hỗ trợ`
-          : `⚠️ **Out of Scope**
-
-I'm MADA AI Assistant, specialized in **Assistive Technology**. Your question is outside my area of expertise.
-
-Please ask about:
-- AT devices for people with disabilities
-- Accessibility standards
-- Assistive technology solutions`,
-        detectedPattern: 'out_of_scope',
+        redirectResponse: MEDICAL_REDIRECT_RESPONSES[language] || MEDICAL_REDIRECT_RESPONSES['en'],
+        detectedPattern: 'medical_treatment',
         suggestedTopic: 'assistive_technology',
       };
     }
 
-    // Query is safe to process
-    return {
-      isSafe: true,
-      shouldRedirect: false,
-    };
-  }
-
-  /**
-   * Enhanced content generation with safety checks
-   */
-  async generateWithGuardrails(
-    query: string,
-    context: string,
-    _conversationHistory: Array<{ role: string; content: string }>,
-    language: 'vi' | 'en' | 'ar' | 'fr' = 'vi'
-  ): Promise<string> {
-    // Analyze query first
-    const analysis = this.analyzeQuery(query, language);
-    
-    if (!analysis.isSafe && analysis.shouldRedirect) {
-      return analysis.redirectResponse!;
+    // Step 4: Check for symptom queries (redirect)
+    if (this.containsSymptomQuery(query)) {
+      console.warn('⚠️ Guardrails: Symptom query pattern detected');
+      return {
+        isSafe: false,
+        shouldRedirect: true,
+        redirectResponse: MEDICAL_REDIRECT_RESPONSES[language] || MEDICAL_REDIRECT_RESPONSES['en'],
+        detectedPattern: 'medical_symptoms',
+        suggestedTopic: 'assistive_technology',
+      };
     }
 
-    // If configured with Gemini, use enhanced generation
-    if (this.isConfigured && this.genAI) {
-      const model = this.genAI.getGenerativeModel({ 
-        model: 'gemini-2.5-flash',
-      });
-
-      const enhancedPrompt = `${context}
-
----
-
-## Safety Reminder:
-- Do NOT provide medical diagnosis
-- Do NOT prescribe medications
-- If user asks about medical issues, redirect to AT solutions
-- Focus on Assistive Technology recommendations`;
-
-      try {
-        const result = await model.generateContent(enhancedPrompt);
-        return result.response.text();
-      } catch (error) {
-        console.error('Guardrails generation error:', error);
-        return context;
-      }
+    // Step 5: Check out of scope
+    const outOfScope = this.checkOutOfScope(query);
+    if (outOfScope) {
+      console.warn(`⚠️ Guardrails: Out of scope (${outOfScope.type})`);
+      return {
+        isSafe: false,
+        shouldRedirect: true,
+        redirectResponse: language === 'vi' ? OUT_OF_SCOPE_RESPONSE_VI : OUT_OF_SCOPE_RESPONSE_EN,
+        detectedPattern: `out_of_scope_${outOfScope.type}`,
+        suggestedTopic: 'assistive_technology',
+      };
     }
 
-    // Fallback to provided context
-    return context;
+    // Step 6: Check for PII (warn but allow)
+    const piiDetected = this.detectPII(query);
+    if (piiDetected.length > 0) {
+      console.info(`ℹ️ Guardrails: PII detected (${piiDetected.join(', ')})`);
+      result.piiDetected = piiDetected;
+    }
+
+    // Query is safe
+    return result;
   }
 
-  /**
-   * Validate response before sending to user
-   */
+  // ==========================================================================
+  // VALIDATION
+  // ==========================================================================
+
   validateResponse(response: string): boolean {
     // Check for potentially harmful content in response
     const harmfulPatterns = [
@@ -279,35 +439,49 @@ Please ask about:
     return !harmfulPatterns.some(pattern => pattern.test(response));
   }
 
-  /**
-   * Get safety score for logging/monitoring
-   */
   calculateSafetyScore(query: string): number {
-    let score = 100; // Start with max score
+    let score = 100;
 
     // Deduct for medical patterns
-    if (this.containsMedicalDiagnosis(query)) {
-      score -= 50;
-    }
+    if (this.containsMedicalDiagnosis(query)) score -= 50;
+    if (this.containsTreatmentRequest(query)) score -= 30;
+    if (this.containsSymptomQuery(query)) score -= 20;
 
-    // Deduct for out-of-scope patterns
-    if (this.isOutOfScope(query)) {
-      score -= 30;
-    }
+    // Deduct for out-of-scope
+    if (this.checkOutOfScope(query)) score -= 30;
+
+    // Deduct for harmful content
+    if (this.detectHarmfulContent(query)) score -= 50;
 
     // Bonus for AT-related keywords
-    if (this.detectATIntent(query)) {
-      score += 10;
-    }
+    if (this.detectATIntent(query)) score += 10;
 
     return Math.max(0, Math.min(100, score));
+  }
+
+  maskPII(text: string): string {
+    let masked = text;
+
+    // Mask emails
+    masked = masked.replace(PII_PATTERNS.email, '[EMAIL]');
+
+    // Mask phone numbers
+    masked = masked.replace(PII_PATTERNS.phone, '[PHONE]');
+
+    // Mask Vietnam IDs
+    masked = masked.replace(PII_PATTERNS.vietnamId, (match) => {
+      if (match.length === 9 || match.length === 12) {
+        return '[ID]';
+      }
+      return match;
+    });
+
+    // Mask passwords
+    masked = masked.replace(PII_PATTERNS.password, '[PASSWORD REDACTED]');
+
+    return masked;
   }
 }
 
 // Singleton instance
 export const guardrails = new GuardrailsSystem();
-
-// Initialize guardrails
-if (typeof process !== 'undefined' && process.env?.GEMINI_API_KEY) {
-  guardrails.initialize();
-}

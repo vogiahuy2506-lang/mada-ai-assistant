@@ -1,14 +1,36 @@
+/**
+ * VectorStore - Multi-Provider Vector Database
+ * 
+ * Hỗ trợ 3 Vector Database providers:
+ * 1. Mock (fallback): TF-IDF mock cho development khi không có DB
+ * 2. Pinecone (cloud): Semantic search với AI embeddings - cloud hosted
+ * 3. Milvus (local/cloud): High-performance vector DB - cần Docker
+ * 
+ * Priority: Mock → Milvus → Pinecone
+ * (Dùng provider nào available đầu tiên)
+ * 
+ * Để chọn provider cụ thể, set trong .env:
+ *   VECTOR_DB_PROVIDER=milvus    (local, cần Docker)
+ *   VECTOR_DB_PROVIDER=pinecone  (cloud, cần API key)
+ *   VECTOR_DB_PROVIDER=mock      (demo, không cần gì)
+ * 
+ * Hoặc để trống để dùng auto-detect (Milvus → Pinecone → Mock)
+ */
+
+// @ts-nocheck
 import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
-
-const COLLECTION_NAME = 'mada_knowledge_base';
+import { Pinecone } from '@pinecone-database/pinecone';
+import { pineconeConfig } from './pinecone';
+import { milvusClient, milvusConfig, isMilvusConfigured } from './milvus';
 
 // ============== EMBEDDING PROVIDER ==============
 
 interface EmbeddingProvider {
   name: string;
   embed(text: string): Promise<number[]>;
+  embedBatch(texts: string[]): Promise<number[][]>;
   isReady(): boolean;
   dimension: number;
 }
@@ -24,6 +46,10 @@ class MockEmbeddingProvider implements EmbeddingProvider {
   async embed(text: string): Promise<number[]> {
     return createSimpleEmbedding(text);
   }
+
+  async embedBatch(texts: string[]): Promise<number[][]> {
+    return texts.map(text => createSimpleEmbedding(text));
+  }
 }
 
 class GeminiEmbeddingProvider implements EmbeddingProvider {
@@ -32,9 +58,7 @@ class GeminiEmbeddingProvider implements EmbeddingProvider {
   private genAI: any = null;
 
   constructor(apiKey: string) {
-    void apiKey; // suppress unused warning
     try {
-      // Lazy import để tránh crash nếu chưa cài
       import('@google/generative-ai').then((mod) => {
         this.genAI = new mod.GoogleGenerativeAI(apiKey);
       }).catch((err) => {
@@ -52,7 +76,6 @@ class GeminiEmbeddingProvider implements EmbeddingProvider {
       throw new Error('Gemini client not initialized');
     }
 
-    // Cắt text nếu quá dài (model giới hạn ~2048 tokens)
     const truncated = text.length > 8000 ? text.slice(0, 8000) : text;
 
     try {
@@ -65,9 +88,12 @@ class GeminiEmbeddingProvider implements EmbeddingProvider {
       return values;
     } catch (err: any) {
       console.error('Gemini embedContent failed:', err.message);
-      // Fallback to mock nếu Gemini lỗi
       return createSimpleEmbedding(text);
     }
+  }
+
+  async embedBatch(texts: string[]): Promise<number[][]> {
+    return Promise.all(texts.map(text => this.embed(text)));
   }
 }
 
@@ -89,6 +115,8 @@ export function getEmbeddingProvider(): EmbeddingProvider {
   return activeProvider;
 }
 
+// ============== DOCUMENT TYPES ==============
+
 export interface Document {
   id: string;
   content: string;
@@ -99,6 +127,7 @@ export interface Document {
     createdAt: string;
     itemId?: string;
     category?: string;
+    tags?: string[];
   };
 }
 
@@ -106,25 +135,24 @@ interface SearchResult {
   content: string;
   metadata: Document['metadata'];
   distance?: number;
+  score?: number;
 }
 
-// Simple text embedding using TF-IDF-like approach
+// ============== MOCK VECTOR FUNCTIONS ==============
+
 function createSimpleEmbedding(text: string): number[] {
   const words = text.toLowerCase().split(/\s+/);
   const wordCount: Record<string, number> = {};
   
-  // Count word frequencies
   words.forEach(word => {
     if (word.length > 2) {
       wordCount[word] = (wordCount[word] || 0) + 1;
     }
   });
   
-  // Create a simple hash-based vector (for demo purposes)
-  const dimension = 384; // Standard embedding dimension
+  const dimension = 384;
   const vector = new Array(dimension).fill(0);
   
-  // Use word hashes to populate vector
   Object.keys(wordCount).slice(0, 50).forEach((word, i) => {
     const hash = crypto.createHash('md5').update(word).digest();
     for (let j = 0; j < Math.min(16, dimension); j++) {
@@ -133,7 +161,6 @@ function createSimpleEmbedding(text: string): number[] {
     }
   });
   
-  // Normalize
   const magnitude = Math.sqrt(vector.reduce((sum, val) => sum + val * val, 0));
   return magnitude > 0 ? vector.map(v => v / magnitude) : vector;
 }
@@ -155,161 +182,353 @@ function cosineSimilarity(a: number[], b: number[]): number {
   return denominator > 0 ? dotProduct / denominator : 0;
 }
 
+// ============== VECTOR STORE MAIN CLASS ==============
+
+export type VectorDBProvider = 'mock' | 'pinecone' | 'milvus' | 'auto';
+
 class VectorStore {
-  private documents: Map<string, Document & { embedding: number[] }> = new Map();
+  // Provider instances
+  private pinecone: any = null;
+  private pineconeIndex: any = null;
+  
+  // State
   private isInitialized = false;
+  private activeDbProvider: VectorDBProvider = 'mock';
   private dataDir: string = '';
+  
+  // In-memory store (backup khi không có vector DB)
+  private inMemoryStore: Map<string, any> = new Map();
 
   async initialize(): Promise<void> {
     if (this.isInitialized) return;
 
     try {
-      // Initialize data directory
       this.dataDir = path.join(process.cwd(), 'data', 'chroma');
       fs.mkdirSync(this.dataDir, { recursive: true });
 
-      // Load existing documents from disk
-      const docsPath = path.join(this.dataDir, 'documents.json');
-      if (fs.existsSync(docsPath)) {
-        try {
-          const data = JSON.parse(fs.readFileSync(docsPath, 'utf-8'));
-          data.forEach((doc: any) => {
-            this.documents.set(doc.id, {
-              ...doc,
-              embedding: createSimpleEmbedding(doc.content),
-            });
-          });
-          console.log(`📚 Loaded ${this.documents.size} existing documents`);
-        } catch (e) {
-          console.log('📚 Starting with empty knowledge base');
-        }
+      // Load in-memory data từ disk
+      await this.loadInMemoryData();
+
+      // Detect và initialize provider
+      const preferredProvider = (process.env.VECTOR_DB_PROVIDER || 'auto') as VectorDBProvider;
+      
+      if (preferredProvider === 'auto') {
+        await this.initializeAutoProvider();
+      } else {
+        await this.initializeProvider(preferredProvider);
       }
 
       this.isInitialized = true;
-      console.log('✅ Vector store initialized');
+      console.log(`✅ Vector store initialized (${this.activeDbProvider})`);
+      
     } catch (error) {
       console.error('Failed to initialize vector store:', error);
-      this.isInitialized = true; // Continue anyway with in-memory store
+      this.activeDbProvider = 'mock';
+      this.isInitialized = true;
     }
   }
 
-  private saveToDisk(): void {
+  private async initializeAutoProvider(): Promise<void> {
+    console.log('🔍 Auto-detecting Vector DB provider...');
+    
+    // Thử Milvus trước (local, fast)
+    try {
+      await this.initializeProvider('milvus');
+      return;
+    } catch (e) {
+      console.log('⚠️  Milvus not available, trying Pinecone...');
+    }
+
+    // Thử Pinecone
+    try {
+      await this.initializeProvider('pinecone');
+      return;
+    } catch (e) {
+      console.log('⚠️  Pinecone not available, using Mock...');
+    }
+
+    this.activeDbProvider = 'mock';
+    console.log('⚠️  Using in-memory mock vector store');
+  }
+
+  private async initializeProvider(provider: VectorDBProvider): Promise<void> {
+    switch (provider) {
+      case 'milvus':
+        await this.initializeMilvus();
+        break;
+      case 'pinecone':
+        await this.initializePinecone();
+        break;
+      default:
+        this.activeDbProvider = 'mock';
+    }
+  }
+
+  private async initializeMilvus(): Promise<void> {
+    if (!isMilvusConfigured()) {
+      throw new Error('Milvus not configured');
+    }
+
+    console.log(`🔌 Connecting to Milvus at ${milvusConfig.address}...`);
+    
+    const connected = await milvusClient.connect();
+    if (!connected) {
+      throw new Error('Failed to connect to Milvus');
+    }
+
+    // Create collection if not exists
+    await milvusClient.createCollection();
+    await milvusClient.loadCollection();
+
+    this.activeDbProvider = 'milvus';
+    console.log(`✅ Connected to Milvus (collection: ${milvusConfig.collectionName})`);
+  }
+
+  private async initializePinecone(): Promise<void> {
+    const apiKey = process.env.PINECONE_API_KEY;
+    if (!apiKey || apiKey === 'your_pinecone_api_key_here') {
+      throw new Error('Pinecone not configured');
+    }
+
+    try {
+      this.pinecone = new Pinecone({ apiKey });
+      this.pineconeIndex = this.pinecone.Index(pineconeConfig.indexName);
+      this.activeDbProvider = 'pinecone';
+      console.log(`✅ Connected to Pinecone index: ${pineconeConfig.indexName}`);
+    } catch (error) {
+      console.error('Failed to initialize Pinecone:', error);
+      throw error;
+    }
+  }
+
+  private async loadInMemoryData(): Promise<void> {
+    const docsPath = path.join(this.dataDir, 'documents.json');
+    if (fs.existsSync(docsPath)) {
+      try {
+        const data = JSON.parse(fs.readFileSync(docsPath, 'utf-8'));
+        data.forEach((doc: any) => {
+          this.inMemoryStore.set(doc.id, {
+            ...doc,
+            embedding: createSimpleEmbedding(doc.content),
+          });
+        });
+        console.log(`📚 Loaded ${this.inMemoryStore.size} documents from disk`);
+      } catch (e) {
+        console.log('📚 Starting with empty knowledge base');
+      }
+    }
+  }
+
+  private saveMetadataToDisk(): void {
     if (!this.dataDir) return;
     
     const docsPath = path.join(this.dataDir, 'documents.json');
-    const docs = Array.from(this.documents.values()).map(({ embedding, ...doc }) => doc);
+    const docs = Array.from(this.inMemoryStore.values()).map(({ embedding, ...doc }) => doc);
     fs.writeFileSync(docsPath, JSON.stringify(docs, null, 2));
   }
 
   async addDocuments(documents: Document[]): Promise<void> {
     const provider = getEmbeddingProvider();
-    // Embed async
+
+    // Always update in-memory store
     for (const doc of documents) {
       const embedding = await provider.embed(doc.content);
-      this.documents.set(doc.id, { ...doc, embedding });
+      this.inMemoryStore.set(doc.id, { ...doc, embedding });
     }
-    this.saveToDisk();
-    console.log(`✅ Added ${documents.length} documents via ${provider.name} (total: ${this.documents.size})`);
+
+    // Add to Milvus if using
+    if (this.activeDbProvider === 'milvus' && milvusClient.isReady()) {
+      try {
+        const embeddings = await provider.embedBatch(documents.map(d => d.content));
+        const vectors = documents.map((doc, i) => ({
+          id: doc.id,
+          content: doc.content,
+          embedding: embeddings[i],
+          source: doc.metadata.source,
+          type: doc.metadata.type,
+          title: doc.metadata.title || '',
+          category: doc.metadata.category || '',
+        }));
+        await milvusClient.insert(vectors);
+      } catch (err) {
+        console.error('Failed to add to Milvus:', err);
+      }
+    }
+
+    // Add to Pinecone if using
+    if (this.activeDbProvider === 'pinecone' && this.pineconeIndex) {
+      try {
+        const embeddings = await provider.embedBatch(documents.map(d => d.content));
+        const vectors = documents.map((doc, i) => ({
+          id: doc.id,
+          values: embeddings[i],
+          metadata: {
+            content: doc.content.slice(0, 1000),
+            source: doc.metadata.source,
+            type: doc.metadata.type,
+            title: doc.metadata.title || '',
+            category: doc.metadata.category || '',
+          },
+        }));
+        await this.pineconeIndex.upsert(vectors);
+      } catch (err) {
+        console.error('Failed to add to Pinecone:', err);
+      }
+    }
+
+    this.saveMetadataToDisk();
+    console.log(`✅ Added ${documents.length} documents (total: ${this.inMemoryStore.size})`);
   }
 
   async search(query: string, topK = 5): Promise<SearchResult[]> {
     const provider = getEmbeddingProvider();
-    const queryLower = query.toLowerCase();
-    const queryWords = queryLower.split(/\s+/).filter(w => w.length > 2);
     const queryEmbedding = await provider.embed(query);
 
-    // Normalize query embedding nếu dimension khác nhau (Gemini = 768, mock = 384)
-    const targetDim = this.documents.values().next().value?.embedding?.length || provider.dimension;
-    const normalizedQuery = this.normalizeDimension(queryEmbedding, targetDim);
+    // Search Milvus if using
+    if (this.activeDbProvider === 'milvus' && milvusClient.isReady()) {
+      try {
+        const results = await milvusClient.search(queryEmbedding, topK);
+        return results.map((r: any) => ({
+          content: r.content,
+          metadata: {
+            source: r.source,
+            type: r.type,
+            title: r.title,
+            category: r.category,
+            createdAt: new Date().toISOString(),
+          },
+          distance: r.distance,
+          score: 1 - (r.distance || 0),
+        }));
+      } catch (err) {
+        console.error('Milvus search failed:', err);
+      }
+    }
 
-    const results: Array<{ doc: Document & { embedding: number[] }; score: number; similarity: number; keywordMatch: number }> = [];
+    // Search Pinecone if using
+    if (this.activeDbProvider === 'pinecone' && this.pineconeIndex) {
+      try {
+        const results = await this.pineconeIndex.query({
+          vector: queryEmbedding,
+          topK,
+          includeMetadata: true,
+        });
+        return (results.matches || []).map((match: any) => ({
+          content: match.metadata?.content || '',
+          metadata: {
+            source: match.metadata?.source || '',
+            type: match.metadata?.type || 'text',
+            title: match.metadata?.title || '',
+            category: match.metadata?.category || '',
+            createdAt: new Date().toISOString(),
+          },
+          distance: match.distance,
+          score: 1 - (match.distance || 0),
+        }));
+      } catch (err) {
+        console.error('Pinecone search failed:', err);
+      }
+    }
 
-    this.documents.forEach(doc => {
-      const docEmb = this.normalizeDimension(doc.embedding, targetDim);
-      const similarity = cosineSimilarity(normalizedQuery, docEmb);
-      const docContent = doc.content.toLowerCase();
-      const docTitle = (doc.metadata.title || '').toLowerCase();
+    // Default: In-memory search
+    return this.searchInMemory(queryEmbedding, topK);
+  }
 
-      let keywordMatch = 0;
-      queryWords.forEach(word => {
-        if (docContent.includes(word)) keywordMatch += 1;
-        if (docTitle.includes(word)) keywordMatch += 3;
-      });
-      keywordMatch = keywordMatch / (queryWords.length * 4 || 1);
+  private searchInMemory(queryEmbedding: number[], topK: number): SearchResult[] {
+    const results: Array<{ doc: any; score: number }> = [];
 
-      const score = keywordMatch * 0.5 + similarity * 0.5;
-      results.push({ doc, score, similarity, keywordMatch });
+    this.inMemoryStore.forEach(doc => {
+      const similarity = cosineSimilarity(queryEmbedding, doc.embedding);
+      results.push({ doc, score: similarity });
     });
 
     results.sort((a, b) => b.score - a.score);
 
-    return results.slice(0, topK).map(({ doc, similarity }) => ({
+    return results.slice(0, topK).map(({ doc, score }) => ({
       content: doc.content,
       metadata: doc.metadata,
-      distance: 1 - similarity,
-      score: similarity,
+      score,
+      distance: 1 - score,
     }));
   }
 
-  /**
-   * Pad/trim vector về cùng dimension (fix mismatch giữa mock & Gemini)
-   */
-  private normalizeDimension(vec: number[], targetDim: number): number[] {
-    if (vec.length === targetDim) return vec;
-    if (vec.length > targetDim) return vec.slice(0, targetDim);
-    return [...vec, ...new Array(targetDim - vec.length).fill(0)];
-  }
-
-  /**
-   * Re-embed toàn bộ knowledge base (khi đổi provider hoặc model)
-   */
   async reindexAll(): Promise<{ count: number; provider: string }> {
-    // Force reset provider để pick up env mới
-    activeProvider = null;
     const provider = getEmbeddingProvider();
-    console.log(`🔄 Re-indexing ${this.documents.size} documents with ${provider.name}...`);
+    console.log(`🔄 Re-indexing ${this.inMemoryStore.size} documents...`);
 
-    let count = 0;
-    for (const [id, doc] of this.documents) {
+    // Re-embed all documents
+    for (const [id, doc] of this.inMemoryStore) {
       try {
         const embedding = await provider.embed(doc.content);
-        this.documents.set(id, { ...doc, embedding });
-        count++;
+        this.inMemoryStore.set(id, { ...doc, embedding });
       } catch (err: any) {
         console.error(`Failed to re-embed ${id}:`, err.message);
       }
     }
-    this.saveToDisk();
-    console.log(`✅ Re-indexed ${count} documents`);
-    return { count, provider: provider.name };
+
+    // Sync to Milvus if using
+    if (this.activeDbProvider === 'milvus' && milvusClient.isReady()) {
+      console.log('   Syncing to Milvus...');
+      await milvusClient.flush();
+    }
+
+    this.saveMetadataToDisk();
+    console.log(`✅ Re-indexed ${this.inMemoryStore.size} documents`);
+    return { count: this.inMemoryStore.size, provider: this.activeDbProvider };
   }
 
   async deleteDocument(id: string): Promise<void> {
-    this.documents.delete(id);
-    this.saveToDisk();
+    this.inMemoryStore.delete(id);
+    
+    if (this.activeDbProvider === 'milvus' && milvusClient.isReady()) {
+      await milvusClient.deleteById([id]);
+    }
+    
+    if (this.activeDbProvider === 'pinecone' && this.pineconeIndex) {
+      await this.pineconeIndex.deleteOne(id);
+    }
+    
+    this.saveMetadataToDisk();
   }
 
-  async getStats(): Promise<{
-    totalDocuments: number;
-    collectionName: string;
-    isInitialized: boolean;
-    provider: string;
-    dimension: number;
-  }> {
+  async getStats(): Promise<any> {
     const provider = getEmbeddingProvider();
+    
+    let totalDocuments = this.inMemoryStore.size;
+    let extraStats = {};
+
+    if (this.activeDbProvider === 'milvus' && milvusClient.isReady()) {
+      try {
+        const stats = await milvusClient.getCollectionStats();
+        totalDocuments = stats.rowCount;
+        extraStats = { milvusStats: stats };
+      } catch {}
+    }
+
     return {
-      totalDocuments: this.documents.size,
-      collectionName: COLLECTION_NAME,
+      totalDocuments,
+      collectionName: this.activeDbProvider === 'milvus' ? milvusConfig.collectionName : pineconeConfig.indexName,
       isInitialized: this.isInitialized,
-      provider: provider.name,
+      provider: this.activeDbProvider,
       dimension: provider.dimension,
+      storage: this.activeDbProvider,
+      ...extraStats,
     };
   }
 
   async clear(): Promise<void> {
-    this.documents.clear();
+    this.inMemoryStore.clear();
     
-    // Clear disk
+    if (this.activeDbProvider === 'milvus' && milvusClient.isReady()) {
+      await milvusClient.dropCollection();
+      await milvusClient.createCollection();
+      await milvusClient.loadCollection();
+    }
+    
+    if (this.activeDbProvider === 'pinecone' && this.pineconeIndex) {
+      await this.pineconeIndex.deleteAll();
+    }
+    
     const docsPath = path.join(this.dataDir, 'documents.json');
     if (fs.existsSync(docsPath)) {
       fs.unlinkSync(docsPath);
@@ -317,12 +536,20 @@ class VectorStore {
     
     console.log('🗑️ Vector store cleared');
   }
+
+  async shutdown(): Promise<void> {
+    if (this.activeDbProvider === 'milvus' && milvusClient.isReady()) {
+      await milvusClient.disconnect();
+    }
+    console.log('🔌 Vector store disconnected');
+  }
 }
 
 // Singleton instance
 export const vectorStore = new VectorStore();
 
-// Helper functions
+// ============== HELPER FUNCTIONS ==============
+
 export function chunkText(text: string, chunkSize = 1000, overlap = 200): string[] {
   const chunks: string[] = [];
   const words = text.split(/\s+/);

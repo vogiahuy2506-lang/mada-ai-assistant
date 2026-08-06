@@ -3,6 +3,10 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
+import fs from 'fs';
+import { createRequire } from 'module';
+
+const require = createRequire(import.meta.url);
 
 // RAG imports
 import { vectorStore } from './lib/rag/vectorStore';
@@ -16,6 +20,8 @@ import './lib/db'; // Initialize DB
 import authRoutes from './routes/auth';
 import userRoutes from './routes/users';
 import kbRoutes from './routes/knowledgeBase';
+import scraperRoutes from './routes/scraper';
+import paymentRoutes from './routes/payments';
 
 dotenv.config();
 
@@ -48,6 +54,8 @@ app.use(express.json({ limit: '50mb' })); // Support large files
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/kb', kbRoutes);
+app.use('/api/scraper', scraperRoutes);
+app.use('/api/payments', paymentRoutes);
 
 // ============== IN-MEMORY ACTIVITY LOG ==============
 interface ActivityLog {
@@ -1470,6 +1478,8 @@ app.post('/api/chat', async (req, res) => {
   try {
     const { message, conversationId, language = 'vi', agentId, agentPrompt } = req.body;
 
+    console.log('📩 Chat request:', { message: message?.slice(0, 50), language, agentId });
+
     if (!message) {
       return res.status(400).json({ success: false, error: 'Message is required' });
     }
@@ -1477,6 +1487,8 @@ app.post('/api/chat', async (req, res) => {
     // Check with Guardrails first
     const guardrailsResult = guardrails.analyzeQuery(message, language);
     const safetyScore = guardrails.calculateSafetyScore(message);
+
+    console.log('🛡️ Guardrails result:', { shouldRedirect: guardrailsResult.shouldRedirect, pattern: guardrailsResult.detectedPattern });
 
     // If query should be redirected
     if (guardrailsResult.shouldRedirect) {
@@ -1535,10 +1547,353 @@ app.post('/api/chat', async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Chat error:', error);
+    console.error('❌ Chat error:', error);
+    console.error('   Stack:', error instanceof Error ? error.stack : 'No stack');
+    res.status(500).json({ success: false, error: `Internal server error: ${error instanceof Error ? error.message : 'Unknown'}` });
+  }
+});
+
+// ============== CHAT WITH FILE ATTACHMENTS ==============
+
+app.post('/api/chat-with-file', async (req, res) => {
+  try {
+    const { message, conversationId, language = 'vi', agentId, agentPrompt, attachments } = req.body;
+    
+    // Write to log file
+    fs.appendFileSync('/tmp/chatlog.txt', `=== ${new Date().toISOString()} ===\n`);
+    fs.appendFileSync('/tmp/chatlog.txt', `Attachments count: ${attachments?.length || 0}\n`);
+    if (attachments) {
+      attachments.forEach((att, i) => {
+        fs.appendFileSync('/tmp/chatlog.txt', `Att[${i}]: type=${att.type}, name=${att.name}, hasBase64=${!!att.base64}\n`);
+      });
+    }
+    fs.appendFileSync('/tmp/chatlog.txt', `Message: ${message?.slice(0, 100)}\n\n`);
+    
+    console.log('🔵 CHAT/WITH-FILE ENDPOINT CALLED');
+    console.log('🔵 Attachments:', attachments?.length || 0);
+
+    console.log('📩 Chat with files:', { message: message?.slice(0, 50), fileCount: attachments?.length || 0 });
+
+    if (!message) {
+      return res.status(400).json({ success: false, error: 'Message is required' });
+    }
+
+    // Parse attachments if provided
+    let fileContext = '';
+    console.log('📎 Chat/file called with attachments:', attachments ? attachments.length : 0);
+    if (attachments && Array.isArray(attachments) && attachments.length > 0) {
+      console.log('📎 Processing attachments...');
+      
+      for (const att of attachments) {
+        console.log('📎 Attachment type:', att.type, '| name:', att.name, '| hasBase64:', !!att.base64);
+        
+        if (att.type === 'text' && att.content) {
+          // Plain text content
+          fileContext += `\n\n=== FILE: ${att.name || 'Document'} ===\n${att.content}\n`;
+        } else if (att.type === 'url' && att.url) {
+          // URL - need to scrape
+          try {
+            const response = await fetch(att.url);
+            const html = await response.text();
+            const text = html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+            fileContext += `\n\n=== URL: ${att.url} ===\n${text.slice(0, 5000)}\n`;
+          } catch (e) {
+            console.log('Failed to fetch URL:', att.url);
+          }
+        } else if ((att.type === 'pdf' || att.type === 'application/pdf' || att.name?.endsWith('.pdf')) && att.base64) {
+          // PDF - decode base64 and parse
+          console.log('🔵✅ MATCHED PDF CONDITION');
+          console.log('📎 Processing as PDF...');
+          try {
+            const buffer = Buffer.from(att.base64, 'base64');
+            console.log('📎 Buffer size:', buffer.length);
+            const tempPath = `/tmp/${Date.now()}_${att.name || 'file.pdf'}`;
+            fs.writeFileSync(tempPath, buffer);
+            console.log('📎 Temp file written:', tempPath);
+            
+            const { parsePDFFile } = await import('./lib/rag/fileParsers');
+            const text = await parsePDFFile(tempPath);
+            fs.unlinkSync(tempPath);
+            console.log('📎 PDF parsed, text length:', text.length);
+            
+            fileContext += `\n\n=== FILE: ${att.name || 'Document.pdf'} ===\n${text}\n`;
+          } catch (e) {
+            console.error('📎 PDF parse error:', e);
+            fileContext += `\n\n=== FILE: ${att.name || 'Document.pdf'} ===\n[Không thể đọc nội dung PDF]\n`;
+          }
+        } else if ((att.type === 'docx' || att.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || att.name?.endsWith('.docx')) && att.base64) {
+          // DOCX - decode base64 and parse
+          try {
+            const buffer = Buffer.from(att.base64, 'base64');
+            const tempPath = `/tmp/${Date.now()}_${att.name || 'file.docx'}`;
+            fs.writeFileSync(tempPath, buffer);
+            
+            const { parseDocxFile } = await import('./lib/rag/fileParsers');
+            const text = await parseDocxFile(tempPath);
+            fs.unlinkSync(tempPath);
+            
+            fileContext += `\n\n=== FILE: ${att.name || 'Document.docx'} ===\n${text}\n`;
+          } catch (e) {
+            console.error('DOCX parse error:', e);
+            fileContext += `\n\n=== FILE: ${att.name || 'Document.docx'} ===\n[Không thể đọc nội dung DOCX]\n`;
+          }
+        }
+      }
+      
+      console.log(`📎 File context prepared: ${fileContext.length} chars`);
+    }
+    
+    console.log('📎 Final fileContext:', fileContext.slice(0, 200));
+    // Guardrails check
+    const guardrailsResult = guardrails.analyzeQuery(message, language);
+    if (guardrailsResult.shouldRedirect) {
+      return res.json({
+        success: true,
+        data: { answer: guardrailsResult.redirectResponse, sources: [], contextUsed: false },
+      });
+    }
+
+    // Store history
+    const convId = conversationId || uuidv4();
+    if (!chatHistory.has(convId)) {
+      chatHistory.set(convId, []);
+    }
+    chatHistory.get(convId)!.push({ role: 'user', content: message });
+
+    // Build prompt WITH file context
+    let enhancedMessage = message;
+    console.log('🔵 fileContext length:', fileContext.length);
+    if (fileContext) {
+      // Prompt chi tiết để AI phân tích đầy đủ
+      enhancedMessage = `Nhiệm vụ: Đọc và phân tích TẤT CẢ nội dung tài liệu đính kèm bên dưới.
+      
+Câu hỏi: ${message}
+
+TÀI LIỆU:
+${fileContext}
+
+YÊU CẦU:
+- Đọc KỸ và HIỂU toàn bộ nội dung tài liệu
+- Trả lời DỰA TRÊN nội dung thực tế trong tài liệu
+- Nếu được hỏi "tóm tắt" hoặc "có gì", hãy LIỆT KÊ TẤT CẢ các mục, thông tin, quy định có trong tài liệu
+- Trích dẫn CHÍNH XÁC thông tin từ tài liệu khi trả lời
+- KHÔNG bịa đặt hoặc thêm thông tin không có trong tài liệu
+
+Hãy trả lời ngay bây giờ:`;
+      console.log('🔵 enhancedMessage length:', enhancedMessage.length);
+    }
+
+    // Query RAG - Dùng system prompt khác khi có file đính kèm
+    const ragConfig: any = {};
+    
+    if (fileContext) {
+      // Khi có file - dùng system prompt không giới hạn
+      ragConfig.systemInstruction = `Ban la tro ly AI ho tro phan tich tai lieu. Hay tra loi CHI TIET va DAY DU cac cau hoi ve noi dung tai lieu duoc cung cap. Khong gioi han do dai tra loi. Doc day du tat ca noi dung va tong hop thong tin.`;
+      ragConfig.maxOutputTokens = 8192; // Tăng output cho file dài
+    } else if (agentPrompt) {
+      ragConfig.systemInstruction = `Ban la tro ly ao MADA. ${agentPrompt}`;
+    }
+
+    const ragResponse = await ragEngine.query(enhancedMessage, chatHistory.get(convId) || [], ragConfig);
+
+    // Log response length for debugging
+    console.log('🔵 RAG response length:', ragResponse.answer.length);
+    console.log('🔵 RAG sources:', ragResponse.sources?.length || 0);
+
+    // Store response
+    chatHistory.get(convId)!.push({ role: 'assistant', content: ragResponse.answer });
+
+    res.json({
+      success: true,
+      data: {
+        answer: ragResponse.answer,
+        sources: ragResponse.sources,
+        contextUsed: true,
+        fileContextIncluded: !!fileContext,
+        conversationId: convId,
+      },
+    });
+  } catch (error) {
+    console.error('❌ Chat file error:', error);
+    res.status(500).json({ success: false, error: `Error: ${error instanceof Error ? error.message : 'Unknown'}` });
+  }
+});
+
+// ============== SCRAPE ENDPOINT ==============
+
+// Scrape content from URL (used by ChatPage for URL attachments)
+app.get('/api/scrape', async (req, res) => {
+  try {
+    const { url } = req.query;
+
+    if (!url || typeof url !== 'string') {
+      return res.status(400).json({ success: false, error: 'URL is required' });
+    }
+
+    // Validate URL
+    let parsedUrl: URL;
+    try {
+      parsedUrl = new URL(url);
+    } catch {
+      return res.status(400).json({ success: false, error: 'Invalid URL format' });
+    }
+
+    // Only allow http and https
+    if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+      return res.status(400).json({ success: false, error: 'Only HTTP and HTTPS URLs are allowed' });
+    }
+
+    // Fetch the URL
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+    try {
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; MADA-AI/1.0; +https://mada.ai)',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.5',
+        },
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        return res.status(400).json({ success: false, error: `Failed to fetch URL: ${response.status} ${response.statusText}` });
+      }
+
+      const contentType = response.headers.get('content-type') || '';
+
+      // Only process HTML content
+      if (!contentType.includes('text/html')) {
+        // Return as raw text for other content types
+        const text = await response.text();
+        return res.status(200).json({
+          success: true,
+          data: {
+            title: parsedUrl.hostname,
+            content: text.slice(0, 10000),
+            url: url,
+            type: 'raw',
+          },
+        });
+      }
+
+      const html = await response.text();
+
+      // Extract title
+      const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+      const title = titleMatch ? titleMatch[1].trim() : parsedUrl.hostname;
+
+      // Extract main content using basic HTML parsing
+      let content = extractMainContent(html);
+
+      // Extract meta description
+      const metaDescMatch = html.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']+)["']/i);
+      const metaDescription = metaDescMatch ? metaDescMatch[1].trim() : '';
+
+      // Combine meta description with content if available
+      if (metaDescription && !content.includes(metaDescription)) {
+        content = metaDescription + '\n\n' + content;
+      }
+
+      res.status(200).json({
+        success: true,
+        data: {
+          title: title,
+          content: content,
+          url: url,
+          type: 'html',
+        },
+      });
+    } catch (fetchError: unknown) {
+      clearTimeout(timeoutId);
+
+      if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+        return res.status(400).json({ success: false, error: 'Request timeout - the website took too long to respond' });
+      }
+
+      return res.status(500).json({ success: false, error: 'Failed to fetch URL content' });
+    }
+  } catch (error) {
+    console.error('Scrape error:', error);
     res.status(500).json({ success: false, error: 'Internal server error' });
   }
 });
+
+// Helper function to extract main content from HTML
+function extractMainContent(html: string): string {
+  // Remove script tags
+  let content = html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
+
+  // Remove style tags
+  content = content.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
+
+  // Remove comments
+  content = content.replace(/<!--[\s\S]*?-->/g, '');
+
+  // Remove nav, header, footer, aside elements
+  content = content.replace(/<(nav|header|footer|aside)[^>]*>[\s\S]*?<\/\1>/gi, '');
+
+  // Try to find main content
+  const mainMatch = content.match(/<main[^>]*>([\s\S]*?)<\/main>/i);
+  if (mainMatch) {
+    content = mainMatch[1];
+  } else {
+    // Try article tag
+    const articleMatch = content.match(/<article[^>]*>([\s\S]*?)<\/article>/i);
+    if (articleMatch) {
+      content = articleMatch[1];
+    }
+  }
+
+  // Replace divs and spans with newlines
+  content = content.replace(/<\/(div|p|li|tr|h[1-6])>/gi, '\n');
+  content = content.replace(/<br\s*\/?>/gi, '\n');
+
+  // Remove all remaining HTML tags
+  content = content.replace(/<[^>]+>/g, ' ');
+
+  // Decode HTML entities
+  content = decodeHTMLEntities(content);
+
+  // Clean up whitespace
+  content = content.replace(/\s+/g, ' ').trim();
+
+  // Limit content length
+  return content.slice(0, 15000);
+}
+
+// Helper to decode HTML entities
+function decodeHTMLEntities(text: string): string {
+  const entities: Record<string, string> = {
+    '&nbsp;': ' ',
+    '&amp;': '&',
+    '&lt;': '<',
+    '&gt;': '>',
+    '&quot;': '"',
+    '&#39;': "'",
+    '&apos;': "'",
+    '&ndash;': '–',
+    '&mdash;': '—',
+    '&hellip;': '...',
+    '&copy;': '©',
+    '&reg;': '®',
+    '&trade;': '™',
+  };
+
+  let result = text;
+  for (const [entity, char] of Object.entries(entities)) {
+    result = result.replace(new RegExp(entity, 'gi'), char);
+  }
+
+  // Handle numeric entities
+  result = result.replace(/&#(\d+);/g, (_, num) => String.fromCharCode(parseInt(num, 10)));
+  result = result.replace(/&#x([a-fA-F0-9]+);/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
+
+  return result;
+}
 
 // ============== DATA INGESTION ENDPOINTS ==============
 

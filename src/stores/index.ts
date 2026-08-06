@@ -343,10 +343,26 @@ export const useChatHistoryStore = create<ChatHistoryState>()(
             ),
           };
         }
+
+        // Limit for anonymous users (conversation IDs starting with 'anon-')
+        let updatedConversations = state.conversations;
+        if (conv.id.startsWith('anon-')) {
+          // Keep only pinned + latest 5 conversations
+          const nonPinned = updatedConversations.filter(c => !c.pinned);
+          if (nonPinned.length >= 5) {
+            // Sort by updatedAt and remove oldest
+            nonPinned.sort((a, b) => a.updatedAt - b.updatedAt);
+            const toRemove = nonPinned.slice(0, nonPinned.length - 4); // Keep 5 latest
+            updatedConversations = updatedConversations.filter(c =>
+              !toRemove.some(r => r.id === c.id)
+            );
+          }
+        }
+
         return {
           conversations: [
             { ...conv, createdAt: conv.createdAt || now, updatedAt: now },
-            ...state.conversations,
+            ...updatedConversations,
           ],
         };
       }),

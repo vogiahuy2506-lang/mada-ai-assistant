@@ -1,9 +1,12 @@
 // Chat Routes - Main chat API endpoints
+// Enhanced with Intent Detection and Response Formatting
 
 import { Router, Request, Response, NextFunction } from 'express';
 import { GeminiAgent } from '../agents/gemini-agent.js';
 import { sessionService } from '../services/session.service.js';
 import { ragService } from '../services/rag.service.js';
+import { intentDetectionService } from '../services/intent-detection.service.js';
+import { responseFormatter } from '../services/response-formatter.service.js';
 import { GuardrailsOrchestrator } from '../guardrails/index.js';
 import { chatRequestSchema } from '../utils/validation.js';
 import { createLogger } from '../utils/logger.js';
@@ -41,13 +44,18 @@ chatRouter.post('/', chatRateLimiter.middleware(), async (req: Request, res: Res
       await sessionService.setLanguage(session.id, language);
     }
 
-    const guardrailResult = await guardrails.check(message, language);
+    // Store user message
     await sessionService.addMessage(session.id, 'user', message);
+
+    // Step 1: Guardrail check
+    const guardrailResult = await guardrails.check(message, language);
 
     let responseText: string;
     let confidence = 0.82;
     let ragContext: RAGContextRef[] = [];
+    let detectedIntent = 'general';
 
+    // Handle guardrail blocked messages
     if (!guardrailResult.passed) {
       if (guardrailResult.customResponse) {
         responseText = guardrailResult.customResponse;
@@ -59,11 +67,22 @@ chatRouter.post('/', chatRateLimiter.middleware(), async (req: Request, res: Res
       }
       confidence = 0.5;
     } else {
+      // Step 2: Intent Detection (NEW)
+      const intentResult = intentDetectionService.detectIntent(message, language);
+      detectedIntent = intentResult.intent;
+      logger.info('Intent detected', { 
+        intent: intentResult.intent, 
+        confidence: intentResult.confidence,
+        categories: intentResult.suggestedCategories 
+      });
+
+      // Step 3: RAG Search with context
       if (process.env.ENABLE_RAG !== 'false') {
         try {
           const ragResults = await ragService.search({
             query: message,
             language,
+            categories: intentResult.suggestedCategories as any || undefined,
             maxResults: 3,
           });
 
@@ -84,28 +103,56 @@ chatRouter.post('/', chatRateLimiter.middleware(), async (req: Request, res: Res
         }
       }
 
+      // Step 4: Get conversation history
       const history = await sessionService.getMessages(session.id, 10);
-      const aiResponse = await geminiAgent.generateResponse(
-        message,
-        history,
-        language as SupportedLanguage,
-        {
-          ragResults: ragContext.map(ctx => ({
+
+      // Step 5: Build enhanced prompt with structured context (NEW)
+      let enhancedMessage = message;
+      
+      // Add RAG context in structured format
+      if (ragContext.length > 0) {
+        enhancedMessage += responseFormatter.buildContextPrompt(
+          ragContext.map(ctx => ({
             name: ctx.name,
             description: '',
             score: ctx.score,
+            category: ctx.type,
           })),
+          intentResult.intent,
+          language as string
+        );
+      }
+
+      // Step 6: Generate response with enhanced system instruction
+      const aiResponse = await geminiAgent.generateResponseWithIntent(
+        enhancedMessage,
+        history,
+        language as SupportedLanguage,
+        {
+          userIntent: intentResult.intent,
+          category: intentResult.suggestedCategories?.[0],
         }
       );
 
-      responseText = aiResponse.text;
+      // Step 7: Format response (NEW)
+      const formattedResponse = responseFormatter.formatResponse(
+        aiResponse.text,
+        intentResult.intent,
+        aiResponse.confidence,
+        language as string,
+        intentResult.suggestedCategories?.[0]
+      );
+
+      responseText = formattedResponse.text;
       confidence = aiResponse.confidence;
     }
 
+    // Store assistant message
     await sessionService.addMessage(session.id, 'assistant', responseText, {
       ragContext,
       confidence,
       guardrailAction: guardrailResult.action,
+      intent: detectedIntent,
     });
 
     res.status(200).json({
@@ -115,6 +162,7 @@ chatRouter.post('/', chatRateLimiter.middleware(), async (req: Request, res: Res
         message: responseText,
         confidence,
         sources: ragContext,
+        intent: detectedIntent,
         guardrailAction: guardrailResult.action !== 'ALLOW' ? guardrailResult.action : undefined,
         metadata: {
           tokensUsed: 0,

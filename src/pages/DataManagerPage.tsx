@@ -1,10 +1,10 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Sidebar } from '@/components';
 import {
   CloudUpload, Globe, FileText,
   Loader2, CheckCircle, AlertCircle, Trash2, Eye,
   Search, Filter, Plus, Clock, Database, Brain, Upload, FilePlus, Sparkles,
-  X, Link, BookOpen, RefreshCw, Trash
+  X, Link, BookOpen, RefreshCw, Trash, FileCheck
 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -36,6 +36,11 @@ export function DataManagerPage() {
   const [addMode, setAddMode] = useState<'text' | 'url' | 'file'>('text');
   const [manualContent, setManualContent] = useState('');
   const [manualTitle, setManualTitle] = useState('');
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch stats and items on mount
@@ -114,12 +119,11 @@ export function DataManagerPage() {
     setIsCollecting(true);
 
     try {
-      const response = await fetch('/api/data/ingest', {
+      const response = await fetch('/api/knowledge/text', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           content: manualContent,
-          type: 'text',
           title: manualTitle || 'Manual input',
         }),
       });
@@ -184,6 +188,72 @@ export function DataManagerPage() {
       setIsAddingSeed(false);
     }
   };
+
+  // Handle file selection
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+      setUploadError(null);
+      setUploadSuccess(null);
+    }
+  };
+
+  // Handle file upload
+  const handleFileUpload = useCallback(async () => {
+    if (!selectedFile) return;
+
+    setIsUploading(true);
+    setUploadProgress(0);
+    setUploadError(null);
+    setUploadSuccess(null);
+
+    const formData = new FormData();
+    formData.append('file', selectedFile);
+
+    try {
+      const response = await fetch('/api/knowledge/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      setUploadProgress(100);
+
+      const data = await response.json();
+
+      if (data.success) {
+        setUploadSuccess(`Đã thêm ${data.data.documentsAdded} tài liệu từ ${selectedFile.name}`);
+        
+        // Add to list
+        const newItem: KnowledgeItem = {
+          id: data.data.taskId,
+          title: selectedFile.name,
+          source: `upload:${selectedFile.name}`,
+          type: selectedFile.name.endsWith('.pdf') ? 'pdf' : 'text',
+          status: 'completed',
+          documentsAdded: data.data.documentsAdded,
+          date: new Date().toLocaleDateString('vi-VN'),
+        };
+        setKnowledgeItems(prev => [newItem, ...prev]);
+        
+        // Reset form after delay
+        setTimeout(() => {
+          setShowAddModal(false);
+          setSelectedFile(null);
+          setUploadProgress(0);
+          setUploadSuccess(null);
+          if (fileInputRef.current) fileInputRef.current.value = '';
+          fetchKnowledgeBase();
+        }, 1500);
+      } else {
+        setUploadError(data.error || 'Upload failed');
+      }
+    } catch (error: any) {
+      setUploadError(error.message || 'Upload failed');
+    } finally {
+      setIsUploading(false);
+    }
+  }, [selectedFile, fetchKnowledgeBase]);
 
   const handleClearKnowledge = async () => {
     if (!confirm('Bạn có chắc muốn xóa toàn bộ cơ sở tri thức? Hành động này không thể hoàn tác.')) {
@@ -581,19 +651,107 @@ export function DataManagerPage() {
                   <input
                     ref={fileInputRef}
                     type="file"
-                    accept=".txt,.md,.pdf,.csv"
+                    accept=".txt,.md,.pdf,.docx,.doc,.csv,.jpg,.jpeg,.png,.webp"
+                    onChange={handleFileSelect}
                     className="hidden"
                   />
-                  <div
-                    onClick={() => fileInputRef.current?.click()}
-                    className="border-2 border-dashed border-outline rounded-xl p-12 text-center cursor-pointer hover:border-primary hover:bg-surface-container transition-colors"
-                  >
-                    <Upload className="w-12 h-12 mx-auto mb-4 text-on-surface-variant" />
-                    <p className="font-medium">Click để upload file</p>
-                    <p className="text-sm text-on-surface-variant mt-2">
-                      Hỗ trợ: TXT, MD, PDF, CSV
-                    </p>
-                  </div>
+                  
+                  {/* File Drop Zone */}
+                  {!selectedFile ? (
+                    <div
+                      onClick={() => fileInputRef.current?.click()}
+                      className="border-2 border-dashed border-outline rounded-xl p-12 text-center cursor-pointer hover:border-primary hover:bg-surface-container transition-colors"
+                    >
+                      <Upload className="w-12 h-12 mx-auto mb-4 text-on-surface-variant" />
+                      <p className="font-medium">Click để upload file</p>
+                      <p className="text-sm text-on-surface-variant mt-2">
+                        Hỗ trợ: TXT, MD, PDF, DOCX, CSV, JPG, PNG, WEBP
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {/* Selected File Info */}
+                      <div className="flex items-center justify-between p-4 bg-surface-container rounded-xl border-2 border-primary/50">
+                        <div className="flex items-center gap-3">
+                          <FileCheck className="w-8 h-8 text-primary" />
+                          <div>
+                            <p className="font-medium">{selectedFile.name}</p>
+                            <p className="text-sm text-on-surface-variant">
+                              {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => {
+                            setSelectedFile(null);
+                            if (fileInputRef.current) fileInputRef.current.value = '';
+                          }}
+                          className="p-2 hover:bg-surface rounded-lg transition-colors"
+                        >
+                          <X className="w-5 h-5" />
+                        </button>
+                      </div>
+
+                      {/* Upload Progress */}
+                      {isUploading && (
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="flex items-center gap-2">
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              Đang upload và xử lý...
+                            </span>
+                            <span>{uploadProgress}%</span>
+                          </div>
+                          <div className="h-2 bg-surface-container rounded-full overflow-hidden">
+                            <div 
+                              className="h-full bg-primary transition-all duration-300"
+                              style={{ width: `${uploadProgress}%` }}
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Upload Success */}
+                      {uploadSuccess && (
+                        <div className="flex items-center gap-2 p-3 bg-green-100 text-green-800 rounded-xl">
+                          <CheckCircle className="w-5 h-5" />
+                          {uploadSuccess}
+                        </div>
+                      )}
+
+                      {/* Upload Error */}
+                      {uploadError && (
+                        <div className="flex items-center gap-2 p-3 bg-red-100 text-red-800 rounded-xl">
+                          <AlertCircle className="w-5 h-5" />
+                          {uploadError}
+                        </div>
+                      )}
+
+                      {/* Upload Button */}
+                      <button
+                        onClick={handleFileUpload}
+                        disabled={isUploading}
+                        className={clsx(
+                          'w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all',
+                          isUploading 
+                            ? 'bg-gray-400 cursor-not-allowed' 
+                            : 'bg-primary text-on-primary hover:bg-primary/90 neo-brutalist-shadow-sm hover:-translate-y-0.5'
+                        )}
+                      >
+                        {isUploading ? (
+                          <>
+                            <Loader2 className="w-5 h-5 animate-spin" />
+                            Đang xử lý...
+                          </>
+                        ) : (
+                          <>
+                            <CloudUpload className="w-5 h-5" />
+                            Upload và thêm vào Knowledge Base
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

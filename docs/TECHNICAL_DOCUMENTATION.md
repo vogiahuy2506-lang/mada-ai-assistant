@@ -1,23 +1,27 @@
 # MADA AI Assistant - Technical Documentation
 
-> **Document Version**: 1.0.0
+> **Document Version**: 2.1.0
 > **Last Updated**: August 2026
 > **Status**: Production Ready
+> **Production Server**: `server/` (port 3001)
 
 ---
 
-## 📋 Table of Contents
+## Table of Contents
 
 1. [System Architecture](#system-architecture)
 2. [Frontend Architecture](#frontend-architecture)
 3. [Backend Architecture](#backend-architecture)
-4. [RAG System](#rag-system)
-5. [AI Guardrails](#ai-guardrails)
-6. [Database Schema](#database-schema)
-7. [API Documentation](#api-documentation)
-8. [Security](#security)
-9. [Deployment](#deployment)
-10. [Monitoring & Logging](#monitoring--logging)
+4. [Vector Database](#vector-database)
+5. [RAG System](#rag-system)
+6. [AI Guardrails](#ai-guardrails)
+7. [Auto Scraping](#auto-scraping)
+8. [Payment System](#payment-system)
+9. [Database Schema](#database-schema)
+10. [API Documentation](#api-documentation)
+11. [Security](#security)
+12. [Deployment](#deployment)
+13. [Metrics & Logging](#metrics--logging)
 
 ---
 
@@ -31,7 +35,7 @@
 │  ┌─────────────────────────────────────────────────────────┐    │
 │  │              React + TypeScript + Tailwind              │    │
 │  │  ┌──────────┐  ┌──────────┐  ┌──────────┐            │    │
-│  │  │  Header  │  │ Sidebar  │  │ ChatArea  │            │    │
+│  │  │  Header  │  │ Sidebar │  │ ChatArea │            │    │
 │  │  └──────────┘  └──────────┘  └──────────┘            │    │
 │  └─────────────────────────────────────────────────────────┘    │
 └─────────────────────────────────────────────────────────────────┘
@@ -43,7 +47,7 @@
 │  ┌─────────────────────────────────────────────────────────┐    │
 │  │              Express.js + TypeScript                     │    │
 │  │  ┌────────────┐  ┌────────────┐  ┌────────────┐       │    │
-│  │  │  /api/chat │  │ /api/recommend │ │ /api/consult │     │    │
+│  │  │  /api/chat│  │  /api/kb  │  │/api/payment│       │    │
 │  │  └────────────┘  └────────────┘  └────────────┘       │    │
 │  └─────────────────────────────────────────────────────────┘    │
 └─────────────────────────────────────────────────────────────────┘
@@ -52,19 +56,23 @@
 ┌─────────────────────────────────────────────────────────────────┐
 │                      INTELLIGENCE LAYER                          │
 │  ┌──────────────────┐         ┌──────────────────┐              │
-│  │  RAG Engine     │         │  Guardrails     │              │
-│  │  ├─ VectorStore │         │  ├─ MedicalBlock │              │
-│  │  └─ Gemini 2.5  │         │  └─ ContentFilter│              │
+│  │  RAG Engine     │         │  Guardrails      │              │
+│  │  ├─ VectorStore│         │  ├─ MedicalBlock │              │
+│  │  └─ Gemini 2.5│         │  └─ ContentFilter│              │
 │  └──────────────────┘         └──────────────────┘              │
 └─────────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                       DATA LAYER                                 │
-│  ┌──────────────────┐         ┌──────────────────┐              │
-│  │  ChromaDB        │         │  Knowledge Base  │              │
-│  │  (Embeddings)   │         │  (JSON Files)   │              │
-│  └──────────────────┘         └──────────────────┘              │
+│  ┌──────────┐  ┌──────────┐  ┌──────────────────┐              │
+│  │  Mock    │  │ Milvus   │  │  Knowledge Base │              │
+│  │ (Dev)    │  │(Docker)  │  │  (SQLite + FS) │              │
+│  └──────────┘  └──────────┘  └──────────────────┘              │
+│  ┌──────────┐                                                      │
+│  │ Pinecone │                                                      │
+│  │ (Cloud) │                                                      │
+│  └──────────┘                                                      │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -73,16 +81,16 @@
 ## Frontend Architecture
 
 ### Tech Stack
-- **React 18.2** - UI Library
-- **TypeScript 5.3** - Type Safety
+- **React 18.3** - UI Library
+- **TypeScript 5.5** - Type Safety
 - **Tailwind CSS 3.4** - Styling
 - **Zustand** - State Management
 - **React Markdown** - Render AI responses
+- **Lucide React** - Icons
 
 ### State Management
 
 ```typescript
-// Store Structure
 interface AppState {
   // Language
   language: 'vi' | 'en' | 'ar' | 'fr';
@@ -118,7 +126,7 @@ interface AppState {
 - **Node.js 20** - Runtime
 - **Express.js** - API Framework
 - **Gemini SDK** - AI Integration
-- **ChromaDB** - Vector Database
+- **Multi Vector DB** - Mock/Milvus/Pinecone (configurable)
 - **TypeScript** - Type Safety
 
 ### Directory Structure
@@ -129,11 +137,69 @@ server/
 ├── lib/
 │   ├── rag/
 │   │   ├── ragEngine.ts     # RAG orchestration
-│   │   ├── vectorStore.ts   # Vector DB operations
-│   │   └── dataIngestion.ts # Data loading
-│   └── guardrails.ts        # Safety checks
-└── tests/
-    └── qa-test-suite.ts    # QA tests
+│   │   ├── vectorStore.ts   # Multi-vector DB abstraction
+│   │   ├── dataIngestion.ts # Data loading & scraping
+│   │   ├── fileParsers.ts   # PDF/DOCX parsing
+│   │   ├── ocrHelper.ts     # Image OCR
+│   │   └── taxonomy.ts      # Auto-classification
+│   ├── scraper/
+│   │   └── scheduler.ts     # Auto scraping scheduler
+│   ├── payments/
+│   │   └── stripe.ts        # Stripe integration
+│   ├── guardrails.ts        # Safety checks
+│   └── db.ts               # SQLite database
+├── routes/
+│   ├── auth.ts             # Authentication
+│   ├── users.ts            # User management
+│   ├── knowledgeBase.ts    # Knowledge base API
+│   ├── scraper.ts          # Scraper API
+│   └── payments.ts         # Payment API
+└── scripts/
+    ├── migrate-to-milvus.ts   # Milvus migration
+    └── migrate-to-pinecone.ts # Pinecone migration
+```
+
+---
+
+## Vector Database
+
+### Supported Providers
+
+| Provider | Type | Use Case | Setup Required |
+|----------|------|----------|---------------|
+| **Mock** | In-memory | Development | None |
+| **Pinecone** | Cloud | Production (cloud) | API Key |
+| **Milvus** | Self-hosted | Production (local) | Docker |
+
+### Configuration
+
+```bash
+# Choose provider
+VECTOR_DB_PROVIDER=mock      # Default, no setup needed
+VECTOR_DB_PROVIDER=pinecone   # Cloud, needs API key
+VECTOR_DB_PROVIDER=milvus     # Docker, needs Docker
+
+# For Pinecone
+PINECONE_API_KEY=your_key_here
+
+# For Milvus (Docker)
+MILVUS_ADDRESS=localhost:19530
+MILVUS_COLLECTION_NAME=mada_kb
+```
+
+### Architecture
+
+```
+VectorStore (abstraction layer)
+    │
+    ├── Mock Provider (TF-IDF in-memory)
+    │       └── Fast for development
+    │
+    ├── Pinecone Provider (cloud)
+    │       └── Scalable, no infrastructure
+    │
+    └── Milvus Provider (Docker)
+            └── High performance, self-hosted
 ```
 
 ---
@@ -148,12 +214,12 @@ User Query
     ▼
 ┌─────────────────┐
 │ Query Embedding │
-│ (TF-IDF + Hash)│
+│ (Gemini/TF-IDF)│
 └────────┬────────┘
          │
          ▼
 ┌─────────────────┐
-│ Vector Search   │
+│ Vector Search    │
 │ (Cosine Sim)    │
 └────────┬────────┘
          │
@@ -182,20 +248,17 @@ Response + Confidence
 ### Embedding Algorithm
 
 ```typescript
-// TF-IDF + Hash-based embedding
+// TF-IDF + Hash-based embedding (Mock)
 function createEmbedding(text: string): number[] {
   // 1. Tokenize and count frequencies
   // 2. Hash words to vector indices
   // 3. Normalize vector
-  // 4. Return 384-dim vector
+  // 4. Return 384-dim vector (Mock) or 768-dim (Gemini)
 }
-```
 
-### Similarity Calculation
-
-```typescript
+// Cosine similarity
 function cosineSimilarity(a: number[], b: number[]): number {
-  // Cosine(a, b) = (a · b) / (|a| × |b|)
+  return dot(a, b) / (|a| × |b|)
 }
 ```
 
@@ -224,58 +287,124 @@ const MEDICAL_PATTERNS = [
   /chẩn đoán.*(bệnh|nặng|nhẹ)/i,
   /uống thuốc.*(gì|bao nhiêu)/i,
   /bác sĩ|bệnh viện|phẫu thuật/i,
-  // ... more patterns
 ];
 ```
 
 ---
 
+## Auto Scraping
+
+### Features
+
+- Cron job scheduling (hourly/daily/weekly)
+- Web scraping with cheerio
+- Auto-classification (ISO/WHO/WCAG)
+- Progress tracking
+- Error handling with retries
+
+### Supported Sources
+
+| Source | Frequency | Category |
+|--------|-----------|----------|
+| WHO - Disability & Health | Weekly | Health |
+| W3C WCAG Guidelines | Weekly | Accessibility |
+| Accessibility Guides | Weekly | General |
+| CDC - Disability & Health | Weekly | Health |
+
+### Usage
+
+```bash
+# Start scheduler
+npx tsx server/lib/scraper/scheduler.ts start
+
+# Run all scrapes once
+npx tsx server/lib/scraper/scheduler.ts run
+
+# Check status
+npx tsx server/lib/scraper/scheduler.ts status
+```
+
+---
+
+## Payment System
+
+### Plans
+
+| Plan | Price | Queries/Month | Documents | Features |
+|------|-------|---------------|----------|----------|
+| Free | 0 VND | 10 | 5 | Basic AI |
+| Pro | 99,000 VND | 100 | 100 | Full RAG, Upload |
+| Enterprise | 299,000 VND | Unlimited | Unlimited | Multi-user, SLA |
+
+### Stripe Integration
+
+```bash
+# Required environment variables
+STRIPE_SECRET_KEY=sk_live_xxx
+STRIPE_WEBHOOK_SECRET=whsec_xxx
+STRIPE_PRICE_PRO=price_xxx
+STRIPE_PRICE_ENTERPRISE=price_xxx
+```
+
+### Features
+- Checkout Sessions
+- Billing Portal
+- Webhook handling
+- Usage tracking
+- Quota management
+
+---
+
 ## Database Schema
 
-### Knowledge Base (JSON)
+### Knowledge Base (SQLite)
 
 ```typescript
-interface KnowledgeEntry {
+interface KnowledgeItem {
   id: string;
-  topic: string;
-  content: string;      // Markdown content
-  source: string;       // Source URL
+  title: string;
+  description: string;
+  content: string;
+  source: string;
+  source_type: 'pdf' | 'web' | 'text' | 'image' | 'docx';
   category: ATCategory;
-  standards: string[];   // ISO, WCAG references
-  createdAt: string;
+  iso_codes: string[];
+  wcag_level: string;
+  confidence: number;
+  status: 'draft' | 'published' | 'archived';
+  chunk_count: number;
+  indexed: boolean;
+  created_at: string;
 }
 ```
 
-### ChromaDB Collection
+### Scheduled Sources
 
 ```typescript
-interface ChromaDocument {
+interface ScheduledSource {
   id: string;
-  content: string;
-  embedding: number[];   // 384-dim vector
-  metadata: {
-    source: string;
-    category: string;
-    standards: string[];
-  };
+  url: string;
+  name: string;
+  type: 'web' | 'api';
+  frequency: 'hourly' | 'daily' | 'weekly';
+  status: 'active' | 'paused' | 'error';
+  last_run: string;
+  documents_added: number;
 }
 ```
 
-### Consultation Requests
+### Subscriptions (Stripe)
 
 ```typescript
-interface ConsultationRequest {
+interface Subscription {
   id: string;
-  userId: string;
-  userName: string;
-  userEmail: string;
-  userPhone?: string;
-  content: string;
-  aiResponse?: string;
-  status: 'pending' | 'in_progress' | 'resolved' | 'closed';
-  priority: 'low' | 'medium' | 'high';
-  createdAt: string;
-  resolvedAt?: string;
+  user_id: string;
+  stripe_customer_id: string;
+  stripe_subscription_id: string;
+  plan_id: string;
+  status: 'active' | 'canceled' | 'past_due';
+  current_period_start: string;
+  current_period_end: string;
 }
 ```
 
@@ -289,16 +418,6 @@ interface ConsultationRequest {
 GET /api/health
 ```
 
-**Response:**
-```json
-{
-  "status": "ok",
-  "timestamp": "2026-08-03T10:00:00.000Z",
-  "ragEnabled": true,
-  "geminiConfigured": true
-}
-```
-
 ### Chat
 
 ```http
@@ -308,49 +427,52 @@ Content-Type: application/json
 {
   "message": "Tôi cần thiết bị hỗ trợ người khiếm thị",
   "language": "vi",
-  "conversationId": "optional-conversation-id"
+  "conversationId": "optional-id"
 }
 ```
 
-**Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "answer": "Dựa trên nhu cầu của bạn...",
-    "confidence": 95,
-    "sources": [...],
-    "contextUsed": true,
-    "conversationId": "abc-123"
-  }
-}
-```
-
-### Recommend
+### Knowledge Base
 
 ```http
-POST /api/recommend
-Content-Type: application/json
+# Upload file
+POST /api/kb/upload
 
-{
-  "query": "wheelchair for elderly",
-  "category": "mobility",
-  "maxResults": 5
-}
+# Scrape URL
+POST /api/kb/scrape
+{ "url": "https://example.com" }
+
+# Search
+GET /api/knowledge/search?q=wheelchair
 ```
 
-### Consultation
+### Scraper
 
 ```http
-POST /api/consultations
-Content-Type: application/json
+# List sources
+GET /api/scraper/sources
 
-{
-  "name": "Nguyễn Văn A",
-  "email": "email@example.com",
-  "phone": "+84 123 456 789",
-  "message": "Tôi cần tư vấn về xe lăn cho người già"
-}
+# Run scrape
+POST /api/scraper/sources/:id/run
+
+# Run all
+POST /api/scraper/run-all
+```
+
+### Payments
+
+```http
+# Get plans
+GET /api/payments/plans
+
+# Create checkout
+POST /api/payments/checkout
+{ "planId": "pro", "userId": "xxx" }
+
+# Get subscription
+GET /api/payments/subscription/:userId
+
+# Get usage
+GET /api/payments/usage/:userId
 ```
 
 ---
@@ -362,13 +484,15 @@ Content-Type: application/json
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `GEMINI_API_KEY` | Yes | Google Gemini API key |
+| `VECTOR_DB_PROVIDER` | No | mock/pinecone/milvus |
+| `PINECONE_API_KEY` | For Pinecone | Pinecone API key |
+| `MILVUS_ADDRESS` | For Milvus | Milvus server address |
+| `STRIPE_SECRET_KEY` | For payments | Stripe API key |
 | `PORT` | No | Server port (default: 3001) |
-| `NODE_ENV` | No | development/production |
 
 ### Security Headers
 
 ```typescript
-// Applied in production
 {
   "X-Frame-Options": "SAMEORIGIN",
   "X-Content-Type-Options": "nosniff",
@@ -376,12 +500,6 @@ Content-Type: application/json
   "Referrer-Policy": "strict-origin-when-cross-origin"
 }
 ```
-
-### Rate Limiting
-
-- API endpoints: 10 requests/second
-- Chat endpoint: 5 requests/second
-- Bulk uploads: 2 requests/minute
 
 ---
 
@@ -397,112 +515,99 @@ docker build -t mada-ai:latest .
 docker run -d \
   -p 3001:3001 \
   -e GEMINI_API_KEY=your_key \
+  -v ./data:/app/data \
   mada-ai:latest
 ```
 
-### Environment Variables
+### Milvus Setup
 
 ```bash
-# .env file
-GEMINI_API_KEY=your_gemini_api_key_here
-PORT=3001
-NODE_ENV=production
+# Start Milvus (requires Docker)
+./scripts/setup-milvus.sh start
+
+# Check status
+./scripts/setup-milvus.sh status
+
+# Stop
+./scripts/setup-milvus.sh stop
 ```
 
-### Health Check
+### Migration
 
 ```bash
-curl http://localhost:3001/api/health
+# Migrate to Milvus
+npm run milvus:migrate
+
+# Migrate to Pinecone
+npm run pinecone:migrate
 ```
 
 ---
 
-## Monitoring & Logging
+## Scripts
 
-### Logs
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Start frontend (Vite) |
+| `npm run server` | Start backend (Express) |
+| `npm run dev:all` | Start both |
+| `npm run build` | Production build |
+| `npm run milvus:start` | Start Milvus Docker |
+| `npm run milvus:migrate` | Migrate to Milvus |
+| `npm run scraper:start` | Start scraper scheduler |
+| `npm run scraper:run` | Run scraper once |
+
+---
+
+## Metrics & Logging
+
+### Structured Logging
 
 ```typescript
-// Server logs
-console.log('🚀 RAG system ready');
-console.log('🛡️ Guardrails system ready');
-console.log('✅ Added 24 documents to vector store');
+import { logger, ragLogger, authLogger } from './lib/logger';
+
+// Basic logging
+logger.info('Server started', { port: 3001 });
+logger.success('User logged in', { userId: '123' });
+logger.warn('Rate limit exceeded', { ip: '192.168.1.1' });
+logger.error('Database connection failed', error);
+
+// Timed operations
+await ragLogger.timed('query', async () => {
+  return await ragEngine.query(query);
+}, { queryLength: query.length });
 ```
 
-### Metrics to Track
+### Metrics Collection
 
-1. **Response Time** - Target < 2s
-2. **Confidence Score** - Target > 85%
-3. **Error Rate** - Target < 1%
-4. **Guardrail Triggers** - Monitor patterns
+```typescript
+import {
+  recordRequestMetrics,
+  recordRAGMetrics,
+  recordGuardrailMetrics,
+  recordAIMetrics,
+  getMetricsSummary,
+} from './lib/metrics';
 
----
+// Record metrics
+recordRequestMetrics('/api/chat', 'POST', 200, 150);
+recordRAGMetrics(5, 0.95, 50, true);
+recordGuardrailMetrics(true, undefined, 5);
+recordAIMetrics(500, 'gemini-2.5-flash', 200, true);
 
-## Performance Optimization
-
-### Frontend
-
-- [x] Code splitting by route
-- [x] Lazy loading components
-- [x] Image optimization
-- [x] CSS purging (Tailwind)
-
-### Backend
-
-- [x] Vector caching
-- [x] Connection pooling
-- [x] Response compression
-- [x] Request batching
-
-### Database
-
-- [x] In-memory vector store
-- [x] Document persistence
-- [x] Efficient indexing
-
----
-
-## Troubleshooting
-
-### Common Issues
-
-1. **"Gemini API key not configured"**
-   - Solution: Add `GEMINI_API_KEY` to `.env`
-
-2. **"Vector store not initialized"**
-   - Solution: Restart server after adding documents
-
-3. **"CORS error"**
-   - Solution: Check backend is running on correct port
-
-### Debug Mode
-
-```bash
-# Enable debug logs
-DEBUG=* npm run server
+// Get summary
+const summary = getMetricsSummary();
 ```
 
----
+### Metrics Endpoints
 
-## Appendix
-
-### Glossary
-
-| Term | Definition |
-|------|------------|
-| RAG | Retrieval-Augmented Generation |
-| AT | Assistive Technology |
-| WCAG | Web Content Accessibility Guidelines |
-| ISO | International Organization for Standardization |
-| WHO | World Health Organization |
-
-### References
-
-- [Gemini API Documentation](https://ai.google.dev/docs)
-- [WCAG 2.1 Guidelines](https://www.w3.org/WAI/WCAG21/quickref/)
-- [ISO 9999:2022](https://www.iso.org/standard/76953.html)
-- [WHO GATE Program](https://www.who.int/health-topics/assistive-technology)
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/admin/logs` | GET | View activity logs |
+| `/api/admin/logs/sources` | GET | List log sources |
+| `/api/admin/analytics` | GET | View analytics summary |
 
 ---
 
-**Document Author**: MADA AI Development Team
-**Last Updated**: August 2026
+*Document version: 2.1.0*
+*Last updated: 2026-08-05*

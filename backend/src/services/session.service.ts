@@ -97,6 +97,7 @@ export class SessionService {
       ragContext?: ChatMessage['ragContext'];
       confidence?: number;
       guardrailAction?: GuardrailResult['action'];
+      intent?: string;
     }
   ): Promise<ChatMessage | null> {
     const session = await this.getSession(sessionId);
@@ -110,6 +111,7 @@ export class SessionService {
       ragContext: options?.ragContext,
       confidence: options?.confidence,
       guardrailAction: options?.guardrailAction,
+      intent: options?.intent,
     });
 
     session.messages.push(message);

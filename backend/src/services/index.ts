@@ -7,3 +7,5 @@ export * from './embedding.service.js';
 export * from './vector-store.js';
 export * from './rag.service.js';
 export * from './rerank.service.js';
+export * from './intent-detection.service.js';
+export * from './response-formatter.service.js';

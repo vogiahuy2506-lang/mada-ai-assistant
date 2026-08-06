@@ -12,21 +12,31 @@ import {
   FileText, Video, Mic2, ImageIcon, File, X, Eye, Shield,
   Globe, ExternalLink, Star, Award, FileCheck, MessageCircle,
   Phone, Mail, UserCircle, Briefcase, LogOut, Sparkles,
-  Search, Pin, MessageSquare, PinOff
+  Search, Pin, MessageSquare, PinOff, Loader2, ArrowRight
 } from 'lucide-react';
 import clsx from 'clsx';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { CATEGORY_INFO, SAMPLE_QUESTIONS, type ATCategory, type Language, type ViewMode } from '@/types';
 
-// Attachment options
-const ATTACHMENT_OPTIONS = [
-  { id: 'image', icon: ImageIcon, label: 'Hình ảnh', accept: 'image/*', description: 'Tải lên hình ảnh' },
-  { id: 'document', icon: FileText, label: 'Tài liệu', accept: '.pdf,.doc,.docx,.txt', description: 'PDF, Word, Text' },
-  { id: 'video', icon: Video, label: 'Video', accept: 'video/*', description: 'Tải lên video' },
-  { id: 'audio', icon: Mic2, label: 'Âm thanh', accept: 'audio/*', description: 'Ghi âm hoặc file' },
-  { id: 'file', icon: File, label: 'File khác', accept: '*/*', description: 'Mọi loại file' },
-];
+// Attachment options - use getAttachmentOptions(language) inside component
+function getAttachmentOptions(lang: Language) {
+  const labels: Record<Language, { image: string; imageDesc: string; document: string; video: string; videoDesc: string; audio: string; audioDesc: string; file: string; fileDesc: string }> = {
+    vi: { image: 'Hình ảnh', imageDesc: 'Tải lên hình ảnh', document: 'Tài liệu', video: 'Video', videoDesc: 'Tải lên video', audio: 'Âm thanh', audioDesc: 'Ghi âm hoặc file', file: 'File khác', fileDesc: 'Mọi loại file' },
+    en: { image: 'Image', imageDesc: 'Upload image', document: 'Document', video: 'Video', videoDesc: 'Upload video', audio: 'Audio', audioDesc: 'Record or file', file: 'Other file', fileDesc: 'All files' },
+    ar: { image: 'صورة', imageDesc: 'تحميل صورة', document: 'مستند', video: 'فيديو', videoDesc: 'تحميل فيديو', audio: 'صوت', audioDesc: 'تسجيل أو ملف', file: 'ملف آخر', fileDesc: 'جميع الملفات' },
+    fr: { image: 'Image', imageDesc: 'Télécharger image', document: 'Document', video: 'Vidéo', videoDesc: 'Télécharger vidéo', audio: 'Audio', audioDesc: 'Enregistrer ou fichier', file: 'Autre fichier', fileDesc: 'Tous les fichiers' },
+  };
+  const l = labels[lang] || labels.vi;
+  
+  return [
+    { id: 'image', icon: ImageIcon, label: l.image, accept: 'image/*', description: l.imageDesc },
+    { id: 'document', icon: FileText, label: l.document, accept: '.pdf,.doc,.docx,.txt', description: 'PDF, Word, Text' },
+    { id: 'video', icon: Video, label: l.video, accept: 'video/*', description: l.videoDesc },
+    { id: 'audio', icon: Mic2, label: l.audio, accept: 'audio/*', description: l.audioDesc },
+    { id: 'file', icon: File, label: l.file, accept: '*/*', description: l.fileDesc },
+  ];
+}
 
 const LANGUAGES: { code: Language; name: string; flag: string }[] = [
   { code: 'vi', name: 'Tiếng Việt', flag: '🇻🇳' },
@@ -90,6 +100,52 @@ const CATEGORY_LABELS: Record<ATCategory, { title: string; titleEn: string; desc
     titleEn: 'EDUCATION', 
     desc: 'Tiêu chuẩn Công nghệ hỗ trợ...', 
     descEn: 'Assistive Technology standards...' 
+  },
+};
+
+// Category prompts - sent to AI when user clicks a category
+const CATEGORY_PROMPTS: Record<ATCategory, Record<Language, string>> = {
+  hearing: {
+    vi: 'Hãy giới thiệu về các thiết bị công nghệ hỗ trợ cho người khiếm thính, bao gồm máy trợ thính, hệ thống FM, thiết bị phản hồi âm thanh, và giải pháp kết nối.',
+    en: 'Introduce assistive technology devices for hearing impaired, including hearing aids, FM systems, alerting devices, and connectivity solutions.',
+    ar: 'قدم أجهزة تقنية مساعدة للمصابين بضعف السمع، بما في ذلك أجهزة السمع وأنظمة FM وأجهزة التنبيه.',
+    fr: 'Présentez les appareils technologiques d\'assistance pour les malentendants, y compris les appareils auditifs, les systèmes FM et les solutions de connectivité.',
+  },
+  vision: {
+    vi: 'Hãy giới thiệu về các thiết bị công nghệ hỗ trợ cho người khiếm thị, bao gồm phần mềm đọc màn hình, màn hình Braille, kính thông minh OrCam, và các công cụ tiếp cận khác.',
+    en: 'Introduce assistive technology devices for visually impaired, including screen readers, Braille displays, smart glasses like OrCam, and other accessibility tools.',
+    ar: 'قدم أجهزة تقنية مساعدة للمكفوفين، بما في ذلك قارئات الشاشة وشاشات برايل والنظارات الذكية.',
+    fr: 'Présentez les appareils technologiques d\'assistance pour les malvoyants, y compris les lecteurs d\'écran, les plages braille et les lunettes intelligentes.',
+  },
+  communication: {
+    vi: 'Hãy giới thiệu về các thiết bị giao tiếp tăng cường (AAC) cho người khó khăn trong giao tiếp, bao gồm thiết bị AAC, ứng dụng di động, và tổng hợp giọng nói.',
+    en: 'Introduce augmentative and alternative communication (AAC) devices for people with speech difficulties, including AAC devices, mobile apps, and speech synthesis.',
+    ar: 'قدم أجهزة الاتصال المعزز والبديل للأشخاص الذين يعانون من صعوبات في الكلام.',
+    fr: 'Présentez les appareils de communication augmentative et alternative (CAA) pour les personnes ayant des difficultés d\'élocution.',
+  },
+  cognition: {
+    vi: 'Hãy giới thiệu về các thiết bị hỗ trợ nhận thức cho người gặp khó khăn về trí nhớ, chú ý, và học tập, bao gồm thiết bị trợ nhớ, ứng dụng sắp xếp, và công cụ hỗ trợ nhận thức.',
+    en: 'Introduce cognitive support devices for people with memory, attention, and learning difficulties, including memory aids, organization apps, and cognitive support tools.',
+    ar: 'قدم أجهزة الدعم المعرفي للأشخاص الذين يعانون من صعوبات في الذاكرة والانتباه والتعلم.',
+    fr: 'Présentez les appareils de soutien cognitif pour les personnes ayant des difficultés de mémoire, d\'attention et d\'apprentissage.',
+  },
+  mobility: {
+    vi: 'Hãy giới thiệu về các thiết bị hỗ trợ vận động và di chuyển, bao gồm xe lăn điện, xe lăn thông minh, prosthetics, và các thiết bị hỗ trợ khác.',
+    en: 'Introduce mobility support devices including electric wheelchairs, smart wheelchairs, prosthetics, and other mobility aids.',
+    ar: 'قدم أجهزة دعم الحركة بما في ذلك الكراسي المتحركة الكهربائية والأطراف الصناعية.',
+    fr: 'Présentez les appareils de soutien à la mobilité incluant les fauteuils roulants électriques et les prothèses.',
+  },
+  daily_living: {
+    vi: 'Hãy giới thiệu về các thiết bị hỗ trợ sinh hoạt hàng ngày cho người khuyết tật, bao gồm dụng cụ ăn uống, thiết bị phòng tắm, và công cụ nhà bếp đặc biệt.',
+    en: 'Introduce daily living aids for people with disabilities, including eating aids, bathroom equipment, and special kitchen tools.',
+    ar: 'قدم أجهزة المعيشة اليومية للأشخاص ذوي الإعاقة، بما في ذلك أدوات الأكل ومعدات الحمام.',
+    fr: 'Présentez les aides à la vie quotidienne pour les personnes handicapées, incluant les ustensiles de repas et les équipements de salle de bain.',
+  },
+  education: {
+    vi: 'Hãy giới thiệu về các công nghệ hỗ trợ giáo dục cho người khuyết tật, bao gồm phần mềm đọc văn bản, công cụ accessibility, và các tài liệu học tập tiếp cận.',
+    en: 'Introduce educational assistive technologies for people with disabilities, including text-to-speech software, accessibility tools, and accessible learning materials.',
+    ar: 'قدم تقنيات المساعدة التعليمية للأشخاص ذوي الإعاقة، بما في ذلك برامج تحويل النص إلى كلام.',
+    fr: 'Présentez les technologies d\'assistance éducative pour les personnes handicapées, incluant les logiciels de synthèse vocale.',
   },
 };
 
@@ -560,7 +616,7 @@ export function ChatPage() {
   const [showAttachmentMenu, setShowAttachmentMenu] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showAgentMenu, setShowAgentMenu] = useState(false);
-  const [selectedFiles, setSelectedFiles] = useState<{ name: string; type: string; size: number; content?: string }[]>([]);
+  const [selectedFiles, setSelectedFiles] = useState<{ name: string; type: string; size: number; content?: string; originalFile?: File }[]>([]);
   const [activeCategory, setActiveCategory] = useState<ATCategory | null>(null);
 
   // Agent state
@@ -585,6 +641,9 @@ export function ChatPage() {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [speakingId, setSpeakingId] = useState<string | null>(null);
   const [showConsultationModal, setShowConsultationModal] = useState(false);
+  const [showUrlInput, setShowUrlInput] = useState(false);
+  const [urlInputValue, setUrlInputValue] = useState('');
+  const [isFetchingUrl, setIsFetchingUrl] = useState(false);
 
   // Helpers — format date relative + ISO
   const formatRelativeDate = (ts: number): string => {
@@ -621,6 +680,12 @@ export function ChatPage() {
       return () => clearTimeout(t);
     }
   }, []);
+  
+  // DEBUG: Log selectedFiles changes
+  useEffect(() => {
+    console.log('[MADA DEBUG] selectedFiles changed:', selectedFiles);
+  }, [selectedFiles]);
+  
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -733,66 +798,113 @@ export function ChatPage() {
 
     let currentConvId = activeConversationId;
     
-    // CHỈ tạo/lưu conversation vào history khi đã đăng nhập
-    if (currentUser) {
-      if (!currentConvId) {
-        currentConvId = crypto.randomUUID();
-        addOrUpdateConversation({
-          id: currentConvId,
-          title: userMessage.slice(0, 40) + (userMessage.length > 40 ? '...' : ''),
-          date: new Date().toISOString().slice(0, 10),
-          preview: userMessage,
-          messages: 1,
-          pinned: false,
-          category: activeCategory,
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-        });
-        setActiveConversationId(currentConvId);
-      } else {
-        touchConversation(currentConvId, userMessage);
-      }
+    // Tạo/lưu conversation vào history - CHO TẤT CẢ USER (đăng nhập hoặc không)
+    if (!currentConvId) {
+      currentConvId = currentUser ? crypto.randomUUID() : `anon-${crypto.randomUUID()}`;
+      addOrUpdateConversation({
+        id: currentConvId,
+        title: userMessage.slice(0, 40) + (userMessage.length > 40 ? '...' : ''),
+        date: new Date().toISOString().slice(0, 10),
+        preview: userMessage,
+        messages: 1,
+        pinned: false,
+        category: activeCategory,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      });
+      setActiveConversationId(currentConvId);
     } else {
-      // Không đăng nhập: dùng session ID tạm, không lưu vào history
-      if (!currentConvId) {
-        currentConvId = `session-${crypto.randomUUID()}`;
-        setActiveConversationId(currentConvId);
-      }
+      touchConversation(currentConvId, userMessage);
     }
 
     addMessage({ role: 'user', content: userMessage });
 
     // Xây dựng message với nội dung file
     let fullMessage = userMessage;
+    let attachments: any[] = [];
+    
     if (selectedFiles.length > 0) {
-      const fileContents = selectedFiles.map(f => {
-        if (f.content) {
-          return `[File: ${f.name}]\n${f.content}`;
+      console.log('[DEBUG] Processing files:', selectedFiles.length);
+      
+      // Chuẩn bị attachments để gửi lên server
+      for (const f of selectedFiles) {
+        if (f.content && !f.content.includes('đang chờ parse')) {
+          // Text content đã có sẵn
+          attachments.push({
+            type: 'text',
+            name: f.name,
+            content: f.content,
+          });
+        } else if (f.originalFile) {
+          // File cần parse - đọc base64
+          try {
+            const arrayBuffer = await f.originalFile.arrayBuffer();
+            const base64 = btoa(
+              new Uint8Array(arrayBuffer)
+                .reduce((data, byte) => data + String.fromCharCode(byte), '')
+            );
+            attachments.push({
+              type: f.type || f.name,
+              name: f.name,
+              base64: base64,
+            });
+          } catch (e) {
+            console.log('[DEBUG] Failed to read file:', f.name);
+          }
         }
-        return `[File: ${f.name} - Không đọc được nội dung]`;
-      }).join('\n\n');
-      fullMessage = `${userMessage}\n\n--- File đính kèm ---\n${fileContents}`;
+      }
+      
+      fullMessage = userMessage;
     }
 
     let apiSuccess = false;
 
     try {
-      const response = await fetch('/api/chat', {
+      // Gửi chat với file đính kèm
+      const chatEndpoint = attachments.length > 0 ? '/api/chat-with-file' : '/api/chat';
+      const chatBody: any = { 
+        message: fullMessage, 
+        language,
+        agentId: selectedAgentId,
+        agentPrompt: selectedAgent?.systemPrompt,
+      };
+      
+      // Thêm attachments nếu có
+      if (attachments.length > 0) {
+        chatBody.attachments = attachments;
+      }
+      
+      const response = await fetch(chatEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          message: fullMessage, 
-          language,
-          agentId: selectedAgentId,
-          agentPrompt: selectedAgent?.systemPrompt,
-        }),
+        body: JSON.stringify(chatBody),
       });
 
-      const data = await response.json();
+      // Check if response is OK
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('API Error:', response.status, errorText);
+        throw new Error(`Server error: ${response.status}`);
+      }
+
+      // Try to parse JSON, handle errors gracefully
+      let data;
+      try {
+        data = await response.json();
+      } catch (parseError) {
+        console.error('JSON parse error:', parseError);
+        throw new Error('Invalid response from server');
+      }
 
       if (data.success && data.data) {
         apiSuccess = true;
-        const fullContent = data.data.answer;
+        // Support both 'answer' and 'message' fields for compatibility
+        const fullContent = data.data.answer || data.data.message || '';
+        
+        if (!fullContent) {
+          throw new Error('Empty response from AI');
+        }
+        
         const chars = fullContent.split('');
 
         for (let i = 0; i < chars.length; i++) {
@@ -834,10 +946,9 @@ export function ChatPage() {
       setStreamingContent('');
       setSelectedFiles([]); // Xóa files sau khi gửi
 
-      // Auto-save messages to history store - CHỈ khi đã đăng nhập
-      const { user: currentUser } = useAuthStore.getState();
+      // Auto-save messages to history store - CHO TẤT CẢ USER
       const currentMessages = useChatStore.getState().messages;
-      if (currentUser && currentConvId && currentMessages.length > 0) {
+      if (currentConvId && currentMessages.length > 0) {
         saveConversationMessages(currentConvId, currentMessages);
       }
     }
@@ -854,10 +965,8 @@ export function ChatPage() {
     window.speechSynthesis?.cancel();
     setSpeakingId(null);
 
-    const { user: currentUser } = useAuthStore.getState();
-
-    // Save current conversation before clearing - CHỈ khi đã đăng nhập
-    if (currentUser && activeConversationId && messages.length > 0) {
+    // Save current conversation before clearing
+    if (activeConversationId && messages.length > 0) {
       saveConversationMessages(activeConversationId, messages);
     }
 
@@ -880,10 +989,8 @@ export function ChatPage() {
     window.speechSynthesis?.cancel();
     setSpeakingId(null);
 
-    const { user: currentUser } = useAuthStore.getState();
-
-    // Save current conversation messages before switching - CHỈ khi đã đăng nhập
-    if (currentUser && activeConversationId && messages.length > 0) {
+    // Save current conversation messages before switching
+    if (activeConversationId && messages.length > 0) {
       saveConversationMessages(activeConversationId, messages);
     }
 
@@ -957,7 +1064,7 @@ export function ChatPage() {
       if (files && files.length > 0) {
         const processedFiles = await Promise.all(
           Array.from(files).map(async (file) => {
-            const fileData: { name: string; type: string; size: number; content?: string } = {
+            const fileData: { name: string; type: string; size: number; content?: string; originalFile?: File } = {
               name: file.name,
               type: file.type,
               size: file.size,
@@ -965,26 +1072,25 @@ export function ChatPage() {
             
             // Đọc nội dung file
             try {
-              if (file.type.startsWith('text/') || 
+              if (file.type.startsWith('image/')) {
+                // Image - convert to base64 for preview
+                const reader = new FileReader();
+                const base64Promise = new Promise<string>((resolve) => {
+                  reader.onload = (e) => resolve(e.target?.result as string);
+                });
+                reader.readAsDataURL(file);
+                fileData.content = await base64Promise;
+              } else if (file.type.startsWith('text/') || 
                   file.name.endsWith('.txt') || 
                   file.name.endsWith('.md') ||
                   file.name.endsWith('.json')) {
                 const text = await file.text();
                 fileData.content = text;
               } else if (file.type === 'application/pdf') {
-                // PDF - đọc bằng pdf.js
-                const arrayBuffer = await file.arrayBuffer();
-                const pdfjsLib = await import('pdfjs-dist');
-                pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
-                const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-                let fullText = '';
-                for (let i = 1; i <= Math.min(pdf.numPages, 10); i++) { // Giới hạn 10 trang
-                  const page = await pdf.getPage(i);
-                  const textContent = await page.getTextContent();
-                  const pageText = textContent.items.map((item: any) => item.str).join(' ');
-                  fullText += pageText + '\n';
-                }
-                fileData.content = fullText.slice(0, 10000); // Giới hạn 10000 ký tự
+                // PDF - gửi file lên server để parse
+                // Lưu file để gửi kèm request
+                fileData.content = `[File PDF: ${file.name}]\n(Kích thước: ${(file.size / 1024).toFixed(1)} KB - đang chờ parse...)`;
+                fileData.originalFile = file; // Lưu file gốc để gửi lên server
               } else if (file.type.includes('word') || file.name.endsWith('.docx')) {
                 // DOCX - đọc bằng mammoth
                 const arrayBuffer = await file.arrayBuffer();
@@ -1004,17 +1110,75 @@ export function ChatPage() {
               fileData.content = `[Không thể đọc nội dung file: ${file.name}]`;
             }
             
+            console.log('[MADA] File processed:', fileData);
             return fileData;
           })
         );
         
         setSelectedFiles(prev => [...prev, ...processedFiles]);
         
+        // Hiển thị file preview trong chat với nội dung
         const fileList = Array.from(files).map(f => f.name).join(', ');
-        addMessage({
-          role: 'user',
-          content: `📎 Đã đính kèm: ${fileList}`,
-        });
+        if (processedFiles.length === 1 && processedFiles[0].content) {
+          // Nếu là file text/URL, hiển thị preview
+          const file = processedFiles[0];
+          const fileContent = file.content || '';
+          const previewContent = fileContent.length > 500 
+            ? fileContent.slice(0, 500) + '...\n\n*(nội dung đầy đủ sẽ được gửi kèm)*'
+            : fileContent;
+          
+          if (file.type === 'text/url') {
+            addMessage({
+              role: 'user',
+              content: `📎 Đã đính kèm: **${file.name}**\n\n${previewContent}`,
+            });
+          } else if (file.type.startsWith('text/') || file.name.match(/\.(txt|md|json)$/)) {
+            addMessage({
+              role: 'user',
+              content: `📄 Đã đính kèm: **${file.name}**\n\`\`\`\n${previewContent}\n\`\`\``,
+            });
+          } else if (file.type === 'application/pdf') {
+            addMessage({
+              role: 'user',
+              content: `📕 Đã đính kèm: **${file.name}**\n*(File PDF - ${(file.size / 1024).toFixed(1)} KB)*`,
+            });
+          } else if (file.type.includes('word') || file.name.endsWith('.docx')) {
+            addMessage({
+              role: 'user',
+              content: `📘 Đã đính kèm: **${file.name}**\n*(File Word - ${(file.size / 1024).toFixed(1)} KB)*`,
+            });
+          } else if (file.type.startsWith('image/')) {
+            addMessage({
+              role: 'user',
+              content: `🖼️ Đã đính kèm: **${file.name}**`,
+            });
+          } else if (file.type.startsWith('video/')) {
+            addMessage({
+              role: 'user',
+              content: `🎬 Đã đính kèm: **${file.name}**\n*(Video - ${(file.size / (1024 * 1024)).toFixed(1)} MB)*`,
+            });
+          } else if (file.type.startsWith('audio/')) {
+            addMessage({
+              role: 'user',
+              content: `🎵 Đã đính kèm: **${file.name}**\n*(Audio - ${(file.size / (1024 * 1024)).toFixed(1)} MB)*`,
+            });
+          } else {
+            addMessage({
+              role: 'user',
+              content: `📎 Đã đính kèm: **${file.name}**\n*(Nội dung đã được đọc, sẽ gửi kèm khi bạn nhấn Enter)*`,
+            });
+          }
+        } else if (processedFiles.length > 1) {
+          addMessage({
+            role: 'user',
+            content: `📎 Đã đính kèm ${processedFiles.length} files: ${fileList}`,
+          });
+        } else {
+          addMessage({
+            role: 'user',
+            content: `📎 Đã đính kèm: ${fileList}`,
+          });
+        }
       }
     };
     
@@ -1024,6 +1188,54 @@ export function ChatPage() {
 
   const handleRemoveFile = (index: number) => {
     setSelectedFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  // Fetch content from URL
+  const handleFetchUrl = async () => {
+    if (!urlInputValue.trim()) return;
+
+    let url = urlInputValue.trim();
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      url = 'https://' + url;
+    }
+
+    setIsFetchingUrl(true);
+    setShowAttachmentMenu(false);
+
+    try {
+      const response = await fetch(`/api/scrape?url=${encodeURIComponent(url)}`);
+      const data = await response.json();
+
+      if (data.success) {
+        // Thêm vào selectedFiles để gửi cùng chat
+        setSelectedFiles(prev => [...prev, {
+          name: data.data?.title || new URL(url).hostname,
+          type: 'text/url',
+          size: (data.data?.content || '').length,
+          content: `[Nguồn: ${url}]\n\n${data.data?.content || ''}`,
+        }]);
+
+        addMessage({
+          role: 'user',
+          content: `🔗 Đã tải nội dung từ: ${url}\n\n**${data.data?.title || 'Không có tiêu đề'}**\n\n${(data.data?.content || '').slice(0, 500)}${(data.data?.content || '').length > 500 ? '...' : ''}`,
+        });
+      } else {
+        addMessage({
+          role: 'assistant',
+          content: `❌ Không thể tải nội dung từ URL: ${data.error || 'Lỗi không xác định'}`,
+        });
+      }
+    } catch (error) {
+      console.error('Fetch URL error:', error);
+      addMessage({
+        role: 'assistant',
+        content: `❌ Không thể kết nối đến URL. Vui lòng kiểm tra lại đường dẫn.`,
+      });
+    } finally {
+      setIsFetchingUrl(false);
+      setUrlInputValue('');
+      setShowUrlInput(false);
+    }
   };
 
   const handleConsultationSubmit = (data: { name: string; email: string; phone: string; message: string }) => {
@@ -1094,7 +1306,7 @@ export function ChatPage() {
             className="w-full text-white rounded-full py-2.5 px-4 flex items-center justify-center gap-2 font-semibold shadow-lg hover:opacity-90 transition-all bg-blue-600 hover:bg-blue-700 text-sm"
           >
             <Plus className="w-4 h-4" strokeWidth={2.5} />
-            Trò chuyện mới
+            {language === 'vi' ? 'Trò chuyện mới' : language === 'en' ? 'New Chat' : language === 'ar' ? 'محادثة جديدة' : 'Nouvelle conversation'}
           </button>
         </div>
 
@@ -1143,8 +1355,15 @@ export function ChatPage() {
                       setSidebarOpen(false);
                     }
 
+                    // Tự động hỏi AI về category được chọn
                     setTimeout(() => {
-                      textareaRef.current?.focus();
+                      const categoryPrompt = CATEGORY_PROMPTS[category]?.[language] || CATEGORY_PROMPTS[category]?.vi || '';
+                      if (categoryPrompt) {
+                        setInputValue(categoryPrompt);
+                        setTimeout(() => {
+                          handleSend();
+                        }, 50);
+                      }
                     }, 100);
                   }
                 }}
@@ -1194,7 +1413,7 @@ export function ChatPage() {
                   type="text"
                   value={historySearch}
                   onChange={(e) => setHistorySearchQuery(e.target.value)}
-                  placeholder="Tìm hội thoại..."
+                  placeholder={language === 'vi' ? 'Tìm hội thoại...' : language === 'en' ? 'Search conversations...' : language === 'ar' ? 'البحث في المحادثات...' : 'Rechercher...'}
                   className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 border border-slate-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-300 text-slate-700 placeholder:text-slate-400 transition-colors"
                 />
               </div>
@@ -1204,8 +1423,8 @@ export function ChatPage() {
               {historyConversations.length === 0 && (
                 <div className="flex flex-col items-center justify-center text-center px-4 py-8 text-slate-400">
                   <MessageSquare className="w-7 h-7 mb-2 opacity-40" />
-                  <p className="text-xs font-medium">Chưa có hội thoại nào</p>
-                  <p className="text-[10px] mt-1 opacity-70">Bắt đầu chat để lưu lịch sử tự động</p>
+                  <p className="text-xs font-medium">{language === 'vi' ? 'Chưa có hội thoại nào' : language === 'en' ? 'No conversations yet' : language === 'ar' ? 'لا توجد محادثات' : 'Pas de conversations'}</p>
+                  <p className="text-[10px] mt-1 opacity-70">{language === 'vi' ? 'Bắt đầu chat để lưu lịch sử tự động' : language === 'en' ? 'Start chatting to save history automatically' : language === 'ar' ? 'ابدأ المحادثة للحفظ التلقائي' : 'Commencez à discuter'}</p>
                 </div>
               )}
 
@@ -1389,7 +1608,10 @@ export function ChatPage() {
             <span className="text-slate-300 mx-2 hidden lg:block">|</span>
             <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
               <span className="w-2 h-2 rounded-full bg-green-500"></span>
-              {isEndUser ? 'Premium Intelligence' : 'AT Specialist Mode'}
+              {isEndUser 
+                ? (language === 'vi' ? 'Premium Intelligence' : language === 'en' ? 'Premium Intelligence' : language === 'ar' ? 'ذكاء متميز' : 'Intelligence Premium')
+                : (language === 'vi' ? 'AT Specialist Mode' : language === 'en' ? 'AT Specialist Mode' : language === 'ar' ? 'وضع خبير AT' : 'Mode Spécialiste AT')
+              }
             </div>
           </div>
           
@@ -1466,9 +1688,9 @@ export function ChatPage() {
 
                 {showLanguageMenu && (
                   <div className="absolute right-0 top-full mt-2 w-56 bg-white border border-slate-200 rounded-xl shadow-xl z-50 overflow-hidden">
-                    <div className="px-3 py-2 border-b border-slate-100">
-                      <p className="text-xs font-bold text-slate-400 uppercase">Ngôn ngữ</p>
-                    </div>
+                  <div className="px-3 py-2 border-b border-slate-100">
+                    <p className="text-xs font-bold text-slate-400 uppercase">{language === 'vi' ? 'Ngôn ngữ' : language === 'en' ? 'Language' : language === 'ar' ? 'اللغة' : 'Langue'}</p>
+                  </div>
                     <div className="p-1">
                       {LANGUAGES.map((lang) => (
                         <button
@@ -1537,21 +1759,30 @@ export function ChatPage() {
                   </h2>
                   <p className="text-slate-500 text-lg">
                     {activeCategory 
-                      ? (isEndUser ? CATEGORY_LABELS[activeCategory].desc : CATEGORY_LABELS[activeCategory].descEn)
-                      : 'Hệ thống tư vấn Công nghệ Hỗ trợ bằng trí tuệ nhân tạo'}
+                      ? (language === 'en' ? CATEGORY_LABELS[activeCategory].descEn : CATEGORY_LABELS[activeCategory].desc)
+                      : (language === 'vi' ? 'Hệ thống tư vấn Công nghệ Hỗ trợ bằng trí tuệ nhân tạo' : language === 'en' ? 'AI-powered Assistive Technology consultation system' : language === 'ar' ? 'نظام استشارة التكنولوجيا المساعدة بالذكاء الاصطناعي' : 'Système de consultation en technologie d\'assistance par IA')
+                    }
                   </p>
                   <div className="mt-4 inline-flex items-center gap-2 px-4 py-1.5 bg-slate-100 rounded-full text-xs font-semibold text-slate-400">
                     <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
-                    Mẹo: Nhấn <kbd className="bg-white px-1.5 py-0.5 rounded border border-slate-200 text-slate-600 mx-1 font-mono">Ctrl + Enter</kbd> để gửi nhanh
+                    {language === 'vi' ? 'Mẹo: Nhấn' : language === 'en' ? 'Tip: Press' : language === 'ar' ? 'تلميح: اضغط' : 'Astuce: Appuyez sur'} <kbd className="bg-white px-1.5 py-0.5 rounded border border-slate-200 text-slate-600 mx-1 font-mono">Ctrl + Enter</kbd> {language === 'vi' ? 'để gửi nhanh' : language === 'en' ? 'to send quickly' : language === 'ar' ? 'للإرسال السريع' : 'pour envoyer'}
                   </div>
                 </div>
 
-                {/* Dynamic Category Questions or Sample Questions */}
+                {/* Dynamic Category Questions or Sample Questions - Beautiful Design */}
                 <div className="w-full max-w-3xl">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4 text-center">
-                    {activeCategory ? (isEndUser ? 'Chọn câu hỏi bên dưới:' : 'Select a question:') : (isEndUser ? 'Gợi ý hỏi mẫu:' : 'Sample questions:')}
-                  </p>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="h-px flex-1 bg-gradient-to-r from-transparent via-slate-200 to-transparent"></div>
+                    <span className="text-xs font-medium text-slate-400 uppercase tracking-wider px-4">
+                      {activeCategory 
+                        ? (language === 'vi' ? 'Câu hỏi gợi ý' : language === 'en' ? 'Suggested questions' : language === 'ar' ? 'أسئلة مقترحة' : 'Questions suggérées')
+                        : (language === 'vi' ? 'Khám phá ngay' : language === 'en' ? 'Explore now' : language === 'ar' ? 'استكشف الآن' : 'Explorer')
+                      }
+                    </span>
+                    <div className="h-px flex-1 bg-gradient-to-r from-transparent via-slate-200 to-transparent"></div>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {(activeCategory ? currentQuestions : [
                       isEndUser ? 'Làm thế nào để tra cứu nhanh xem một thiết bị trợ giúp có an toàn và đạt quy chuẩn kỹ thuật không?' : 'Compare WCAG 2.1 Level AAA compliance for screen readers',
                       isEndUser ? 'Tôi cần tìm thiết bị hỗ trợ cho người khiếm thị' : 'What AT devices are available for blind users?',
@@ -1564,12 +1795,35 @@ export function ChatPage() {
                           setInputValue(question);
                           textareaRef.current?.focus();
                         }}
-                        className="bg-white border border-slate-200 px-5 py-4 rounded-xl text-sm text-slate-600 hover:border-blue-500 hover:bg-blue-50 cursor-pointer transition-all text-left flex items-start gap-3 group"
+                        className="group relative bg-white border border-slate-200 rounded-2xl p-5 text-left hover:border-violet-300 hover:shadow-lg hover:shadow-violet-100 transition-all duration-300 overflow-hidden"
                       >
-                        <span className="material-symbols-outlined text-lg text-blue-400 group-hover:text-blue-500 flex-shrink-0 mt-0.5">
-                          {activeCategory ? CATEGORY_ICONS[activeCategory] : 'chat'}
-                        </span>
-                        {question}
+                        {/* Gradient background on hover */}
+                        <div className="absolute inset-0 bg-gradient-to-br from-violet-50/0 via-purple-50/0 to-blue-50/0 group-hover:from-violet-50/50 group-hover:via-purple-50/30 group-hover:to-blue-50/30 transition-all duration-500 opacity-0 group-hover:opacity-100" />
+                        
+                        {/* Number indicator */}
+                        <div className="absolute top-3 right-3 w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-400 group-hover:bg-violet-100 group-hover:text-violet-600 transition-colors">
+                          {index + 1}
+                        </div>
+                        
+                        {/* Icon */}
+                        <div className="relative z-10 flex items-start gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-100 to-blue-100 flex items-center justify-center flex-shrink-0 group-hover:from-violet-200 group-hover:to-blue-200 transition-colors">
+                            <span className="material-symbols-outlined text-lg text-violet-600" style={{ fontVariationSettings: "'FILL' 1" }}>
+                              {activeCategory ? CATEGORY_ICONS[activeCategory] : (index === 0 ? 'search' : index === 1 ? 'visibility' : index === 2 ? 'hearing' : 'rule')}
+                            </span>
+                          </div>
+                          <p className="text-sm text-slate-600 group-hover:text-slate-800 leading-relaxed flex-1">
+                            {question}
+                          </p>
+                        </div>
+                        
+                        {/* Arrow indicator */}
+                        <div className="relative z-10 mt-3 flex items-center gap-1 text-[10px] font-medium text-slate-400 group-hover:text-violet-500 transition-colors">
+                          <span>{language === 'vi' ? 'Nhấn để hỏi' : language === 'en' ? 'Press to ask' : language === 'ar' ? 'اضغط للسؤال' : 'Appuyez pour demander'}</span>
+                          <svg className="w-3 h-3 transform group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                          </svg>
+                        </div>
                       </button>
                     ))}
                   </div>
@@ -1605,6 +1859,7 @@ export function ChatPage() {
                     speakingId={speakingId}
                     viewMode={viewMode}
                     onRequestConsultation={() => setShowConsultationModal(true)}
+                    language={language}
                   />
                 ))}
 
@@ -1641,36 +1896,78 @@ export function ChatPage() {
                 <div ref={messagesEndRef} />
               </div>
 
-              {/* Category Quick Questions - Hiển thị gọn khi đang chat */}
-              {activeCategory && !inputValue && (
-                <div className="mb-3 px-3 py-2 bg-slate-50/60 rounded-xl border border-slate-200/60 backdrop-blur-sm">
-                  <div className="flex items-center gap-1.5 mb-2">
-                    <span className="material-symbols-outlined text-[11px] text-slate-400">
-                      {CATEGORY_ICONS[activeCategory]}
-                    </span>
-                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
-                      {isEndUser ? 'Gợi ý' : 'Suggestions'}
-                    </p>
+              {/* Category Quick Questions - Show AFTER AI finishes responding */}
+              {activeCategory && !inputValue && messages.length > 0 && !isLoading && (
+                <div className="mb-4 group">
+                  {/* Header */}
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 via-purple-500 to-indigo-500 flex items-center justify-center shadow-lg shadow-violet-500/30 group-hover:shadow-xl group-hover:shadow-violet-500/40 transition-all">
+                      <span className="material-symbols-outlined text-lg text-white" style={{ fontVariationSettings: "'FILL' 1" }}>
+                        {CATEGORY_ICONS[activeCategory]}
+                      </span>
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-sm font-bold bg-gradient-to-r from-violet-600 to-indigo-600 bg-clip-text text-transparent">
+                        {isEndUser 
+                          ? (language === 'vi' ? 'Gợi ý câu hỏi' : language === 'en' ? 'Suggested Questions' : 'اقتراحات سريعة')
+                          : 'Quick suggestions'
+                        }
+                      </h3>
+                      <p className="text-[11px] text-slate-400">
+                        {language === 'vi' ? 'Chạm để hỏi ngay • Tap to ask' : language === 'en' ? 'Tap to ask instantly' : 'انقر للسؤال'}
+                      </p>
+                    </div>
                     <button
                       onClick={() => setActiveCategory(null)}
-                      className="ml-auto text-slate-300 hover:text-slate-500 transition-colors"
-                      aria-label="Đóng gợi ý"
+                      className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-400 hover:text-slate-600 transition-all opacity-0 group-hover:opacity-100"
+                      aria-label={language === 'vi' ? 'Đóng' : 'Close'}
                     >
-                      <X className="w-3 h-3" />
+                      <X className="w-4 h-4" />
                     </button>
                   </div>
-                  {/* Scroll ngang để tiết kiệm diện tích */}
-                  <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-thin">
-                    {currentQuestions.slice(0, 5).map((question, index) => (
+                  
+                  {/* Suggestions Grid - Modern Card Style */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {currentQuestions.slice(0, 6).map((question, index) => (
                       <button
                         key={index}
                         onClick={() => {
                           setInputValue(question);
                           textareaRef.current?.focus();
                         }}
-                        className="flex-shrink-0 px-2.5 py-1 bg-white border border-slate-200 rounded-full text-[11px] text-slate-600 hover:border-blue-500 hover:text-blue-500 hover:bg-blue-50 transition-all whitespace-nowrap"
+                        className="group/item relative overflow-hidden p-4 bg-white rounded-2xl border border-slate-200 hover:border-violet-300 hover:shadow-lg hover:shadow-violet-500/10 transition-all duration-300 text-left active:scale-[0.98]"
                       >
-                        {question.length > 32 ? question.slice(0, 32) + '…' : question}
+                        {/* Background gradient on hover */}
+                        <div className="absolute inset-0 bg-gradient-to-br from-violet-50/0 via-purple-50/0 to-indigo-50/0 group-hover/item:from-violet-50/50 group-hover/item:via-purple-50/50 group-hover/item:to-indigo-50/50 transition-all duration-300 rounded-2xl" />
+                        
+                        <div className="relative flex items-start gap-3">
+                          {/* Icon Badge */}
+                          <div className={clsx(
+                            'w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors',
+                            index === 0 && 'bg-amber-100 text-amber-600 group-hover/item:bg-amber-200',
+                            index === 1 && 'bg-emerald-100 text-emerald-600 group-hover/item:bg-emerald-200',
+                            index === 2 && 'bg-blue-100 text-blue-600 group-hover/item:bg-blue-200',
+                            index === 3 && 'bg-rose-100 text-rose-600 group-hover/item:bg-rose-200',
+                            index === 4 && 'bg-violet-100 text-violet-600 group-hover/item:bg-violet-200',
+                            index === 5 && 'bg-cyan-100 text-cyan-600 group-hover/item:bg-cyan-200',
+                          )}>
+                            <span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>
+                              {index === 0 ? 'lightbulb' : index === 1 ? 'search' : index === 2 ? 'info' : index === 3 ? 'help' : index === 4 ? 'smart_toy' : 'chat'}
+                            </span>
+                          </div>
+                          
+                          {/* Text */}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm text-slate-700 leading-snug group-hover/item:text-violet-700 transition-colors font-medium">
+                              {question.length > 50 ? question.slice(0, 50) + '…' : question}
+                            </p>
+                          </div>
+                          
+                          {/* Arrow indicator */}
+                          <div className="opacity-0 group-hover/item:opacity-100 transition-opacity">
+                            <ArrowRight className="w-4 h-4 text-violet-500" />
+                          </div>
+                        </div>
                       </button>
                     ))}
                   </div>
@@ -1690,32 +1987,93 @@ export function ChatPage() {
               </button>
             </div>
 
-            {/* Selected Files Preview */}
+            {/* DEBUG: Show file count */}
             {selectedFiles.length > 0 && (
-              <div className="mb-3 flex flex-wrap gap-2">
+              <div className="mb-2 px-3 py-1.5 bg-yellow-100 border border-yellow-300 rounded-lg text-xs text-yellow-800 flex items-center gap-2">
+                <span className="font-bold">📎</span>
+                <span>{selectedFiles.length} file(s) đính kèm</span>
+                <span className="text-yellow-600">•</span>
+                <span>{selectedFiles.map(f => f.name).join(', ')}</span>
+              </div>
+            )}
+
+            {/* Selected Files Preview - Enhanced Display */}
+            {selectedFiles.length > 0 && (
+              <div className="mb-3 space-y-2">
                 {selectedFiles.map((file, index) => (
-                  <div 
+                  <div
                     key={index}
-                    className="flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-full text-sm"
+                    className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl shadow-sm hover:shadow-md transition-shadow"
                   >
-                    {file.type.startsWith('image/') ? (
-                      <ImageIcon className="w-4 h-4 text-blue-500" />
-                    ) : file.type.startsWith('video/') ? (
-                      <Video className="w-4 h-4 text-blue-500" />
-                    ) : file.type.startsWith('audio/') ? (
-                      <Mic2 className="w-4 h-4 text-blue-500" />
-                    ) : (
-                      <FileText className="w-4 h-4 text-blue-500" />
-                    )}
-                    <span className="text-blue-700 font-medium max-w-[150px] truncate">{file.name}</span>
-                    <button
-                      onClick={() => handleRemoveFile(index)}
-                      className="p-0.5 hover:bg-blue-100 rounded-full transition-colors"
-                    >
-                      <X className="w-3.5 h-3.5 text-blue-500" />
-                    </button>
+                    {/* File Type Icon / Image Preview */}
+                    <div className={clsx(
+                      'w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden',
+                      file.type.startsWith('image/') && 'bg-pink-100 text-pink-600',
+                      file.type.startsWith('video/') && 'bg-purple-100 text-purple-600',
+                      file.type.startsWith('audio/') && 'bg-amber-100 text-amber-600',
+                      file.type === 'application/pdf' && 'bg-red-100 text-red-600',
+                      file.type.includes('word') && 'bg-blue-100 text-blue-600',
+                      file.type === 'text/url' && 'bg-green-100 text-green-600',
+                      !file.type.startsWith('image/') && !file.type.startsWith('video/') &&
+                        !file.type.startsWith('audio/') && file.type !== 'application/pdf' &&
+                        !file.type.includes('word') && file.type !== 'text/url' && 'bg-gray-100 text-gray-600'
+                    )}>
+                      {file.type.startsWith('image/') && file.content ? (
+                        // Image preview - check if it's a base64 data URL
+                        file.content.startsWith('data:') ? (
+                          <img src={file.content} alt={file.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <ImageIcon className="w-5 h-5" />
+                        )
+                      ) : file.type.startsWith('image/') ? (
+                        <ImageIcon className="w-5 h-5" />
+                      ) : file.type.startsWith('video/') ? (
+                        <Video className="w-5 h-5" />
+                      ) : file.type.startsWith('audio/') ? (
+                        <Mic2 className="w-5 h-5" />
+                      ) : file.type === 'application/pdf' ? (
+                        <FileText className="w-5 h-5" />
+                      ) : file.type === 'text/url' ? (
+                        <Globe className="w-5 h-5" />
+                      ) : (
+                        <File className="w-5 h-5" />
+                      )}
+                    </div>
+
+                    {/* File Info */}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-slate-800 truncate">{file.name}</p>
+                      <p className="text-xs text-slate-500">
+                        {file.size > 0 ? `${(file.size / 1024).toFixed(1)} KB` : 'Đã đọc nội dung'}
+                      </p>
+                    </div>
+
+                    {/* File Status Badge */}
+                    <div className="flex items-center gap-2">
+                      {file.content ? (
+                        <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-700 rounded-full">
+                          ✓ Sẵn sàng
+                        </span>
+                      ) : (
+                        <span className="px-2 py-1 text-xs font-medium bg-amber-100 text-amber-700 rounded-full">
+                          ⚠ Chờ xử lý
+                        </span>
+                      )}
+                      <button
+                        onClick={() => handleRemoveFile(index)}
+                        className="p-1.5 hover:bg-red-100 rounded-lg transition-colors group"
+                        title="Xóa file"
+                      >
+                        <X className="w-4 h-4 text-slate-400 group-hover:text-red-500" />
+                      </button>
+                    </div>
                   </div>
                 ))}
+
+                {/* Action Hint */}
+                <p className="text-xs text-slate-400 text-center">
+                  Nhấn Enter hoặc bấm nút gửi để AI đọc file này
+                </p>
               </div>
             )}
 
@@ -1742,12 +2100,58 @@ export function ChatPage() {
 
                   {/* Attachment Menu */}
                   {showAttachmentMenu && (
-                    <div className="absolute bottom-full left-0 mb-2 w-64 bg-white border border-slate-200 rounded-xl shadow-xl z-50 overflow-hidden">
-                      <div className="px-4 py-3 border-b border-slate-100 bg-slate-50">
+                    <div className="absolute bottom-full left-0 mb-2 w-72 bg-white border border-slate-200 rounded-xl shadow-xl z-50 overflow-hidden">
+                      <div className="px-4 py-3 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
                         <p className="text-sm font-bold text-slate-700">Thêm tệp đính kèm</p>
+                        <button
+                          onClick={() => setShowUrlInput(!showUrlInput)}
+                          className={clsx(
+                            'px-3 py-1 text-xs font-medium rounded-full transition-colors',
+                            showUrlInput
+                              ? 'bg-blue-500 text-white'
+                              : 'bg-blue-100 text-blue-600 hover:bg-blue-200'
+                          )}
+                        >
+                          🌐 URL
+                        </button>
                       </div>
+
+                      {/* URL Input Section */}
+                      {showUrlInput && (
+                        <div className="p-3 border-b border-slate-100 bg-blue-50">
+                          <p className="text-xs text-blue-600 mb-2">Nhập link web để AI đọc và phân tích nội dung:</p>
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              value={urlInputValue}
+                              onChange={(e) => setUrlInputValue(e.target.value)}
+                              onKeyDown={(e) => e.key === 'Enter' && handleFetchUrl()}
+                              placeholder="https://example.com"
+                              className="flex-1 px-3 py-2 text-sm border border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                            <button
+                              onClick={handleFetchUrl}
+                              disabled={!urlInputValue.trim() || isFetchingUrl}
+                              className="px-4 py-2 bg-blue-500 text-white text-sm font-medium rounded-lg hover:bg-blue-600 disabled:opacity-50 flex items-center gap-2"
+                            >
+                              {isFetchingUrl ? (
+                                <>
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                  Đang tải...
+                                </>
+                              ) : (
+                                <>
+                                  <Sparkles className="w-4 h-4" />
+                                  Đọc
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
                       <div className="p-1.5 grid grid-cols-1 gap-0.5">
-                        {ATTACHMENT_OPTIONS.map((option) => (
+                        {getAttachmentOptions(language).map((option) => (
                           <button
                             key={option.id}
                             onClick={() => handleAttachmentSelect(option.id, option.accept)}
@@ -1773,7 +2177,10 @@ export function ChatPage() {
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder={isEndUser ? "Message MADA AI..." : "Ask AT Specialist..."}
+                  placeholder={isEndUser 
+                    ? (language === 'vi' ? 'Hỏi MADA AI...' : language === 'en' ? 'Message MADA AI...' : language === 'ar' ? 'رسالة MADA AI...' : 'Message MADA AI...')
+                    : (language === 'vi' ? 'Hỏi chuyên gia AT...' : language === 'en' ? 'Ask AT Specialist...' : language === 'ar' ? 'اسأل خبير AT...' : 'Demander au spécialiste...')
+                  }
                   rows={1}
                   className="flex-1 border-none focus:ring-0 text-slate-800 bg-transparent py-2 text-sm placeholder:text-slate-400 resize-none leading-tight"
                   style={{ minHeight: '36px', maxHeight: '100px' }}
@@ -1828,7 +2235,8 @@ function MessageBubble({
   onSpeak, 
   speakingId,
   viewMode,
-  onRequestConsultation
+  onRequestConsultation,
+  language = 'vi' as Language
 }: { 
   message: Message; 
   onCopy: (content: string, id: string) => void;
@@ -1837,6 +2245,7 @@ function MessageBubble({
   speakingId: string | null;
   viewMode: ViewMode;
   onRequestConsultation: () => void;
+  language?: Language;
 }) {
   const [showSources, setShowSources] = useState(false);
   const [feedback, setFeedback] = useState<'like' | 'dislike' | null>(null);
@@ -1901,7 +2310,10 @@ function MessageBubble({
             className="flex items-center gap-2 bg-slate-900 text-white px-5 py-2 rounded-full text-xs font-bold hover:opacity-90 transition-all"
           >
             <span className="material-symbols-outlined text-sm">support_agent</span>
-            {isEndUser ? 'Tư vấn Chuyên gia' : 'Request Specialist'}
+            {isEndUser 
+              ? (language === 'vi' ? 'Tư vấn Chuyên gia' : language === 'en' ? 'Request Specialist' : language === 'ar' ? 'طلب خبير' : 'Demander un spécialiste')
+              : 'Request Specialist'
+            }
           </button>
         </div>
 
@@ -1909,7 +2321,7 @@ function MessageBubble({
         <div className="mt-4">
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
             <Star className="w-4 h-4" />
-            {isEndUser ? 'Thiết bị được gợi ý' : 'Recommended Products'}
+            {language === 'vi' ? 'Thiết bị được gợi ý' : language === 'en' ? 'Recommended Devices' : language === 'ar' ? 'الأجهزة الموصى بها' : 'Appareils recommandés'}
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {sampleProducts.slice(0, 2).map((product, idx) => (
@@ -1921,7 +2333,7 @@ function MessageBubble({
         {/* Standards Badges */}
         <div className="mt-4">
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">
-            {isEndUser ? 'Tiêu chuẩn kỹ thuật' : 'Technical Standards'}
+            {language === 'vi' ? 'Tiêu chuẩn kỹ thuật' : language === 'en' ? 'Technical Standards' : language === 'ar' ? 'المعايير التقنية' : 'Normes techniques'}
           </p>
           <StandardsBadge standards={message.standards && message.standards.length > 0 ? message.standards : relevantStandards} />
         </div>
@@ -1936,7 +2348,10 @@ function MessageBubble({
                 ? 'bg-blue-500 text-white'
                 : 'hover:bg-slate-100 text-slate-500'
             )}
-            title={speakingId === message.id ? 'Dừng đọc' : 'Đọc tin nhắn'}
+            title={speakingId === message.id 
+              ? (language === 'vi' ? 'Dừng đọc' : language === 'en' ? 'Stop reading' : language === 'ar' ? 'إيقاف' : 'Arrêter')
+              : (language === 'vi' ? 'Đọc tin nhắn' : language === 'en' ? 'Read message' : language === 'ar' ? 'قراءة' : 'Lire')
+            }
           >
             <Speaker className="w-4 h-4" />
           </button>
@@ -1946,7 +2361,10 @@ function MessageBubble({
               'p-1.5 rounded-lg transition-colors hover:bg-slate-100',
               copiedId === message.id ? 'text-green-500' : 'text-slate-500'
             )}
-            title={copiedId === message.id ? 'Đã sao chép!' : 'Sao chép'}
+            title={copiedId === message.id 
+              ? (language === 'vi' ? 'Đã sao chép!' : language === 'en' ? 'Copied!' : language === 'ar' ? 'تم!' : 'Copié!')
+              : (language === 'vi' ? 'Sao chép' : language === 'en' ? 'Copy' : language === 'ar' ? 'نسخ' : 'Copier')
+            }
           >
             {copiedId === message.id ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
           </button>
@@ -1970,7 +2388,7 @@ function MessageBubble({
               'p-1.5 rounded-lg transition-colors',
               feedback === 'dislike' ? 'bg-blue-500 text-white' : 'hover:bg-slate-100 text-slate-500'
             )}
-            title="Không thích"
+            title={language === 'vi' ? 'Không thích' : language === 'en' ? 'Dislike' : language === 'ar' ? 'عدم الإعجاب' : 'Pas aimer'}
           >
             <ThumbsDown className="w-4 h-4" />
           </button>
@@ -1981,7 +2399,7 @@ function MessageBubble({
                 'p-1.5 rounded-lg transition-colors',
                 showSources ? 'bg-blue-500 text-white' : 'hover:bg-slate-100 text-slate-500'
               )}
-              title="Xem nguồn tham khảo"
+              title={language === 'vi' ? 'Xem nguồn tham khảo' : language === 'en' ? 'View sources' : language === 'ar' ? 'عرض المصادر' : 'Voir les sources'}
             >
               <BookOpen className="w-4 h-4" />
             </button>
@@ -1993,7 +2411,7 @@ function MessageBubble({
           <div className="mt-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
             <div className="flex items-center gap-2 mb-2">
               <BookOpen className="w-4 h-4 text-blue-500" />
-              <span className="text-xs font-bold text-slate-500 uppercase">Nguồn tham khảo</span>
+              <span className="text-xs font-bold text-slate-500 uppercase">{language === 'vi' ? 'Nguồn tham khảo' : language === 'en' ? 'References' : language === 'ar' ? 'المراجع' : 'Références'}</span>
               {message.contextUsed && (
                 <span className="px-1.5 py-0.5 bg-green-100 text-green-700 text-[10px] rounded">RAG</span>
               )}

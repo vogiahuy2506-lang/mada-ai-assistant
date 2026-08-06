@@ -35,7 +35,8 @@ export class RateLimiter {
   private getKey(req: Request): string {
     // Use IP address as key, or user ID if authenticated
     const ip = req.ip || req.socket.remoteAddress || 'unknown';
-    const userId = (req as any).user?.id || '';
+    const user = (req as Request & { user?: { id?: string } }).user;
+    const userId = user?.id || '';
     return userId ? `user:${userId}` : `ip:${ip}`;
   }
 
@@ -104,3 +105,8 @@ export const rateLimiter = new RateLimiter();
 // Per-endpoint rate limiters
 export const chatRateLimiter = new RateLimiter(60000, 30); // 30 requests per minute
 export const searchRateLimiter = new RateLimiter(60000, 60); // 60 requests per minute
+
+// Create scrape rate limiter as a function to avoid initialization issues
+export function createScrapeRateLimiter() {
+  return new RateLimiter(60000, 20); // 20 requests per minute
+}

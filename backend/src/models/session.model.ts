@@ -25,6 +25,7 @@ export interface ChatMessage {
   ragContext?: RAGContextRef[];
   confidence?: number;
   guardrailAction?: GuardrailAction;
+  intent?: string;
   createdAt: Date;
 }
 

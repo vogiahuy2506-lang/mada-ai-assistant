@@ -6,6 +6,9 @@ import { chunkingService } from './chunking.service.js';
 import { rerankService, type RerankableItem } from './rerank.service.js';
 import { Product, MadaCategory } from '../models/product.model.js';
 import { SEED_PRODUCTS } from '../data/seed-products.js';
+import { createLogger } from '../utils/logger.js';
+
+const logger = createLogger('RAGService');
 
 export interface RAGRequest {
   query: string;
@@ -45,11 +48,11 @@ export class RAGService {
   async initialize(): Promise<void> {
     if (this.initialized) return;
 
-    console.log('Initializing RAG service...');
+    logger.info('Initializing RAG service...');
     await vectorStore.initialize();
     await this.indexProducts(SEED_PRODUCTS);
     this.initialized = true;
-    console.log(`RAG service initialized with ${SEED_PRODUCTS.length} seed products`);
+    logger.info(`RAG service initialized with ${SEED_PRODUCTS.length} seed products`);
   }
 
   private async indexProducts(products: Product[]): Promise<void> {
@@ -71,13 +74,13 @@ export class RAGService {
         for (let i = 0; i < chunks.length; i++) {
           chunks[i].embedding = embeddings[i];
         }
-      } catch {
-        console.warn('Embedding generation failed, skipping embeddings');
+      } catch (error) {
+        logger.warn('Embedding generation failed, skipping embeddings', { error });
       }
 
       await vectorStore.insert(chunks);
     }
-    console.log('Products indexed:', products.length);
+    logger.info('Products indexed', { count: products.length });
   }
 
   async search(request: RAGRequest): Promise<RAGResponse> {

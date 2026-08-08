@@ -1,4 +1,5 @@
 // App Configuration - Environment variables and settings
+// Updated with Pinecone and Embeddings configuration
 
 import dotenv from 'dotenv';
 import { z } from 'zod';
@@ -16,6 +17,19 @@ const envSchema = z.object({
   GEMINI_MODEL: z.string().default('gemini-2.5-flash'),
   GEMINI_TEMPERATURE: z.coerce.number().min(0).max(1).default(0.3),
   GEMINI_MAX_TOKENS: z.coerce.number().min(1).default(8192),
+
+  // Pinecone Vector Database
+  PINECONE_API_KEY: z.string().optional(),
+  PINECONE_INDEX_NAME: z.string().default('mada-products'),
+  PINECONE_DIMENSION: z.coerce.number().default(768),
+  PINECONE_METRIC: z.enum(['cosine', 'euclidean', 'dotproduct']).default('cosine'),
+  PINECONE_CLOUD: z.enum(['aws', 'gcp', 'azure']).default('aws'),
+  PINECONE_REGION: z.string().default('us-east-1'),
+
+  // Embeddings
+  EMBEDDING_MODEL: z.string().default('gemini-embedding-exp-03-07'),
+  EMBEDDING_DIMENSION: z.coerce.number().default(768),
+  USE_REAL_EMBEDDINGS: z.string().default('false'), // Set to 'true' for production
 
   // Redis
   REDIS_URL: z.string().default('redis://localhost:6379'),
@@ -36,6 +50,7 @@ const envSchema = z.object({
   ENABLE_RAG: z.string().default('true'),
   ENABLE_GUARDRAILS: z.string().default('true'),
   ENABLE_METRICS: z.string().default('true'),
+  ENABLE_PINECONE: z.string().default('false'), // Set to 'true' for production
 });
 
 const parseResult = envSchema.safeParse(process.env);
@@ -63,6 +78,22 @@ export const geminiConfig = {
   maxTokens: config.GEMINI_MAX_TOKENS,
 };
 
+export const pineconeConfig = {
+  apiKey: config.PINECONE_API_KEY,
+  indexName: config.PINECONE_INDEX_NAME,
+  dimension: config.PINECONE_DIMENSION,
+  metric: config.PINECONE_METRIC,
+  cloud: config.PINECONE_CLOUD,
+  region: config.PINECONE_REGION,
+  enabled: config.ENABLE_PINECONE === 'true',
+};
+
+export const embeddingConfig = {
+  model: config.EMBEDDING_MODEL,
+  dimension: config.EMBEDDING_DIMENSION,
+  useRealEmbeddings: config.USE_REAL_EMBEDDINGS === 'true',
+};
+
 export const sessionConfig = {
   ttl: config.SESSION_TTL * 1000, // Convert to ms
   secret: config.SESSION_SECRET,
@@ -77,4 +108,5 @@ export const featureFlags = {
   enableRag: config.ENABLE_RAG === 'true',
   enableGuardrails: config.ENABLE_GUARDRAILS === 'true',
   enableMetrics: config.ENABLE_METRICS === 'true',
+  enablePinecone: config.ENABLE_PINECONE === 'true',
 };

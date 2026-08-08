@@ -1,11 +1,20 @@
 import { Zap, Infinity as InfinityIcon, LogIn, Crown } from 'lucide-react';
-import { useAuthStore, useAnonQuotaStore, useAuthModalStore, usePaywallModalStore } from '@/stores';
+import { useAuthStore, useAnonQuotaStore, useAuthModalStore, usePaywallModalStore, useLanguageStore } from '@/stores';
 
 export function QuotaIndicator() {
   const user = useAuthStore((s) => s.user);
   const anon = useAnonQuotaStore();
   const authModal = useAuthModalStore();
   const paywall = usePaywallModalStore();
+  const language = useLanguageStore((s) => s.language);
+
+  const labels = {
+    vi: { outOfQuota: 'Đã hết lượt miễn phí', trialUsage: 'Lượt dùng thử (chưa đăng nhập)', proUnlimited: 'Gói Pro — không giới hạn', remaining: 'Còn', usages: 'lượt' },
+    en: { outOfQuota: 'Free quota exhausted', trialUsage: 'Trial usage (not logged in)', proUnlimited: 'Pro Plan — unlimited', remaining: 'Remaining', usages: 'usages' },
+    ar: { outOfQuota: 'انتهت الحصة المجانية', trialUsage: 'الاستخدام التجريبي (لم يتم تسجيل الدخول)', proUnlimited: 'خطة برو — غير محدود', remaining: 'متبقي', usages: 'استخدامات' },
+    fr: { outOfQuota: 'Quota gratuit épuisé', trialUsage: 'Utilisation d\'essai (non connecté)', proUnlimited: 'Plan Pro — illimité', remaining: 'Restant', usages: 'utilisations' },
+  };
+  const l = labels[language as keyof typeof labels] || labels.vi;
 
   if (!user) {
     const remaining = anon.remaining();
@@ -24,7 +33,7 @@ export function QuotaIndicator() {
               ? 'bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100'
               : 'bg-gradient-to-r from-violet-50 to-blue-50 border-violet-200/60 text-violet-700 hover:from-violet-100 hover:to-blue-100'
         }`}
-        title={isOut ? 'Đã hết lượt miễn phí' : 'Lượt dùng thử (chưa đăng nhập)'}
+        title={isOut ? l.outOfQuota : l.trialUsage}
       >
         {isOut ? (
           <Crown className="w-3.5 h-3.5" />
@@ -71,7 +80,7 @@ export function QuotaIndicator() {
               ? 'bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100'
               : 'bg-gradient-to-r from-violet-50 to-blue-50 border-violet-200/60 text-violet-700 hover:from-violet-100 hover:to-blue-100'
       }`}
-      title={isUnlimited ? 'Gói Pro — không giới hạn' : `Còn ${remaining}/${limit} lượt`}
+      title={isUnlimited ? l.proUnlimited : `${l.remaining} ${remaining}/${limit} ${l.usages}`}
     >
       {isPro ? (
         <Crown className="w-3.5 h-3.5" fill="currentColor" />

@@ -107,4 +107,105 @@ export const adminApi = {
   async getAnalytics() {
     return request<any>(`/admin/analytics`);
   },
+
+  // Products
+  async getProducts(params?: { q?: string; category?: string; status?: string; featured?: boolean; limit?: number; offset?: number }) {
+    const p = new URLSearchParams();
+    if (params?.q) p.set('q', params.q);
+    if (params?.category) p.set('category', params.category);
+    if (params?.status) p.set('status', params.status);
+    if (params?.featured !== undefined) p.set('featured', String(params.featured));
+    if (params?.limit) p.set('limit', String(params.limit));
+    if (params?.offset) p.set('offset', String(params.offset));
+    const qs = p.toString();
+    return request<{ items: Product[]; total: number; limit: number; offset: number }>(`/admin/products/items${qs ? `?${qs}` : ''}`);
+  },
+  async getProduct(id: string) {
+    return request<Product>(`/admin/products/items/${id}`);
+  },
+  async createProduct(data: Partial<Product>) {
+    return request<Product>(`/admin/products/items`, { method: 'POST', body: JSON.stringify(data) });
+  },
+  async updateProduct(id: string, data: Partial<Product>) {
+    return request<Product>(`/admin/products/items/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
+  },
+  async deleteProduct(id: string) {
+    return request<{ success: boolean }>(`/admin/products/items/${id}`, { method: 'DELETE' });
+  },
+  async publishProduct(id: string, status: 'published' | 'draft' | 'archived') {
+    return request<{ success: boolean }>(`/admin/products/items/${id}/publish`, { method: 'POST', body: JSON.stringify({ status }) });
+  },
+
+  // Categories
+  async getCategories() {
+    return request<Category[]>(`/admin/products/categories`);
+  },
+  async getCategory(id: string) {
+    return request<Category>(`/admin/products/categories/${id}`);
+  },
+  async createCategory(data: Partial<Category> & { id: string; name_vi: string; name_en: string }) {
+    return request<Category>(`/admin/products/categories`, { method: 'POST', body: JSON.stringify(data) });
+  },
+  async updateCategory(id: string, data: Partial<Category>) {
+    return request<Category>(`/admin/products/categories/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
+  },
+  async deleteCategory(id: string) {
+    return request<{ success: boolean }>(`/admin/products/categories/${id}`, { method: 'DELETE' });
+  },
+
+  // Products Stats
+  async getProductsStats() {
+    return request<ProductStats>(`/admin/products/stats`);
+  },
+
+  // Bulk import
+  async bulkImportProducts(items: Partial<Product>[]) {
+    return request<{ success: boolean; added: number }>(`/admin/products/items/bulk`, { method: 'POST', body: JSON.stringify({ items }) });
+  },
 };
+
+export interface Product {
+  id: string;
+  title: string;
+  title_en: string;
+  description: string;
+  description_en: string;
+  content: string;
+  category: string;
+  brand: string;
+  model: string;
+  price_range: string;
+  source_url: string;
+  product_url: string;
+  image_url: string;
+  iso_codes: string[];
+  wcag_level: string;
+  who_gate_area: string;
+  status: 'draft' | 'published' | 'archived';
+  featured: boolean;
+  sort_order: number;
+  language: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Category {
+  id: string;
+  name_vi: string;
+  name_en: string;
+  icon: string;
+  sort_order: number;
+  description_vi: string | null;
+  description_en: string | null;
+  related_url: string | null;
+  product_link: string | null;
+  created_at: string;
+  updated_at: string | null;
+}
+
+export interface ProductStats {
+  totalProducts: number;
+  published: number;
+  byCategory: { category: string; count: number }[];
+  categories: Category[];
+}

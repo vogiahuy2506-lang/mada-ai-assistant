@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Mail, Lock, User as UserIcon, X, Eye, EyeOff, Loader2, ShieldCheck, KeyRound } from 'lucide-react';
+import { Mail, Lock, User as UserIcon, X, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { RobotLogo } from '@/components/icons/RobotLogo';
 import { useAuthModalStore, useAuthStore, useAnonQuotaStore, PLAN_LIMITS } from '@/stores';
 import type { User, UserPlan } from '@/types';
-import { ADMIN_CREDENTIALS, DEMO_CREDENTIALS } from '@/lib/adminCredentials';
 
 type Tab = 'login' | 'register';
 
@@ -16,7 +15,6 @@ interface FormState {
 
 export function AuthModal() {
   const { isOpen, mode, close } = useAuthModalStore();
-  const login = useAuthStore((s) => s.login);
   const loginWithEmail = useAuthStore((s) => s.loginWithEmail);
   const registerWithEmail = useAuthStore((s) => s.registerWithEmail);
   const navigate = useNavigate();
@@ -27,12 +25,10 @@ export function AuthModal() {
   const [showPwd, setShowPwd] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showAdminHint, setShowAdminHint] = useState(false);
 
   useEffect(() => {
     setTab(mode);
     setError(null);
-    setShowAdminHint(false);
   }, [mode, isOpen]);
 
   useEffect(() => {
@@ -97,9 +93,13 @@ export function AuthModal() {
 
     setLoading(true);
     try {
+      console.log('🔐 Auth request:', tab, form.email);
+      
       const result = tab === 'login'
         ? await loginWithEmail(form.email, form.password)
         : await registerWithEmail(form.email, form.password, form.name);
+
+      console.log('📦 Auth result:', result);
 
       if (!result.success) {
         setError(result.error || 'Đã xảy ra lỗi. Vui lòng thử lại.');
@@ -113,43 +113,15 @@ export function AuthModal() {
       // Redirect theo vai trò
       setTimeout(() => {
         const u = useAuthStore.getState().user;
+        console.log('👤 User after login:', u);
         if (u?.role === 'admin') navigate('/admin');
         else if (u?.role === 'expert') navigate('/expert');
         else if (u?.role === 'data_manager') navigate('/data');
         else navigate('/');
       }, 50);
-    } catch (err) {
-      setError('Đã xảy ra lỗi. Vui lòng thử lại.');
-      console.error('Email auth error:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleQuickAdminLogin = async (credential: typeof ADMIN_CREDENTIALS[number]) => {
-    setError(null);
-    setLoading(true);
-    try {
-      const result = await loginWithEmail(credential.email, credential.password);
-      if (!result.success) {
-        setError(result.error || 'Không thể đăng nhập.');
-        return;
-      }
-      resetAnon();
-      close();
-      setForm({ email: '', password: '', name: '' });
-
-      // Redirect theo vai trò
-      setTimeout(() => {
-        const u = useAuthStore.getState().user;
-        if (u?.role === 'admin') navigate('/admin');
-        else if (u?.role === 'expert') navigate('/expert');
-        else if (u?.role === 'data_manager') navigate('/data');
-        else navigate('/');
-      }, 50);
-    } catch (err) {
-      setError('Không thể đăng nhập admin.');
-      console.error('Admin auth error:', err);
+    } catch (err: any) {
+      console.error('❌ Auth error:', err);
+      setError('Đã xảy ra lỗi kết nối. Vui lòng kiểm tra server đang chạy.');
     } finally {
       setLoading(false);
     }
@@ -157,29 +129,18 @@ export function AuthModal() {
 
   const handleGoogle = async () => {
     setLoading(true);
+    setError(null);
     try {
-      await new Promise((r) => setTimeout(r, 900));
-      const user = buildUser('user.mada@gmail.com', 'Google User', 'google');
-      login(user);
-      resetAnon();
-      close();
-
-      // Redirect theo vai trò (Google mock = user thường)
-      setTimeout(() => navigate('/'), 50);
+      // Redirect to backend which will redirect to Google OAuth
+      window.location.href = `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/auth/google`;
     } catch (err) {
-      setError('Đăng nhập Google thất bại. Vui lòng thử lại.');
       console.error('Google auth error:', err);
-    } finally {
+      setError('Có lỗi khi đăng nhập Google. Vui lòng thử lại.');
       setLoading(false);
     }
   };
 
-  const handleDemo = () => {
-    const user = buildUser('demo@mada.ai', 'Demo User', 'email');
-    login(user);
-    resetAnon();
-    close();
-  };
+  const handleDemo = () => { /* Demo disabled */ };
 
   return (
     <div
@@ -343,73 +304,6 @@ export function AuthModal() {
             </svg>
             Tiếp tục với Google
           </button>
-
-          <button
-            type="button"
-            onClick={handleDemo}
-            className="w-full mt-3 py-2 text-xs font-bold text-violet-600 hover:text-violet-700 transition-colors"
-          >
-            ⚡ Dùng thử tài khoản Demo (1 click)
-          </button>
-
-          {/* ADMIN QUICK LOGIN */}
-          <div className="mt-5 pt-5 border-t border-slate-200">
-            <button
-              type="button"
-              onClick={() => setShowAdminHint(!showAdminHint)}
-              className="w-full flex items-center justify-center gap-2 text-[10px] font-bold text-slate-500 hover:text-slate-700 uppercase tracking-widest transition-colors"
-            >
-              <ShieldCheck className="w-3.5 h-3.5" />
-              Đăng nhập với tài khoản đặc biệt
-              <span className={`material-icons text-[14px] transition-transform ${showAdminHint ? 'rotate-180' : ''}`}>expand_more</span>
-            </button>
-
-            {showAdminHint && (
-              <div className="mt-3 p-4 rounded-2xl bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200/60 space-y-3 animate-in slide-in-from-top-2">
-                <div className="flex items-start gap-2 mb-2">
-                  <KeyRound className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
-                  <div>
-                    <p className="text-xs font-bold text-amber-900">Tài khoản có sẵn trong hệ thống</p>
-                    <p className="text-[10px] text-amber-700/80 leading-relaxed">
-                      Click để đăng nhập nhanh — không cần nhớ mật khẩu.
-                    </p>
-                  </div>
-                </div>
-
-                {DEMO_CREDENTIALS.map((cred) => (
-                  <button
-                    key={cred.email}
-                    type="button"
-                    disabled={loading}
-                    onClick={() => handleQuickAdminLogin(cred)}
-                    className="w-full p-3 rounded-xl bg-white border border-amber-200 hover:border-amber-400 hover:bg-amber-50/50 transition-all text-left group disabled:opacity-60"
-                  >
-                    <div className="flex items-center justify-between gap-2 mb-1">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className={`px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider ${
-                          cred.role === 'admin'
-                            ? 'bg-red-100 text-red-700'
-                            : cred.role === 'expert'
-                              ? 'bg-violet-100 text-violet-700'
-                              : 'bg-blue-100 text-blue-700'
-                        }`}>
-                          {cred.role}
-                        </span>
-                        <span className="font-bold text-xs text-slate-900 truncate">{cred.name}</span>
-                      </div>
-                      <span className="material-icons text-[16px] text-amber-600 group-hover:translate-x-1 transition-transform">arrow_forward</span>
-                    </div>
-                    <p className="text-[10px] font-mono text-slate-500 mb-1">
-                      {cred.email} · {cred.password}
-                    </p>
-                    <p className="text-[10px] text-slate-500 leading-relaxed">
-                      {cred.description}
-                    </p>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
 
           <p className="text-[10px] text-slate-400 text-center mt-5 leading-relaxed">
             Bằng việc tiếp tục, bạn đồng ý với{' '}

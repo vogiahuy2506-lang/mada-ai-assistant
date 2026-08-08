@@ -1,5 +1,5 @@
 // API client for MADA AI backend
-const API_BASE = (import.meta as any).env?.VITE_API_BASE || 'http://localhost:3001';
+const API_BASE = '/api'; // Use proxy in dev, full URL in production
 
 export interface ApiUser {
   id: string;
@@ -100,34 +100,34 @@ async function request<T>(
 
 export const authApi = {
   async register(email: string, password: string, name: string) {
-    return request<AuthResponse>('/api/auth/register', {
+    return request<AuthResponse>('/auth/register', {
       method: 'POST',
       body: JSON.stringify({ email, password, name }),
     });
   },
   async login(email: string, password: string) {
-    return request<AuthResponse>('/api/auth/login', {
+    return request<AuthResponse>('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     });
   },
   async logout() {
-    return request<{ success: boolean }>('/api/auth/logout', {
+    return request<{ success: boolean }>('/auth/logout', {
       method: 'POST',
       body: JSON.stringify({ refreshToken: getRefreshToken() }),
     });
   },
   async me() {
-    return request<{ user: ApiUser }>('/api/auth/me');
+    return request<{ user: ApiUser }>('/auth/me');
   },
   async updateProfile(updates: { name?: string; avatar?: string }) {
-    return request<{ user: ApiUser }>('/api/auth/profile', {
+    return request<{ user: ApiUser }>('/auth/profile', {
       method: 'PUT',
       body: JSON.stringify(updates),
     });
   },
   async changePassword(currentPassword: string, newPassword: string) {
-    return request<{ success: boolean }>('/api/auth/password', {
+    return request<{ success: boolean }>('/auth/password', {
       method: 'PUT',
       body: JSON.stringify({ currentPassword, newPassword }),
     });
@@ -139,31 +139,31 @@ export const authApi = {
 export const usersApi = {
   async list(params?: { search?: string; role?: string; status?: string; plan?: string }) {
     const query = new URLSearchParams(params as any).toString();
-    return request<{ users: ApiUser[]; total: number }>(`/api/users${query ? `?${query}` : ''}`);
+    return request<{ users: ApiUser[]; total: number }>(`/users${query ? `?${query}` : ''}`);
   },
   async get(id: string) {
-    return request<{ user: ApiUser }>(`/api/users/${id}`);
+    return request<{ user: ApiUser }>(`/users/${id}`);
   },
   async create(data: { email: string; password: string; name: string; role?: string; plan?: string }) {
-    return request<{ user: ApiUser }>('/api/users', {
+    return request<{ user: ApiUser }>('/users', {
       method: 'POST',
       body: JSON.stringify(data),
     });
   },
   async update(id: string, updates: Partial<{ role: string; plan: string; status: string; name: string; quotaLimit: number }>) {
-    return request<{ user: ApiUser }>(`/api/users/${id}`, {
+    return request<{ user: ApiUser }>(`/users/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(updates),
     });
   },
   async delete(id: string) {
-    return request<{ success: boolean }>(`/api/users/${id}`, { method: 'DELETE' });
+    return request<{ success: boolean }>(`/users/${id}`, { method: 'DELETE' });
   },
   async stats() {
     return request<{
       total: number; active: number; suspended: number; pending: number;
       admins: number; enterprise: number; pro: number; free: number;
-    }>('/api/users/stats/overview');
+    }>('/users/stats/overview');
   },
 };
 

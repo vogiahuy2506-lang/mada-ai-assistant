@@ -1,22 +1,27 @@
 import { ReactNode, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { useAuthStore, useThemeStore } from '@/stores';
+import { useAuthStore, useThemeStore, useLanguageStore } from '@/stores';
 import clsx from 'clsx';
+import { ChevronDown } from 'lucide-react';
 
 interface NavItem {
   label: string;
+  labelEn: string;
+  labelAr: string;
+  labelFr: string;
   href: string;
   icon: string;
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { label: 'Tổng quan', href: '/admin', icon: 'dashboard' },
-  { label: 'Người dùng', href: '/admin/users', icon: 'group' },
-  { label: 'Nhật ký', href: '/admin/logs', icon: 'receipt_long' },
-  { label: 'Phân tích', href: '/admin/analytics', icon: 'analytics' },
-  { label: 'Agents', href: '/admin/agents', icon: 'smart_toy' },
-  { label: 'Tư vấn', href: '/admin/consultations', icon: 'support_agent' },
-  { label: 'Cấu hình', href: '/admin/settings', icon: 'settings_suggest' },
+  { label: 'Tổng quan', labelEn: 'Overview', labelAr: 'نظرة عامة', labelFr: 'Aperçu', href: '/admin', icon: 'dashboard' },
+  { label: 'Người dùng', labelEn: 'Users', labelAr: 'المستخدمين', labelFr: 'Utilisateurs', href: '/admin/users', icon: 'group' },
+  { label: 'Sản phẩm', labelEn: 'Products', labelAr: 'المنتجات', labelFr: 'Produits', href: '/admin/products', icon: 'inventory_2' },
+  { label: 'Nhật ký', labelEn: 'Logs', labelAr: 'السجلات', labelFr: 'Journaux', href: '/admin/logs', icon: 'receipt_long' },
+  { label: 'Phân tích', labelEn: 'Analytics', labelAr: 'التحليلات', labelFr: 'Analytique', href: '/admin/analytics', icon: 'analytics' },
+  { label: 'Agents', labelEn: 'Agents', labelAr: 'الوكلاء', labelFr: 'Agents', href: '/admin/agents', icon: 'smart_toy' },
+  { label: 'Tư vấn', labelEn: 'Consultations', labelAr: 'الاستشارات', labelFr: 'Consultations', href: '/admin/consultations', icon: 'support_agent' },
+  { label: 'Cấu hình', labelEn: 'Settings', labelAr: 'الإعدادات', labelFr: 'Paramètres', href: '/admin/settings', icon: 'settings_suggest' },
 ];
 
 interface AdminLayoutProps {
@@ -24,19 +29,43 @@ interface AdminLayoutProps {
   title?: string;
   subtitle?: string;
   showFab?: boolean;
+  showLayoutTitle?: boolean;
 }
 
 export function AdminLayout({
   children,
   title = 'Trung tâm Điều khiển',
+  titleEn = 'Control Center',
+  titleAr = 'مركز التحكم',
   subtitle,
+  subtitleEn,
+  subtitleAr,
   showFab = true,
-}: AdminLayoutProps) {
+  showLayoutTitle = true,
+}: AdminLayoutProps & { titleEn?: string; titleAr?: string; subtitleEn?: string; subtitleAr?: string }) {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuthStore();
   const { isDark, toggleTheme } = useThemeStore();
+  const { language, setLanguage } = useLanguageStore();
   const [searchQuery, setSearchQuery] = useState('');
+  const [showLangMenu, setShowLangMenu] = useState(false);
+
+  const LANGUAGES = [
+    { code: 'vi', name: 'Tiếng Việt', nameEn: 'Vietnamese', flag: '🇻🇳' },
+    { code: 'en', name: 'English', nameEn: 'English', flag: '🇬🇧' },
+    { code: 'ar', name: 'العربية', nameEn: 'Arabic', flag: '🇸🇦' },
+    { code: 'fr', name: 'Français', nameEn: 'French', flag: '🇫🇷' },
+  ];
+
+  const currentLang = LANGUAGES.find(l => l.code === language) || LANGUAGES[0];
+
+  const getNavLabel = (item: NavItem) => {
+    if (language === 'en') return item.labelEn;
+    if (language === 'ar') return item.labelAr;
+    if (language === 'fr') return item.labelFr;
+    return item.label;
+  };
 
   const handleLogout = () => {
     logout();
@@ -79,7 +108,9 @@ export function AdminLayout({
           </div>
           <div>
             <h1 className="font-display-lg text-headline-md font-bold tracking-tight text-primary leading-tight">MADA AI</h1>
-            <p className="font-label-sm text-on-surface-variant leading-none">Hệ thống Quản trị</p>
+            <p className="font-label-sm text-on-surface-variant leading-none">
+              {language === 'vi' ? 'Hệ thống Quản trị' : language === 'en' ? 'Admin System' : language === 'ar' ? 'نظام الإدارة' : 'Système Admin'}
+            </p>
           </div>
         </div>
 
@@ -99,7 +130,7 @@ export function AdminLayout({
                 )}
               >
                 <span className="material-symbols-outlined">{item.icon}</span>
-                <span className="font-label-md">{item.label}</span>
+                <span className="font-label-md">{getNavLabel(item)}</span>
               </Link>
             );
           })}
@@ -124,7 +155,7 @@ export function AdminLayout({
             className="flex items-center gap-3 px-4 py-3 rounded-xl text-on-surface-variant hover:bg-primary/5 hover:text-primary transition-all text-left"
           >
             <span className="material-symbols-outlined">arrow_back</span>
-            <span className="font-label-md">Về trang chính</span>
+            <span className="font-label-md">{language === 'vi' ? 'Về trang chính' : language === 'en' ? 'Back to Home' : language === 'ar' ? 'العودة للرئيسية' : 'Retour'}</span>
           </button>
 
           <a
@@ -132,7 +163,7 @@ export function AdminLayout({
             className="flex items-center gap-3 px-4 py-3 rounded-xl text-on-surface-variant hover:bg-primary/5 hover:text-primary transition-all"
           >
             <span className="material-symbols-outlined">help</span>
-            <span className="font-label-md">Hỗ trợ</span>
+            <span className="font-label-md">{language === 'vi' ? 'Hỗ trợ' : language === 'en' ? 'Help' : language === 'ar' ? 'مساعدة' : 'Aide'}</span>
           </a>
 
           <button
@@ -140,7 +171,7 @@ export function AdminLayout({
             className="flex items-center gap-3 px-4 py-3 rounded-xl text-on-surface-variant hover:bg-error/5 hover:text-error transition-all text-left"
           >
             <span className="material-symbols-outlined">logout</span>
-            <span className="font-label-md">Đăng xuất</span>
+            <span className="font-label-md">{language === 'vi' ? 'Đăng xuất' : language === 'en' ? 'Logout' : language === 'ar' ? 'تسجيل الخروج' : 'Déconnexion'}</span>
           </button>
         </div>
       </aside>
@@ -149,13 +180,13 @@ export function AdminLayout({
       <main className="ml-64 min-h-screen">
         {/* TOP NAV BAR */}
         <header className="fixed top-0 right-0 w-[calc(100%-256px)] h-16 z-40 backdrop-blur-xl bg-white/70 border-b border-white/40 px-margin-desktop flex justify-between items-center shadow-[0_4px_12px_rgba(0,0,0,0.03)]">
-          <div className="flex items-center gap-4 bg-surface-container-low px-4 py-2 rounded-full border border-outline-variant/30 w-96">
+            <div className="flex items-center gap-4 bg-surface-container-low px-4 py-2 rounded-full border border-outline-variant/30 w-96">
             <span className="material-symbols-outlined text-on-surface-variant">search</span>
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Tìm kiếm tài nguyên, người dùng..."
+              placeholder={language === 'vi' ? 'Tìm kiếm tài nguyên, người dùng...' : language === 'en' ? 'Search resources, users...' : language === 'ar' ? 'البحث في الموارد والمستخدمين...' : 'Rechercher ressources, utilisateurs...'}
               className="bg-transparent border-none focus:ring-0 text-body-md w-full placeholder:text-on-surface-variant/60 outline-none"
             />
           </div>
@@ -175,12 +206,48 @@ export function AdminLayout({
               >
                 <span className="material-symbols-outlined">{isDark ? 'light_mode' : 'settings'}</span>
               </button>
+              
+              {/* Language Selector */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowLangMenu(!showLangMenu)}
+                  className="flex items-center gap-2 px-3 py-2 rounded-full border border-outline-variant/30 hover:bg-surface-container-low transition-all"
+                >
+                  <span className="text-lg">{currentLang.flag}</span>
+                  <ChevronDown className={clsx('w-4 h-4 text-on-surface-variant transition-transform', showLangMenu && 'rotate-180')} />
+                </button>
+                {showLangMenu && (
+                  <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-outline-variant/30 rounded-xl shadow-lg overflow-hidden z-50">
+                    {LANGUAGES.map((lang) => (
+                      <button
+                        key={lang.code}
+                        onClick={() => {
+                          setLanguage(lang.code as any);
+                          setShowLangMenu(false);
+                        }}
+                        className={clsx(
+                          'w-full flex items-center gap-3 px-4 py-3 hover:bg-surface-container-low transition-colors text-left',
+                          language === lang.code && 'bg-primary/10 text-primary font-semibold'
+                        )}
+                      >
+                        <span className="text-lg">{lang.flag}</span>
+                        <div>
+                          <p className="font-label-md">{lang.name}</p>
+                          <p className="text-xs text-on-surface-variant">{lang.nameEn}</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="flex items-center gap-3 pl-6 border-l border-outline-variant/30">
               <div className="text-right">
                 <p className="font-label-md text-on-surface leading-tight">{user?.name ?? 'Admin'}</p>
-                <p className="font-label-sm text-primary">Quản trị viên cấp cao</p>
+                <p className="font-label-sm text-primary">
+                  {language === 'vi' ? 'Quản trị viên cấp cao' : language === 'en' ? 'Senior Administrator' : language === 'ar' ? 'مدير أول' : 'Administrateur Senior'}
+                </p>
               </div>
               <div className="w-10 h-10 rounded-full border-2 border-primary/20 overflow-hidden bg-gradient-to-br from-primary to-tertiary flex items-center justify-center text-white font-bold">
                 {(user?.name ?? 'A').charAt(0).toUpperCase()}
@@ -191,25 +258,28 @@ export function AdminLayout({
 
         {/* PAGE BODY */}
         <div className="mt-16 p-8 max-w-[1600px] mx-auto space-y-8">
-          {/* HERO HEADER */}
-          <section className="flex flex-col md:flex-row justify-between items-end gap-6">
-            <div>
-              <h2 className="font-display-lg text-headline-lg text-on-surface leading-tight">
-                {title} <span className="animate-pulse">👋</span>
-              </h2>
-              {subtitle && (
-                <p className="font-body-lg text-on-surface-variant mt-2 max-w-2xl">{subtitle}</p>
-              )}
-            </div>
+          {showLayoutTitle && (
+            <section className="flex flex-col md:flex-row justify-between items-end gap-6">
+              <div>
+                <h2 className="font-display-lg text-headline-lg text-on-surface leading-tight">
+                  {titleEn && language === 'en' ? titleEn : titleAr && language === 'ar' ? titleAr : title} <span className="animate-pulse">👋</span>
+                </h2>
+                {subtitle && (
+                  <p className="font-body-lg text-on-surface-variant mt-2 max-w-2xl">
+                    {subtitleEn && language === 'en' ? subtitleEn : subtitleAr && language === 'ar' ? subtitleAr : subtitle}
+                  </p>
+                )}
+              </div>
 
-            <button className="group relative px-8 py-4 bg-primary text-white rounded-2xl font-label-md shadow-lg shadow-primary/25 overflow-hidden transition-all hover:shadow-primary/40 active:scale-95">
-              <div className="absolute inset-0 bg-gradient-to-r from-primary to-tertiary opacity-0 group-hover:opacity-100 transition-opacity" />
-              <span className="relative flex items-center gap-2">
-                <span className="material-symbols-outlined">cloud_download</span>
-                Xuất báo cáo hệ thống
-              </span>
-            </button>
-          </section>
+              <button className="group relative px-8 py-4 bg-primary text-white rounded-2xl font-label-md shadow-lg shadow-primary/25 overflow-hidden transition-all hover:shadow-primary/40 active:scale-95">
+                <div className="absolute inset-0 bg-gradient-to-r from-primary to-tertiary opacity-0 group-hover:opacity-100 transition-opacity" />
+                <span className="relative flex items-center gap-2">
+                  <span className="material-symbols-outlined">cloud_download</span>
+                  {language === 'vi' ? 'Xuất báo cáo hệ thống' : language === 'en' ? 'Export System Report' : language === 'ar' ? 'تصدير تقرير النظام' : 'Exporter le rapport'}
+                </span>
+              </button>
+            </section>
+          )}
 
           {children}
         </div>
@@ -223,7 +293,7 @@ export function AdminLayout({
         >
           <span className="material-symbols-outlined text-[28px] group-hover:rotate-90 transition-transform duration-300">add</span>
           <div className="absolute right-full mr-4 bg-inverse-surface text-inverse-on-surface px-4 py-2 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none font-label-md">
-            Triển khai mô hình mới
+            {language === 'vi' ? 'Triển khai mô hình mới' : language === 'en' ? 'Deploy new model' : language === 'ar' ? 'نشر نموذج جديد' : 'Déployer un nouveau modèle'}
           </div>
         </button>
       )}

@@ -1,17 +1,39 @@
 import { useEffect, useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '@/stores';
 
 export function RoleLanding() {
   const user = useAuthStore((s) => s.user);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const loginWithGoogle = useAuthStore((s) => s.loginWithGoogle);
   const [ready, setReady] = useState(false);
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
 
   useEffect(() => {
+    // Handle Google OAuth callback
+    const googleAuth = searchParams.get('google_auth');
+    const accessToken = searchParams.get('access_token');
+    const refreshToken = searchParams.get('refresh_token');
+    const expiresAt = searchParams.get('expires_at');
+    const error = searchParams.get('error');
+
+    if (error) {
+      console.error('Google OAuth error:', error);
+      navigate('/chat?error=google_failed', { replace: true });
+      return;
+    }
+
+    if (googleAuth === 'success' && accessToken && refreshToken && expiresAt) {
+      // Process Google OAuth login
+      loginWithGoogle({ accessToken, refreshToken, expiresAt });
+      return;
+    }
+
     // Đợi 1 tick để store hydrate từ localStorage
     const id = setTimeout(() => setReady(true), 100);
     return () => clearTimeout(id);
-  }, []);
+  }, [searchParams]);
 
   if (!ready) {
     return (

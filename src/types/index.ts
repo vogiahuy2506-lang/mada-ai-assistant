@@ -86,6 +86,7 @@ export interface ChatMessage {
   consultationId?: string;
   sources?: Source[];
   contextUsed?: boolean;
+  attachments?: { name: string; type: string; preview?: string }[];
 }
 
 // Consultation Request

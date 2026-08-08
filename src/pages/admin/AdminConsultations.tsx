@@ -62,9 +62,9 @@ export function AdminConsultations() {
     : requests.filter(r => r.status === statusFilter);
 
   const statusColors = {
-    pending: 'bg-yellow-100 text-yellow-800',
-    reviewed: 'bg-blue-100 text-blue-800',
-    contacted: 'bg-green-100 text-green-800',
+    pending: 'bg-yellow-100 text-yellow-800 border-yellow-300',
+    reviewed: 'bg-blue-100 text-blue-800 border-blue-300',
+    contacted: 'bg-green-100 text-green-800 border-green-300',
   };
 
   const statusLabels = {
@@ -76,169 +76,313 @@ export function AdminConsultations() {
   return (
     <AdminLayout
       title="Quản lý Yêu cầu Tư vấn"
+      titleEn="Consultation Requests Management"
       subtitle="Xem và xử lý các yêu cầu tư vấn từ người dùng."
+      subtitleEn="View and manage consultation requests from users."
+      showLayoutTitle={false}
     >
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        {[
-          { label: 'Tổng yêu cầu', count: requests.length, color: 'bg-slate-100 text-slate-700' },
-          { label: 'Chờ xử lý', count: requests.filter(r => r.status === 'pending').length, color: 'bg-yellow-100 text-yellow-700' },
-          { label: 'Đã xem', count: requests.filter(r => r.status === 'reviewed').length, color: 'bg-blue-100 text-blue-700' },
-          { label: 'Đã liên hệ', count: requests.filter(r => r.status === 'contacted').length, color: 'bg-green-100 text-green-700' },
-        ].map((stat) => (
-          <div key={stat.label} className={clsx('p-4 rounded-2xl', stat.color)}>
-            <div className="text-2xl font-bold">{stat.count}</div>
-            <div className="text-sm opacity-80">{stat.label}</div>
+      {/* Hero Banner Section */}
+      <section className="mb-12">
+        <div className="flex justify-between items-end mb-8 relative">
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-white to-secondary/10 backdrop-blur-xl rounded-3xl"></div>
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-primary/10 via-transparent to-transparent rounded-3xl"></div>
+          <div className="max-w-2xl relative z-10 py-8 px-6">
+            <h2 className="text-4xl font-black text-on-surface mb-4 tracking-tight flex items-center gap-4">
+              Quản lý Yêu cầu Tư vấn
+            </h2>
+            <p className="text-lg font-medium text-on-surface-variant border-l-4 border-primary pl-6 py-2 bg-white/40 backdrop-blur-sm rounded-r-xl">
+              Xem và xử lý các yêu cầu tư vấn từ người dùng.
+            </p>
           </div>
-        ))}
-      </div>
+        </div>
+      </section>
 
-      {/* Filters */}
-      <div className="flex items-center gap-2 mb-4">
-        <span className="text-sm text-on-surface-variant">Lọc:</span>
-        {['all', 'pending', 'reviewed', 'contacted'].map((status) => (
+      {/* Metrics Row */}
+      <section className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        {/* Metric 1 - Total */}
+        <div className="relative bg-gradient-to-br from-white/80 to-white/40 backdrop-blur-xl rounded-2xl p-4 border-3 border-black flex items-center gap-3 transform rotate-[-0.5deg] hover:rotate-0 transition-transform shadow-[6px_6px_0px_0px_#000] hover:shadow-[8px_8px_0px_0px_#000]">
+          <div className="w-10 h-10 rounded-xl bg-gray-100 border-2 border-black flex items-center justify-center shadow-[3px_3px_0px_0px_#000]">
+            <span className="material-symbols-outlined text-on-surface text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>inbox</span>
+          </div>
+          <div>
+            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">TỔNG YÊU CẦU</p>
+            <h3 className="text-xl font-black text-on-surface">{requests.length}</h3>
+          </div>
+        </div>
+
+        {/* Metric 2 - Pending */}
+        <div className="relative bg-gradient-to-br from-yellow-50/80 to-yellow-100/40 backdrop-blur-xl rounded-2xl p-4 border-3 border-black flex items-center gap-3 transform rotate-[0.5deg] hover:rotate-0 transition-transform shadow-[6px_6px_0px_0px_#000] hover:shadow-[8px_8px_0px_0px_#000]">
+          <div className="w-10 h-10 rounded-xl bg-yellow-200 border-2 border-black flex items-center justify-center shadow-[3px_3px_0px_0px_#000]">
+            <span className="material-symbols-outlined text-yellow-600 text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>pending_actions</span>
+          </div>
+          <div>
+            <p className="text-[10px] font-bold text-yellow-700 uppercase tracking-wider mb-1">CHỜ XỬ LÝ</p>
+            <h3 className="text-xl font-black text-yellow-700">{requests.filter(r => r.status === 'pending').length}</h3>
+          </div>
+        </div>
+
+        {/* Metric 3 - Reviewed */}
+        <div className="relative bg-gradient-to-br from-blue-50/80 to-blue-100/40 backdrop-blur-xl rounded-2xl p-4 border-3 border-black flex items-center gap-3 transform rotate-[-0.5deg] hover:rotate-0 transition-transform shadow-[6px_6px_0px_0px_#000] hover:shadow-[8px_8px_0px_0px_#000]">
+          <div className="w-10 h-10 rounded-xl bg-blue-100 border-2 border-black flex items-center justify-center shadow-[3px_3px_0px_0px_#000]">
+            <span className="material-symbols-outlined text-blue-600 text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>visibility</span>
+          </div>
+          <div>
+            <p className="text-[10px] font-bold text-blue-700 uppercase tracking-wider mb-1">ĐÃ XEM</p>
+            <h3 className="text-xl font-black text-blue-700">{requests.filter(r => r.status === 'reviewed').length}</h3>
+          </div>
+        </div>
+
+        {/* Metric 4 - Contacted */}
+        <div className="relative bg-gradient-to-br from-green-50/80 to-green-100/40 backdrop-blur-xl rounded-2xl p-4 border-3 border-black flex items-center gap-3 transform rotate-[0.5deg] hover:rotate-0 transition-transform shadow-[6px_6px_0px_0px_#000] hover:shadow-[8px_8px_0px_0px_#000]">
+          <div className="w-10 h-10 rounded-xl bg-green-100 border-2 border-black flex items-center justify-center shadow-[3px_3px_0px_0px_#000]">
+            <span className="material-symbols-outlined text-green-600 text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
+          </div>
+          <div>
+            <p className="text-[10px] font-bold text-green-700 uppercase tracking-wider mb-1">ĐÃ LIÊN HỆ</p>
+            <h3 className="text-xl font-black text-green-700">{requests.filter(r => r.status === 'contacted').length}</h3>
+          </div>
+        </div>
+      </section>
+
+      {/* Filter & Action Row */}
+      <div className="flex items-center justify-between mb-8 flex-wrap gap-4">
+        <div className="flex items-center gap-3 p-1.5 bg-white/60 backdrop-blur-xl rounded-full border-2 border-black">
+          <span className="text-on-surface-variant font-medium text-sm ml-4 mr-2">Lọc:</span>
           <button
-            key={status}
-            onClick={() => setStatusFilter(status)}
+            onClick={() => setStatusFilter('all')}
             className={clsx(
-              'px-3 py-1.5 rounded-full text-sm font-label-md transition-all',
-              statusFilter === status
-                ? 'bg-primary text-white'
-                : 'bg-surface-container hover:bg-surface-container-high'
+              'px-5 py-2 rounded-full font-bold text-sm transition-all border-2',
+              statusFilter === 'all'
+                ? 'bg-primary text-white border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[3px_3px_0px_0px_rgba(0,0,0,1)]'
+                : 'bg-transparent text-on-surface-variant hover:bg-white/80 border-transparent hover:border-black transition-colors'
             )}
           >
-            {status === 'all' ? 'Tất cả' : statusLabels[status as keyof typeof statusLabels]}
+            Tất cả
           </button>
-        ))}
+          <button
+            onClick={() => setStatusFilter('pending')}
+            className={clsx(
+              'px-5 py-2 rounded-full font-bold text-sm transition-all border-2',
+              statusFilter === 'pending'
+                ? 'bg-yellow-400 text-black border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[3px_3px_0px_0px_rgba(0,0,0,1)]'
+                : 'bg-transparent text-on-surface-variant hover:bg-yellow-50 border-transparent hover:border-black transition-colors'
+            )}
+          >
+            Chờ xử lý
+          </button>
+          <button
+            onClick={() => setStatusFilter('reviewed')}
+            className={clsx(
+              'px-5 py-2 rounded-full font-bold text-sm transition-all border-2',
+              statusFilter === 'reviewed'
+                ? 'bg-blue-500 text-white border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[3px_3px_0px_0px_rgba(0,0,0,1)]'
+                : 'bg-transparent text-on-surface-variant hover:bg-blue-50 border-transparent hover:border-black transition-colors'
+            )}
+          >
+            Đã xem
+          </button>
+          <button
+            onClick={() => setStatusFilter('contacted')}
+            className={clsx(
+              'px-5 py-2 rounded-full font-bold text-sm transition-all border-2',
+              statusFilter === 'contacted'
+                ? 'bg-green-500 text-white border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[3px_3px_0px_0px_rgba(0,0,0,1)]'
+                : 'bg-transparent text-on-surface-variant hover:bg-green-50 border-transparent hover:border-black transition-colors'
+            )}
+          >
+            Đã liên hệ
+          </button>
+        </div>
+        <div>
+          <button className="flex items-center gap-2 bg-white text-primary px-6 py-2.5 rounded-full font-bold text-sm border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] transition-all group">
+            <span className="material-symbols-outlined text-sm transition-transform group-hover:-translate-y-1">cloud_download</span>
+            Xuất báo cáo hệ thống
+          </button>
+        </div>
       </div>
 
-      {/* Requests List */}
-      <div className="bg-white rounded-2xl border border-outline-variant/30 overflow-hidden">
+      {/* Requests List / Empty State */}
+      <div className="relative bg-gradient-to-br from-white/80 to-white/40 backdrop-blur-xl rounded-3xl border-3 border-black p-8 md:p-12 shadow-[12px_12px_0px_0px_#000]">
+        <div className="absolute inset-0 bg-gradient-to-b from-white/40 to-transparent rounded-3xl"></div>
+        
         {loading ? (
-          <div className="p-8 text-center text-on-surface-variant">Đang tải...</div>
+          <div className="relative z-10 flex flex-col items-center justify-center min-h-[300px]">
+            <div className="w-16 h-16 rounded-2xl bg-gray-100 border-2 border-black flex items-center justify-center mb-4 shadow-[4px_4px_0px_0px_#000] animate-pulse">
+              <span className="material-symbols-outlined text-gray-400 text-3xl">hourglass_empty</span>
+            </div>
+            <p className="text-lg font-bold text-gray-500">Đang tải dữ liệu...</p>
+          </div>
         ) : filteredRequests.length === 0 ? (
-          <div className="p-8 text-center text-on-surface-variant">
-            <span className="material-symbols-outlined text-4xl mb-2">inbox</span>
-            <p>Không có yêu cầu nào</p>
+          <div className="relative z-10 flex flex-col items-center justify-center min-h-[400px]">
+            <div className="w-24 h-24 rounded-2xl bg-gray-100 border-2 border-black flex items-center justify-center mb-6 text-gray-400 transform rotate-[-3deg] hover:rotate-0 transition-all duration-300 shadow-[8px_8px_0px_0px_#000]">
+              <span className="material-symbols-outlined text-5xl">inbox</span>
+            </div>
+            <h4 className="text-2xl font-black text-on-surface mb-2">Không có yêu cầu nào</h4>
+            <p className="text-base font-medium text-on-surface-variant text-center max-w-sm">
+              Hiện tại chưa có yêu cầu tư vấn mới nào cần xử lý trong hệ thống.
+            </p>
           </div>
         ) : (
-          <table className="w-full">
-            <thead className="bg-surface-container-low">
-              <tr>
-                <th className="text-left px-4 py-3 text-sm font-semibold text-on-surface">Người gửi</th>
-                <th className="text-left px-4 py-3 text-sm font-semibold text-on-surface">Email</th>
-                <th className="text-left px-4 py-3 text-sm font-semibold text-on-surface hidden md:table-cell">Ngày gửi</th>
-                <th className="text-left px-4 py-3 text-sm font-semibold text-on-surface">Trạng thái</th>
-                <th className="text-right px-4 py-3 text-sm font-semibold text-on-surface">Thao tác</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredRequests.map((request) => (
-                <tr
-                  key={request.id}
-                  className="border-t border-outline-variant/20 hover:bg-surface-container-low/50 transition-colors"
-                >
-                  <td className="px-4 py-3">
-                    <div className="font-medium text-on-surface">{request.name}</div>
-                    {request.phone && (
-                      <div className="text-xs text-on-surface-variant">{request.phone}</div>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-on-surface-variant">{request.email}</td>
-                  <td className="px-4 py-3 text-sm text-on-surface-variant hidden md:table-cell">
-                    {new Date(request.timestamp).toLocaleDateString('vi-VN', {
-                      day: '2-digit',
-                      month: '2-digit',
-                      year: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={clsx('px-2 py-1 rounded-full text-xs font-semibold', statusColors[request.status])}>
+          <div className="relative z-10 space-y-4">
+            {filteredRequests.map((request, index) => (
+              <div
+                key={request.id}
+                className="bg-white/60 backdrop-blur-xl rounded-2xl border-2 border-black p-6 hover:shadow-[6px_6px_0px_0px_#000] hover:-translate-x-1 hover:-translate-y-1 transition-all cursor-pointer"
+                style={{
+                  boxShadow: `${4 + (index % 3) * 2}px ${4 + (index % 3) * 2}px 0px 0px #000`,
+                }}
+                onClick={() => setSelectedRequest(request)}
+              >
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/20 to-secondary/20 border-2 border-black flex items-center justify-center shadow-[2px_2px_0px_0px_#000]">
+                      <span className="material-symbols-outlined text-primary text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>person</span>
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-on-surface text-lg">{request.name}</h4>
+                      <p className="text-sm text-on-surface-variant">{request.email}</p>
+                      {request.phone && (
+                        <p className="text-sm text-on-surface-variant flex items-center gap-1 mt-1">
+                          <span className="material-symbols-outlined text-sm">phone</span>
+                          {request.phone}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <span className="px-3 py-1.5 rounded-full text-xs font-bold uppercase border-2 bg-gray-50 border-black">
+                      {new Date(request.timestamp).toLocaleDateString('vi-VN', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric',
+                      })}
+                    </span>
+                    <span className={clsx(
+                      'px-4 py-2 rounded-full text-sm font-bold border-2 border-black',
+                      statusColors[request.status]
+                    )}>
                       {statusLabels[request.status]}
                     </span>
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <button
-                      onClick={() => setSelectedRequest(request)}
-                      className="px-3 py-1.5 rounded-lg bg-surface-container hover:bg-surface-container-high text-sm transition-colors"
-                    >
+                    <button className="px-4 py-2 rounded-full bg-primary text-white text-sm font-bold border-2 border-black shadow-[2px_2px_0px_0px_#000] hover:translate-x-[-1px] hover:-translate-y-[1px] hover:shadow-[3px_3px_0px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all">
                       Xem chi tiết
                     </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  </div>
+                </div>
+                
+                <div className="mt-4 p-4 bg-gray-50/60 rounded-xl border border-black/20">
+                  <p className="text-sm text-on-surface-variant line-clamp-2">{request.message}</p>
+                </div>
+              </div>
+            ))}
+          </div>
         )}
+      </div>
+
+      {/* FAB */}
+      <div className="fixed bottom-10 right-10 z-50">
+        <button className="w-14 h-14 bg-primary text-white rounded-full flex items-center justify-center border-3 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[-2px] hover:-translate-y-[2px] hover:shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all">
+          <span className="material-symbols-outlined text-2xl font-bold">add</span>
+        </button>
       </div>
 
       {/* Detail Modal */}
       {selectedRequest && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-outline-variant/30">
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+          style={{ backgroundColor: 'rgba(15, 23, 42, 0.7)', backdropFilter: 'blur(8px)' }}
+          onClick={(e) => { if (e.target === e.currentTarget) setSelectedRequest(null); }}
+        >
+          <div
+            className="relative bg-gradient-to-br from-white/95 to-white/80 backdrop-blur-xl rounded-3xl border-3 border-black w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-[12px_12px_0px_0px_#000]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="sticky top-0 bg-white/80 backdrop-blur-xl border-b-2 border-black p-6 z-10">
               <div className="flex items-center justify-between">
-                <h3 className="font-headline-lg text-on-surface">Chi tiết yêu cầu</h3>
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-secondary border-2 border-black flex items-center justify-center shadow-[3px_3px_0px_0px_#000]">
+                    <span className="material-symbols-outlined text-white text-2xl" style={{ fontVariationSettings: "'FILL' 1" }}>clinical_notes</span>
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-black text-on-surface">Chi tiết yêu cầu</h3>
+                    <p className="text-sm text-on-surface-variant">Mã: #{selectedRequest.id.slice(0, 8)}</p>
+                  </div>
+                </div>
                 <button
                   onClick={() => setSelectedRequest(null)}
-                  className="p-2 rounded-full hover:bg-surface-container transition-colors"
+                  className="w-10 h-10 rounded-full bg-white border-2 border-black flex items-center justify-center hover:bg-gray-100 transition-colors shadow-[2px_2px_0px_0px_#000]"
                 >
                   <span className="material-symbols-outlined">close</span>
                 </button>
               </div>
             </div>
 
-            <div className="p-6 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-on-surface-variant mb-1">Họ tên</label>
-                  <p className="font-medium text-on-surface">{selectedRequest.name}</p>
+            {/* Modal Content */}
+            <div className="p-6 space-y-6">
+              {/* Info Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-white/60 backdrop-blur-xl rounded-2xl p-4 border-2 border-black shadow-[3px_3px_0px_0px_#000]">
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Họ tên</label>
+                  <p className="font-bold text-on-surface text-lg">{selectedRequest.name}</p>
                 </div>
-                <div>
-                  <label className="block text-xs font-semibold text-on-surface-variant mb-1">Email</label>
-                  <a href={`mailto:${selectedRequest.email}`} className="text-primary hover:underline">
+                <div className="bg-white/60 backdrop-blur-xl rounded-2xl p-4 border-2 border-black shadow-[3px_3px_0px_0px_#000]">
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Email</label>
+                  <a href={`mailto:${selectedRequest.email}`} className="font-bold text-primary hover:underline">
                     {selectedRequest.email}
                   </a>
                 </div>
                 {selectedRequest.phone && (
-                  <div>
-                    <label className="block text-xs font-semibold text-on-surface-variant mb-1">Điện thoại</label>
-                    <a href={`tel:${selectedRequest.phone}`} className="text-primary hover:underline">
+                  <div className="bg-white/60 backdrop-blur-xl rounded-2xl p-4 border-2 border-black shadow-[3px_3px_0px_0px_#000]">
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Điện thoại</label>
+                    <a href={`tel:${selectedRequest.phone}`} className="font-bold text-primary hover:underline flex items-center gap-2">
+                      <span className="material-symbols-outlined text-sm">phone</span>
                       {selectedRequest.phone}
                     </a>
                   </div>
                 )}
-                <div>
-                  <label className="block text-xs font-semibold text-on-surface-variant mb-1">Ngày gửi</label>
-                  <p className="text-on-surface">
-                    {new Date(selectedRequest.timestamp).toLocaleString('vi-VN')}
+                <div className="bg-white/60 backdrop-blur-xl rounded-2xl p-4 border-2 border-black shadow-[3px_3px_0px_0px_#000]">
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Ngày gửi</label>
+                  <p className="font-bold text-on-surface">
+                    {new Date(selectedRequest.timestamp).toLocaleString('vi-VN', {
+                      day: '2-digit',
+                      month: '2-digit',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
                   </p>
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-on-surface-variant mb-1">Nội dung yêu cầu</label>
-                <div className="p-4 bg-surface-container-low rounded-xl">
-                  <p className="whitespace-pre-wrap text-on-surface">{selectedRequest.message}</p>
+              {/* Message Content */}
+              <div className="bg-white/60 backdrop-blur-xl rounded-2xl p-6 border-2 border-black shadow-[3px_3px_0px_0px_#000]">
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">Nội dung yêu cầu</label>
+                <div className="p-4 bg-gray-50/60 rounded-xl border border-black/20">
+                  <p className="whitespace-pre-wrap text-on-surface leading-relaxed">{selectedRequest.message}</p>
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-on-surface-variant mb-2">Cập nhật trạng thái</label>
-                <div className="flex gap-2">
+              {/* Status Update */}
+              <div className="bg-white/60 backdrop-blur-xl rounded-2xl p-6 border-2 border-black shadow-[3px_3px_0px_0px_#000]">
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-4">Cập nhật trạng thái</label>
+                <div className="flex flex-wrap gap-3">
                   {(['pending', 'reviewed', 'contacted'] as const).map((status) => (
                     <button
                       key={status}
                       onClick={() => updateStatus(selectedRequest.id, status)}
                       className={clsx(
-                        'px-4 py-2 rounded-xl text-sm font-label-md transition-all',
+                        'px-5 py-3 rounded-xl text-sm font-bold transition-all border-2 border-black',
                         selectedRequest.status === status
-                          ? statusColors[status] + ' ring-2 ring-offset-2 ring-primary'
-                          : 'bg-surface-container hover:bg-surface-container-high'
+                          ? status === 'pending' ? 'bg-yellow-400 shadow-[2px_2px_0px_0px_#000]'
+                            : status === 'reviewed' ? 'bg-blue-500 text-white shadow-[2px_2px_0px_0px_#000]'
+                            : 'bg-green-500 text-white shadow-[2px_2px_0px_0px_#000]'
+                          : 'bg-white shadow-[2px_2px_0px_0px_#000] hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-[3px_3px_0px_0px_#000]'
                       )}
                     >
+                      {status === 'pending' && <span className="material-symbols-outlined text-sm mr-2">pending_actions</span>}
+                      {status === 'reviewed' && <span className="material-symbols-outlined text-sm mr-2">visibility</span>}
+                      {status === 'contacted' && <span className="material-symbols-outlined text-sm mr-2">check_circle</span>}
                       {statusLabels[status]}
                     </button>
                   ))}
@@ -246,17 +390,20 @@ export function AdminConsultations() {
               </div>
             </div>
 
-            <div className="p-6 border-t border-outline-variant/30 flex justify-end gap-3">
+            {/* Modal Footer */}
+            <div className="p-6 border-t-2 border-black bg-white/80 backdrop-blur-xl flex flex-col sm:flex-row justify-end gap-3">
               <a
                 href={`mailto:${selectedRequest.email}?subject=Re: Yêu cầu tư vấn MADA&body=Xin chào ${selectedRequest.name},`}
-                className="px-6 py-2.5 rounded-xl bg-primary text-white font-label-md hover:bg-primary/90 transition-all"
+                className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-primary text-white font-bold text-sm border-2 border-black shadow-[4px_4px_0px_0px_#000] hover:-translate-x-1 hover:-translate-y-1 hover:shadow-[5px_5px_0px_0px_#000] active:translate-x-0 active:translate-y-0 active:shadow-none transition-all"
               >
+                <span className="material-symbols-outlined">email</span>
                 Trả lời qua Email
               </a>
               <button
                 onClick={() => setSelectedRequest(null)}
-                className="px-6 py-2.5 rounded-xl bg-surface-container hover:bg-surface-container-high font-label-md transition-colors"
+                className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-white text-on-surface font-bold text-sm border-2 border-black shadow-[4px_4px_0px_0px_#000] hover:-translate-x-1 hover:-translate-y-1 hover:shadow-[5px_5px_0px_0px_#000] active:translate-x-0 active:translate-y-0 active:shadow-none transition-all"
               >
+                <span className="material-symbols-outlined">close</span>
                 Đóng
               </button>
             </div>

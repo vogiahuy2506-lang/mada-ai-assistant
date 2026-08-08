@@ -76,7 +76,12 @@ db.exec(`
     name_en TEXT NOT NULL,
     icon TEXT,
     sort_order INTEGER NOT NULL DEFAULT 0,
-    created_at TEXT NOT NULL
+    description_vi TEXT,
+    description_en TEXT,
+    related_url TEXT,
+    product_link TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
   );
 
   -- Bảng knowledge_items: từng tài liệu / sản phẩm trong KB
@@ -147,6 +152,67 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_kb_audit_item ON kb_audit(item_id);
 `);
 
+// ============== PRODUCTS SCHEMA ==============
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS kb_products (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    title_en TEXT NOT NULL DEFAULT '',
+    description TEXT NOT NULL DEFAULT '',
+    description_en TEXT NOT NULL DEFAULT '',
+    content TEXT NOT NULL DEFAULT '',
+    category TEXT NOT NULL DEFAULT 'general',
+    brand TEXT NOT NULL DEFAULT '',
+    model TEXT NOT NULL DEFAULT '',
+    price_range TEXT NOT NULL DEFAULT '',
+    source_url TEXT NOT NULL DEFAULT '',
+    product_url TEXT NOT NULL DEFAULT '',
+    image_url TEXT NOT NULL DEFAULT '',
+    iso_codes TEXT NOT NULL DEFAULT '[]',
+    wcag_level TEXT NOT NULL DEFAULT '',
+    who_gate_area TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','published','archived')),
+    featured INTEGER NOT NULL DEFAULT 0,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    language TEXT NOT NULL DEFAULT 'vi',
+    created_by TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_products_category ON kb_products(category);
+  CREATE INDEX IF NOT EXISTS idx_products_status ON kb_products(status);
+  CREATE INDEX IF NOT EXISTS idx_products_featured ON kb_products(featured);
+  CREATE INDEX IF NOT EXISTS idx_products_created ON kb_products(created_at);
+`);
+
+
+try {
+  const cols = db.prepare("PRAGMA table_info(kb_categories)").all() as any[];
+  const colNames = cols.map((c: any) => c.name);
+  if (!colNames.includes('description_vi')) {
+    db.exec(`ALTER TABLE kb_categories ADD COLUMN description_vi TEXT`);
+  }
+  if (!colNames.includes('description_en')) {
+    db.exec(`ALTER TABLE kb_categories ADD COLUMN description_en TEXT`);
+  }
+  if (!colNames.includes('related_url')) {
+    db.exec(`ALTER TABLE kb_categories ADD COLUMN related_url TEXT`);
+  }
+  if (!colNames.includes('product_link')) {
+    db.exec(`ALTER TABLE kb_categories ADD COLUMN product_link TEXT`);
+  }
+  if (!colNames.includes('updated_at')) {
+    db.exec(`ALTER TABLE kb_categories ADD COLUMN updated_at TEXT`);
+  }
+} catch (e: any) {
+  // Columns may already exist in newer schema
+  if (!e.message?.includes('duplicate column')) {
+    console.log('⚠️ Migration note:', e.message);
+  }
+}
+
 // ============== SCHEDULED SOURCES SCHEMA ==============
 
 db.exec(`
@@ -174,22 +240,22 @@ db.exec(`
 // Seed 7+2 categories
 function seedCategories() {
   const cats = [
-    { id: 'vision', name_vi: 'Hỗ trợ Thị giác', name_en: 'Vision', icon: '👁️', sort_order: 1 },
-    { id: 'hearing', name_vi: 'Hỗ trợ Thính giác', name_en: 'Hearing', icon: '👂', sort_order: 2 },
-    { id: 'mobility', name_vi: 'Hỗ trợ Vận động', name_en: 'Mobility', icon: '🦽', sort_order: 3 },
-    { id: 'cognition', name_vi: 'Hỗ trợ Nhận thức', name_en: 'Cognition', icon: '🧠', sort_order: 4 },
-    { id: 'communication', name_vi: 'Hỗ trợ Giao tiếp', name_en: 'Communication', icon: '💬', sort_order: 5 },
-    { id: 'daily_living', name_vi: 'Hỗ trợ Sinh hoạt', name_en: 'Daily Living', icon: '🏠', sort_order: 6 },
-    { id: 'education', name_vi: 'Hỗ trợ Giáo dục', name_en: 'Education', icon: '📚', sort_order: 7 },
-    { id: 'web_accessibility', name_vi: 'Tiếp cận Web', name_en: 'Web Accessibility', icon: '🌐', sort_order: 8 },
-    { id: 'general', name_vi: 'Tổng quát', name_en: 'General', icon: '📋', sort_order: 99 },
+    { id: 'vision', name_vi: 'Hỗ trợ Thị giác', name_en: 'Vision', icon: '👁️', sort_order: 1, description_vi: 'Thiết bị hỗ trợ người khiếm thị như phần mềm đọc màn hình, màn hình chữ nổi Braille, kính thông minh', description_en: 'Devices supporting visually impaired users such as screen readers, Braille displays, smart glasses', related_url: '', product_link: '' },
+    { id: 'hearing', name_vi: 'Hỗ trợ Thính giác', name_en: 'Hearing', icon: '👂', sort_order: 2, description_vi: 'Thiết bị hỗ trợ người khiếm thính như máy trợ thính, hệ thống FM, thiết bị phản hồi âm thanh', description_en: 'Devices supporting hearing impaired users such as hearing aids, FM systems, alerting devices', related_url: '', product_link: '' },
+    { id: 'mobility', name_vi: 'Hỗ trợ Vận động', name_en: 'Mobility', icon: '🦽', sort_order: 3, description_vi: 'Thiết bị hỗ trợ vận động như xe lăn điện, xe lăn thông minh, prosthetics, nẹp chỉnh hình', description_en: 'Mobility support devices such as electric wheelchairs, smart wheelchairs, prosthetics, orthoses', related_url: '', product_link: '' },
+    { id: 'cognition', name_vi: 'Hỗ trợ Nhận thức', name_en: 'Cognition', icon: '🧠', sort_order: 4, description_vi: 'Thiết bị hỗ trợ trí nhớ, chú ý và học tập như ứng dụng sắp xếp, thiết bị trợ nhớ', description_en: 'Cognitive support devices for memory, attention and learning such as organization apps, memory aids', related_url: '', product_link: '' },
+    { id: 'communication', name_vi: 'Hỗ trợ Giao tiếp', name_en: 'Communication', icon: '💬', sort_order: 5, description_vi: 'Thiết bị giao tiếp tăng cường (AAC) cho người khó khăn trong giao tiếp lời nói', description_en: 'Augmentative and Alternative Communication (AAC) devices for people with speech difficulties', related_url: '', product_link: '' },
+    { id: 'daily_living', name_vi: 'Hỗ trợ Sinh hoạt', name_en: 'Daily Living', icon: '🏠', sort_order: 6, description_vi: 'Thiết bị hỗ trợ sinh hoạt hàng ngày như dụng cụ ăn uống, thiết bị phòng tắm, công cụ nhà bếp', description_en: 'Daily living aids such as eating aids, bathroom equipment, special kitchen tools', related_url: '', product_link: '' },
+    { id: 'education', name_vi: 'Hỗ trợ Giáo dục', name_en: 'Education', icon: '📚', sort_order: 7, description_vi: 'Công nghệ hỗ trợ giáo dục cho người khuyết tật như phần mềm đọc văn bản, công cụ accessibility', description_en: 'Educational assistive technologies such as text-to-speech software, accessibility tools', related_url: '', product_link: '' },
+    { id: 'web_accessibility', name_vi: 'Tiếp cận Web', name_en: 'Web Accessibility', icon: '🌐', sort_order: 8, description_vi: 'Công cụ và tiêu chuẩn tiếp cận web như WCAG, phần mềm hỗ trợ duyệt web', description_en: 'Web accessibility tools and standards such as WCAG, web browsing assistive software', related_url: '', product_link: '' },
+    { id: 'general', name_vi: 'Tổng quát', name_en: 'General', icon: '📋', sort_order: 99, description_vi: 'Thông tin tổng quát về công nghệ hỗ trợ và các tài nguyên chung', description_en: 'General information about assistive technology and common resources', related_url: '', product_link: '' },
   ];
-  const stmt = db.prepare(`
-    INSERT OR IGNORE INTO kb_categories (id, name_vi, name_en, icon, sort_order, created_at)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `);
   const now = new Date().toISOString();
-  for (const c of cats) stmt.run(c.id, c.name_vi, c.name_en, c.icon, c.sort_order, now);
+  const stmt = db.prepare(`
+    INSERT OR IGNORE INTO kb_categories (id, name_vi, name_en, icon, sort_order, description_vi, description_en, related_url, product_link, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  for (const c of cats) stmt.run(c.id, c.name_vi, c.name_en, c.icon, c.sort_order, c.description_vi, c.description_en, c.related_url, c.product_link, now, now);
   console.log(`🌱 Seeded ${cats.length} KB categories`);
 }
 seedCategories();

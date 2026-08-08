@@ -258,4 +258,135 @@ router.put('/password', authenticate, (req: AuthRequest, res: Response) => {
   }
 });
 
+// ============== GET /auth/google/url ==============
+
+router.get('/google/url', (_req, res) => {
+  if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+    return res.status(503).json({ 
+      success: false, 
+      message: 'Google OAuth chưa được cấu hình. Vui lòng liên hệ quản trị viên.' 
+    });
+  }
+  
+  // Redirect to Google OAuth
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const redirectUri = encodeURIComponent(`${process.env.APP_URL || 'http://localhost:5173'}/api/auth/google/callback`);
+  const scope = encodeURIComponent('profile email');
+  const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=${scope}&prompt=select_account`;
+  
+  res.json({ success: true, url: authUrl });
+});
+
+// Alias for frontend compatibility (direct redirect)
+router.get('/google', (req, res) => {
+  if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+    return res.status(503).json({ 
+      success: false, 
+      message: 'Google OAuth chưa được cấu hình.' 
+    });
+  }
+  
+  // Redirect to Google OAuth
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const redirectUri = encodeURIComponent(`${process.env.APP_URL || 'http://localhost:5173'}/api/auth/google/callback`);
+  const scope = encodeURIComponent('profile email');
+  const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=${scope}&prompt=select_account`;
+  
+  res.redirect(authUrl);
+});
+
+// ============== GET /auth/google/callback ==============
+
+router.get('/google/callback', (req, res) => {
+  const { code, error } = req.query;
+  
+  if (error || !code) {
+    console.error('Google OAuth error:', error);
+    return res.redirect('/?error=google_oauth_failed');
+  }
+  
+  // Exchange code for tokens and authenticate user
+  exchangeCodeForTokens(code as string, req, res);
+});
+
+async function exchangeCodeForTokens(code: string, req: any, res: any) {
+  try {
+    const clientId = process.env.GOOGLE_CLIENT_ID!;
+    const clientSecret = process.env.GOOGLE_CLIENT_SECRET!;
+    const redirectUri = `${process.env.APP_URL || 'http://localhost:5173'}/api/auth/google/callback`;
+    
+    // Exchange code for tokens
+    const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        code,
+        client_id: clientId,
+        client_secret: clientSecret,
+        redirect_uri: redirectUri,
+        grant_type: 'authorization_code',
+      }),
+    });
+
+    if (!tokenResponse.ok) {
+      throw new Error('Failed to exchange code for tokens');
+    }
+
+    const tokens = await tokenResponse.json() as { access_token: string; id_token: string };
+    
+    // Get user info from Google
+    const userResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+      headers: { Authorization: `Bearer ${tokens.access_token}` },
+    });
+
+    if (!userResponse.ok) {
+      throw new Error('Failed to get user info');
+    }
+
+    const googleUser = await userResponse.json() as { id: string; email: string; name: string; picture: string };
+    
+    // Find or create user in database
+    const email = googleUser.email.toLowerCase();
+    let user = db.prepare('SELECT * FROM users WHERE google_id = ?').get(googleUser.id) as UserRow | undefined;
+    
+    if (!user) {
+      // Check if email exists (link account)
+      user = db.prepare('SELECT * FROM users WHERE email = ?').get(email) as UserRow | undefined;
+      
+      if (user) {
+        // Link Google to existing account
+        db.prepare('UPDATE users SET google_id = ?, avatar = COALESCE(?, avatar), updated_at = ? WHERE id = ?')
+          .run(googleUser.id, googleUser.picture, new Date().toISOString(), user.id);
+      } else {
+        // Create new user
+        const id = `user-${crypto.randomUUID()}`;
+        const now = new Date().toISOString();
+        db.prepare(`
+          INSERT INTO users (id, email, name, google_id, avatar, role, plan, status, provider, quota_used, quota_limit, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, 'user', 'free', 'active', 'google', 0, 10, ?, ?)
+        `).run(id, email, googleUser.name, googleUser.id, googleUser.picture, now, now);
+      }
+      user = db.prepare('SELECT * FROM users WHERE google_id = ?').get(googleUser.id) as UserRow;
+    }
+
+    // Update last login
+    const now = new Date().toISOString();
+    db.prepare('UPDATE users SET last_login_at = ? WHERE id = ?').run(now, user!.id);
+    user = db.prepare('SELECT * FROM users WHERE id = ?').get(user!.id) as UserRow;
+
+    // Generate JWT tokens
+    const accessToken = signAccessToken(user!);
+    const { refreshToken, expiresAt } = createSession(user!.id);
+
+    auditLog(user!.id, 'google_login', req);
+    logActivity('info', `User logged in with Google: ${user!.name}`, 'Auth Service', user!.email);
+
+    // Redirect to frontend with tokens
+    res.redirect(`/?google_auth=success&access_token=${accessToken}&refresh_token=${refreshToken}&expires_at=${expiresAt}&user_id=${user!.id}`);
+  } catch (err) {
+    console.error('Google OAuth callback error:', err);
+    res.redirect('/?error=google_oauth_failed');
+  }
+}
+
 export default router;

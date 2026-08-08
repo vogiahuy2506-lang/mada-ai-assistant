@@ -4,9 +4,7 @@ import dotenv from 'dotenv';
 import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
 import fs from 'fs';
-import { createRequire } from 'module';
-
-const require = createRequire(import.meta.url);
+import session from 'express-session';
 
 // RAG imports
 import { vectorStore } from './lib/rag/vectorStore';
@@ -17,16 +15,26 @@ import { guardrails } from './lib/guardrails';
 
 // Auth imports
 import './lib/db'; // Initialize DB
+import db from './lib/db';
 import authRoutes from './routes/auth';
 import userRoutes from './routes/users';
 import kbRoutes from './routes/knowledgeBase';
 import scraperRoutes from './routes/scraper';
 import paymentRoutes from './routes/payments';
+import productsRoutes from './routes/products';
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+
+// ============== SESSION SETUP ==============
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'mada-ai-secret-key-change-in-production',
+  resave: false,
+  saveUninitialized: false,
+  cookie: { secure: false, httpOnly: true, maxAge: 24 * 60 * 60 * 1000 }, // 24 hours
+}));
 
 // Middleware
 app.use(cors({
@@ -56,6 +64,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/kb', kbRoutes);
 app.use('/api/scraper', scraperRoutes);
 app.use('/api/payments', paymentRoutes);
+app.use('/api/admin/products', productsRoutes);
 
 // ============== IN-MEMORY ACTIVITY LOG ==============
 interface ActivityLog {
@@ -1514,9 +1523,16 @@ app.post('/api/chat', async (req, res) => {
     chatHistory.get(convId)!.push({ role: 'user', content: message });
 
     // Build system instruction with agent prompt if provided
-    const ragConfig = agentPrompt 
-      ? { systemInstruction: `Bạn là trợ lý ảo MADA. ${agentPrompt}\n\nHãy trả lời bằng tiếng ${language === 'vi' ? 'Việt' : language === 'en' ? 'Anh' : language}.` }
-      : {};
+    const languageInstructions: Record<string, string> = {
+      vi: 'Bạn là trợ lý ảo MADA. Hãy trả lời bằng tiếng Việt.',
+      en: 'You are MADA AI assistant. Always respond in English.',
+      ar: 'أنت مساعد MADA الذكي. أجب دائمًا باللغة العربية.',
+      fr: 'Vous êtes l\'assistant MADA. Répondez toujours en français.',
+    };
+    
+    const baseInstruction = languageInstructions[language] || languageInstructions.vi;
+    const agentInstruction = agentPrompt ? `${baseInstruction} ${agentPrompt}` : baseInstruction;
+    const ragConfig = { systemInstruction: agentInstruction };
 
     // Query RAG engine with agent context
     const ragResponse = await ragEngine.query(message, chatHistory.get(convId) || [], ragConfig);
@@ -1663,35 +1679,82 @@ app.post('/api/chat-with-file', async (req, res) => {
     // Build prompt WITH file context
     let enhancedMessage = message;
     console.log('🔵 fileContext length:', fileContext.length);
-    if (fileContext) {
-      // Prompt chi tiết để AI phân tích đầy đủ
-      enhancedMessage = `Nhiệm vụ: Đọc và phân tích TẤT CẢ nội dung tài liệu đính kèm bên dưới.
-      
-Câu hỏi: ${message}
-
-TÀI LIỆU:
-${fileContext}
-
-YÊU CẦU:
-- Đọc KỸ và HIỂU toàn bộ nội dung tài liệu
-- Trả lời DỰA TRÊN nội dung thực tế trong tài liệu
+    
+    // Language-specific file analysis prompts
+    const filePromptTemplates: Record<string, { task: string; instructions: string; respondNow: string }> = {
+      vi: {
+        task: 'Nhiệm vụ: Đọc và phân tích TẤT CẢ nội dung tài liệu đính kèm bên dưới.',
+        instructions: `- Đọc KỸ và HIỂU toàn bộ nội dung tài liệu
+- Trả lời DỰA TRÊN nội dung thực tế trong tài liệu bằng tiếng Việt
 - Nếu được hỏi "tóm tắt" hoặc "có gì", hãy LIỆT KÊ TẤT CẢ các mục, thông tin, quy định có trong tài liệu
 - Trích dẫn CHÍNH XÁC thông tin từ tài liệu khi trả lời
-- KHÔNG bịa đặt hoặc thêm thông tin không có trong tài liệu
+- KHÔNG bịa đặt hoặc thêm thông tin không có trong tài liệu`,
+        respondNow: 'Hãy trả lời ngay bây giờ:'
+      },
+      en: {
+        task: 'Task: Read and analyze ALL content of the attached document below.',
+        instructions: `- Read CAREFULLY and UNDERSTAND all document content
+- Answer BASED ON the actual content in the document in English
+- If asked to "summarize" or "what\'s inside", LIST ALL items, information, and regulations in the document
+- Quote EXACTLY the information from the document when answering
+- DO NOT fabricate or add information not in the document`,
+        respondNow: 'Please respond now:'
+      },
+      ar: {
+        task: 'المهمة: قراءة وتحليل جميع محتويات المستند المرفق أدناه.',
+        instructions: `- اقرأ بعناية وفهم جميع محتويات المستند
+- أجب بناءً على المحتوى الفعلي في المستند باللغة العربية
+- إذا طُلب "تلخيص" أو "ما داخله"، فاذكر جميع العناصر والمعلومات واللوائح في المستند
+- اقتبس المعلومات من المستند بدقة عند الإجابة
+- لا تخترع أو تضيف معلومات غير موجودة في المستند`,
+        respondNow: 'الرجاء الرد الآن:'
+      },
+      fr: {
+        task: 'Tâche: Lire et analyser TOUT le contenu du document ci-joint.',
+        instructions: `- Lisez SOIGNEUSEMENT et COMPRENEZ tout le contenu du document
+- Répondez BASÉ SUR le contenu réel du document en français
+- Si on vous demande de "résumer" ou "contenu", LISTEZ TOUS les éléments, informations et réglementations du document
+- Citez EXACTEMENT les informations du document lors de la réponse
+- NE PAS inventer ou ajouter des informations non présentes dans le document`,
+        respondNow: 'Veuillez répondre maintenant:'
+      }
+    };
+    
+    const promptTemplate = filePromptTemplates[language] || filePromptTemplates.vi;
+    
+    if (fileContext) {
+      enhancedMessage = `${promptTemplate.task}
+      
+Question: ${message}
 
-Hãy trả lời ngay bây giờ:`;
+DOCUMENT:
+${fileContext}
+
+REQUIREMENTS:
+${promptTemplate.instructions}
+
+${promptTemplate.respondNow}`;
       console.log('🔵 enhancedMessage length:', enhancedMessage.length);
     }
 
     // Query RAG - Dùng system prompt khác khi có file đính kèm
+    const languageInstructions: Record<string, string> = {
+      vi: 'Ban la tro ly AI MADA ho tro phan tich tai lieu. Hay tra loi CHI TIET va DAY DU tieng Viet.',
+      en: 'You are MADA AI assistant for document analysis. Respond in English. Answer DETAILED and COMPLETE.',
+      ar: 'أنت مساعد MADA الذكي لتحليل المستندات. أجب دائمًا باللغة العربية وبالتفصيل.',
+      fr: 'Vous êtes l\'assistant MADA pour l\'analyse de documents. Répondez en français et en détail.',
+    };
+    
+    const langInstruction = languageInstructions[language] || languageInstructions.vi;
+    
     const ragConfig: any = {};
     
     if (fileContext) {
       // Khi có file - dùng system prompt không giới hạn
-      ragConfig.systemInstruction = `Ban la tro ly AI ho tro phan tich tai lieu. Hay tra loi CHI TIET va DAY DU cac cau hoi ve noi dung tai lieu duoc cung cap. Khong gioi han do dai tra loi. Doc day du tat ca noi dung va tong hop thong tin.`;
+      ragConfig.systemInstruction = langInstruction;
       ragConfig.maxOutputTokens = 8192; // Tăng output cho file dài
     } else if (agentPrompt) {
-      ragConfig.systemInstruction = `Ban la tro ly ao MADA. ${agentPrompt}`;
+      ragConfig.systemInstruction = `${langInstruction} ${agentPrompt}`;
     }
 
     const ragResponse = await ragEngine.query(enhancedMessage, chatHistory.get(convId) || [], ragConfig);
@@ -1741,6 +1804,49 @@ app.get('/api/scrape', async (req, res) => {
     // Only allow http and https
     if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
       return res.status(400).json({ success: false, error: 'Only HTTP and HTTPS URLs are allowed' });
+    }
+
+    // ========== SPECIAL HANDLING FOR GOOGLE DOCS ==========
+    // Google Docs published URLs - export as plain text
+    if (
+      parsedUrl.hostname.includes('docs.google.com') &&
+      (parsedUrl.pathname.includes('/document/d/') || parsedUrl.pathname.includes('/document/pub/'))
+    ) {
+      try {
+        // For published Google Docs, we can try to get the export URL
+        const docIdMatch = parsedUrl.pathname.match(/\/document\/d\/([a-zA-Z0-9-_]+)/);
+        if (docIdMatch) {
+          const docId = docIdMatch[1];
+          const exportUrl = `https://docs.google.com/document/d/${docId}/export?format=txt`;
+          
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 30000);
+          
+          const response = await fetch(exportUrl, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (compatible; MADA-AI/1.0)',
+            },
+            signal: controller.signal,
+          });
+          clearTimeout(timeoutId);
+          
+          if (response.ok) {
+            const text = await response.text();
+            return res.status(200).json({
+              success: true,
+              data: {
+                title: 'Google Docs',
+                content: text.slice(0, 50000), // Limit content size
+                url: url,
+                type: 'google-docs',
+              },
+            });
+          }
+        }
+      } catch (e) {
+        console.error('Google Docs fetch error:', e);
+        // Fall through to normal scraping
+      }
     }
 
     // Fetch the URL

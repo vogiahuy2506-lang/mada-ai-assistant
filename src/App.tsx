@@ -10,6 +10,7 @@ import {
   AdminSettings,
   AdminAgents,
   AdminConsultations,
+  AdminProducts,
   DataManagerPage,
   ExpertPage,
   ProfilePage,
@@ -109,6 +110,14 @@ function App() {
           element={
             <RoleGuard requiredRole="admin">
               <AdminConsultations />
+            </RoleGuard>
+          }
+        />
+        <Route
+          path="/admin/products"
+          element={
+            <RoleGuard requiredRole="admin">
+              <AdminProducts />
             </RoleGuard>
           }
         />

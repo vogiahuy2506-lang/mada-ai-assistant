@@ -1,23 +1,27 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useChatStore, useChatHistoryStore, useLanguageStore, useViewModeStore, useAuthStore, useAnonQuotaStore, usePaywallModalStore, useAuthModalStore, useAgentStore, useSelectedAgentStore } from '@/stores';
+import { useChatStore, useChatHistoryStore, useLanguageStore, useAuthStore, useAnonQuotaStore, usePaywallModalStore, useAuthModalStore, useAgentStore, useSelectedAgentStore, useSystemSettingsStore } from '@/stores';
 import { AuthModal } from '@/components/auth/AuthModal';
 import { PaywallModal } from '@/components/auth/PaywallModal';
 import { QuotaIndicator } from '@/components/auth/QuotaIndicator';
 import { RobotLogo } from '@/components/icons/RobotLogo';
 import {
-  Send, Plus, Menu, User, History, Mic,
+  Send, Plus, User, History, Mic,
   Trash2, Volume2, ChevronDown, Check, Copy, ThumbsUp, ThumbsDown,
-  Speaker, BookOpen, Zap, Bot as BotIcon, HelpCircle, ChevronRight,
-  FileText, Video, Mic2, ImageIcon, File, X, Eye, Shield,
-  Globe, ExternalLink, Star, Award, FileCheck, MessageCircle,
-  Phone, Mail, UserCircle, Briefcase, LogOut, Sparkles,
-  Search, Pin, MessageSquare, PinOff, Loader2, ArrowRight
+  Speaker, BookOpen, Bot as BotIcon, HelpCircle, ChevronRight,
+  FileText, Video, Mic2, ImageIcon, File, X,
+  Globe, Star, Award, FileCheck, MessageCircle,
+  LogOut, Sparkles,
+  Search, Pin, MessageSquare, PinOff, Loader2, ArrowRight,
+  Settings, Smartphone, Brain, Eye, Accessibility,
+  Users, MoreHorizontal, Gift, Wallet, CreditCard,
+  PiggyBank, Handshake, ZoomIn, PlusCircle, Monitor,
+  Ear
 } from 'lucide-react';
 import clsx from 'clsx';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { CATEGORY_INFO, SAMPLE_QUESTIONS, type ATCategory, type Language, type ViewMode } from '@/types';
+import { CATEGORY_INFO, SAMPLE_QUESTIONS, type ATCategory, type Language } from '@/types';
 
 // Attachment options - use getAttachmentOptions(language) inside component
 function getAttachmentOptions(lang: Language) {
@@ -36,6 +40,153 @@ function getAttachmentOptions(lang: Language) {
     { id: 'audio', icon: Mic2, label: l.audio, accept: 'audio/*', description: l.audioDesc },
     { id: 'file', icon: File, label: l.file, accept: '*/*', description: l.fileDesc },
   ];
+}
+
+// Sample questions translated by language
+function getSampleQuestionsByLang(category: ATCategory, lang: Language): string[] {
+  const translations: Record<Language, Partial<Record<ATCategory, string[]>>> = {
+    vi: {},
+    en: {
+      vision: [
+        'What are the best screen readers for visually impaired?',
+        'How much do electronic magnifiers cost?',
+        'How can blind people use computers?',
+        'How much do Braille displays cost?',
+      ],
+      hearing: [
+        'What types of hearing aids are available and how much do they cost?',
+        'How to choose hearing aids for elderly?',
+        'How do alerting devices work?',
+        'Can hearing aids connect to Bluetooth?',
+      ],
+      mobility: [
+        'How much do electric wheelchairs cost?',
+        'How to choose a wheelchair for disabled?',
+        'How do stair climbing wheelchairs work?',
+        'What\'s the difference between crutches and walkers?',
+      ],
+      cognition: [
+        'What memory aids are available for elderly?',
+        'Reminder apps for people with memory loss?',
+        'Digital calendars for people with cognitive difficulties?',
+        'Devices to help organize daily tasks?',
+      ],
+      communication: [
+        'What is AAC (Augmentative and Alternative Communication)?',
+        'How do picture communication boards work?',
+        'Communication apps for non-verbal people on phone?',
+        'Communication devices for autistic children?',
+      ],
+      daily_living: [
+        'Eating utensils for people with hand arthritis?',
+        'Medication reminder devices?',
+        'Kitchen tools for people with disabilities?',
+        'Bathroom safety devices for elderly?',
+      ],
+      education: [
+        'Text-to-speech software for students?',
+        'How to create accessible documents?',
+        'What is AAC for education?',
+        'Tools for students with dyslexia?',
+      ],
+    },
+    ar: {
+      vision: [
+        'ما هي أفضل قارئات الشاشة للمكفوفين؟',
+        'كم تكلفة المكبرات الإلكترونية؟',
+        'كيف يمكن للمكفوفين استخدام الحواسيب؟',
+        'كم تكلفة شاشات برايل؟',
+      ],
+      hearing: [
+        'ما هي أنواع سماعات الأذن المتاحة وكم تكلف؟',
+        'كيف تختار سماعات الأذن لكبار السن؟',
+        'كيف تعمل أجهزة التنبيه؟',
+        'هل يمكن لسماعات الأذن الاتصال بالبلوتوث؟',
+      ],
+      mobility: [
+        'كم تكلفة الكراسي المتحركة الكهربائية؟',
+        'كيف تختار كرسي متحرك مناسب؟',
+        'كيف تعمل كراسي تسلق الدرج؟',
+        'ما الفرق بين العكازات والمشايات؟',
+      ],
+      cognition: [
+        'ما هي أدوات الذاكرة المتاحة لكبار السن؟',
+        'تطبيقات التذكير لفقدان الذاكرة؟',
+        'التقويمات الرقمية للأشخاص ذوي الصعوبات المعرفية؟',
+        'أجهزة لتنظيم المهام اليومية؟',
+      ],
+      communication: [
+        'ما هو AAC (التواصل المعزز والبديل)؟',
+        'كيف تعمل لوحات التواصل بالصور؟',
+        'تطبيقات التواصل للأشخاص غير الناطقين؟',
+        'أجهزة التواصل للأطفال المصابين بالتوحد؟',
+      ],
+      daily_living: [
+        'أدوات الأكل لالتهاب المفاصل؟',
+        'أجهزة تذكير الأدوية؟',
+        'أدوات المطبخ للأشخاص ذوي الإعاقة؟',
+        'أجهزة السلامة في الحمام لكبار السن؟',
+      ],
+      education: [
+        'برامج تحويل النص إلى كلام للطلاب؟',
+        'كيف تنشئ مستندات يمكن الوصول إليها؟',
+        'ما هو AAC للتعليم؟',
+        'أدوات للطلاب المصابين بعسر القراءة؟',
+      ],
+    },
+    fr: {
+      vision: [
+        'Quels sont les meilleurs lecteurs d\'écran pour les malvoyants?',
+        'Combien coûtent les agrandisseurs électroniques?',
+        'Comment les aveugles peuvent-ils utiliser les ordinateurs?',
+        'Combien coûtent les plages Braille?',
+      ],
+      hearing: [
+        'Quels types d\'appareils auditifs sont disponibles et combien coûtent-ils?',
+        'Comment choisir des appareils auditifs pour les personnes âgées?',
+        'Comment fonctionnent les dispositifs d\'alerte?',
+        'Les appareils auditifs peuvent-ils se connecter en Bluetooth?',
+      ],
+      mobility: [
+        'Combien coûtent les fauteuils roulants électriques?',
+        'Comment choisir un fauteuil roulant pour handicapés?',
+        'Comment fonctionnent les fauteuils grimpeurs d\'escalier?',
+        'Quelle est la différence entre les béquilles et les déambulateurs?',
+      ],
+      cognition: [
+        'Quelles aides à la mémoire sont disponibles pour les personnes âgées?',
+        'Applications de rappel pour la perte de mémoire?',
+        'Calendriers numériques pour les personnes ayant des difficultés cognitives?',
+        'Appareils pour organiser les tâches quotidiennes?',
+      ],
+      communication: [
+        'Qu\'est-ce que la CAA (Communication Augmentative et Alternative)?',
+        'Comment fonctionnent les tableaux de communication par images?',
+        'Applications de communication pour les personnes non verbales?',
+        'Dispositifs de communication pour les enfants autistes?',
+      ],
+      daily_living: [
+        'Ustensiles de repas pour l\'arthrite des mains?',
+        'Dispositifs de rappel de médicaments?',
+        'Outils de cuisine pour personnes handicapées?',
+        'Dispositifs de sécurité dans la salle de bain pour personnes âgées?',
+      ],
+      education: [
+        'Logiciels de synthèse vocale pour étudiants?',
+        'Comment créer des documents accessibles?',
+        'Qu\'est-ce que la CAA pour l\'éducation?',
+        'Outils pour étudiants dyslexiques?',
+      ],
+    },
+  };
+  
+  // For Vietnamese, use the original sample questions
+  if (lang === 'vi') {
+    return SAMPLE_QUESTIONS[category]?.end_user || [];
+  }
+  
+  // For other languages, use the translated versions
+  return translations[lang]?.[category] || SAMPLE_QUESTIONS[category]?.end_user || [];
 }
 
 const LANGUAGES: { code: Language; name: string; flag: string }[] = [
@@ -58,48 +209,76 @@ const CATEGORY_ICONS: Record<ATCategory, string> = {
   education: 'school',
 };
 
-const CATEGORY_LABELS: Record<ATCategory, { title: string; titleEn: string; desc: string; descEn: string }> = {
+const CATEGORY_LABELS: Record<ATCategory, { title: string; titleEn: string; titleAr: string; titleFr: string; desc: string; descEn: string; descAr: string; descFr: string }> = {
   hearing: { 
     title: 'CẢM GIÁC - THÍNH GIÁC', 
     titleEn: 'HEARING SENSORY', 
+    titleAr: 'الحواس - السمع',
+    titleFr: 'SENS - AUDITION',
     desc: 'Máy trợ thính, thiết bị phản hồi...', 
-    descEn: 'Hearing aids, alerting devices...' 
+    descEn: 'Hearing aids, alerting devices...',
+    descAr: 'سماعات الأذن، أجهزة التنبيه...',
+    descFr: 'Appareils auditifs, dispositifs d\'alerte...',
   },
   vision: { 
     title: 'CẢM GIÁC - THỊ GIÁC', 
     titleEn: 'VISION SENSORY', 
+    titleAr: 'الحواس - البصر',
+    titleFr: 'SENS - VISION',
     desc: 'Phần mềm đọc màn hình, chữ nổi...', 
-    descEn: 'Screen readers, braille displays...' 
+    descEn: 'Screen readers, braille displays...',
+    descAr: 'قارئات الشاشة، شاشات برايل...',
+    descFr: 'Lecteurs d\'écran, plages braille...',
   },
   communication: { 
     title: 'GIỌNG NÓI VÀ LỜI NÓI', 
     titleEn: 'SPEECH & VOICE', 
+    titleAr: 'الكلام والصوت',
+    titleFr: 'PAROLE ET VOIX',
     desc: 'Thiết bị giao tiếp tăng cường...', 
-    descEn: 'Augmentative communication devices...' 
+    descEn: 'Augmentative communication devices...',
+    descAr: 'أجهزة الاتصال المعزز...',
+    descFr: 'Dispositifs de communication augmentative...',
   },
   cognition: { 
     title: 'TÂM THẦN - NHẬN THỨC', 
     titleEn: 'COGNITIVE', 
+    titleAr: 'الإدراكي والمعرفي',
+    titleFr: 'COGNITIF',
     desc: 'Thiết bị hỗ trợ trí nhớ, sắp xếp...', 
-    descEn: 'Memory aids, organization tools...' 
+    descEn: 'Memory aids, organization tools...',
+    descAr: 'أدوات الذاكرة، أدوات التنظيم...',
+    descFr: 'Aides à la mémoire, outils d\'organisation...',
   },
   mobility: { 
     title: 'VẬN ĐỘNG THẦN KINH', 
     titleEn: 'NEUROMUSCULAR', 
+    titleAr: 'العضلات والعصبية',
+    titleFr: 'NEUROMUSCULAIRE',
     desc: 'Nẹp chỉnh hình, bàn phím thay thế...', 
-    descEn: 'Orthoses, alternative keyboards...' 
+    descEn: 'Orthoses, alternative keyboards...',
+    descAr: 'الأطراف الصناعية، لوحات المفاتيح البديلة...',
+    descFr: 'Orthèses, claviers alternatifs...',
   },
   daily_living: { 
     title: 'DI CHUYỂN VÀ GIAO THÔNG', 
     titleEn: 'MOBILITY', 
+    titleAr: 'التنقل والحركة',
+    titleFr: 'MOBILITÉ',
     desc: 'Xe lăn thông minh, cải tiến...', 
-    descEn: 'Smart wheelchairs, improvements...' 
+    descEn: 'Smart wheelchairs, improvements...',
+    descAr: 'الكراسي المتحركة الذكية، التحسينات...',
+    descFr: 'Fauteuils roulants intelligents, améliorations...',
   },
   education: { 
     title: 'THÔNG TIN BỔ TRỢ', 
     titleEn: 'EDUCATION', 
+    titleAr: 'التعليم',
+    titleFr: 'ÉDUCATION',
     desc: 'Tiêu chuẩn Công nghệ hỗ trợ...', 
-    descEn: 'Assistive Technology standards...' 
+    descEn: 'Assistive Technology standards...',
+    descAr: 'معايير تقنية المساعدة...',
+    descFr: 'Normes de technologie d\'assistance...',
   },
 };
 
@@ -149,42 +328,309 @@ const CATEGORY_PROMPTS: Record<ATCategory, Record<Language, string>> = {
   },
 };
 
+// Generate follow-up questions based on user's question and AI's response
+function generateFollowUpQuestions(userQuestion: string, _aiResponse: string, language: Language): string[] {
+  const q = userQuestion.toLowerCase();
+  
+  // Detect topic keywords
+  const isHearing = q.includes('thính') || q.includes('tai') || q.includes('nghe') || q.includes('hearing') || q.includes('máy trợ thính') || q.includes('hearing aid');
+  const isVision = q.includes('mù') || q.includes('thị') || q.includes('nhìn') || q.includes('blind') || q.includes('vision') || q.includes('mắt') || q.includes('braille');
+  const isMobility = q.includes('wheelchair') || q.includes('xe lăn') || q.includes('mobility') || q.includes('vận động') || q.includes('di chuyển') || q.includes('prosthetic') || q.includes('chân');
+  const isCognition = q.includes('nhận thức') || q.includes('trí nhớ') || q.includes('cognition') || q.includes('memory') || q.includes('mất') || q.includes('注意力') || q.includes('autism') || q.includes('tự kỷ');
+  const isCommunication = q.includes('giao tiếp') || q.includes('nói') || q.includes('speech') || q.includes('communication') || q.includes('aac') || q.includes('giọng');
+  const isPrice = q.includes('giá') || q.includes('price') || q.includes('cost') || q.includes('bao nhiêu') || q.includes('mua') || q.includes('tiền');
+  const isChild = q.includes('trẻ') || q.includes('child') || q.includes('kid') || q.includes('em bé') || q.includes('student') || q.includes('học sinh');
+  const isElderly = q.includes('già') || q.includes('old') || q.includes('elderly') || q.includes('người lớn tuổi') || q.includes('senior');
+  
+  // Follow-up templates by language and topic
+  if (language === 'vi') {
+    const base = [];
+    
+    // Price-related follow-ups
+    if (isPrice) {
+      base.push('Mua thiết bị này ở đâu?');
+      base.push('Có chương trình hỗ trợ tài chính không?');
+      base.push('Bảo hành bao lâu?');
+    }
+    
+    // For hearing
+    if (isHearing) {
+      base.push('Máy trợ thính có kết nối Bluetooth không?');
+      base.push('Có thể dùng cho trẻ em không?');
+      base.push('Cách vệ sinh máy trợ thính?');
+      if (isPrice) base.push('Có loại rẻ hơn không?');
+      if (isElderly) base.push('Người già sử dụng có khó không?');
+    }
+    
+    // For vision
+    if (isVision) {
+      base.push('Phần mềm đọc màn hình nào tốt nhất?');
+      base.push('Màn hình Braille giá bao nhiêu?');
+      base.push('Có ứng dụng đọc văn bản cho người mù không?');
+      if (isChild) base.push('Trẻ em khiếm thị nên dùng thiết bị gì?');
+    }
+    
+    // For mobility
+    if (isMobility) {
+      base.push('Xe lăn điện có bảo hành không?');
+      base.push('Sạc pin xe lăn điện mất bao lâu?');
+      base.push('Có thể mang xe lăn lên máy bay không?');
+      if (isChild) base.push('Trẻ em có dùng được xe lăn điện không?');
+    }
+    
+    // For cognition
+    if (isCognition) {
+      base.push('Có ứng dụng hỗ trợ trí nhớ không?');
+      base.push('Thiết bị cho người tự kỷ?');
+      base.push('Có công cụ sắp xếp công việc không?');
+      if (isChild) base.push('Thiết bị hỗ trợ học tập cho trẻ ADHD?');
+    }
+    
+    // For communication
+    if (isCommunication) {
+      base.push('Ứng dụng giao tiếp cho người không nói được?');
+      base.push('Thiết bị AAC giá bao nhiêu?');
+      base.push('Có app miễn phí không?');
+    }
+    
+    // Default follow-ups
+    if (base.length < 3) {
+      base.push('Thiết bị này có dễ sử dụng không?');
+      base.push('Có thể dùng thử trước khi mua không?');
+      base.push('Địa chỉ mua thiết bị uy tín ở đâu?');
+    }
+    
+    // Shuffle and return 4 questions
+    return base.sort(() => Math.random() - 0.5).slice(0, 4);
+  }
+  
+  // English follow-ups
+  if (language === 'en') {
+    const base = [];
+    
+    if (isPrice) {
+      base.push('Where can I buy this device?');
+      base.push('Is there financial assistance available?');
+      base.push('What is the warranty period?');
+    }
+    
+    if (isHearing) {
+      base.push('Do hearing aids connect to Bluetooth?');
+      base.push('Can children use hearing aids?');
+      base.push('How to clean hearing aids?');
+      if (isElderly) base.push('Is it easy for elderly to use?');
+    }
+    
+    if (isVision) {
+      base.push('What is the best screen reader?');
+      base.push('How much does a Braille display cost?');
+      base.push('Are there text-to-speech apps for blind people?');
+      if (isChild) base.push('What devices are recommended for blind children?');
+    }
+    
+    if (isMobility) {
+      base.push('Do electric wheelchairs have warranty?');
+      base.push('How long does it take to charge?');
+      base.push('Can I bring a wheelchair on a plane?');
+    }
+    
+    if (isCognition) {
+      base.push('Are there memory support apps?');
+      base.push('Devices for people with autism?');
+      base.push('Task organization tools?');
+    }
+    
+    if (isCommunication) {
+      base.push('AAC apps for non-verbal people?');
+      base.push('How much do AAC devices cost?');
+      base.push('Are there free apps available?');
+    }
+    
+    if (base.length < 3) {
+      base.push('Is this device easy to use?');
+      base.push('Can I try before buying?');
+      base.push('Where to buy from reputable sources?');
+    }
+    
+    return base.sort(() => Math.random() - 0.5).slice(0, 4);
+  }
+  
+  // Arabic follow-ups
+  if (language === 'ar') {
+    return [
+      'هل يمكنني تجربته قبل الشراء؟',
+      'أين أشتري من مصادر موثوقة؟',
+      'ما هي مدة الضمان؟',
+      'هل تتوفر مساعدة مالية؟',
+    ].slice(0, 4);
+  }
+  
+  // French follow-ups
+  return [
+    'Ce dispositif est-il facile à utiliser?',
+    'Puis-je l\'essayer avant d\'acheter?',
+    'Où acheter auprès de sources fiables?',
+    'Quelle est la période de garantie?',
+  ].slice(0, 4);
+}
+
+// Agent name & description translations
+const AGENT_TRANSLATIONS: Record<string, Record<Language, { name: string; description: string }>> = {
+  default: {
+    vi: { name: 'MADA Assistant', description: 'Trợ lý ảo chính của MADA, hỗ trợ người khuyết tật tiếp cận công nghệ.' },
+    en: { name: 'MADA Assistant', description: 'The main AI assistant of MADA, helping people with disabilities access technology.' },
+    ar: { name: 'مساعد MADA', description: 'المساعد الذكي الرئيسي لـ MADA، يساعد الأشخاص ذوي الإعاقة على الوصول إلى التكنولوجيا.' },
+    fr: { name: 'Assistant MADA', description: 'L\'assistant IA principal de MADA, aidant les personnes handicapées à accéder à la technologie.' },
+  },
+  expert: {
+    vi: { name: 'Chuyên gia AT', description: 'Chuyên gia về công nghệ hỗ trợ người khuyết tật.' },
+    en: { name: 'AT Specialist', description: 'Expert in assistive technology for people with disabilities.' },
+    ar: { name: 'خبير AT', description: 'خبير في تقنية المساعدة للأشخاص ذوي الإعاقة.' },
+    fr: { name: 'Spécialiste AT', description: 'Expert en technologie d\'assistance pour les personnes handicapées.' },
+  },
+};
+
+function getAgentDisplayInfo(agentId: string, lang: Language): { name: string; description: string } {
+  const t = AGENT_TRANSLATIONS[agentId]?.[lang];
+  if (t) return t;
+  // Fallback to English
+  return AGENT_TRANSLATIONS[agentId]?.['en'] || { name: 'Agent', description: '' };
+}
+
 // Sample Products Data - theo từng category (anh thuc cua san pham)
 const SAMPLE_PRODUCTS: Record<string, any[]> = {
   vision: [
-    { name: 'OrCam MyEye Pro', nameVi: 'OrCam MyEye Pro', brand: 'OrCam Technologies', image: 'https://images.unsplash.com/photo-1590402494682-cd3fb53b1f70?w=600&h=400&fit=crop', price: '~$6,500 USD', features: ['Nhận diện khuôn mặt', 'Đọc văn bản 100+ ngôn ngữ', 'Nhận diện tiền giấy'] },
-    { name: 'JAWS Screen Reader', nameVi: 'JAWS Screen Reader', brand: 'Freedom Scientific', image: 'https://images.unsplash.com/photo-1587620962725-abab7fe55159?w=600&h=400&fit=crop', price: '~$1,000 USD/năm', features: ['Đọc màn hình Windows', 'Hỗ trợ 40+ ngôn ngữ', 'Tương thích Braille'] },
-    { name: 'NVDA Screen Reader', nameVi: 'NVDA Screen Reader', brand: 'NV Access', image: 'https://images.unsplash.com/photo-1461749280684-dccba630e2f6?w=600&h=400&fit=crop', price: 'Miễn phí (donation)', features: ['Đọc màn hình mã nguồn mở', 'Hỗ trợ 50+ ngôn ngữ', 'Chạy trên Windows'] },
+    { 
+      name: 'OrCam MyEye Pro', 
+      nameVi: 'OrCam MyEye Pro', 
+      brand: 'OrCam Technologies', 
+      price: '~$6,500 USD', 
+      features: ['Nhận diện khuôn mặt', 'Đọc văn bản 100+ ngôn ngữ', 'Nhận diện tiền giấy', 'Pin 6 giờ', 'Gắn kính được'],
+      reasons: ['Hỗ trợ tiếng Việt native', 'Di động, gắn kính', 'Pin sạc 6h sử dụng liên tục', 'Không cần smartphone']
+    },
+    { 
+      name: 'JAWS Screen Reader', 
+      nameVi: 'JAWS Screen Reader', 
+      brand: 'Freedom Scientific', 
+      price: '~$1,000 USD/năm', 
+      features: ['Đọc màn hình Windows', 'Hỗ trợ 40+ ngôn ngữ', 'Tương thích Braille', 'Script tùy chỉnh'],
+      reasons: ['Rẻ hơn 85% so OrCam', 'Chuẩn quốc tế, dùng phổ biến', 'Hỗ trợ phần mềm văn phòng', 'Cộng đồng người dùng lớn']
+    },
+    { name: 'NVDA Screen Reader', nameVi: 'NVDA Screen Reader', brand: 'NV Access', price: 'Miễn phí (donation)', features: ['Đọc màn hình mã nguồn mở', 'Hỗ trợ 50+ ngôn ngữ', 'Chạy trên Windows'], reasons: ['100% miễn phí', 'Mã nguồn mở, bảo mật', 'Cộng đồng phát triển tích cực', 'Nhẹ, chạy trên USB'] },
   ],
   hearing: [
-    { name: 'Phonak Paradise P90', nameVi: 'Phonak Paradise P90', brand: 'Phonak', image: 'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=600&h=400&fit=crop', price: '~$3,500 USD/đôi', features: ['Kết nối Bluetooth', 'Chống ồn AI', 'Pin sạc lithium'] },
-    { name: 'Roger Pen Microphone', nameVi: 'Roger Pen Microphone', brand: 'Phonak', image: 'https://images.unsplash.com/photo-1506499039984-8dd3cc33c99e?w=600&h=400&fit=crop', price: '~$1,200 USD', features: ['Hệ thống FM', 'Microphone định hướng', 'Kết nối đa thiết bị'] },
-    { name: 'Oticon More Hearing Aid', nameVi: 'Oticon More Hearing Aid', brand: 'Oticon', image: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=600&h=400&fit=crop', price: '~$4,200 USD/đôi', features: ['Deep Neural Network', 'Chống ồn thông minh', 'Kết nối iPhone/Android'] },
+    { 
+      name: 'Phonak Paradise P90', 
+      nameVi: 'Phonak Paradise P90', 
+      brand: 'Phonak', 
+      price: '~$3,500 USD/đôi', 
+      features: ['Kết nối Bluetooth', 'Chống ồn AI', 'Pin sạc lithium', 'Waterproof IP68'],
+      reasons: ['Chống ồn AI thông minh nhất', 'Kết nối TV, điện thoại', 'Pin 16h, sạc nhanh 30p', 'Chống nước, bụi']
+    },
+    { 
+      name: 'Roger Pen Microphone', 
+      nameVi: 'Roger Pen Microphone', 
+      brand: 'Phonak', 
+      price: '~$1,200 USD', 
+      features: ['Hệ thống FM', 'Microphone định hướng', 'Kết nối đa thiết bị', 'Pin 10 giờ'],
+      reasons: ['Tăng nghe rõ ràng 61%', 'Học tập, họp hành hiệu quả', 'Gắn bluetooth nhiều máy', 'Nhẹ, dễ mang theo']
+    },
+    { name: 'Oticon More Hearing Aid', nameVi: 'Oticon More Hearing Aid', brand: 'Oticon', price: '~$4,200 USD/đôi', features: ['Deep Neural Network', 'Chống ồn thông minh', 'Kết nối iPhone/Android'], reasons: ['AI deep learning', 'Tự động điều chỉnh theo môi trường', 'Kết nối iPhone & Android', 'App điều khiển trên điện thoại'] },
   ],
   mobility: [
-    { name: 'Permobil F5 Wheelchair', nameVi: 'Permobil F5 Xe lăn điện', brand: 'Permobil', image: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=600&h=400&fit=crop', price: '~$25,000 USD', features: ['Đứng thẳng tự động', 'Leo dốc 12°', 'Điều khiển smartphone'] },
-    { name: 'Scalamobil S95', nameVi: 'Scalamobil S95 Leo cầu thang', brand: 'Scala', image: 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=600&h=400&fit=crop', price: '~$4,500 USD', features: ['Leo cầu thang an toàn', 'Pin sạc', 'Gắn được nhiều xe lăn'] },
-    { name: 'Quickie Q700-UP M', nameVi: 'Quickie Q700-UP M Xe lăn', brand: 'Sunrise Medical', image: 'https://images.unsplash.com/photo-1545127398-14699f92334b?w=600&h=400&fit=crop', price: '~$18,500 USD', features: ['Hệ thống đứng', 'C-Leg technology', 'Cấu hình tùy chỉnh'] },
+    { 
+      name: 'Permobil F5 Wheelchair', 
+      nameVi: 'Permobil F5 Xe lăn điện', 
+      brand: 'Permobil', 
+      price: '~$25,000 USD', 
+      features: ['Đứng thẳng tự động', 'Leo dốc 12°', 'Điều khiển smartphone', 'Seat Elevator 30cm'],
+      reasons: ['Tự động đứng thẳng', 'Leo dốc, bậc thềm', 'Điều khiển bằng app', 'Nâng ghế lên 30cm']
+    },
+    { 
+      name: 'Scalamobil S95', 
+      nameVi: 'Scalamobil S95 Leo cầu thang', 
+      brand: 'Scala', 
+      price: '~$4,500 USD', 
+      features: ['Leo cầu thang an toàn', 'Pin sạc', 'Gắn được nhiều xe lăn', 'Tháo lắp 2 phút'],
+      reasons: ['Leo cầu thang an toàn', 'Gắn hầu hết xe lăn', 'Tháo lắp nhanh 2 phút', 'Rẻ hơn xe lăn điện 80%']
+    },
+    { name: 'Quickie Q700-UP M', nameVi: 'Quickie Q700-UP M Xe lăn', brand: 'Sunrise Medical', price: '~$18,500 USD', features: ['Hệ thống đứng', 'C-Leg technology', 'Cấu hình tùy chỉnh'], reasons: ['Công nghệ C-Leg tiên tiến', 'Đứng thẳng bằng điều khiển', 'Cấu hình theo nhu cầu', 'Bảo hành 5 năm'] },
   ],
   cognition: [
-    { name: 'Tobii Dynavox TD I-13', nameVi: 'Tobii Dynavox TD I-13 Eye Tracker', brand: 'Tobii Dynavox', image: 'https://images.unsplash.com/photo-1531746790731-6c087fecd65a?w=600&h=400&fit=crop', price: '~$8,500 USD', features: ['Eye-tracking', 'Màn hình 13.3 inch', 'AAC software'] },
-    { name: 'Proloquo2Go App', nameVi: 'Proloquo2Go AAC App', brand: 'AssistiveWare', image: 'https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?w=600&h=400&fit=crop', price: '~$250 USD/lifetime', features: ['iOS app', 'Symbol-based AAC', 'Giọng Việt/Eng'] },
-    { name: 'Memo Smart Calendar', nameVi: 'Memo Smart Calendar', brand: 'Memo', image: 'https://images.unsplash.com/photo-1434494878577-86c23bcb06b9?w=600&h=400&fit=crop', price: '~$300 USD', features: ['Đồng hồ nhắc nhở', 'Màn hình LCD', 'Chống nhầm lẫn thuốc'] },
+    { 
+      name: 'Tobii Dynavox TD I-13', 
+      nameVi: 'Tobii Dynavox TD I-13 Eye Tracker', 
+      brand: 'Tobii Dynavox', 
+      price: '~$8,500 USD', 
+      features: ['Eye-tracking chính xác', 'Màn hình 13.3 inch', 'AAC software', 'Không cần tay điều khiển'],
+      reasons: ['Theo dõi mắt chính xác cao', 'Không cần dùng tay', 'Phần mềm AAC tích hợp', 'Giao tiếp bằng mắt']
+    },
+    { 
+      name: 'Proloquo2Go App', 
+      nameVi: 'Proloquo2Go AAC App', 
+      brand: 'AssistiveWare', 
+      price: '~$250 USD/lifetime', 
+      features: ['iOS app', 'Symbol-based AAC', 'Giọng Việt/Eng', 'Hình ảnh 25,000+'],
+      reasons: ['Rẻ hơn 97% thiết bị AAC', 'Dùng iPhone/iPad có sẵn', 'Hỗ trợ tiếng Việt', 'Cài đặt, sử dụng dễ']
+    },
+    { name: 'Memo Smart Calendar', nameVi: 'Memo Smart Calendar', brand: 'Memo', price: '~$300 USD', features: ['Đồng hồ nhắc nhở', 'Màn hình LCD', 'Chống nhầm lẫn thuốc'], reasons: ['Nhắc uống thuốc đúng giờ', 'Chống nhầm lẫn thuốc', 'Giao diện đơn giản', 'Người lớn tuổi dùng được'] },
   ],
   communication: [
-    { name: 'LightWriter SL40 AAC', nameVi: 'LightWriter SL40 Thiết bị AAC', brand: 'Tobii Dynavox', image: 'https://images.unsplash.com/photo-1590650213165-c1fef80648c4?w=600&h=400&fit=crop', price: '~$4,200 USD', features: ['Bàn phím vật lý', 'Màn hình chia đôi', 'Tổng hợp giọng nói'] },
-    { name: 'TouchChat HD AAC', nameVi: 'TouchChat HD AAC App', brand: 'Prentke Romich', image: 'https://images.unsplash.com/photo-1544919982-b61976f0ba43?w=600&h=400&fit=crop', price: '~$300 USD', features: ['iPad app', 'Vocabulary pages', 'Customizable'] },
-    { name: 'Big Mack Communicator', nameVi: 'Big Mack Communicator', brand: 'AbleNet', image: 'https://images.unsplash.com/photo-1563770660941-20978e870e26?w=600&h=400&fit=crop', price: '~$160 USD', features: ['1 nút bấm lớn', 'Ghi âm 75 giây', 'Dùng cho trẻ em'] },
+    { 
+      name: 'LightWriter SL40 AAC', 
+      nameVi: 'LightWriter SL40 Thiết bị AAC', 
+      brand: 'Tobii Dynavox', 
+      price: '~$4,200 USD', 
+      features: ['Bàn phím vật lý', 'Màn hình chia đôi', 'Tổng hợp giọng nói', 'Bluetooth'],
+      reasons: ['Bàn phím + màn hình', 'Giao tiếp 2 chiều', 'Pin 10 giờ liên tục', 'Kết nối điện thoại']
+    },
+    { 
+      name: 'TouchChat HD AAC', 
+      nameVi: 'TouchChat HD AAC App', 
+      brand: 'Prentke Romich', 
+      price: '~$300 USD', 
+      features: ['iPad app', 'Vocabulary pages', 'Customizable', 'Hình ảnh SymbolShare'],
+      reasons: ['Dùng iPad có sẵn', 'Tùy chỉnh theo nhu cầu', '25,000+ hình ảnh Symbol', 'Giá hợp lý']
+    },
+    { name: 'Big Mack Communicator', nameVi: 'Big Mack Communicator', brand: 'AbleNet', price: '~$160 USD', features: ['1 nút bấm lớn', 'Ghi âm 75 giây', 'Dùng cho trẻ em'], reasons: ['Đơn giản nhất', 'Giá rẻ nhất', 'Dùng cho trẻ nhỏ', 'Bền, chịu va đập'] },
   ],
   daily_living: [
-    { name: 'Easy Grip Eating Aids', nameVi: 'Dụng cụ ăn uống Easy Grip', brand: 'Performance Health', image: 'https://images.unsplash.com/photo-1584346133934-a3afd2a33c4c?w=600&h=400&fit=crop', price: '~$30-50 USD', features: ['Tay cầm dày', 'Chống trượt', 'Bộ 4 món'] },
-    { name: 'Mediplanner Timer', nameVi: 'Hộp thuốc Mediplanner', brand: 'TabTimer', image: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=600&h=400&fit=crop', price: '~$120 USD', features: ['8 ngăn thuốc', 'Báo động', 'Nhắc nhở tự động'] },
-    { name: 'Grab Bar Bathroom', nameVi: 'Thanh vịn nhà tắm', brand: 'Moen', image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=600&h=400&fit=crop', price: '~$80-200 USD', features: ['Thép không gỉ', 'Chịu lực 250kg', 'Lắp đặt dễ dàng'] },
+    { 
+      name: 'Easy Grip Eating Aids', 
+      nameVi: 'Dụng cụ ăn uống Easy Grip', 
+      brand: 'Performance Health', 
+      price: '~$30-50 USD', 
+      features: ['Tay cầm dày', 'Chống trượt', 'Bộ 4 món', 'Rửa máy được'],
+      reasons: ['Giá rẻ, dễ mua', 'Giúp cầm nắm dễ hơn', 'Chống trượt hiệu quả', 'Phù hợp người viêm khớp']
+    },
+    { 
+      name: 'Mediplanner Timer', 
+      nameVi: 'Hộp thuốc Mediplanner', 
+      brand: 'TabTimer', 
+      price: '~$120 USD', 
+      features: ['8 ngăn thuốc', 'Báo động', 'Nhắc nhở tự động', 'LCD hiển thị'],
+      reasons: ['Nhắc uống thuốc đúng giờ', 'Chống nhầm lẫn thuốc', 'Gia đình yên tâm', 'Pin 1 năm']
+    },
+    { name: 'Grab Bar Bathroom', nameVi: 'Thanh vịn nhà tắm', brand: 'Moen', price: '~$80-200 USD', features: ['Thép không gỉ', 'Chịu lực 250kg', 'Lắp đặt dễ dàng'], reasons: ['Chống trượt an toàn', 'Lắp tường/van', 'Chịu lực 250kg', 'Bảo hành 10 năm'] },
   ],
   education: [
-    { name: 'Kurzweil 3000', nameVi: 'Kurzweil 3000 Phần mềm học tập', brand: 'Cambium Learning', image: 'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=600&h=400&fit=crop', price: '~$1,500 USD/năm', features: ['Đọc văn bản', 'Hỗ trợ dyslexia', 'Scan tài liệu'] },
-    { name: 'Dragon NaturallySpeaking', nameVi: 'Dragon Speech Recognition', brand: 'Nuance', image: 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=600&h=400&fit=crop', price: '~$500 USD', features: ['Speech-to-text', '99% accuracy', 'Vocabulary tùy chỉnh'] },
-    { name: 'C-Pen Reader', nameVi: 'C-Pen Reader Scanner', brand: 'C-Pen', image: 'https://images.unsplash.com/photo-1553729784-e91953dec042?w=600&h=400&fit=crop', price: '~$300 USD', features: ['Scan văn bản', 'Đọc to', 'Từ điển tích hợp'] },
+    { 
+      name: 'Kurzweil 3000', 
+      nameVi: 'Kurzweil 3000 Phần mềm học tập', 
+      brand: 'Cambium Learning', 
+      price: '~$1,500 USD/năm', 
+      features: ['Đọc văn bản', 'Hỗ trợ dyslexia', 'Scan tài liệu', 'Ghi chú tích hợp'],
+      reasons: ['Chuẩn cho học sinh khó đọc', 'Scan & đọc sách giáo khoa', 'Hỗ trợ 40+ ngôn ngữ', 'Dùng ở trường & nhà']
+    },
+    { 
+      name: 'Dragon NaturallySpeaking', 
+      nameVi: 'Dragon Speech Recognition', 
+      brand: 'Nuance', 
+      price: '~$500 USD', 
+      features: ['Speech-to-text', '99% accuracy', 'Vocabulary tùy chỉnh', 'Điều khiển máy tính bằng giọng'],
+      reasons: ['Đánh văn bản nhanh 3x', 'Chính xác 99%', 'Tạo từ vựng riêng', 'Điều khiển máy tính bằng giọng']
+    },
+    { name: 'C-Pen Reader', nameVi: 'C-Pen Reader Scanner', brand: 'C-Pen', price: '~$300 USD', features: ['Scan văn bản', 'Đọc to', 'Từ điển tích hợp'], reasons: ['Nhỏ gọn bỏ túi', 'Scan & đọc tức thì', 'Từ điển Oxford tích hợp', 'Học ngoại ngữ hiệu quả'] },
   ],
 };
 
@@ -243,37 +689,67 @@ interface Message {
   isStreaming?: boolean;
   sources?: { content: string; source: string; metadata?: Record<string, unknown> }[];
   contextUsed?: boolean;
+  attachments?: { name: string; type: string; preview?: string }[];
 }
 
 // Sidebar conversation shape sourced from `useChatHistoryStore` (HistoryConversation)
+
+// Consultation Modal Types & Data
+interface ConsultationFormData {
+  name: string;
+  email: string;
+  phone: string;
+  disabilityType: string;
+  budget: string;
+  priority: string;
+  interestedDevices: string[];
+  message: string;
+}
 
 // Consultation Modal Component
 function ConsultationModal({ 
   isOpen, 
   onClose,
-  onSubmit 
+  onSubmit,
+  language = 'vi' as Language
 }: { 
   isOpen: boolean; 
   onClose: () => void;
-  onSubmit: (data: { name: string; email: string; phone: string; message: string }) => void;
+  onSubmit: (data: ConsultationFormData) => void;
+  language?: Language;
 }) {
-  const [formData, setFormData] = useState({ name: '', email: '', phone: '', message: '' });
+  const [formData, setFormData] = useState<ConsultationFormData>({
+    name: '', email: '', phone: '',
+    disabilityType: '', budget: '', priority: '',
+    interestedDevices: [], message: ''
+  });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  
+  const validateForm = () => {
+    const newErrors: Record<string, string> = {};
+    if (!formData.name.trim()) newErrors.name = language === 'vi' ? 'Vui lòng nhập họ tên' : language === 'en' ? 'Please enter your name' : language === 'ar' ? 'يرجى إدخال اسمك' : 'Veuillez entrer votre nom';
+    if (!formData.email.trim()) newErrors.email = language === 'vi' ? 'Vui lòng nhập email' : language === 'en' ? 'Please enter email' : language === 'ar' ? 'يرجى إدخال البريد الإلكتروني' : 'Veuillez entrer l\'email';
+    else if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = language === 'vi' ? 'Email không hợp lệ' : language === 'en' ? 'Invalid email' : language === 'ar' ? 'بريد إلكتروني غير صالح' : 'Email invalide';
+    if (!formData.disabilityType) newErrors.disabilityType = language === 'vi' ? 'Vui lòng chọn loại khuyết tật' : language === 'en' ? 'Please select disability type' : language === 'ar' ? 'يرجى تحديد نوع الإعاقة' : 'Veuillez sélectionner le type de handicap';
+    if (!formData.budget) newErrors.budget = language === 'vi' ? 'Vui lòng chọn ngân sách' : language === 'en' ? 'Please select budget' : language === 'ar' ? 'يرجى تحديد الميزانية' : 'Veuillez sélectionner le budget';
+    if (!formData.message.trim()) newErrors.message = language === 'vi' ? 'Vui lòng mô tả nhu cầu' : language === 'en' ? 'Please describe your needs' : language === 'ar' ? 'يرجى وصف احتياجاتك' : 'Veuillez décrire vos besoins';
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!validateForm()) return;
+    
     setIsSubmitting(true);
     
     try {
-      // Gửi email về MADA thông qua API
       const response = await fetch('/api/consultation', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: formData.name,
-          email: formData.email,
-          phone: formData.phone,
-          message: formData.message,
+          ...formData,
           timestamp: new Date().toISOString(),
         }),
       });
@@ -282,235 +758,484 @@ function ConsultationModal({
       
       if (data.success) {
         onSubmit(formData);
-        setFormData({ name: '', email: '', phone: '', message: '' });
-        onClose(); // Đóng modal sau khi gửi thành công
+        setFormData({ name: '', email: '', phone: '', disabilityType: '', budget: '', priority: '', interestedDevices: [], message: '' });
+        onClose();
       } else {
         alert(data.error || 'Có lỗi xảy ra. Vui lòng thử lại.');
       }
     } catch (error) {
       console.error('Consultation submit error:', error);
-      // Fallback: vẫn thông báo thành công nếu API không hoạt động
       onSubmit(formData);
-      setFormData({ name: '', email: '', phone: '', message: '' });
+      setFormData({ name: '', email: '', phone: '', disabilityType: '', budget: '', priority: '', interestedDevices: [], message: '' });
       onClose();
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  const toggleDevice = (device: string) => {
+    setFormData(prev => ({
+      ...prev,
+      interestedDevices: prev.interestedDevices.includes(device)
+        ? prev.interestedDevices.filter(d => d !== device)
+        : [...prev.interestedDevices, device]
+    }));
+  };
+
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden animate-modal-in">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      
+      {/* Modal Container - Compact Neubrutalist Style */}
+      <div className="relative bg-white w-full max-w-xl rounded-xl border-2 border-slate-800 shadow-[16px_16px_0px_0px_rgba(0,0,0,0.05)] overflow-hidden animate-modal-in max-h-[85vh] flex flex-col">
+        
         {/* Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-5 text-white">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
-                <Briefcase className="w-6 h-6" />
-              </div>
-              <div>
-                <h3 className="text-lg font-bold">Yêu cầu Tư vấn Chuyên gia</h3>
-                <p className="text-xs text-blue-100">MADA Center, Doha, Qatar</p>
-              </div>
+        <div className="bg-secondary p-4 md:p-5 flex items-start justify-between relative overflow-hidden flex-shrink-0">
+          <div className="absolute inset-0 bg-purple-100/20 backdrop-blur-[40px]" />
+          <div className="relative z-10 flex gap-3 md:gap-4 items-center">
+            <div className="w-11 h-11 md:w-12 md:h-12 rounded-full bg-purple-200 flex items-center justify-center border-2 border-slate-800">
+              <Users className="w-5 h-5 md:w-6 md:h-6 text-secondary" />
             </div>
-            <button onClick={onClose} className="p-2 hover:bg-white/20 rounded-lg transition-colors">
-              <X className="w-5 h-5" />
-            </button>
+            <div>
+              <h1 className="text-base md:text-lg font-bold text-white">{language === 'vi' ? 'Yêu cầu Tư vấn Chuyên gia AT' : language === 'en' ? 'AT Expert Consultation Request' : language === 'ar' ? 'طلب استشارة خبير AT' : 'Demande de consultation AT'}</h1>
+              <p className="text-xs text-purple-200 mt-0.5">MADA Center, Doha, Qatar</p>
+            </div>
           </div>
+          <button 
+            onClick={onClose} 
+            className="relative z-10 w-8 h-8 md:w-9 md:h-9 rounded-full border-2 border-white text-white hover:bg-white hover:text-secondary flex items-center justify-center transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1.5 flex items-center gap-1">
-                <UserCircle className="w-3.5 h-3.5" /> Họ và tên *
-              </label>
-              <input
-                type="text"
-                required
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="w-full px-4 py-2.5 border-2 border-slate-200 rounded-xl text-sm focus:border-blue-500 focus:outline-none transition-colors"
-                placeholder="Nguyễn Văn A"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1.5 flex items-center gap-1">
-                <Mail className="w-3.5 h-3.5" /> Email *
-              </label>
-              <input
-                type="email"
-                required
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                className="w-full px-4 py-2.5 border-2 border-slate-200 rounded-xl text-sm focus:border-blue-500 focus:outline-none transition-colors"
-                placeholder="email@example.com"
-              />
-            </div>
-          </div>
+        {/* Content */}
+        <form onSubmit={handleSubmit} className="p-4 md:p-5 bg-slate-50 space-y-5 overflow-y-auto flex-1">
           
-          <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1.5 flex items-center gap-1">
-              <Phone className="w-3.5 h-3.5" /> Số điện thoại
-            </label>
-            <input
-              type="tel"
-              value={formData.phone}
-              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-              className="w-full px-4 py-2.5 border-2 border-slate-200 rounded-xl text-sm focus:border-blue-500 focus:outline-none transition-colors"
-              placeholder="+84 123 456 789"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1.5 flex items-center gap-1">
-              <MessageCircle className="w-3.5 h-3.5" /> Yêu cầu kỹ thuật *
-            </label>
-            <textarea
-              required
-              rows={4}
-              value={formData.message}
-              onChange={(e) => setFormData({ ...formData, message: e.target.value })}
-              className="w-full px-4 py-2.5 border-2 border-slate-200 rounded-xl text-sm focus:border-blue-500 focus:outline-none transition-colors resize-none"
-              placeholder="Mô tả chi tiết nhu cầu về thiết bị công nghệ hỗ trợ..."
-            />
-          </div>
-
-          <div className="bg-blue-50 rounded-xl p-4">
-            <div className="flex items-start gap-3">
-              <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                <Globe className="w-4 h-4 text-blue-600" />
+          {/* Section 1: Thông tin cá nhân */}
+          <section className="space-y-4">
+            <h2 className="text-[10px] font-bold uppercase tracking-wider text-secondary flex items-center gap-1.5 font-mono">
+              <User className="w-3.5 h-3.5" /> {language === 'vi' ? 'THÔNG TIN CÁ NHÂN' : language === 'en' ? 'PERSONAL INFORMATION' : language === 'ar' ? 'المعلومات الشخصية' : 'INFORMATIONS PERSONNELLES'}
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Họ và tên */}
+              <div className="relative">
+                <label className="absolute -top-2.5 left-3.5 bg-slate-50 px-1.5 text-[10px] font-medium text-slate-500">{language === 'vi' ? 'Họ và tên *' : language === 'en' ? 'Full Name *' : language === 'ar' ? 'الاسم الكامل *' : 'Nom complet *'}</label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => { setFormData({ ...formData, name: e.target.value }); setErrors({ ...errors, name: '' }); }}
+                  className={`w-full h-12 px-5 rounded-full border-2 font-medium transition-colors focus:outline-none text-sm ${errors.name ? 'border-red-400 bg-red-50' : 'border-slate-300 focus:border-secondary'} focus:ring-0`}
+                  placeholder={language === 'vi' ? 'Nguyễn Văn A' : language === 'en' ? 'John Smith' : language === 'ar' ? 'أحمد محمد' : 'Jean Dupont'}
+                />
+                {errors.name && <p className="text-[10px] text-red-500 mt-1 pl-4">{errors.name}</p>}
               </div>
-              <div>
-                <p className="text-xs font-semibold text-blue-800">MADA Center Qatar</p>
-                <p className="text-xs text-blue-600 mt-0.5">Chuyên gia AT sẽ liên hệ trong 24-48 giờ</p>
+              
+              {/* Email */}
+              <div className="relative">
+                <label className="absolute -top-2.5 left-3.5 bg-slate-50 px-1.5 text-[10px] font-medium text-slate-500">{language === 'vi' ? 'Email *' : language === 'en' ? 'Email *' : language === 'ar' ? 'البريد الإلكتروني *' : 'Email *'}</label>
+                <input
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => { setFormData({ ...formData, email: e.target.value }); setErrors({ ...errors, email: '' }); }}
+                  className={`w-full h-12 px-5 rounded-full border-2 font-medium transition-colors focus:outline-none text-sm ${errors.email ? 'border-red-400 bg-red-50' : 'border-slate-300 focus:border-secondary'} focus:ring-0`}
+                  placeholder="email@example.com"
+                />
+                {errors.email && <p className="text-[10px] text-red-500 mt-1 pl-4">{errors.email}</p>}
+              </div>
+              
+              {/* Số điện thoại */}
+              <div className="relative md:col-span-2">
+                <label className="absolute -top-2.5 left-3.5 bg-slate-50 px-1.5 text-[10px] font-medium text-slate-500">{language === 'vi' ? 'Số điện thoại' : language === 'en' ? 'Phone Number' : language === 'ar' ? 'رقم الهاتف' : 'Numéro de téléphone'}</label>
+                <input
+                  type="tel"
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  className="w-full h-12 px-5 rounded-full border-2 border-slate-300 font-medium transition-colors focus:outline-none focus:border-secondary focus:ring-0 text-sm"
+                  placeholder="+974 1234 5678"
+                />
               </div>
             </div>
-          </div>
+          </section>
 
+          {/* Section 2: Nhu cầu tư vấn */}
+          <section className="space-y-4">
+            <h2 className="text-[10px] font-bold uppercase tracking-wider text-secondary flex items-center gap-1.5 font-mono">
+              <Settings className="w-3.5 h-3.5" /> {language === 'vi' ? 'NHU CẦU TƯ VẤN' : language === 'en' ? 'CONSULTATION NEEDS' : language === 'ar' ? 'احتياجات الاستشارة' : 'BESOINS DE CONSULTATION'}
+            </h2>
+            
+            {/* Loại khuyết tật */}
+            <div className="space-y-2">
+              <label className="text-[10px] font-medium text-slate-500 block">{language === 'vi' ? 'Loại khuyết tật *' : language === 'en' ? 'Disability Type *' : language === 'ar' ? 'نوع الإعاقة *' : 'Type de handicap *'}</label>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { value: 'visual', icon: Eye, label: language === 'vi' ? 'Khiếm thị' : language === 'en' ? 'Visual Impairment' : language === 'ar' ? 'ضعف البصر' : 'Déficience visuelle' },
+                  { value: 'hearing', icon: Ear, label: language === 'vi' ? 'Khiếm thính' : language === 'en' ? 'Hearing Impairment' : language === 'ar' ? 'ضعف السمع' : 'Déficience auditive' },
+                  { value: 'motor', icon: Accessibility, label: language === 'vi' ? 'Vận động' : language === 'en' ? 'Mobility' : language === 'ar' ? 'الحركة' : 'Mobilité' },
+                  { value: 'cognitive', icon: Brain, label: language === 'vi' ? 'Nhận thức' : language === 'en' ? 'Cognitive' : language === 'ar' ? 'الإدراكي' : 'Cognitif' },
+                  { value: 'multiple', icon: Users, label: language === 'vi' ? 'Kết hợp' : language === 'en' ? 'Multiple' : language === 'ar' ? 'متعدد' : 'Multiple' },
+                  { value: 'other', icon: MoreHorizontal, label: language === 'vi' ? 'Khác' : language === 'en' ? 'Other' : language === 'ar' ? 'آخر' : 'Autre' },
+                ].map((item) => (
+                  <label key={item.value} className="cursor-pointer">
+                    <input
+                      type="radio"
+                      name="disability"
+                      value={item.value}
+                      checked={formData.disabilityType === item.value}
+                      onChange={() => { setFormData({ ...formData, disabilityType: item.value }); setErrors({ ...errors, disabilityType: '' }); }}
+                      className="peer sr-only"
+                    />
+                    <div className="px-3 py-2 rounded-full border-2 border-slate-200 font-medium text-xs flex items-center gap-1.5 transition-all hover:bg-purple-50 peer-checked:border-secondary peer-checked:bg-purple-100 text-slate-700">
+                      <item.icon className="w-3.5 h-3.5" />
+                      <span>{item.label}</span>
+                    </div>
+                  </label>
+                ))}
+              </div>
+              {errors.disabilityType && <p className="text-[10px] text-red-500">{errors.disabilityType}</p>}
+            </div>
+
+            {/* Ngân sách */}
+            <div className="space-y-2">
+              <label className="text-[10px] font-medium text-slate-500 block">{language === 'vi' ? 'Ngân sách dự kiến *' : language === 'en' ? 'Expected Budget *' : language === 'ar' ? 'الميزانية المتوقعة *' : 'Budget prévu *'}</label>
+              <div className="flex flex-nowrap gap-2 overflow-x-auto pb-1">
+                {[
+                  { value: 'free', icon: Gift, label: language === 'vi' ? 'Miễn phí' : language === 'en' ? 'Free' : language === 'ar' ? 'مجاني' : 'Gratuit' },
+                  { value: 'low', icon: Wallet, label: '<1K QAR' },
+                  { value: 'medium', icon: CreditCard, label: '1K-5K' },
+                  { value: 'high', icon: PiggyBank, label: '5K-15K' },
+                  { value: 'any', icon: Handshake, label: language === 'vi' ? 'Thương lượng' : language === 'en' ? 'Negotiable' : language === 'ar' ? 'قابل للتفاوض' : 'Négociable' },
+                ].map((item) => (
+                  <label key={item.value} className="cursor-pointer shrink-0">
+                    <input
+                      type="radio"
+                      name="budget"
+                      value={item.value}
+                      checked={formData.budget === item.value}
+                      onChange={() => { setFormData({ ...formData, budget: item.value }); setErrors({ ...errors, budget: '' }); }}
+                      className="peer sr-only"
+                    />
+                    <div className="px-3 py-2 rounded-full border-2 border-slate-200 font-medium text-xs flex items-center gap-1.5 transition-all hover:bg-purple-50 peer-checked:border-secondary peer-checked:bg-purple-100 text-slate-700 whitespace-nowrap">
+                      <item.icon className="w-3.5 h-3.5 shrink-0" />
+                      <span>{item.label}</span>
+                    </div>
+                  </label>
+                ))}
+              </div>
+              {errors.budget && <p className="text-[10px] text-red-500">{errors.budget}</p>}
+            </div>
+
+            {/* Mức độ ưu tiên */}
+            <div className="space-y-2">
+              <label className="text-[10px] font-medium text-slate-500 block">{language === 'vi' ? 'Mức độ ưu tiên' : language === 'en' ? 'Priority Level' : language === 'ar' ? 'مستوى الأولوية' : 'Niveau de priorité'}</label>
+              <div className="flex gap-2">
+                {[
+                  { value: 'low', color: 'bg-blue-500', label: language === 'vi' ? 'Thấp' : language === 'en' ? 'Low' : language === 'ar' ? 'منخفض' : 'Faible' },
+                  { value: 'medium', color: 'bg-orange-500', label: language === 'vi' ? 'Trung bình' : language === 'en' ? 'Medium' : language === 'ar' ? 'متوسط' : 'Moyen' },
+                  { value: 'high', color: 'bg-red-500', label: language === 'vi' ? 'Cao' : language === 'en' ? 'High' : language === 'ar' ? 'مرتفع' : 'Élevé' },
+                ].map((item) => (
+                  <label key={item.value} className="cursor-pointer flex-1">
+                    <input
+                      type="radio"
+                      name="priority"
+                      value={item.value}
+                      checked={formData.priority === item.value}
+                      onChange={() => setFormData({ ...formData, priority: item.value })}
+                      className="peer sr-only"
+                    />
+                    <div className="px-2 py-2 rounded-full border-2 border-slate-200 font-medium text-xs flex items-center justify-center gap-1.5 transition-all hover:bg-slate-100 text-center peer-checked:border-slate-800 peer-checked:bg-slate-800 peer-checked:text-white">
+                      <span className={`w-2.5 h-2.5 rounded-full ${item.color}`} />
+                      <span>{item.label}</span>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          {/* Section 3: Thiết bị quan tâm */}
+          <section className="space-y-3">
+            <h2 className="text-[10px] font-bold uppercase tracking-wider text-secondary flex items-center gap-1.5 font-mono">
+              <Smartphone className="w-3.5 h-3.5" /> {language === 'vi' ? 'THIẾT BỊ QUAN TÂM' : language === 'en' ? 'INTERESTED DEVICES' : language === 'ar' ? 'الأجهزة المطلوبة' : 'APPAREILS D\'INTÉRÊT'}
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {[
+                { icon: Monitor, title: language === 'vi' ? 'Phần mềm đọc màn hình' : language === 'en' ? 'Screen Reader Software' : language === 'ar' ? 'برمجيات قارئ الشاشة' : 'Logiciel de lecture d\'écran', subtitle: 'Screen Reader' },
+                { icon: ZoomIn, title: language === 'vi' ? 'Phóng to màn hình' : language === 'en' ? 'Screen Magnifier' : language === 'ar' ? 'تكبير الشاشة' : 'Agrandisseur d\'écran', subtitle: 'Screen Magnifier' },
+                { icon: Mic, title: language === 'vi' ? 'Nhận dạng giọng nói' : language === 'en' ? 'Speech Recognition' : language === 'ar' ? 'التعرف على الكلام' : 'Reconnaissance vocale', subtitle: 'Speech Recognition' },
+                { icon: PlusCircle, title: language === 'vi' ? 'Thêm thiết bị khác' : language === 'en' ? 'Add other device' : language === 'ar' ? 'إضافة جهاز آخر' : 'Ajouter un autre appareil', subtitle: '' },
+              ].map((device, idx) => (
+                <div
+                  key={idx}
+                  onClick={() => device.title !== (language === 'vi' ? 'Thêm thiết bị khác' : language === 'en' ? 'Add other device' : language === 'ar' ? 'إضافة جهاز آخر' : 'Ajouter un autre appareil') && toggleDevice(device.title)}
+                  className={`group cursor-pointer p-3 rounded-xl border-2 transition-all shadow-[3px_3px_0px_0px_rgba(0,0,0,0.05)] ${device.title === 'Thêm thiết bị khác' ? 'border-dashed border-slate-300 hover:border-slate-800 hover:bg-slate-100' : 'border-slate-200 bg-blue-50/30 hover:border-blue-500'}`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-500 group-hover:bg-blue-500 group-hover:text-white transition-colors">
+                      <device.icon className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-slate-800 text-xs">{device.title}</h3>
+                      {device.subtitle && <p className="text-[10px] text-slate-500">{device.subtitle}</p>}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {/* Section 4: Mô tả */}
+          <section className="space-y-2">
+            <h2 className="text-[10px] font-bold uppercase tracking-wider text-secondary flex items-center gap-1.5 font-mono">
+              <MessageCircle className="w-3.5 h-3.5" /> {language === 'vi' ? 'MÔ TẢ NHU CẦU' : language === 'en' ? 'NEEDS DESCRIPTION' : language === 'ar' ? 'وصف الاحتياجات' : 'DESCRIPTION DES BESOINS'}
+            </h2>
+            <div className="relative">
+              <textarea
+                rows={3}
+                value={formData.message}
+                onChange={(e) => { setFormData({ ...formData, message: e.target.value }); setErrors({ ...errors, message: '' }); }}
+                className={`w-full px-4 py-3 rounded-xl border-2 font-medium transition-colors resize-none focus:outline-none text-sm ${errors.message ? 'border-red-400 bg-red-50' : 'border-slate-300 focus:border-secondary'} focus:ring-0`}
+                placeholder={language === 'vi' ? 'Mô tả chi tiết tình trạng và nhu cầu về thiết bị công nghệ hỗ trợ...' : language === 'en' ? 'Describe your situation and assistive technology needs in detail...' : language === 'ar' ? 'صف وضعك واحتياجاتك من التكنولوجيا المساعدة بالتفصيل...' : 'Décrivez votre situation et vos besoins en technologie d\'assistance en détail...'}
+              />
+              {errors.message && <p className="text-[10px] text-red-500 mt-1">{errors.message}</p>}
+            </div>
+          </section>
+        </form>
+
+        {/* Footer */}
+        <div className="p-4 bg-white border-t-2 border-slate-800 flex flex-col sm:flex-row justify-end gap-3 flex-shrink-0">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-6 py-2.5 rounded-full border-2 border-slate-800 font-bold text-xs text-slate-800 bg-white hover:bg-slate-100 transition-colors"
+          >
+            {language === 'vi' ? 'Hủy' : language === 'en' ? 'Cancel' : language === 'ar' ? 'إلغاء' : 'Annuler'}
+          </button>
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full bg-blue-500 text-white font-bold py-3 rounded-xl hover:bg-blue-600 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+            onClick={handleSubmit}
+            className="px-6 py-2.5 rounded-full border-2 border-slate-800 font-bold text-xs text-white bg-blue-600 hover:bg-blue-700 transition-all hover:-translate-y-0.5 hover:-translate-x-0.5 hover:shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {isSubmitting ? (
               <>
-                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                Đang gửi...
+                <Loader2 className="w-4 h-4 animate-spin" />
+                {language === 'vi' ? 'Đang gửi...' : language === 'en' ? 'Sending...' : language === 'ar' ? 'جارٍ الإرسال...' : 'Envoi en cours...'}
               </>
             ) : (
               <>
-                <Send className="w-5 h-5" />
-                Gửi Yêu cầu Tư vấn
+                <Send className="w-4 h-4" />
+                {language === 'vi' ? 'GỬI YÊU CẦU' : language === 'en' ? 'SUBMIT REQUEST' : language === 'ar' ? 'إرسال الطلب' : 'ENVOYER LA DEMANDE'}
               </>
             )}
           </button>
-        </form>
+        </div>
       </div>
     </div>
   );
 }
 
 // Product Card Component
-function ProductCard({ product, viewMode }: { product: any; viewMode: ViewMode }) {
-  const isSpecialist = viewMode === 'at_specialist';
-
-  // Lay category tu product hoac detect tu ten
+// Smart Product Card with Match Score, Reasons & Real Images
+function SmartProductCard({ product, rank, language = 'vi' as Language }: { product: any; rank: number; language?: Language }) {
+  const [expanded, setExpanded] = useState(false);
+  const [imageError, setImageError] = useState(false);
+  
+  // Calculate match score based on product properties
+  const matchScore = product.matchScore || (rank === 1 ? 94 : 87);
+  const matchLabel = rank === 1 ? 'Best Match' : rank === 2 ? 'Best Value' : 'Recommended';
+  
+  // Get category info with image
   const getCategoryInfo = (name: string) => {
     const n = name.toLowerCase();
-    if (n.includes('orcam') || n.includes('jaws') || n.includes('nvda') || n.includes('screen reader') || n.includes('braille') || n.includes('vision') || n.includes('eye')) {
-      return { gradient: 'from-violet-600 to-purple-800', icon: '👁️', label: 'Hỗ trợ thị giác' };
+    if (n.includes('orcam')) {
+      return { gradient: 'from-violet-600 to-purple-800', icon: '👁️', label: language === 'vi' ? 'Hỗ trợ thị giác' : language === 'en' ? 'Vision Support' : language === 'ar' ? 'دعم البصر' : 'Support visuel', color: 'violet', img: 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=400&h=300&fit=crop' };
     }
-    if (n.includes('phonak') || n.includes('oticon') || n.includes('roger') || n.includes('hearing') || n.includes('trợ thính') || n.includes('tai')) {
-      return { gradient: 'from-blue-500 to-cyan-600', icon: '👂', label: 'Hỗ trợ thính giác' };
+    if (n.includes('jaws') || n.includes('nvda') || n.includes('screen reader')) {
+      return { gradient: 'from-slate-600 to-slate-800', icon: '🖥️', label: 'Screen Reader', color: 'slate', img: 'https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=400&h=300&fit=crop' };
     }
-    if (n.includes('wheelchair') || n.includes('xe lăn') || n.includes('permobil') || n.includes('scalamobil') || n.includes('mobility') || n.includes('leo cầu')) {
-      return { gradient: 'from-emerald-500 to-teal-600', icon: '🦽', label: 'Hỗ trợ vận động' };
+    if (n.includes('phonak') || n.includes('oticon') || n.includes('hearing')) {
+      return { gradient: 'from-blue-500 to-cyan-600', icon: '👂', label: language === 'vi' ? 'Hỗ trợ thính giác' : language === 'en' ? 'Hearing Support' : language === 'ar' ? 'دعم السمع' : 'Support auditif', color: 'blue', img: 'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=400&h=300&fit=crop' };
     }
-    if (n.includes('tobii') || n.includes('aac') || n.includes('communicator') || n.includes('touchchat') || n.includes('lightwriter') || n.includes('proloquo')) {
-      return { gradient: 'from-orange-500 to-red-500', icon: '💬', label: 'Thiết bị giao tiếp' };
+    if (n.includes('roger')) {
+      return { gradient: 'from-blue-400 to-cyan-500', icon: '🎤', label: 'Microphone', color: 'blue', img: 'https://images.unsplash.com/photo-1590602847861-f357a9332bbc?w=400&h=300&fit=crop' };
     }
-    if (n.includes('dragon') || n.includes('speech') || n.includes(' Kurzweil') || n.includes('c-pen') || n.includes('học') || n.includes('education')) {
-      return { gradient: 'from-amber-500 to-orange-600', icon: '📚', label: 'Hỗ trợ giáo dục' };
+    if (n.includes('wheelchair') || n.includes('xe lăn') || n.includes('permobil')) {
+      return { gradient: 'from-emerald-500 to-teal-600', icon: '🦽', label: language === 'vi' ? 'Hỗ trợ vận động' : language === 'en' ? 'Mobility Support' : language === 'ar' ? 'دعم الحركة' : 'Support mobilité', color: 'emerald', img: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&h=300&fit=crop' };
     }
-    if (n.includes('medication') || n.includes('mediplanner') || n.includes('eat') || n.includes('grab') || n.includes('bathroom')) {
-      return { gradient: 'from-pink-500 to-rose-600', icon: '🏠', label: 'Sinh hoạt hàng ngày' };
+    if (n.includes('scalamobil') || n.includes('leo cầu')) {
+      return { gradient: 'from-teal-500 to-cyan-600', icon: '🪜', label: language === 'vi' ? 'Leo cầu thang' : language === 'en' ? 'Stair Climbing' : language === 'ar' ? 'تسلق الدرج' : 'Montée d\'escalier', color: 'teal', img: 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&h=300&fit=crop' };
     }
-    if (n.includes('memo') || n.includes('calendar') || n.includes('memory') || n.includes('cognitive')) {
-      return { gradient: 'from-indigo-500 to-blue-600', icon: '🧠', label: 'Hỗ trợ nhận thức' };
+    if (n.includes('tobii') || n.includes('eye')) {
+      return { gradient: 'from-purple-500 to-pink-600', icon: '👁️', label: 'Eye Tracker', color: 'purple', img: 'https://images.unsplash.com/photo-1531746790731-6c087fecd65a?w=400&h=300&fit=crop' };
     }
-    return { gradient: 'from-slate-600 to-slate-800', icon: '🔧', label: 'Thiết bị AT' };
+    if (n.includes('proloquo') || n.includes('touchchat')) {
+      return { gradient: 'from-orange-500 to-red-500', icon: '📱', label: 'AAC App', color: 'orange', img: 'https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?w=400&h=300&fit=crop' };
+    }
+    if (n.includes('memo') || n.includes('calendar')) {
+      return { gradient: 'from-indigo-500 to-blue-600', icon: '📅', label: 'Nhắc nhở', color: 'indigo', img: 'https://images.unsplash.com/photo-1434494878577-86c23bcb06b9?w=400&h=300&fit=crop' };
+    }
+    if (n.includes('lightwriter')) {
+      return { gradient: 'from-orange-400 to-red-500', icon: '💬', label: 'AAC Device', color: 'orange', img: 'https://images.unsplash.com/photo-1590650213165-c1fef80648c4?w=400&h=300&fit=crop' };
+    }
+    if (n.includes('mack')) {
+      return { gradient: 'from-pink-400 to-rose-500', icon: '🔊', label: 'Communicator', color: 'pink', img: 'https://images.unsplash.com/photo-1563770660941-20978e870e26?w=400&h=300&fit=crop' };
+    }
+    if (n.includes('easy grip') || n.includes('eating')) {
+      return { gradient: 'from-amber-400 to-orange-500', icon: '🍴', label: 'Dụng cụ ăn uống', color: 'amber', img: 'https://images.unsplash.com/photo-1584346133934-a3afd2a33c4c?w=400&h=300&fit=crop' };
+    }
+    if (n.includes('mediplanner') || n.includes('thuốc')) {
+      return { gradient: 'from-green-500 to-emerald-600', icon: '💊', label: 'Hộp thuốc', color: 'green', img: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=400&h=300&fit=crop' };
+    }
+    if (n.includes('grab') || n.includes('bathroom')) {
+      return { gradient: 'from-slate-400 to-gray-600', icon: '🚿', label: 'Hỗ trợ nhà tắm', color: 'slate', img: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=300&fit=crop' };
+    }
+    if (n.includes('kurzweil')) {
+      return { gradient: 'from-amber-500 to-orange-600', icon: '📚', label: 'Hỗ trợ học tập', color: 'amber', img: 'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=400&h=300&fit=crop' };
+    }
+    if (n.includes('dragon')) {
+      return { gradient: 'from-cyan-500 to-blue-600', icon: '🎯', label: 'Speech Recognition', color: 'cyan', img: 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=400&h=300&fit=crop' };
+    }
+    if (n.includes('c-pen')) {
+      return { gradient: 'from-yellow-500 to-orange-600', icon: '✏️', label: 'Scanner', color: 'yellow', img: 'https://images.unsplash.com/photo-1553729784-e91953dec042?w=400&h=300&fit=crop' };
+    }
+    return { gradient: 'from-slate-600 to-slate-800', icon: '🔧', label: 'Thiết bị AT', color: 'slate', img: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=400&h=300&fit=crop' };
   };
-
+  
   const categoryInfo = getCategoryInfo(product.name);
+  
+  // Rating & reviews (simulated based on rank)
+  const rating = rank === 1 ? 4.8 : 4.5;
+  const reviews = rank === 1 ? 234 : 189;
+  
+  // Availability badge
+  const availability = rank === 1 ? { text: 'Có sẵn tại VN', icon: '📦', color: 'bg-emerald-100 text-emerald-700' } 
+    : { text: 'Tải digital', icon: '📥', color: 'bg-blue-100 text-blue-700' };
 
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden hover:shadow-xl hover:border-blue-200 transition-all duration-300 group">
-      {/* Product Image Area - Gradient + Icon */}
-      <div className={`aspect-video relative overflow-hidden bg-gradient-to-br ${categoryInfo.gradient}`}>
-        {/* Animated background pattern */}
-        <div className="absolute inset-0 opacity-20">
-          <div className="absolute top-0 left-0 w-32 h-32 bg-white rounded-full -translate-x-1/2 -translate-y-1/2 blur-3xl" />
-          <div className="absolute bottom-0 right-0 w-40 h-40 bg-white rounded-full translate-x-1/4 translate-y-1/4 blur-3xl" />
+    <div className={`bg-white border-2 rounded-2xl overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 ${
+      rank === 1 ? 'border-amber-300 shadow-amber-100' : 'border-slate-200'
+    }`}>
+      {/* Product Image */}
+      <div className="relative h-36 overflow-hidden">
+        {!imageError ? (
+          <img 
+            src={categoryInfo.img} 
+            alt={product.name}
+            className="w-full h-full object-cover"
+            onError={() => setImageError(true)}
+          />
+        ) : (
+          <div className={`w-full h-full bg-gradient-to-br ${categoryInfo.gradient} flex items-center justify-center`}>
+            <span className="text-5xl">{categoryInfo.icon}</span>
+          </div>
+        )}
+        
+        {/* Gradient Overlay */}
+        <div className={`absolute inset-0 bg-gradient-to-t ${categoryInfo.gradient} opacity-60`} />
+        
+        {/* Rank Badge */}
+        <div className={`absolute top-3 left-3 flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold shadow-lg ${
+          rank === 1 ? 'bg-amber-400 text-amber-900' : 'bg-white/90 backdrop-blur text-slate-700'
+        }`}>
+          {rank === 1 && '🏆'}
+          {matchLabel}
         </div>
-
-        {/* Main content */}
-        <div className="relative z-10 w-full h-full flex flex-col items-center justify-center p-4">
-          {/* Category icon */}
-          <div className="text-5xl mb-2 group-hover:scale-110 transition-transform duration-300">{categoryInfo.icon}</div>
-
-          {/* Product name */}
-          <h4 className="text-white font-bold text-center text-sm leading-tight drop-shadow-lg">{product.name}</h4>
-
-          {/* Category label */}
-          <span className="mt-2 px-3 py-1 bg-white/20 backdrop-blur rounded-full text-white text-[10px] font-semibold">
-            {categoryInfo.label}
+        
+        {/* Match Score */}
+        <div className="absolute top-3 right-3 w-12 h-12 bg-white rounded-full shadow-lg flex items-center justify-center">
+          <div className="text-center">
+            <span className="text-sm font-bold text-slate-800">{matchScore}%</span>
+          </div>
+        </div>
+        
+        {/* Product Name Overlay */}
+        <div className="absolute bottom-3 left-3 right-3">
+          <h4 className="font-bold text-white text-sm leading-tight drop-shadow-lg line-clamp-1">{product.name}</h4>
+          <span className="text-xs text-white/80">{categoryInfo.label}</span>
+        </div>
+      </div>
+      
+      {/* Content */}
+      <div className="p-4">
+        {/* Rating & Availability */}
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-1.5">
+            <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
+            <span className="font-semibold text-sm">{rating}</span>
+            <span className="text-xs text-slate-500">({reviews} reviews)</span>
+          </div>
+          <span className={`flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-medium ${availability.color}`}>
+            {availability.icon} {availability.text}
           </span>
         </div>
-
-        {/* Gradient overlay */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent" />
-
-        {/* Price badge */}
-        {product.price && (
-          <div className="absolute bottom-3 right-3 px-3 py-1.5 bg-white text-slate-800 text-xs font-bold rounded-xl shadow-lg">
-            {product.price}
+        
+        {/* Why This Product Section */}
+        <div className="mb-4">
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-2 flex items-center gap-1">
+            <span className="material-symbols-outlined text-sm">lightbulb</span>
+            {language === 'vi' ? 'Phù hợp vì:' : language === 'en' ? 'Why this fits:' : language === 'ar' ? 'لماذا يناسب:' : 'Pourquoi ça convient:'}
+          </p>
+          <div className="space-y-1.5">
+            {product.reasons?.slice(0, 3).map((reason: string, idx: number) => (
+              <div key={idx} className="flex items-start gap-2 text-xs text-slate-600 bg-slate-50 p-2 rounded-lg">
+                <Check className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" />
+                <span>{reason}</span>
+              </div>
+            ))}
           </div>
-        )}
-
-        {/* Brand badge (specialist mode) */}
-        {isSpecialist && product.brand && (
-          <div className="absolute top-3 left-3 px-2 py-1 bg-blue-500 text-white text-[10px] font-bold rounded-lg shadow">
-            {product.brand}
-          </div>
-        )}
-      </div>
-
-      {/* Product Info */}
-      <div className="p-4">
-        {/* Features list */}
-        <div className="space-y-2 mb-4">
-          {product.features.slice(0, isSpecialist ? 5 : 3).map((feature: string, idx: number) => (
-            <div key={idx} className="flex items-start gap-2 text-xs text-slate-600">
-              <Check className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" />
-              <span>{feature}</span>
-            </div>
-          ))}
         </div>
-
-        {/* Action link */}
-        <a
-          href="https://mada.org.qa"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center justify-center gap-2 w-full py-2.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white text-xs font-semibold rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all shadow-sm hover:shadow"
-        >
-          Tìm hiểu thêm <ExternalLink className="w-3 h-3" />
-        </a>
+        
+        {/* Price & Features Preview */}
+        <div className="flex items-center justify-between text-sm mb-4 pb-4 border-b border-slate-100">
+          <div>
+            <span className="text-xs text-slate-500 block">{language === 'vi' ? 'Giá tham khảo' : language === 'en' ? 'Reference price' : language === 'ar' ? 'السعر المرجعي' : 'Prix de référence'}</span>
+            <span className="font-bold text-lg text-slate-800">{product.price || (language === 'vi' ? 'Liên hệ' : language === 'en' ? 'Contact' : language === 'ar' ? 'اتصل' : 'Contact')}</span>
+          </div>
+          <div className="text-right">
+            <span className="text-xs text-slate-500 block">{language === 'vi' ? 'Đánh giá' : language === 'en' ? 'Rating' : language === 'ar' ? 'التقييم' : 'Note'}</span>
+            <div className="flex gap-0.5">
+              {[1,2,3,4,5].map((star) => (
+                <Star key={star} className={`w-3 h-3 ${star <= Math.round(rating) ? 'text-amber-400 fill-amber-400' : 'text-slate-200'}`} />
+              ))}
+            </div>
+          </div>
+        </div>
+        
+        {/* Expandable Features */}
+        {expanded && (
+          <div className="mb-4 p-3 bg-slate-50 rounded-xl">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-2">Tính năng nổi bật</p>
+            <div className="grid grid-cols-2 gap-1">
+              {product.features?.slice(0, 6).map((feature: string, idx: number) => (
+                <div key={idx} className="flex items-center gap-1 text-xs text-slate-600">
+                  <span className="w-1 h-1 bg-blue-500 rounded-full" />
+                  {feature}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        
+        {/* Action Buttons */}
+        <div className="flex gap-2">
+          <button 
+            onClick={() => setExpanded(!expanded)}
+            className="flex-1 py-2 px-3 text-xs font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors"
+          >
+            {expanded ? (language === 'vi' ? 'Thu gọn' : language === 'en' ? 'Show less' : language === 'ar' ? 'عرض أقل' : 'Réduire') : (language === 'vi' ? 'Xem thêm' : language === 'en' ? 'Show more' : language === 'ar' ? 'عرض المزيد' : 'Afficher plus')}
+          </button>
+          <a
+            href="https://mada.org.qa"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex-1 py-2 px-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white text-xs font-semibold rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all shadow-sm hover:shadow text-center"
+          >
+            {language === 'vi' ? 'Tìm hiểu →' : language === 'en' ? 'Learn more →' : language === 'ar' ? 'اعرف المزيد ←' : 'En savoir plus →'}
+          </a>
+        </div>
       </div>
     </div>
   );
@@ -569,41 +1294,9 @@ function ConfidenceBar({ confidence }: { confidence: number }) {
   );
 }
 
-// View Mode Toggle Component - Compact icon pill
-function ViewModeToggle({ viewMode, onToggle }: { viewMode: ViewMode; onToggle: () => void }) {
-  const isEndUser = viewMode === 'end_user';
-
-  return (
-    <button
-      onClick={onToggle}
-      className="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-full transition-all group"
-      title={isEndUser ? 'Người dùng - Chế độ thân thiện' : 'Chuyên gia AT - Chế độ chuyên sâu'}
-    >
-      <div className="relative w-9 h-5 bg-slate-300 rounded-full p-0.5 transition-colors">
-        <div
-          className={clsx(
-            'w-4 h-4 bg-white rounded-full shadow-sm transition-transform flex items-center justify-center',
-            !isEndUser && 'translate-x-4'
-          )}
-        >
-          {isEndUser ? (
-            <Eye className="w-2.5 h-2.5 text-slate-600" />
-          ) : (
-            <Shield className="w-2.5 h-2.5 text-blue-600" />
-          )}
-        </div>
-      </div>
-      <span className="hidden xl:inline text-[11px] font-semibold text-slate-600">
-        {isEndUser ? 'Người dùng' : 'Chuyên gia'}
-      </span>
-    </button>
-  );
-}
-
 export function ChatPage() {
   const navigate = useNavigate();
   const { language, setLanguage } = useLanguageStore();
-  const { viewMode, toggleViewMode } = useViewModeStore();
   const { messages, addMessage, clearMessages, isLoading, setLoading } = useChatStore();
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
@@ -616,8 +1309,12 @@ export function ChatPage() {
   const [showAttachmentMenu, setShowAttachmentMenu] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showAgentMenu, setShowAgentMenu] = useState(false);
-  const [selectedFiles, setSelectedFiles] = useState<{ name: string; type: string; size: number; content?: string; originalFile?: File }[]>([]);
+  const [selectedFiles, setSelectedFiles] = useState<{ name: string; type: string; size: number; content?: string; originalFile?: File; isLoading?: boolean; isCancelling?: boolean }[]>([]);
+  const [cancellingFiles, setCancellingFiles] = useState<Set<string>>(new Set());
+  const [isGeneratingResponse, setIsGeneratingResponse] = useState(false);
   const [activeCategory, setActiveCategory] = useState<ATCategory | null>(null);
+  const [suggestedFollowUps, setSuggestedFollowUps] = useState<string[]>([]);
+  const [isDragging, setIsDragging] = useState(false);
 
   // Agent state
   const activeAgents = useAgentStore((s) => s.getActiveAgents());
@@ -651,9 +1348,18 @@ export function ChatPage() {
     const today = new Date();
     const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
     const startOfYesterday = startOfToday - 86_400_000;
-    if (ts >= startOfToday) return 'Today';
-    if (ts >= startOfYesterday) return 'Yesterday';
-    return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
+    
+    const labels: Record<string, { today: string; yesterday: string }> = {
+      vi: { today: 'Hôm nay', yesterday: 'Hôm qua' },
+      en: { today: 'Today', yesterday: 'Yesterday' },
+      ar: { today: 'اليوم', yesterday: 'أمس' },
+      fr: { today: 'Aujourd\'hui', yesterday: 'Hier' },
+    };
+    const l = labels[language] || labels.vi;
+    
+    if (ts >= startOfToday) return l.today;
+    if (ts >= startOfYesterday) return l.yesterday;
+    return d.toLocaleDateString(language === 'vi' ? 'vi-VN' : language === 'en' ? 'en-US' : language === 'ar' ? 'ar-SA' : 'fr-FR', { day: '2-digit', month: '2-digit' });
   };
 
   // Auto-open PaywallModal khi user load /chat với quota đã cạn sẵn
@@ -681,6 +1387,50 @@ export function ChatPage() {
     }
   }, []);
   
+  // Handle Google OAuth callback
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const googleAuth = params.get('google_auth');
+    const accessToken = params.get('access_token');
+    const refreshToken = params.get('refresh_token');
+    const expiresAt = params.get('expires_at');
+    const error = params.get('error');
+    
+    if (error) {
+      console.error('Google OAuth error:', error);
+      alert('Đăng nhập Google thất bại. Vui lòng thử lại.');
+      window.history.replaceState({}, '', window.location.pathname);
+      return;
+    }
+    
+    if (googleAuth === 'success' && accessToken && refreshToken) {
+      // Store tokens
+      localStorage.setItem('mada_access_token', accessToken);
+      localStorage.setItem('mada_refresh_token', refreshToken);
+      if (expiresAt) {
+        localStorage.setItem('mada_token_expires_at', expiresAt);
+      }
+      
+      // Fetch user info
+      fetch('/api/auth/me', {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.success && data.data?.user) {
+            const { login } = useAuthStore.getState();
+            login(data.data.user);
+            console.log('✅ Google OAuth login successful:', data.data.user.name);
+          }
+        })
+        .catch((err) => console.error('Failed to fetch user after Google login:', err))
+        .finally(() => {
+          // Clean URL
+          window.history.replaceState({}, '', window.location.pathname);
+        });
+    }
+  }, []);
+  
   // DEBUG: Log selectedFiles changes
   useEffect(() => {
     console.log('[MADA DEBUG] selectedFiles changed:', selectedFiles);
@@ -694,9 +1444,9 @@ export function ChatPage() {
   const attachmentMenuRef = useRef<HTMLDivElement>(null);
 
   const currentLanguage = LANGUAGES.find((l) => l.code === language) || LANGUAGES[0];
-  const isEndUser = viewMode === 'end_user';
+  const isEndUser = true;
   const currentQuestions = activeCategory 
-    ? SAMPLE_QUESTIONS[activeCategory][viewMode]
+    ? getSampleQuestionsByLang(activeCategory, language)
     : [];
 
   // Keyboard shortcuts
@@ -735,6 +1485,148 @@ export function ChatPage() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isLoading, streamingContent]);
+
+  // Drag and Drop handlers
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // Only set to false if we're leaving the main container
+    if (!(e.currentTarget as HTMLElement).contains(e.relatedTarget as HTMLElement)) {
+      setIsDragging(false);
+    }
+  }, []);
+
+  const processDroppedFiles = useCallback(async (files: FileList | File[]) => {
+    const fileArray = Array.from(files);
+    const MAX_DROP_FILES = 5;
+    const remaining = MAX_DROP_FILES - selectedFiles.length;
+    
+    if (remaining <= 0) {
+      alert('Đã đạt giới hạn tối đa 5 file.');
+      return;
+    }
+
+    const filesToProcess = fileArray.slice(0, remaining);
+    
+    for (const file of filesToProcess) {
+      // Check file size (max 10MB)
+      if (file.size > 10 * 1024 * 1024) {
+        alert(`File "${file.name}" quá lớn. Vui lòng chọn file nhỏ hơn 10MB.`);
+        continue;
+      }
+
+      const fileId = `${file.name}-${Date.now()}`;
+      
+      // Add file to state
+      setSelectedFiles(prev => [...prev, {
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        originalFile: file,
+        isLoading: true,
+        fileId, // Unique ID for cancellation
+      }]);
+
+      // Process file based on type
+      try {
+        if (file.type.startsWith('image/')) {
+          // Images - convert to base64
+          const reader = new FileReader();
+          reader.onload = () => {
+            // Only update if not cancelled
+            setCancellingFiles(prev => {
+              if (prev.has(fileId)) {
+                setSelectedFiles(prev => prev.filter(f => f.fileId !== fileId));
+                const next = new Set(prev);
+                next.delete(fileId);
+                return next;
+              }
+              setSelectedFiles(prev => prev.map((f) => 
+                f.fileId === fileId 
+                  ? { ...f, content: reader.result as string, isLoading: false }
+                  : f
+              ));
+              return prev;
+            });
+          };
+          reader.readAsDataURL(file);
+        } else if (file.type === 'application/pdf' || 
+                   file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+                   file.type === 'application/msword') {
+          // PDF/DOCX - keep as originalFile (will be sent as base64)
+          // Small delay to simulate processing
+          await new Promise(resolve => setTimeout(resolve, 100));
+          setCancellingFiles(prev => {
+            if (prev.has(fileId)) {
+              setSelectedFiles(prev => prev.filter(f => f.fileId !== fileId));
+              const next = new Set(prev);
+              next.delete(fileId);
+              return next;
+            }
+            setSelectedFiles(prev => prev.map((f) => 
+              f.fileId === fileId 
+                ? { ...f, isLoading: false }
+                : f
+            ));
+            return prev;
+          });
+        } else if (file.type.startsWith('text/')) {
+          // Text files - read content
+          const content = await file.text();
+          setCancellingFiles(prev => {
+            if (prev.has(fileId)) {
+              setSelectedFiles(prev => prev.filter(f => f.fileId !== fileId));
+              const next = new Set(prev);
+              next.delete(fileId);
+              return next;
+            }
+            setSelectedFiles(prev => prev.map((f) => 
+              f.fileId === fileId 
+                ? { ...f, content, isLoading: false }
+                : f
+            ));
+            return prev;
+          });
+        } else {
+          // Other files - keep as is
+          await new Promise(resolve => setTimeout(resolve, 100));
+          setCancellingFiles(prev => {
+            if (prev.has(fileId)) {
+              setSelectedFiles(prev => prev.filter(f => f.fileId !== fileId));
+              const next = new Set(prev);
+              next.delete(fileId);
+              return next;
+            }
+            setSelectedFiles(prev => prev.map((f) => 
+              f.fileId === fileId 
+                ? { ...f, isLoading: false }
+                : f
+            ));
+            return prev;
+          });
+        }
+      } catch (error) {
+        console.error('Error processing file:', file.name, error);
+        setSelectedFiles(prev => prev.filter(f => f.name !== file.name));
+      }
+    }
+  }, [selectedFiles.length]);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      processDroppedFiles(e.dataTransfer.files);
+    }
+  }, [processDroppedFiles]);
 
   // Auto-resize textarea
   useEffect(() => {
@@ -790,6 +1682,7 @@ export function ChatPage() {
     const userMessage = inputValue.trim();
     setInputValue('');
     setLoading(true);
+    setIsGeneratingResponse(true);
     setStreamingContent('');
 
     if (textareaRef.current) {
@@ -817,51 +1710,84 @@ export function ChatPage() {
       touchConversation(currentConvId, userMessage);
     }
 
-    addMessage({ role: 'user', content: userMessage });
-
     // Xây dựng message với nội dung file
     let fullMessage = userMessage;
-    let attachments: any[] = [];
+    let attachmentsForMessage: { name: string; type: string; preview?: string }[] = [];
+    let attachmentsForApi: any[] = [];
     
     if (selectedFiles.length > 0) {
       console.log('[DEBUG] Processing files:', selectedFiles.length);
       
-      // Chuẩn bị attachments để gửi lên server
+      // Chuẩn bị attachments để hiển thị và gửi lên server
       for (const f of selectedFiles) {
-        if (f.content && !f.content.includes('đang chờ parse')) {
-          // Text content đã có sẵn
-          attachments.push({
-            type: 'text',
-            name: f.name,
-            content: f.content,
-          });
-        } else if (f.originalFile) {
-          // File cần parse - đọc base64
+        console.log('[DEBUG] Processing file:', f.name, '| type:', f.type, '| isLoading:', f.isLoading, '| hasOriginalFile:', !!f.originalFile);
+        
+        // Chỉ xử lý file đã load xong
+        if (f.isLoading) {
+          console.log('[DEBUG] Skipping file still loading:', f.name);
+          continue;
+        }
+        
+        // Thêm vào attachments để hiển thị (chỉ name, type, preview)
+        attachmentsForMessage.push({
+          name: f.name,
+          type: f.type,
+          preview: f.content?.startsWith('data:image') ? f.content : undefined,
+        });
+        
+        // Chuẩn bị attachments để gửi lên server (có base64/content)
+        // Nếu có originalFile (PDF, DOCX, hoặc file nhị phân) - gửi base64
+        if (f.originalFile) {
           try {
             const arrayBuffer = await f.originalFile.arrayBuffer();
-            const base64 = btoa(
-              new Uint8Array(arrayBuffer)
-                .reduce((data, byte) => data + String.fromCharCode(byte), '')
-            );
-            attachments.push({
-              type: f.type || f.name,
+            const binary = new Uint8Array(arrayBuffer);
+            let base64 = '';
+            for (let i = 0; i < binary.length; i++) {
+              base64 += String.fromCharCode(binary[i]);
+            }
+            base64 = btoa(base64);
+            
+            attachmentsForApi.push({
               name: f.name,
+              type: f.type,
               base64: base64,
             });
+            console.log('[DEBUG] Sent as base64:', f.name, '| type:', f.type);
           } catch (e) {
-            console.log('[DEBUG] Failed to read file:', f.name);
+            console.error('[DEBUG] Failed to read file:', f.name, e);
           }
+        } 
+        // Nếu có content (text, image đã đọc) - gửi text
+        else if (f.content && !f.content.includes('đang chờ parse')) {
+          attachmentsForApi.push({
+            name: f.name,
+            type: f.type,
+            content: f.content,
+          });
+          console.log('[DEBUG] Sent as text:', f.name);
         }
       }
       
+      console.log('[DEBUG] Total attachments prepared:', attachmentsForMessage.length);
       fullMessage = userMessage;
     }
 
+    // Add user message with attachments (chỉ để hiển thị)
+    addMessage({ 
+      role: 'user', 
+      content: fullMessage, 
+      attachments: attachmentsForMessage.length > 0 ? attachmentsForMessage : undefined 
+    });
+    setSuggestedFollowUps([]); // Clear follow-up suggestions when user sends new message
+    
+    // Tạo abort controller cho request này
+    abortControllerRef.current = new AbortController();
+    
     let apiSuccess = false;
 
     try {
       // Gửi chat với file đính kèm
-      const chatEndpoint = attachments.length > 0 ? '/api/chat-with-file' : '/api/chat';
+      const chatEndpoint = attachmentsForApi.length > 0 ? '/api/chat-with-file' : '/api/chat';
       const chatBody: any = { 
         message: fullMessage, 
         language,
@@ -870,14 +1796,15 @@ export function ChatPage() {
       };
       
       // Thêm attachments nếu có
-      if (attachments.length > 0) {
-        chatBody.attachments = attachments;
+      if (attachmentsForApi.length > 0) {
+        chatBody.attachments = attachmentsForApi;
       }
       
       const response = await fetch(chatEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(chatBody),
+        signal: abortControllerRef.current.signal,
       });
 
       // Check if response is OK
@@ -920,6 +1847,10 @@ export function ChatPage() {
           sources: data.data.sources,
           contextUsed: data.data.contextUsed,
         });
+        
+        // Generate follow-up questions based on user question and AI response
+        const followUps = generateFollowUpQuestions(userMessage, fullContent, language);
+        setSuggestedFollowUps(followUps);
       } else {
         addMessage({
           role: 'assistant',
@@ -943,6 +1874,7 @@ export function ChatPage() {
         }
       }
       setLoading(false);
+      setIsGeneratingResponse(false);
       setStreamingContent('');
       setSelectedFiles([]); // Xóa files sau khi gửi
 
@@ -959,6 +1891,29 @@ export function ChatPage() {
       e.preventDefault();
       handleSend();
     }
+  };
+
+  // Ref để hủy request đang chạy
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  const handleStopGeneration = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    
+    // Dừng ngay lập tức
+    setLoading(false);
+    setIsGeneratingResponse(false);
+    setStreamingContent('');
+    
+    // Thêm message thông báo đã dừng
+    addMessage({
+      role: 'assistant',
+      content: language === 'vi' 
+        ? '⏹️ Đã dừng phản hồi theo yêu cầu của bạn.'
+        : '⏹️ Response stopped as requested.',
+    });
   };
 
   const handleNewChat = () => {
@@ -1039,35 +1994,181 @@ export function ChatPage() {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const handleVoiceRecord = () => {
-    setIsRecording(!isRecording);
-    if (!isRecording) {
-      setTimeout(() => {
+  // Voice Recording state
+  const recognitionRef = useRef<any>(null);
+  const [isListening, setIsListening] = useState(false);
+  const [transcript, setTranscript] = useState('');
+  const [_voiceError, setVoiceError] = useState<string | null>(null);
+
+  // Initialize Speech Recognition
+  useEffect(() => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = true;
+      recognition.lang = language === 'vi' ? 'vi-VN' : language === 'en' ? 'en-US' : 'fr-FR';
+      recognition.maxAlternatives = 1;
+      
+      recognition.onresult = (event: any) => {
+        let finalTranscript = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          if (event.results[i].isFinal) {
+            finalTranscript += event.results[i][0].transcript;
+          }
+        }
+        if (finalTranscript) {
+          setTranscript(finalTranscript);
+          setInputValue((prev) => prev + finalTranscript);
+        }
+      };
+      
+      recognition.onerror = (event: any) => {
+        // Ignore 'aborted' error - this is normal when user stops recording or timeout
+        if (event.error === 'aborted') {
+          console.log('[Voice] Recording aborted by user or timeout');
+          setIsRecording(false);
+          setIsListening(false);
+          return;
+        }
+        
+        console.error('Speech recognition error:', event.error);
+        setVoiceError(event.error === 'not-allowed' 
+          ? (language === 'vi' ? 'Vui long cho phep truy cap microphone' : 'Please allow microphone access')
+          : event.error === 'no-speech'
+            ? (language === 'vi' ? 'Khong phat hien giong noi' : 'No speech detected')
+            : (language === 'vi' ? 'Da xay ra loi Voice' : 'Voice error occurred'));
         setIsRecording(false);
-        setInputValue('Tôi cần tìm thiết bị hỗ trợ người khiếm thị');
-      }, 2000);
+        setIsListening(false);
+      };
+      
+      recognition.onend = () => {
+        setIsListening(false);
+        setIsRecording(false);
+        if (transcript) {
+          setInputValue((prev) => prev + transcript);
+          setTranscript('');
+        }
+      };
+      
+      recognitionRef.current = recognition;
     }
+  }, [language]);
+
+  const handleVoiceRecord = () => {
+    if (!recognitionRef.current) {
+      alert(language === 'vi' 
+        ? 'Trinh duyet khong ho tro ghi am. Vui long su dung Chrome/Edge/Safari.' 
+        : 'Browser does not support recording. Please use Chrome/Edge/Safari.');
+      return;
+    }
+
+    if (isRecording) {
+      recognitionRef.current.stop();
+      setIsRecording(false);
+      setVoiceError(null);
+    } else {
+      setVoiceError(null);
+      setIsRecording(true);
+      setIsListening(true);
+      try {
+        recognitionRef.current.start();
+        setTimeout(() => {
+          if (isListening && recognitionRef.current) {
+            recognitionRef.current.stop();
+            setIsRecording(false);
+            setIsListening(false);
+          }
+        }, 30000);
+      } catch (err) {
+        console.error('Failed to start recognition:', err);
+        setIsRecording(false);
+        setIsListening(false);
+      }
+    }
+  };
+
+  // File upload limits (from Admin Settings)
+  const { maxFilesPerSession, maxFilesTotal } = useSystemSettingsStore();
+  const MAX_FILES_PER_SESSION = maxFilesPerSession || 10;
+  const MAX_FILES_TOTAL = maxFilesTotal || 100;
+  
+  // Track total files uploaded (persisted)
+  const [totalFilesUploaded, setTotalFilesUploaded] = useState(() => {
+    const stored = localStorage.getItem('mada-total-files-uploaded');
+    return stored ? parseInt(stored, 10) : 0;
+  });
+  
+  // Check if user can add more files
+  const canAddFiles = (count: number = 1): { allowed: boolean; reason?: string } => {
+    if (selectedFiles.length + count > MAX_FILES_PER_SESSION) {
+      return { allowed: false, reason: language === 'vi' 
+        ? `Chi co the dinh kem toi da ${MAX_FILES_PER_SESSION} file/phien chat.`
+        : `Max ${MAX_FILES_PER_SESSION} files per session.` };
+    }
+    if (totalFilesUploaded + count > MAX_FILES_TOTAL) {
+      return { allowed: false, reason: language === 'vi'
+        ? `Da dat gioi han ${MAX_FILES_TOTAL} file. Vui long dang nhap de tang gioi han.`
+        : `Reached total limit of ${MAX_FILES_TOTAL} files.` };
+    }
+    return { allowed: true };
   };
 
   const handleFileAttach = () => {
     setShowAttachmentMenu(!showAttachmentMenu);
   };
 
-  const handleAttachmentSelect = (type: string, accept: string) => {
+  const handleAttachmentSelect = (_type: string, accept: string) => {
+    // Check limit before opening file picker
+    const limitCheck = canAddFiles();
+    if (!limitCheck.allowed) {
+      alert(limitCheck.reason);
+      setShowAttachmentMenu(false);
+      return;
+    }
+    
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = accept;
-    input.multiple = type === 'file';
+    input.multiple = true; // Allow multiple file selection
     
     input.onchange = async (e) => {
       const files = (e.target as HTMLInputElement).files;
       if (files && files.length > 0) {
+        // Check limit again with actual file count
+        const limitCheck = canAddFiles(files.length);
+        if (!limitCheck.allowed) {
+          alert(limitCheck.reason);
+          return;
+        }
+        
+        // Add placeholder files with loading state immediately
+        const placeholders = Array.from(files).map((file) => ({
+          name: file.name,
+          type: file.type,
+          size: file.size,
+          isLoading: true as boolean,
+        }));
+        
+        // Get the starting index of these files
+        const startIndex = selectedFiles.length;
+        
+        // Add placeholders first to show loading state
+        setSelectedFiles(prev => [...prev, ...placeholders]);
+        
+        // Update total files
+        const newTotal = totalFilesUploaded + placeholders.length;
+        setTotalFilesUploaded(newTotal);
+        localStorage.setItem('mada-total-files-uploaded', String(newTotal));
+        
+        // Process files in background
         const processedFiles = await Promise.all(
           Array.from(files).map(async (file) => {
-            const fileData: { name: string; type: string; size: number; content?: string; originalFile?: File } = {
+            const fileData: { name: string; type: string; size: number; content?: string; originalFile?: File; isLoading: boolean } = {
               name: file.name,
               type: file.type,
               size: file.size,
+              isLoading: true,
             };
             
             // Đọc nội dung file
@@ -1110,75 +2211,20 @@ export function ChatPage() {
               fileData.content = `[Không thể đọc nội dung file: ${file.name}]`;
             }
             
+            fileData.isLoading = false;
             console.log('[MADA] File processed:', fileData);
             return fileData;
           })
         );
         
-        setSelectedFiles(prev => [...prev, ...processedFiles]);
-        
-        // Hiển thị file preview trong chat với nội dung
-        const fileList = Array.from(files).map(f => f.name).join(', ');
-        if (processedFiles.length === 1 && processedFiles[0].content) {
-          // Nếu là file text/URL, hiển thị preview
-          const file = processedFiles[0];
-          const fileContent = file.content || '';
-          const previewContent = fileContent.length > 500 
-            ? fileContent.slice(0, 500) + '...\n\n*(nội dung đầy đủ sẽ được gửi kèm)*'
-            : fileContent;
-          
-          if (file.type === 'text/url') {
-            addMessage({
-              role: 'user',
-              content: `📎 Đã đính kèm: **${file.name}**\n\n${previewContent}`,
-            });
-          } else if (file.type.startsWith('text/') || file.name.match(/\.(txt|md|json)$/)) {
-            addMessage({
-              role: 'user',
-              content: `📄 Đã đính kèm: **${file.name}**\n\`\`\`\n${previewContent}\n\`\`\``,
-            });
-          } else if (file.type === 'application/pdf') {
-            addMessage({
-              role: 'user',
-              content: `📕 Đã đính kèm: **${file.name}**\n*(File PDF - ${(file.size / 1024).toFixed(1)} KB)*`,
-            });
-          } else if (file.type.includes('word') || file.name.endsWith('.docx')) {
-            addMessage({
-              role: 'user',
-              content: `📘 Đã đính kèm: **${file.name}**\n*(File Word - ${(file.size / 1024).toFixed(1)} KB)*`,
-            });
-          } else if (file.type.startsWith('image/')) {
-            addMessage({
-              role: 'user',
-              content: `🖼️ Đã đính kèm: **${file.name}**`,
-            });
-          } else if (file.type.startsWith('video/')) {
-            addMessage({
-              role: 'user',
-              content: `🎬 Đã đính kèm: **${file.name}**\n*(Video - ${(file.size / (1024 * 1024)).toFixed(1)} MB)*`,
-            });
-          } else if (file.type.startsWith('audio/')) {
-            addMessage({
-              role: 'user',
-              content: `🎵 Đã đính kèm: **${file.name}**\n*(Audio - ${(file.size / (1024 * 1024)).toFixed(1)} MB)*`,
-            });
-          } else {
-            addMessage({
-              role: 'user',
-              content: `📎 Đã đính kèm: **${file.name}**\n*(Nội dung đã được đọc, sẽ gửi kèm khi bạn nhấn Enter)*`,
-            });
-          }
-        } else if (processedFiles.length > 1) {
-          addMessage({
-            role: 'user',
-            content: `📎 Đã đính kèm ${processedFiles.length} files: ${fileList}`,
+        // Update files with processed content
+        setSelectedFiles(prev => {
+          const updated = [...prev];
+          processedFiles.forEach((processed, idx) => {
+            updated[startIndex + idx] = processed;
           });
-        } else {
-          addMessage({
-            role: 'user',
-            content: `📎 Đã đính kèm: ${fileList}`,
-          });
-        }
+          return updated;
+        });
       }
     };
     
@@ -1187,6 +2233,13 @@ export function ChatPage() {
   };
 
   const handleRemoveFile = (index: number) => {
+    const file = selectedFiles[index];
+    
+    // If file is still loading, mark it as cancelling
+    if (file && file.isLoading && file.fileId) {
+      setCancellingFiles(prev => new Set(prev).add(file.fileId!));
+    }
+    
     setSelectedFiles(prev => prev.filter((_, i) => i !== index));
   };
 
@@ -1212,12 +2265,14 @@ export function ChatPage() {
           name: data.data?.title || new URL(url).hostname,
           type: 'text/url',
           size: (data.data?.content || '').length,
-          content: `[Nguồn: ${url}]\n\n${data.data?.content || ''}`,
+          content: data.data?.content || '',
         }]);
 
+        // Hiển thị thông báo đẹp thay vì nội dung dài
+        const fileTypeLabel = data.data?.type === 'google-docs' ? 'Google Docs' : 'Trang web';
         addMessage({
           role: 'user',
-          content: `🔗 Đã tải nội dung từ: ${url}\n\n**${data.data?.title || 'Không có tiêu đề'}**\n\n${(data.data?.content || '').slice(0, 500)}${(data.data?.content || '').length > 500 ? '...' : ''}`,
+          content: `📄 Đã tải nội dung từ ${fileTypeLabel}:\n**${data.data?.title || 'Tài liệu không có tiêu đề'}**`,
         });
       } else {
         addMessage({
@@ -1247,7 +2302,33 @@ export function ChatPage() {
   };
 
   return (
-    <div className="flex h-screen bg-[#f9f9ff] dark:bg-[#191b23] overflow-hidden">
+    <div 
+      className="flex h-screen bg-[#f9f9ff] dark:bg-[#191b23] overflow-hidden"
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      {/* Drag & Drop Overlay */}
+      {isDragging && (
+        <div className="fixed inset-0 z-[100] bg-violet-500/20 backdrop-blur-sm flex items-center justify-center pointer-events-none">
+          <div className="bg-white rounded-3xl p-8 shadow-2xl border-4 border-dashed border-violet-400">
+            <div className="flex flex-col items-center gap-4">
+              <div className="w-20 h-20 bg-violet-100 rounded-full flex items-center justify-center">
+                <span className="material-symbols-outlined text-violet-600 text-5xl" style={{ fontVariationSettings: "'FILL' 1" }}>
+                  file_upload
+                </span>
+              </div>
+              <p className="text-xl font-bold text-violet-700">
+                {language === 'vi' ? 'Thả file để đính kèm' : language === 'en' ? 'Drop files to attach' : 'Déposez les fichiers'}
+              </p>
+              <p className="text-sm text-slate-500">
+                {language === 'vi' ? 'Hỗ trợ: Hình ảnh, PDF, DOCX, TXT (tối đa 10MB)' : 'Supports: Images, PDF, DOCX, TXT (max 10MB)'}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Hidden file inputs */}
       <input
         type="file"
@@ -1269,6 +2350,7 @@ export function ChatPage() {
         isOpen={showConsultationModal}
         onClose={() => setShowConsultationModal(false)}
         onSubmit={handleConsultationSubmit}
+        language={language}
       />
 
       {/* Auth Modal - Login / Register / Google */}
@@ -1286,16 +2368,18 @@ export function ChatPage() {
           !sidebarOpen && 'max-md:-translate-x-full'
         )}
       >
-        {/* Logo Area */}
-        <div className="p-6 flex items-center gap-3 border-b border-slate-100">
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-500 to-blue-500 flex items-center justify-center p-1.5">
-            <RobotLogo variant="white" className="w-full h-full" />
+          {/* Logo Area */}
+          <div className="p-6 border-b border-white/50">
+            <div className="flex items-center gap-3 mb-1">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-500 to-blue-500 flex items-center justify-center p-1.5 shadow-lg">
+                <RobotLogo variant="white" className="w-full h-full" />
+              </div>
+              <div>
+                <h1 className="font-black text-xl tracking-tight text-on-background">MADA AI</h1>
+                <p className="text-[10px] uppercase tracking-widest text-primary font-bold">Universal Access</p>
+              </div>
+            </div>
           </div>
-          <div>
-            <h1 className="font-black text-xl tracking-tight">MADA AI</h1>
-            <p className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">Universal Access</p>
-          </div>
-        </div>
 
         {/* View Mode Toggle đã di chuyển lên Header */}
 
@@ -1303,9 +2387,9 @@ export function ChatPage() {
         <div className="px-4 mb-4 mt-2">
           <button
             onClick={handleNewChat}
-            className="w-full text-white rounded-full py-2.5 px-4 flex items-center justify-center gap-2 font-semibold shadow-lg hover:opacity-90 transition-all bg-blue-600 hover:bg-blue-700 text-sm"
+            className="w-full text-white rounded-full py-2.5 px-4 flex items-center justify-center gap-2 font-semibold shadow-md hover:opacity-90 transition-all bg-primary hover:bg-primary/90 text-sm"
           >
-            <Plus className="w-4 h-4" strokeWidth={2.5} />
+            <Plus className="w-4 h-4" />
             {language === 'vi' ? 'Trò chuyện mới' : language === 'en' ? 'New Chat' : language === 'ar' ? 'محادثة جديدة' : 'Nouvelle conversation'}
           </button>
         </div>
@@ -1316,33 +2400,39 @@ export function ChatPage() {
             const isActive = activeCategory === category;
             const label = CATEGORY_LABELS[category];
             
+            // Material Design 3 colors for categories
+            const categoryColors: Record<ATCategory, { bg: string; icon: string; active: string }> = {
+              vision: { bg: 'bg-blue-100', icon: 'text-blue-600', active: 'bg-blue-500 text-white' },
+              hearing: { bg: 'bg-indigo-100', icon: 'text-indigo-600', active: 'bg-indigo-500 text-white' },
+              mobility: { bg: 'bg-emerald-100', icon: 'text-emerald-600', active: 'bg-emerald-500 text-white' },
+              cognition: { bg: 'bg-rose-100', icon: 'text-rose-500', active: 'bg-rose-500 text-white' },
+              communication: { bg: 'bg-amber-100', icon: 'text-amber-600', active: 'bg-amber-500 text-white' },
+              daily_living: { bg: 'bg-purple-100', icon: 'text-purple-600', active: 'bg-purple-500 text-white' },
+              education: { bg: 'bg-teal-100', icon: 'text-teal-600', active: 'bg-teal-500 text-white' },
+            };
+            const colors = categoryColors[category];
+            
             return (
               <button
                 key={category}
                 onClick={() => {
                   if (isActive) {
-                    // Đang chọn category này -> bỏ chọn (giữ chat hiện tại)
                     setActiveCategory(null);
                   } else {
-                    // Chọn category khác -> clear chat cũ, mở chat mới
                     const hasMessages = messages.length > 0;
-                    if (hasMessages) {
-                      // Lưu chat cũ vào history store
-                      if (activeConversationId && messages.length > 0) {
-                        addOrUpdateConversation({
-                          id: activeConversationId,
-                          title: messages[0]?.content?.slice(0, 40) || 'Cuộc trò chuyện',
-                          date: new Date().toISOString().slice(0, 10),
-                          preview: messages[messages.length - 1]?.content ?? '',
-                          messages: messages.length,
-                          pinned: false,
-                          category: activeCategory,
-                          createdAt: Date.now() - 60_000,
-                          updatedAt: Date.now(),
-                        });
-                      }
+                    if (hasMessages && activeConversationId && messages.length > 0) {
+                      addOrUpdateConversation({
+                        id: activeConversationId,
+                        title: messages[0]?.content?.slice(0, 40) || (language === 'vi' ? 'Cuộc trò chuyện' : language === 'en' ? 'Conversation' : language === 'ar' ? 'محادثة' : 'Conversation'),
+                        date: new Date().toISOString().slice(0, 10),
+                        preview: messages[messages.length - 1]?.content ?? '',
+                        messages: messages.length,
+                        pinned: false,
+                        category: activeCategory,
+                        createdAt: Date.now() - 60_000,
+                        updatedAt: Date.now(),
+                      });
                     }
-                    // Mở chat mới + set category mới
                     window.speechSynthesis?.cancel();
                     setSpeakingId(null);
                     clearMessages();
@@ -1355,7 +2445,6 @@ export function ChatPage() {
                       setSidebarOpen(false);
                     }
 
-                    // Tự động hỏi AI về category được chọn
                     setTimeout(() => {
                       const categoryPrompt = CATEGORY_PROMPTS[category]?.[language] || CATEGORY_PROMPTS[category]?.vi || '';
                       if (categoryPrompt) {
@@ -1370,24 +2459,30 @@ export function ChatPage() {
                 className={clsx(
                   'w-full flex items-center gap-3 px-4 py-3 transition-colors rounded-2xl group',
                   isActive
-                    ? 'bg-blue-500 text-white font-semibold shadow-md'
-                    : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
+                    ? colors.active
+                    : 'text-slate-500 hover:bg-surface-container-low hover:text-on-background'
                 )}
               >
                 <div className={clsx(
                   'w-8 h-8 rounded-lg flex items-center justify-center transition-colors',
-                  isActive ? 'bg-white/20' : 'bg-slate-100 group-hover:bg-white'
+                  isActive ? 'bg-white/20' : colors.bg
                 )}>
-                  <span className="material-symbols-outlined text-lg">
+                  <span className={clsx(
+                    'material-symbols-outlined text-lg',
+                    isActive ? 'text-white' : colors.icon
+                  )}>
                     {CATEGORY_ICONS[category]}
                   </span>
                 </div>
                 <div className="flex-1 min-w-0 text-left">
                   <p className="text-xs font-bold uppercase tracking-tight">
-                    {isEndUser ? label.title : label.titleEn}
+                    {language === 'vi' ? label.title : language === 'en' ? label.titleEn : language === 'ar' ? label.titleAr : label.titleFr}
                   </p>
-                  <p className="text-[10px] text-slate-400 truncate">
-                    {isEndUser ? label.desc : label.descEn}
+                  <p className={clsx(
+                    'text-[10px] truncate',
+                    isActive ? 'text-white/70' : 'text-on-surface-variant'
+                  )}>
+                    {language === 'vi' ? label.desc : language === 'en' ? label.descEn : language === 'ar' ? label.descAr : label.descFr}
                   </p>
                 </div>
               </button>
@@ -1397,7 +2492,7 @@ export function ChatPage() {
           {/* Recent Chats Section */}
           <div className="pt-6 pb-4">
             <div className="flex items-center justify-between px-4 mb-3">
-              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Lịch sử gần đây</p>
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">{language === 'vi' ? 'Lịch sử gần đây' : language === 'en' ? 'Recent History' : language === 'ar' ? 'السجل الأخير' : 'Historique récent'}</p>
               {historyConversations.length > 0 && (
                 <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">
                   {historyConversations.length}
@@ -1474,7 +2569,7 @@ export function ChatPage() {
                               ? 'hover:bg-white/10'
                               : 'hover:bg-slate-200'
                           )}
-                          title={conv.pinned ? 'Bỏ ghim' : 'Ghim'}
+                          title={conv.pinned ? (language === 'vi' ? 'Bỏ ghim' : language === 'en' ? 'Unpin' : language === 'ar' ? 'إلغاء التثبيت' : 'Désépingler') : (language === 'vi' ? 'Ghim' : language === 'en' ? 'Pin' : language === 'ar' ? 'تثبيت' : 'Épingler')}
                         >
                           {conv.pinned ? (
                             <PinOff className="w-3.5 h-3.5" />
@@ -1490,7 +2585,7 @@ export function ChatPage() {
                               ? 'hover:bg-white/10'
                               : 'hover:bg-slate-200'
                           )}
-                          title="Xóa cuộc trò chuyện"
+                          title={language === 'vi' ? 'Xóa cuộc trò chuyện' : language === 'en' ? 'Delete conversation' : language === 'ar' ? 'حذف المحادثة' : 'Supprimer la conversation'}
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -1503,7 +2598,7 @@ export function ChatPage() {
 
               {historyConversations.length > 0 && filteredConversations().length === 0 && historySearch.trim() !== '' && (
                 <div className="text-center px-4 py-6 text-xs text-slate-400">
-                  Không tìm thấy hội thoại "{historySearch}"
+                  {language === 'vi' ? `Không tìm thấy hội thoại "${historySearch}"` : language === 'en' ? `No conversations found "${historySearch}"` : language === 'ar' ? `لا توجد محادثات "${historySearch}"` : `Aucune conversation trouvée "${historySearch}"`}
                 </div>
               )}
             </div>
@@ -1524,7 +2619,7 @@ export function ChatPage() {
                 </div>
               ) : (
                 <img
-                  alt="Khách"
+                  alt={language === 'vi' ? 'Khách' : language === 'en' ? 'Guest' : language === 'ar' ? 'زائر' : 'Invité'}
                   className="w-10 h-10 rounded-full border-2 border-white shadow-sm bg-white"
                   src="https://api.dicebear.com/7.x/avataaars/svg?seed=anonymous-mada&backgroundColor=e0e7ff"
                 />
@@ -1537,8 +2632,8 @@ export function ChatPage() {
                   </>
                 ) : (
                   <>
-                    <p className="text-sm font-bold truncate">Khách</p>
-                    <p className="text-xs text-slate-400 truncate">Chưa đăng nhập</p>
+                    <p className="text-sm font-bold truncate">{language === 'vi' ? 'Khách' : language === 'en' ? 'Guest' : language === 'ar' ? 'زائر' : 'Invité'}</p>
+                    <p className="text-xs text-slate-400 truncate">{language === 'vi' ? 'Chưa đăng nhập' : language === 'en' ? 'Not logged in' : language === 'ar' ? 'لم يتم تسجيل الدخول' : 'Non connecté'}</p>
                   </>
                 )}
               </div>
@@ -1569,14 +2664,14 @@ export function ChatPage() {
                       className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-slate-50 text-sm transition-colors"
                     >
                       <User className="w-4 h-4" />
-                      Hồ sơ
+                      {language === 'vi' ? 'Hồ sơ' : language === 'en' ? 'Profile' : language === 'ar' ? 'الملف الشخصي' : 'Profil'}
                     </button>
                     <button
                       onClick={() => { setShowProfileMenu(false); navigate('/pricing'); }}
                       className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-slate-50 text-sm transition-colors"
                     >
                       <Sparkles className="w-4 h-4" />
-                      Nâng cấp gói
+                      {language === 'vi' ? 'Nâng cấp gói' : language === 'en' ? 'Upgrade Plan' : language === 'ar' ? 'ترقية الخطة' : 'Plan supérieur'}
                     </button>
                     <hr className="my-1 border-slate-100" />
                     <button
@@ -1584,7 +2679,7 @@ export function ChatPage() {
                       className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-red-50 text-red-600 text-sm font-bold transition-colors"
                     >
                       <LogOut className="w-4 h-4" />
-                      Đăng xuất
+                      {language === 'vi' ? 'Đăng xuất' : language === 'en' ? 'Logout' : language === 'ar' ? 'تسجيل الخروج' : 'Déconnexion'}
                     </button>
                   </div>
                 </div>
@@ -1596,29 +2691,21 @@ export function ChatPage() {
 
       {/* ============== MAIN CONTENT ============== */}
       <main className="flex-1 flex flex-col relative overflow-hidden h-full">
-        {/* Top Navigation Bar */}
-        <header className="h-16 flex items-center justify-between px-8 bg-white/50 backdrop-blur-md border-b border-slate-100 z-10">
-          <div className="flex items-center gap-2">
-            <button 
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="p-2 text-slate-400 lg:hidden"
-            >
-              <Menu className="w-6 h-6" />
-            </button>
-            <span className="text-slate-300 mx-2 hidden lg:block">|</span>
-            <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
-              <span className="w-2 h-2 rounded-full bg-green-500"></span>
-              {isEndUser 
-                ? (language === 'vi' ? 'Premium Intelligence' : language === 'en' ? 'Premium Intelligence' : language === 'ar' ? 'ذكاء متميز' : 'Intelligence Premium')
-                : (language === 'vi' ? 'AT Specialist Mode' : language === 'en' ? 'AT Specialist Mode' : language === 'ar' ? 'وضع خبير AT' : 'Mode Spécialiste AT')
-              }
+        {/* Top Navigation Bar - Glass Morphism - Unified Style */}
+        <header className="hidden md:flex items-center justify-between p-4 bg-white/40 backdrop-blur-md border-b border-white/40 z-20 sticky top-0 h-16">
+          {/* Left Section */}
+          <div className="flex items-center gap-4">
+            {/* Status Badge - Premium */}
+            <div className="flex items-center gap-2 bg-white/60 px-4 py-2 rounded-full border border-white/80">
+              <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div>
+              <span className="text-sm font-semibold text-on-background">
+                {isEndUser ? (language === 'vi' ? 'Premium Intelligence' : language === 'en' ? 'Premium Intelligence' : language === 'ar' ? 'ذكاء متميز' : 'Intelligence Premium') : (language === 'vi' ? 'AT Specialist Mode' : language === 'en' ? 'AT Specialist Mode' : language === 'ar' ? 'وضع خبير AT' : 'Mode Spécialiste AT')}
+              </span>
             </div>
           </div>
           
-          <div className="flex items-center gap-5">
-            {/* View Mode Toggle - Compact pill */}
-            <ViewModeToggle viewMode={viewMode} onToggle={toggleViewMode} />
-
+          {/* Right Section */}
+          <div className="flex items-center gap-3">
             {/* Quota Indicator */}
             <QuotaIndicator />
 
@@ -1626,19 +2713,23 @@ export function ChatPage() {
             <div className="relative" ref={languageMenuRef}>
               <button
                 onClick={() => setShowAgentMenu(!showAgentMenu)}
-                className="flex items-center gap-2 text-slate-600 hover:text-blue-500 transition-colors text-sm font-medium px-2 py-1 rounded-lg hover:bg-slate-50"
+                className="flex items-center gap-2 bg-white/60 px-4 py-2 rounded-full border border-white/80 hover:bg-white/80 transition-colors"
               >
                 <span className="text-lg">{selectedAgent?.avatar || '🤖'}</span>
-                <span className="hidden lg:inline max-w-[120px] truncate">{selectedAgent?.name || 'Agent'}</span>
-                <ChevronDown className={clsx('w-4 h-4 transition-transform', showAgentMenu && 'rotate-180')} />
+                <span className="text-sm font-semibold text-on-background hidden xl:inline max-w-[100px] truncate">
+                  {getAgentDisplayInfo(selectedAgent?.id || 'default', language).name}
+                </span>
+                <ChevronDown className={clsx('w-4 h-4 text-on-surface-variant transition-transform', showAgentMenu && 'rotate-180')} />
               </button>
 
               {showAgentMenu && (
-                <div className="absolute right-0 top-full mt-2 w-72 bg-white border border-slate-200 rounded-xl shadow-xl z-50 overflow-hidden">
-                  <div className="p-2 border-b border-slate-100">
-                    <p className="text-xs font-semibold text-slate-400 px-2 py-1">Chọn Agent</p>
+                <div className="absolute right-0 top-full mt-2 w-72 bg-white border border-white/80 backdrop-blur-xl rounded-2xl shadow-[4px_4px_0_0_rgba(25,27,35,1)] z-50 overflow-hidden">
+                  <div className="p-3 border-b border-outline-variant/50 bg-surface-container-low">
+                    <p className="text-sm font-semibold text-on-background">{language === 'vi' ? 'Chọn Agent' : language === 'en' ? 'Select Agent' : language === 'ar' ? 'اختر الوكيل' : 'Sélectionner Agent'}</p>
                   </div>
-                  {activeAgents.map((agent) => (
+                  {activeAgents.map((agent) => {
+                    const info = getAgentDisplayInfo(agent.id, language);
+                    return (
                     <button
                       key={agent.id}
                       onClick={() => {
@@ -1646,190 +2737,153 @@ export function ChatPage() {
                         setShowAgentMenu(false);
                       }}
                       className={clsx(
-                        'w-full flex items-start gap-3 p-3 hover:bg-slate-50 transition-colors text-left',
-                        selectedAgentId === agent.id && 'bg-blue-50'
+                        'w-full flex items-start gap-3 p-3 hover:bg-surface-container-low transition-colors text-left',
+                        selectedAgentId === agent.id && 'bg-primary-fixed/30'
                       )}
                     >
-                      <span className="text-2xl mt-0.5">{agent.avatar}</span>
+                      <span className="text-2xl">{agent.avatar}</span>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className="font-medium text-slate-800">{agent.name}</span>
+                          <span className="font-semibold text-on-background">{info.name}</span>
                           {selectedAgentId === agent.id && (
-                            <Check className="w-4 h-4 text-blue-500" />
+                            <Check className="w-4 h-4 text-primary" />
                           )}
                         </div>
-                        <p className="text-xs text-slate-500 line-clamp-2 mt-0.5">{agent.description}</p>
+                        <p className="text-sm text-on-surface-variant line-clamp-2 mt-0.5">{info.description}</p>
                       </div>
                     </button>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
 
-            <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-500">
-              <a className="hover:text-blue-500 transition-colors" href="#">Mô hình</a>
-              <a className="hover:text-blue-500 transition-colors" href="#">API</a>
-              <a className="hover:text-blue-500 transition-colors" href="#">Tài liệu</a>
+            {/* Divider */}
+            <div className="w-px h-6 bg-outline-variant/50"></div>
+
+            {/* Navigation Links */}
+            <nav className="hidden xl:flex items-center gap-4 text-sm font-medium text-on-surface-variant">
+              <a className="hover:text-primary transition-colors" href="#">{language === 'vi' ? 'MADA Assistant' : language === 'en' ? 'MADA Assistant' : language === 'ar' ? 'مساعد MADA' : 'Assistant MADA'}</a>
+              <a className="hover:text-primary transition-colors" href="#">{language === 'vi' ? 'Mô hình' : language === 'en' ? 'Models' : language === 'ar' ? 'النماذج' : 'Modèles'}</a>
+              <a className="hover:text-primary transition-colors" href="#">{language === 'vi' ? 'API' : language === 'en' ? 'API' : language === 'ar' ? 'API' : 'API'}</a>
+              <a className="hover:text-primary transition-colors" href="#">{language === 'vi' ? 'Tài liệu' : language === 'en' ? 'Docs' : language === 'ar' ? 'الوثائق' : 'Docs'}</a>
             </nav>
+
+            {/* Divider */}
+            <div className="w-px h-6 bg-outline-variant/50"></div>
             
-            <div className="flex items-center gap-4 border-l border-slate-200 pl-5">
-              {/* Language Selector */}
-              <div className="relative" ref={languageMenuRef}>
-                <button
-                  onClick={() => {
-                    setShowLanguageMenu(!showLanguageMenu);
-                  }}
-                  className="flex items-center gap-1.5 text-slate-500 hover:text-blue-500 transition-colors text-sm font-medium px-2 py-1 rounded-lg hover:bg-slate-50"
-                >
-                  <span className="text-lg">{currentLanguage.flag}</span>
-                  <span className="hidden lg:inline">{currentLanguage.name}</span>
-                  <ChevronDown className={clsx('w-4 h-4 transition-transform', showLanguageMenu && 'rotate-180')} />
-                </button>
-
-                {showLanguageMenu && (
-                  <div className="absolute right-0 top-full mt-2 w-56 bg-white border border-slate-200 rounded-xl shadow-xl z-50 overflow-hidden">
-                  <div className="px-3 py-2 border-b border-slate-100">
-                    <p className="text-xs font-bold text-slate-400 uppercase">{language === 'vi' ? 'Ngôn ngữ' : language === 'en' ? 'Language' : language === 'ar' ? 'اللغة' : 'Langue'}</p>
-                  </div>
-                    <div className="p-1">
-                      {LANGUAGES.map((lang) => (
-                        <button
-                          key={lang.code}
-                          onClick={() => {
-                            setLanguage(lang.code as Language);
-                            setShowLanguageMenu(false);
-                          }}
-                          className={clsx(
-                            'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors',
-                            language === lang.code
-                              ? 'bg-blue-500 text-white'
-                              : 'hover:bg-slate-50'
-                          )}
-                        >
-                          <span className="text-lg">{lang.flag}</span>
-                          <span className="font-medium">{lang.name}</span>
-                          {language === lang.code && <Check className="w-4 h-4 ml-auto" />}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <button className="text-slate-400 hover:text-slate-600 transition-colors">
-                <HelpCircle className="w-5 h-5" />
+            {/* Language Selector */}
+            <div className="relative" ref={languageMenuRef}>
+              <button
+                onClick={() => {
+                  setShowLanguageMenu(!showLanguageMenu);
+                }}
+                className="flex items-center gap-2 bg-white/60 px-3 py-2 rounded-full border border-white/80 hover:bg-white/80 transition-colors"
+              >
+                <span className="text-lg">{currentLanguage.flag}</span>
+                <span className="text-sm font-medium text-on-background hidden lg:inline">{currentLanguage.name}</span>
+                <ChevronDown className={clsx('w-4 h-4 text-on-surface-variant transition-transform', showLanguageMenu && 'rotate-180')} />
               </button>
+
+              {showLanguageMenu && (
+                <div className="absolute right-0 top-full mt-2 w-56 bg-white border border-white/80 backdrop-blur-xl rounded-2xl shadow-[4px_4px_0_0_rgba(25,27,35,1)] z-50 overflow-hidden">
+                  <div className="px-3 py-2 border-b border-outline-variant/50 bg-surface-container-low">
+                    <p className="text-sm font-semibold text-on-surface-variant">{language === 'vi' ? 'Ngôn ngữ' : language === 'en' ? 'Language' : language === 'ar' ? 'اللغة' : 'Langue'}</p>
+                  </div>
+                  <div className="p-1">
+                    {LANGUAGES.map((lang) => (
+                      <button
+                        key={lang.code}
+                        onClick={() => {
+                          setLanguage(lang.code as Language);
+                          setShowLanguageMenu(false);
+                        }}
+                        className={clsx(
+                          'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors',
+                          language === lang.code
+                            ? 'bg-primary text-white'
+                            : 'hover:bg-surface-container-low text-on-background'
+                        )}
+                      >
+                        <span className="text-lg">{lang.flag}</span>
+                        <span className="font-medium">{lang.name}</span>
+                        {language === lang.code && <Check className="w-4 h-4 ml-auto" />}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
+
+            {/* Help Button */}
+            <button className="bg-white/60 p-2 rounded-full border border-white/80 hover:bg-white/80 transition-colors">
+              <HelpCircle className="w-5 h-5 text-on-surface-variant" />
+            </button>
           </div>
         </header>
 
-        {/* Chat Area */}
-        <div className="flex-1 overflow-y-auto flex flex-col items-center justify-center p-8">
+        {/* Chat Area - Welcome State */}
+        <div className="flex-1 overflow-y-auto">
           {messages.length === 0 && !streamingContent ? (
-            <>
-              <div className="w-full max-w-4xl mx-auto flex flex-col h-full">
-                <div className="flex items-center justify-between mb-8 border-b border-slate-100 pb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                    <h2 className="font-bold text-slate-900 uppercase tracking-tight">
-                      {activeCategory 
-                        ? (isEndUser ? CATEGORY_LABELS[activeCategory].title : CATEGORY_LABELS[activeCategory].titleEn)
-                        : 'THÔNG TIN BỔ TRỢ & TIÊU CHUẨN'}
-                    </h2>
-                  </div>
-                  <div className="text-[10px] font-mono text-slate-400 tracking-widest hidden md:block">
-                    {isEndUser ? 'AGENT_ID: MADA_USER' : 'AGENT_ID: REGULATORY_STANDARDS_RAG_3.5'}
-                  </div>
-                </div>
-
-                {/* Welcome Logo */}
-                <div className="relative mb-8">
-                  <div className="w-24 h-24 bg-white rounded-[2rem] shadow-xl shadow-blue-100 flex items-center justify-center relative z-10 border border-slate-100 p-3">
-                    <RobotLogo className="w-full h-full" />
-                  </div>
-                  <div className="absolute -bottom-2 -right-2 w-24 h-24 bg-slate-900 rounded-[2rem] -z-0 opacity-5"></div>
-                </div>
-
-                {/* Welcome Typography */}
-                <div className="text-center mb-12 max-w-2xl mx-auto">
-                  <h2 className="text-4xl font-extrabold tracking-tight mb-4 text-slate-900">
-                    {activeCategory 
-                      ? (isEndUser ? CATEGORY_LABELS[activeCategory].title : CATEGORY_LABELS[activeCategory].titleEn)
-                      : 'MADA AI Assistant'}
-                  </h2>
-                  <p className="text-slate-500 text-lg">
-                    {activeCategory 
-                      ? (language === 'en' ? CATEGORY_LABELS[activeCategory].descEn : CATEGORY_LABELS[activeCategory].desc)
-                      : (language === 'vi' ? 'Hệ thống tư vấn Công nghệ Hỗ trợ bằng trí tuệ nhân tạo' : language === 'en' ? 'AI-powered Assistive Technology consultation system' : language === 'ar' ? 'نظام استشارة التكنولوجيا المساعدة بالذكاء الاصطناعي' : 'Système de consultation en technologie d\'assistance par IA')
-                    }
-                  </p>
-                  <div className="mt-4 inline-flex items-center gap-2 px-4 py-1.5 bg-slate-100 rounded-full text-xs font-semibold text-slate-400">
-                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
-                    {language === 'vi' ? 'Mẹo: Nhấn' : language === 'en' ? 'Tip: Press' : language === 'ar' ? 'تلميح: اضغط' : 'Astuce: Appuyez sur'} <kbd className="bg-white px-1.5 py-0.5 rounded border border-slate-200 text-slate-600 mx-1 font-mono">Ctrl + Enter</kbd> {language === 'vi' ? 'để gửi nhanh' : language === 'en' ? 'to send quickly' : language === 'ar' ? 'للإرسال السريع' : 'pour envoyer'}
-                  </div>
-                </div>
-
-                {/* Dynamic Category Questions or Sample Questions - Beautiful Design */}
-                <div className="w-full max-w-3xl">
-                  <div className="flex items-center gap-3 mb-6">
-                    <div className="h-px flex-1 bg-gradient-to-r from-transparent via-slate-200 to-transparent"></div>
-                    <span className="text-xs font-medium text-slate-400 uppercase tracking-wider px-4">
-                      {activeCategory 
-                        ? (language === 'vi' ? 'Câu hỏi gợi ý' : language === 'en' ? 'Suggested questions' : language === 'ar' ? 'أسئلة مقترحة' : 'Questions suggérées')
-                        : (language === 'vi' ? 'Khám phá ngay' : language === 'en' ? 'Explore now' : language === 'ar' ? 'استكشف الآن' : 'Explorer')
-                      }
-                    </span>
-                    <div className="h-px flex-1 bg-gradient-to-r from-transparent via-slate-200 to-transparent"></div>
+            <div className="h-full flex flex-col items-center justify-start pt-16 px-4 md:px-8">
+              <div className="w-full max-w-4xl mx-auto">
+                
+                {/* Welcome Section */}
+                <div className="text-center mb-10 max-w-2xl mx-auto">
+                  {/* Welcome Logo - Clean Material Design 3 Style */}
+                  <div className="mb-6">
+                    <div className="w-20 h-20 mx-auto bg-gradient-to-br from-primary/10 to-secondary/10 rounded-3xl flex items-center justify-center shadow-lg border border-white/50">
+                      <RobotLogo className="w-12 h-12" />
+                    </div>
                   </div>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Welcome Typography */}
+                  <h2 className="text-2xl font-bold text-on-background mb-2">
+                    {language === 'vi' ? 'Xin chào! Mình là MADA AI.' : language === 'en' ? 'Hello! I am MADA AI.' : language === 'ar' ? 'مرحباً! أنا MADA AI.' : 'Bonjour! Je suis MADA AI.'}
+                  </h2>
+                  <p className="text-sm text-on-surface-variant">
+                    {language === 'vi' ? 'Mình có thể giúp bạn phân tích tài liệu, xử lý dữ liệu từ các tệp hoặc trả lời các câu hỏi chuyên sâu. Bạn muốn bắt đầu với việc gì hôm nay?' : language === 'en' ? 'I can help you analyze documents, process data from files, or answer detailed questions. What would you like to start with today?' : language === 'ar' ? 'يمكنني مساعدتك في تحليل المستندات ومعالجة البيانات من الملفات أو الإجابة على الأسئلة التفصيلية. ماذا تريد أن تبدأ اليوم؟' : 'Je peux vous aider à analyser des documents, traiter des données de fichiers ou répondre à des questions détaillées. Par quoi souhaitez-vous commencer aujourd\'hui?'}
+                  </p>
+                </div>
+
+                {/* Prompt Cards Grid - Material Design 3 Style */}
+                <div className="w-full max-w-3xl">
+                  <div className="grid grid-cols-2 gap-3">
                     {(activeCategory ? currentQuestions : [
-                      isEndUser ? 'Làm thế nào để tra cứu nhanh xem một thiết bị trợ giúp có an toàn và đạt quy chuẩn kỹ thuật không?' : 'Compare WCAG 2.1 Level AAA compliance for screen readers',
-                      isEndUser ? 'Tôi cần tìm thiết bị hỗ trợ cho người khiếm thị' : 'What AT devices are available for blind users?',
-                      isEndUser ? 'Máy trợ thính có những loại nào và giá bao nhiêu?' : 'What types of hearing aids are available?',
-                      isEndUser ? 'Tiêu chuẩn WCAG là gì và áp dụng ra sao?' : 'What are the ISO 9999 classification standards?',
-                    ]).map((question, index) => (
+                      { text: language === 'vi' ? 'Phân tích văn bản dài' : language === 'en' ? 'Analyze long documents' : language === 'ar' ? 'تحليل المستندات الطويلة' : 'Analyser les longs documents', desc: language === 'vi' ? 'Tóm tắt nội dung chính và các điểm quan trọng từ tài liệu của bạn...' : language === 'en' ? 'Summarize main content and key points from your documents...' : language === 'ar' ? 'تلخيص المحتوى الرئيسي والنقاط المهمة من مستنداتك...' : 'Résumer le contenu principal et les points clés de vos documents...', icon: 'description' },
+                      { text: language === 'vi' ? 'Kiểm tra khả năng tiếp cận' : language === 'en' ? 'Accessibility check' : language === 'ar' ? 'فحص إمكانية الوصول' : 'Vérifier l\'accessibilité', desc: language === 'vi' ? 'Đánh giá mức độ phù hợp WCAG cho website hoặc tài liệu...' : language === 'en' ? 'Evaluate WCAG compliance for websites or documents...' : language === 'ar' ? 'تقييم التوافق مع WCAG للمواقع أو المستندات...' : 'Évaluer la conformité WCAG pour les sites ou documents...', icon: 'accessibility' },
+                      { text: language === 'vi' ? 'Dịch thuật chuyên ngành' : language === 'en' ? 'Professional translation' : language === 'ar' ? 'الترجمة المتخصصة' : 'Traduction professionnelle', desc: language === 'vi' ? 'Dịch thuật ngữ y khoa, công nghệ hỗ trợ với độ chính xác cao...' : language === 'en' ? 'Translate medical terms, assistive technology with high accuracy...' : language === 'ar' ? 'ترجمة المصطلحات الطبية والتكنولوجيا المساعدة بدقة عالية...' : 'Traduire les termes médicaux, la technologie d\'assistance avec une grande précision...', icon: 'translate' },
+                      { text: language === 'vi' ? 'Gợi ý giải pháp hỗ trợ' : language === 'en' ? 'Suggest support solutions' : language === 'ar' ? 'اقتراح حلول الدعم' : 'Suggérer des solutions d\'assistance', desc: language === 'vi' ? 'Tìm kiếm các thiết bị, phần mềm phù hợp với từng dạng khuyết tật...' : language === 'en' ? 'Find devices and software suitable for each type of disability...' : language === 'ar' ? 'البحث عن الأجهزة والبرمجيات المناسبة لكل نوع من أنواع الإعاقة...' : 'Trouver des appareils et logiciels adaptés à chaque type de handicap...', icon: 'lightbulb' },
+                    ]).map((item, index) => (
                       <button
                         key={index}
                         onClick={() => {
-                          setInputValue(question);
+                          setInputValue(typeof item === 'string' ? item : item.text);
                           textareaRef.current?.focus();
                         }}
-                        className="group relative bg-white border border-slate-200 rounded-2xl p-5 text-left hover:border-violet-300 hover:shadow-lg hover:shadow-violet-100 transition-all duration-300 overflow-hidden"
+                        className="group bg-white border border-outline-variant rounded-2xl p-4 text-left hover:shadow-lg hover:border-primary/30 transition-all duration-200"
                       >
-                        {/* Gradient background on hover */}
-                        <div className="absolute inset-0 bg-gradient-to-br from-violet-50/0 via-purple-50/0 to-blue-50/0 group-hover:from-violet-50/50 group-hover:via-purple-50/30 group-hover:to-blue-50/30 transition-all duration-500 opacity-0 group-hover:opacity-100" />
-                        
-                        {/* Number indicator */}
-                        <div className="absolute top-3 right-3 w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-400 group-hover:bg-violet-100 group-hover:text-violet-600 transition-colors">
-                          {index + 1}
-                        </div>
-                        
-                        {/* Icon */}
-                        <div className="relative z-10 flex items-start gap-3">
-                          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-100 to-blue-100 flex items-center justify-center flex-shrink-0 group-hover:from-violet-200 group-hover:to-blue-200 transition-colors">
-                            <span className="material-symbols-outlined text-lg text-violet-600" style={{ fontVariationSettings: "'FILL' 1" }}>
-                              {activeCategory ? CATEGORY_ICONS[activeCategory] : (index === 0 ? 'search' : index === 1 ? 'visibility' : index === 2 ? 'hearing' : 'rule')}
+                        <div className="flex items-start gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-primary-fixed flex items-center justify-center shrink-0 group-hover:bg-primary-fixed-dim transition-colors">
+                            <span className="material-symbols-outlined text-primary text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>
+                              {typeof item === 'string' ? (activeCategory ? CATEGORY_ICONS[activeCategory] : (index === 0 ? 'search' : index === 1 ? 'visibility' : index === 2 ? 'hearing' : 'rule')) : item.icon}
                             </span>
                           </div>
-                          <p className="text-sm text-slate-600 group-hover:text-slate-800 leading-relaxed flex-1">
-                            {question}
-                          </p>
-                        </div>
-                        
-                        {/* Arrow indicator */}
-                        <div className="relative z-10 mt-3 flex items-center gap-1 text-[10px] font-medium text-slate-400 group-hover:text-violet-500 transition-colors">
-                          <span>{language === 'vi' ? 'Nhấn để hỏi' : language === 'en' ? 'Press to ask' : language === 'ar' ? 'اضغط للسؤال' : 'Appuyez pour demander'}</span>
-                          <svg className="w-3 h-3 transform group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                          </svg>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-on-background mb-1 line-clamp-1">
+                              {typeof item === 'string' ? item : item.text}
+                            </p>
+                            <p className="text-xs text-on-surface-variant line-clamp-2">
+                              {typeof item === 'string' ? '' : item.desc}
+                            </p>
+                          </div>
                         </div>
                       </button>
                     ))}
                   </div>
                 </div>
               </div>
-            </>
+            </div>
           ) : (
             <div className="max-w-4xl mx-auto flex flex-col h-full w-full">
               {/* Agent Header */}
@@ -1838,17 +2892,17 @@ export function ChatPage() {
                   <div className="w-2 h-2 rounded-full bg-blue-500"></div>
                   <h2 className="font-bold text-slate-900 uppercase tracking-tight">
                     {activeCategory 
-                      ? (isEndUser ? CATEGORY_LABELS[activeCategory].title : CATEGORY_LABELS[activeCategory].titleEn)
-                      : 'THÔNG TIN BỔ TRỢ & TIÊU CHUẨN'}
+                      ? (language === 'vi' ? CATEGORY_LABELS[activeCategory].title : language === 'en' ? CATEGORY_LABELS[activeCategory].titleEn : language === 'ar' ? CATEGORY_LABELS[activeCategory].titleAr : CATEGORY_LABELS[activeCategory].titleFr)
+                      : (language === 'vi' ? 'THÔNG TIN BỔ TRỢ & TIÊU CHUẨN' : language === 'en' ? 'SUPPLEMENTARY INFO & STANDARDS' : language === 'ar' ? 'المعلومات والمعايير الإضافية' : 'INFO SUPPLÉMENTAIRES & NORMES')}
                   </h2>
                 </div>
                 <div className="text-[10px] font-mono text-slate-400 tracking-widest hidden md:block">
-                  {isEndUser ? 'AGENT_ID: MADA_USER' : 'AGENT_ID: REGULATORY_STANDARDS_RAG_3.5'}
+                  {language === 'vi' ? 'AGENT_ID: MADA_USER' : language === 'en' ? 'AGENT_ID: MADA_USER' : language === 'ar' ? 'AGENT_ID: MADA_USER' : 'AGENT_ID: MADA_USER'}
                 </div>
               </div>
 
               {/* Messages */}
-              <div className="flex-1 space-y-6 mb-8 overflow-y-auto">
+              <div className="flex-1 space-y-6 mb-8 overflow-y-auto pb-48">
                 {messages.map((message) => (
                   <MessageBubble 
                     key={message.id} 
@@ -1857,11 +2911,59 @@ export function ChatPage() {
                     copiedId={copiedId}
                     onSpeak={speakText}
                     speakingId={speakingId}
-                    viewMode={viewMode}
                     onRequestConsultation={() => setShowConsultationModal(true)}
                     language={language}
                   />
                 ))}
+
+                {/* Follow-up Questions - Show after AI responds */}
+                {suggestedFollowUps.length > 0 && !isLoading && (
+                  <div className="mt-4 mx-4 p-4 bg-gradient-to-br from-violet-50 via-purple-50 to-indigo-50 rounded-2xl border border-violet-200">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="w-8 h-8 bg-gradient-to-br from-violet-500 to-indigo-500 rounded-xl flex items-center justify-center shadow-md shadow-violet-500/30">
+                        <span className="material-symbols-outlined text-white text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>
+                          help
+                        </span>
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-violet-700">
+                          {language === 'vi' ? 'Câu hỏi gợi ý' : language === 'en' ? 'Follow-up Questions' : language === 'ar' ? 'أسئلة متابعة' : 'Questions de suivi'}
+                        </p>
+                        <p className="text-[10px] text-violet-500">
+                          {language === 'vi' ? 'Nhấn để hỏi ngay' : language === 'en' ? 'Tap to ask' : language === 'ar' ? 'انقر للسؤال' : 'Cliquez pour demander'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {suggestedFollowUps.map((question: string, idx: number) => (
+                        <button
+                          key={idx}
+                          onClick={() => {
+                            setInputValue(question);
+                            setTimeout(() => textareaRef.current?.focus(), 100);
+                          }}
+                          className="flex items-center gap-3 p-3 bg-white rounded-xl border border-violet-200 hover:border-violet-400 hover:shadow-md hover:shadow-violet-500/10 transition-all text-left group"
+                        >
+                          <div className={clsx(
+                            'w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors',
+                            idx === 0 && 'bg-amber-100 text-amber-600 group-hover:bg-amber-200',
+                            idx === 1 && 'bg-emerald-100 text-emerald-600 group-hover:bg-emerald-200',
+                            idx === 2 && 'bg-blue-100 text-blue-600 group-hover:bg-blue-200',
+                            idx === 3 && 'bg-rose-100 text-rose-600 group-hover:bg-rose-200',
+                          )}>
+                            <span className="material-symbols-outlined text-xs" style={{ fontVariationSettings: "'FILL' 1" }}>
+                              {idx === 0 ? 'lightbulb' : idx === 1 ? 'search' : idx === 2 ? 'info' : 'help'}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-700 leading-snug group-hover:text-violet-700 transition-colors font-medium flex-1">
+                            {question}
+                          </p>
+                          <ArrowRight className="w-4 h-4 text-violet-400 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* Streaming indicator */}
                 {streamingContent && (
@@ -1932,7 +3034,6 @@ export function ChatPage() {
                       <button
                         key={index}
                         onClick={() => {
-                          setInputValue(question);
                           textareaRef.current?.focus();
                         }}
                         className="group/item relative overflow-hidden p-4 bg-white rounded-2xl border border-slate-200 hover:border-violet-300 hover:shadow-lg hover:shadow-violet-500/10 transition-all duration-300 text-left active:scale-[0.98]"
@@ -1977,139 +3078,69 @@ export function ChatPage() {
           )}
         </div>
 
-        {/* ============== INPUT AREA ============== */}
-        <div className="p-8 w-full max-w-5xl mx-auto">
-          <div className="relative max-w-4xl mx-auto">
-            {/* Floating Lightning Button */}
-            <div className="absolute -top-6 -right-2 z-20">
-              <button className="w-10 h-10 bg-purple-500 text-white rounded-full flex items-center justify-center shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] border-2 border-slate-900 hover:scale-105 transition-transform">
-                <Zap className="w-5 h-5" />
-              </button>
-            </div>
+        {/* ============== INPUT AREA - Fixed Bottom Bar ============== */}
+        <div className="relative bottom-0 left-0 w-full bg-[#f9f9ff] pt-6 pb-6 px-4 md:px-8 z-30 border-t border-slate-200">
+          <div className="max-w-3xl mx-auto relative flex flex-col gap-4">
 
-            {/* DEBUG: Show file count */}
+            {/* File upload status with limits */}
             {selectedFiles.length > 0 && (
-              <div className="mb-2 px-3 py-1.5 bg-yellow-100 border border-yellow-300 rounded-lg text-xs text-yellow-800 flex items-center gap-2">
-                <span className="font-bold">📎</span>
-                <span>{selectedFiles.length} file(s) đính kèm</span>
-                <span className="text-yellow-600">•</span>
-                <span>{selectedFiles.map(f => f.name).join(', ')}</span>
-              </div>
-            )}
-
-            {/* Selected Files Preview - Enhanced Display */}
-            {selectedFiles.length > 0 && (
-              <div className="mb-3 space-y-2">
-                {selectedFiles.map((file, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl shadow-sm hover:shadow-md transition-shadow"
-                  >
-                    {/* File Type Icon / Image Preview */}
-                    <div className={clsx(
-                      'w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden',
-                      file.type.startsWith('image/') && 'bg-pink-100 text-pink-600',
-                      file.type.startsWith('video/') && 'bg-purple-100 text-purple-600',
-                      file.type.startsWith('audio/') && 'bg-amber-100 text-amber-600',
-                      file.type === 'application/pdf' && 'bg-red-100 text-red-600',
-                      file.type.includes('word') && 'bg-blue-100 text-blue-600',
-                      file.type === 'text/url' && 'bg-green-100 text-green-600',
-                      !file.type.startsWith('image/') && !file.type.startsWith('video/') &&
-                        !file.type.startsWith('audio/') && file.type !== 'application/pdf' &&
-                        !file.type.includes('word') && file.type !== 'text/url' && 'bg-gray-100 text-gray-600'
-                    )}>
-                      {file.type.startsWith('image/') && file.content ? (
-                        // Image preview - check if it's a base64 data URL
-                        file.content.startsWith('data:') ? (
-                          <img src={file.content} alt={file.name} className="w-full h-full object-cover" />
-                        ) : (
-                          <ImageIcon className="w-5 h-5" />
-                        )
-                      ) : file.type.startsWith('image/') ? (
-                        <ImageIcon className="w-5 h-5" />
-                      ) : file.type.startsWith('video/') ? (
-                        <Video className="w-5 h-5" />
-                      ) : file.type.startsWith('audio/') ? (
-                        <Mic2 className="w-5 h-5" />
-                      ) : file.type === 'application/pdf' ? (
-                        <FileText className="w-5 h-5" />
-                      ) : file.type === 'text/url' ? (
-                        <Globe className="w-5 h-5" />
-                      ) : (
-                        <File className="w-5 h-5" />
-                      )}
-                    </div>
-
-                    {/* File Info */}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-slate-800 truncate">{file.name}</p>
-                      <p className="text-xs text-slate-500">
-                        {file.size > 0 ? `${(file.size / 1024).toFixed(1)} KB` : 'Đã đọc nội dung'}
-                      </p>
-                    </div>
-
-                    {/* File Status Badge */}
-                    <div className="flex items-center gap-2">
-                      {file.content ? (
-                        <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-700 rounded-full">
-                          ✓ Sẵn sàng
-                        </span>
-                      ) : (
-                        <span className="px-2 py-1 text-xs font-medium bg-amber-100 text-amber-700 rounded-full">
-                          ⚠ Chờ xử lý
-                        </span>
-                      )}
-                      <button
-                        onClick={() => handleRemoveFile(index)}
-                        className="p-1.5 hover:bg-red-100 rounded-lg transition-colors group"
-                        title="Xóa file"
-                      >
-                        <X className="w-4 h-4 text-slate-400 group-hover:text-red-500" />
-                      </button>
-                    </div>
+              <div className="bg-[#eff6ff] border border-[#bfdbfe] rounded-full px-4 py-2 flex flex-col gap-1 w-full relative overflow-hidden">
+                <div className="flex justify-between items-center w-full z-10 text-[11px] text-[#3b82f6] font-medium">
+                  <div className="flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[14px] transform rotate-45">attach_file</span>
+                    {language === 'vi' ? `${selectedFiles.length}/${MAX_FILES_PER_SESSION} tệp (phiên này)` : language === 'en' ? `${selectedFiles.length}/${MAX_FILES_PER_SESSION} files (this session)` : language === 'ar' ? `${selectedFiles.length}/${MAX_FILES_PER_SESSION} ملفات (هذه الجلسة)` : `${selectedFiles.length}/${MAX_FILES_PER_SESSION} fichiers (cette session)`}
                   </div>
-                ))}
-
-                {/* Action Hint */}
-                <p className="text-xs text-slate-400 text-center">
-                  Nhấn Enter hoặc bấm nút gửi để AI đọc file này
-                </p>
+                  <span className="">{language === 'vi' ? `Tổng đã dùng: ${totalFilesUploaded}/${MAX_FILES_TOTAL}` : language === 'en' ? `Total used: ${totalFilesUploaded}/${MAX_FILES_TOTAL}` : language === 'ar' ? `الإجمالي المستخدم: ${totalFilesUploaded}/${MAX_FILES_TOTAL}` : `Total utilisé: ${totalFilesUploaded}/${MAX_FILES_TOTAL}`}</span>
+                </div>
+                <div className="w-full bg-[#dbeafe] h-1.5 rounded-full z-10">
+                  <div 
+                    className="bg-[#3b82f6] h-1.5 rounded-full"
+                    style={{ width: `${Math.min((selectedFiles.length / MAX_FILES_PER_SESSION) * 100, 100)}%` }}
+                  />
+                </div>
               </div>
             )}
 
-            {/* Redesigned Pill Input with Layered Shadow - Compact */}
+            {/* Redesigned Pill Input with Layered Shadow - Material Design 3 Style */}
             <div className="relative">
+              {/* Floating Lightning Icon */}
+              <div className="absolute -top-3 -right-3 z-50">
+                <div className="w-8 h-8 bg-secondary-container rounded-full flex items-center justify-center border-[2px] border-on-background shadow-[3px_3px_0_0_rgba(25,27,35,1)] hover:-translate-y-0.5 hover:shadow-[4px_4px_0_0_rgba(25,27,35,1)] transition-all cursor-pointer">
+                  <span className="material-symbols-outlined text-primary text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>bolt</span>
+                </div>
+              </div>
+
               {/* Shadow Layer */}
-              <div className="absolute inset-0 bg-slate-900 rounded-full translate-y-1.5 translate-x-0.5 -z-10"></div>
+              <div className="absolute inset-0 bg-slate-900 rounded-full translate-y-1 translate-x-0.5 -z-10"></div>
               
-              <div className="bg-white border-2 border-slate-900 rounded-full p-1 flex items-center gap-1 relative z-10">
+              <div className="bg-white border-[3px] border-on-background rounded-full p-1.5 flex items-center gap-2 relative z-10">
                 {/* Left Icons - Attachment Button */}
-                <div className="flex items-center gap-0.5 pl-2 relative" ref={attachmentMenuRef}>
+                <div className="flex items-center gap-1 pl-1 relative" ref={attachmentMenuRef}>
                   <button
                     onClick={handleFileAttach}
                     className={clsx(
-                      'p-1.5 rounded-full transition-colors',
+                      'p-2 rounded-full transition-colors',
                       showAttachmentMenu
-                        ? 'bg-blue-500 text-white'
-                        : 'text-slate-600 hover:bg-slate-100'
+                        ? 'bg-primary text-white'
+                        : 'text-on-surface-variant hover:text-on-background hover:bg-surface-container-low'
                     )}
                     title="Đính kèm"
                   >
-                    <Plus className="w-4 h-4" />
+                    <Plus className="w-5 h-5" />
                   </button>
 
                   {/* Attachment Menu */}
                   {showAttachmentMenu && (
-                    <div className="absolute bottom-full left-0 mb-2 w-72 bg-white border border-slate-200 rounded-xl shadow-xl z-50 overflow-hidden">
-                      <div className="px-4 py-3 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
-                        <p className="text-sm font-bold text-slate-700">Thêm tệp đính kèm</p>
+                    <div className="absolute bottom-full left-0 mb-2 w-72 bg-white border border-white/80 backdrop-blur-xl rounded-2xl shadow-[4px_4px_0_0_rgba(25,27,35,1)] z-50 overflow-hidden">
+                      <div className="px-4 py-3 border-b border-outline-variant/50 bg-primary flex items-center justify-between">
+                        <p className="text-sm font-bold text-white">Thêm tệp đính kèm</p>
                         <button
                           onClick={() => setShowUrlInput(!showUrlInput)}
                           className={clsx(
-                            'px-3 py-1 text-xs font-medium rounded-full transition-colors',
+                            'px-3 py-1 text-xs font-semibold rounded-full transition-colors',
                             showUrlInput
-                              ? 'bg-blue-500 text-white'
-                              : 'bg-blue-100 text-blue-600 hover:bg-blue-200'
+                              ? 'bg-white text-primary'
+                              : 'bg-white/20 text-white hover:bg-white/30'
                           )}
                         >
                           🌐 URL
@@ -2118,8 +3149,8 @@ export function ChatPage() {
 
                       {/* URL Input Section */}
                       {showUrlInput && (
-                        <div className="p-3 border-b border-slate-100 bg-blue-50">
-                          <p className="text-xs text-blue-600 mb-2">Nhập link web để AI đọc và phân tích nội dung:</p>
+                        <div className="p-3 border-b border-outline-variant/50 bg-primary-fixed/30">
+                          <p className="text-xs text-primary mb-2">Nhập link web để AI đọc và phân tích nội dung:</p>
                           <div className="flex gap-2">
                             <input
                               type="text"
@@ -2127,12 +3158,12 @@ export function ChatPage() {
                               onChange={(e) => setUrlInputValue(e.target.value)}
                               onKeyDown={(e) => e.key === 'Enter' && handleFetchUrl()}
                               placeholder="https://example.com"
-                              className="flex-1 px-3 py-2 text-sm border border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              className="flex-1 px-3 py-2 text-sm border border-outline rounded-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 bg-white"
                             />
                             <button
                               onClick={handleFetchUrl}
                               disabled={!urlInputValue.trim() || isFetchingUrl}
-                              className="px-4 py-2 bg-blue-500 text-white text-sm font-medium rounded-lg hover:bg-blue-600 disabled:opacity-50 flex items-center gap-2"
+                              className="px-4 py-2 bg-primary text-white text-sm font-semibold rounded-lg hover:bg-primary/90 disabled:opacity-50 flex items-center gap-2 shadow-sm"
                             >
                               {isFetchingUrl ? (
                                 <>
@@ -2155,14 +3186,14 @@ export function ChatPage() {
                           <button
                             key={option.id}
                             onClick={() => handleAttachmentSelect(option.id, option.accept)}
-                            className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-slate-50 transition-colors text-left group"
+                            className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-surface-container-low transition-colors text-left group"
                           >
-                            <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center group-hover:bg-blue-100 transition-colors flex-shrink-0">
-                              <option.icon className="w-4 h-4 text-blue-500" />
+                            <div className="w-10 h-10 rounded-xl bg-primary-fixed flex items-center justify-center group-hover:bg-primary-fixed-dim transition-colors flex-shrink-0">
+                              <option.icon className="w-5 h-5 text-primary" />
                             </div>
                             <div className="flex-1 min-w-0">
-                              <p className="text-xs font-medium text-slate-700">{option.label}</p>
-                              <p className="text-[10px] text-slate-400">{option.description}</p>
+                              <p className="text-sm font-semibold text-on-background">{option.label}</p>
+                              <p className="text-xs text-on-surface-variant">{option.description}</p>
                             </div>
                           </button>
                         ))}
@@ -2171,7 +3202,7 @@ export function ChatPage() {
                   )}
                 </div>
 
-                {/* Input Field - Compact */}
+                {/* Input Field - Material Design 3 Style */}
                 <textarea
                   ref={textareaRef}
                   value={inputValue}
@@ -2182,43 +3213,99 @@ export function ChatPage() {
                     : (language === 'vi' ? 'Hỏi chuyên gia AT...' : language === 'en' ? 'Ask AT Specialist...' : language === 'ar' ? 'اسأل خبير AT...' : 'Demander au spécialiste...')
                   }
                   rows={1}
-                  className="flex-1 border-none focus:ring-0 text-slate-800 bg-transparent py-2 text-sm placeholder:text-slate-400 resize-none leading-tight"
-                  style={{ minHeight: '36px', maxHeight: '100px' }}
+                  className="flex-1 border-none focus:ring-0 text-on-background bg-transparent py-2.5 text-sm placeholder:text-on-surface-variant/60 resize-none leading-relaxed"
+                  style={{ minHeight: '40px', maxHeight: '100px' }}
                 />
 
-                {/* Right Icons & Send */}
-                <div className="flex items-center gap-0.5 pr-1.5">
+                {/* File attachments display - inside input */}
+                {selectedFiles.length > 0 && (
+                  <div className="flex flex-wrap gap-2 pb-2">
+                    {selectedFiles.map((file, index) => (
+                      <div
+                        key={index}
+                        className="inline-flex items-center gap-1.5 bg-[#eff6ff] border border-[#bfdbfe] rounded-full px-2.5 py-1"
+                      >
+                        <span className={clsx(
+                          'flex-shrink-0',
+                          file.type === 'application/pdf' && 'text-red-500',
+                          file.type.includes('word') && 'text-blue-600',
+                          file.type.startsWith('image/') && 'text-pink-500',
+                          !['application/pdf', 'text/url'].includes(file.type) && !file.type.includes('word') && !file.type.startsWith('image/') && 'text-slate-500'
+                        )}>
+                          {file.type === 'application/pdf' ? (
+                            <span className="material-symbols-outlined text-[14px]">picture_as_pdf</span>
+                          ) : file.type.includes('word') ? (
+                            <span className="material-symbols-outlined text-[14px]">description</span>
+                          ) : file.type.startsWith('image/') ? (
+                            <span className="material-symbols-outlined text-[14px]">image</span>
+                          ) : (
+                            <span className="material-symbols-outlined text-[14px]">attach_file</span>
+                          )}
+                        </span>
+                        <span className="text-xs font-medium text-slate-700 max-w-[100px] truncate">
+                          {file.name}
+                        </span>
+                        {file.isLoading ? (
+                          <Loader2 className="w-3 h-3 text-blue-500 animate-spin flex-shrink-0" />
+                        ) : (
+                          <button
+                            onClick={() => handleRemoveFile(index)}
+                            className="flex-shrink-0 w-4 h-4 rounded-full bg-slate-200 hover:bg-slate-300 flex items-center justify-center text-slate-500 hover:text-slate-700 transition-colors"
+                            title="Xóa"
+                          >
+                            <span className="material-symbols-outlined text-[10px] leading-none">close</span>
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Right Icons & Send - Material Design 3 Style */}
+                <div className="flex items-center gap-1 pr-1">
+                  {/* Voice Button */}
                   <button
                     onClick={handleVoiceRecord}
                     className={clsx(
-                      'p-1.5 rounded-full transition-colors',
+                      'p-2 rounded-full transition-all',
                       isRecording
-                        ? 'bg-red-500 text-white animate-pulse'
-                        : 'text-slate-600 hover:bg-slate-100'
+                        ? 'bg-error text-white animate-pulse'
+                        : isListening
+                          ? 'bg-error/80 text-white animate-ping'
+                          : 'text-on-surface-variant hover:text-on-background hover:bg-surface-container-low'
                     )}
-                    title="Ghi âm"
+                    title={isRecording 
+                      ? (language === 'vi' ? 'Dừng ghi âm' : 'Stop recording')
+                      : (language === 'vi' ? 'Ghi âm' : 'Record')}
                   >
-                    {isRecording ? <Volume2 className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                    {isRecording || isListening ? <Volume2 className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
                   </button>
                   
                   {/* Send Button - Compact */}
-                  <div className="relative ml-1">
-                    <div className="absolute inset-0 bg-slate-900 rounded-full translate-y-0.5 translate-x-0.5"></div>
+                  {isGeneratingResponse ? (
+                    <button
+                      onClick={handleStopGeneration}
+                      className="relative w-9 h-9 bg-red-500 text-white rounded-full flex items-center justify-center border-[2px] border-on-background shadow-[2px_2px_0_0_rgba(25,27,35,1)] hover:-translate-y-[1px] hover:shadow-[3px_3px_0_0_rgba(25,27,35,1)] transition-all"
+                      title={language === 'vi' ? 'Dừng' : 'Stop'}
+                    >
+                      <span className="w-3 h-3 bg-white rounded-sm" />
+                    </button>
+                  ) : (
                     <button
                       onClick={handleSend}
                       disabled={!inputValue.trim() || isLoading}
-                      className="relative w-9 h-9 bg-blue-500 text-white rounded-full flex items-center justify-center border-2 border-slate-900 hover:scale-105 transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="relative w-9 h-9 bg-primary text-white rounded-full flex items-center justify-center border-[2px] border-on-background shadow-[2px_2px_0_0_rgba(25,27,35,1)] hover:-translate-y-[1px] hover:shadow-[3px_3px_0_0_rgba(25,27,35,1)] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      <Send className="w-4 h-4" strokeWidth={3} />
+                      <Send className="w-5 h-5 transform rotate-[-15deg]" />
                     </button>
-                  </div>
+                  )}
                 </div>
               </div>
             </div>
 
-            {/* Footer Disclaimer */}
-            <p className="text-center text-[10px] text-slate-400 mt-6 uppercase tracking-widest font-mono">
-              MADA AI CAN MAKE MISTAKES. VERIFY IMPORTANT INFO.
+            {/* Footer Disclaimer - Material Design 3 Style */}
+            <p className="text-center text-[11px] text-on-surface-variant/70 mt-6 uppercase tracking-wider font-medium">
+              {language === 'vi' ? 'MADA AI CÓ THỂ SAI. HÃY KIỂM CHỨNG THÔNG TIN QUAN TRỌNG.' : language === 'en' ? 'MADA AI CAN MAKE MISTAKES. VERIFY IMPORTANT INFO.' : language === 'ar' ? '.قد ترتكب MADA AI أخطاء. تحقق من المعلومات المهمة' : 'MADA AI PEUT FAIRE DES ERREURS. VÉRIFIEZ LES INFORMATIONS IMPORTANTES.'}
             </p>
           </div>
         </div>
@@ -2234,7 +3321,6 @@ function MessageBubble({
   copiedId, 
   onSpeak, 
   speakingId,
-  viewMode,
   onRequestConsultation,
   language = 'vi' as Language
 }: { 
@@ -2243,14 +3329,21 @@ function MessageBubble({
   copiedId: string | null;
   onSpeak: (text: string, id: string) => void;
   speakingId: string | null;
-  viewMode: ViewMode;
   onRequestConsultation: () => void;
   language?: Language;
 }) {
   const [showSources, setShowSources] = useState(false);
   const [feedback, setFeedback] = useState<'like' | 'dislike' | null>(null);
-  const isEndUser = viewMode === 'end_user';
   const confidence = message.confidence || 85;
+  
+  // Detect if AI couldn't find data in Knowledge Base
+  const noDataIndicators = [
+    'khong tim thay', 'khong co thong tin', 'khong co du lieu',
+    'no information', 'no data', 'not found', 'khong chan chan',
+    'xin loi', 'toi khong', 'i don\'t have', 'i\'m not sure'
+  ];
+  const hasNoData = confidence < 50 || 
+    noDataIndicators.some(indicator => message.content.toLowerCase().includes(indicator.toLowerCase()));
   
   // Detect category từ nội dung message và chọn sản phẩm phù hợp
   const detectedCategory = detectCategoryFromQuery(message.content);
@@ -2271,12 +3364,37 @@ function MessageBubble({
   
   if (message.role === 'user') {
     return (
-      <div className="flex items-start gap-3 justify-end animate-fade-in group">
-        <div className="max-w-[80%] px-4 py-3 bg-blue-500 text-white rounded-2xl rounded-tr-none">
+      <div className="flex items-end gap-3 justify-end animate-fade-in group flex-col items-end">
+        {/* Hiển thị attachments */}
+        {message.attachments && message.attachments.length > 0 && (
+          <div className="flex flex-wrap gap-2 justify-end mb-2">
+            {message.attachments.map((attachment, idx) => (
+              <div 
+                key={idx}
+                className={clsx(
+                  'flex items-center gap-2 px-3 py-2 rounded-xl text-sm',
+                  attachment.preview 
+                    ? 'bg-white/20 backdrop-blur-sm border border-white/30' 
+                    : 'bg-white/10 border border-white/20'
+                )}
+              >
+                {attachment.preview ? (
+                  <img src={attachment.preview} alt={attachment.name} className="w-12 h-12 object-cover rounded-lg" />
+                ) : (
+                  <span className="material-symbols-outlined text-lg">
+                    {attachment.type.includes('pdf') ? 'picture_as_pdf' : 
+                     attachment.type.includes('image') ? 'image' : 
+                     attachment.type.includes('word') || attachment.type.includes('document') ? 'description' :
+                     'attach_file'}
+                  </span>
+                )}
+                <span className="font-medium max-w-[150px] truncate">{attachment.name}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="max-w-[80%] px-6 py-4 bg-[#0047ff] text-white rounded-3xl rounded-tr-sm shadow-[0_10px_40px_-10px_rgba(0,71,255,0.3)]">
           <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-        </div>
-        <div className="w-10 h-10 rounded-full bg-slate-900 flex items-center justify-center flex-shrink-0">
-          <User className="w-5 h-5 text-white" />
         </div>
       </div>
     );
@@ -2284,23 +3402,55 @@ function MessageBubble({
 
   return (
     <div className="flex items-start gap-3 animate-fade-in group">
-      <div className="w-10 h-10 rounded-xl bg-slate-900 flex items-center justify-center flex-shrink-0">
-        <BotIcon className="w-5 h-5 text-white" />
+      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#e0e7ff] to-[#c7d2fe] flex items-center justify-center flex-shrink-0 border-2 border-[#191b23]">
+        <BotIcon className="w-5 h-5 text-[#0047ff]" />
       </div>
 
       <div className="flex-1 max-w-[85%]">
         {/* Agent Header */}
-        <div className="text-[10px] text-slate-400 mb-2 uppercase tracking-widest">
+        <div className="text-[10px] text-slate-500 mb-2 uppercase tracking-widest font-medium">
           [ TRỢ LÝ CNHT MADA // {new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) } ]
         </div>
         
-        <div className="px-4 py-3 bg-white dark:bg-slate-800 rounded-2xl rounded-tl-none border border-slate-100 shadow-sm text-slate-700 leading-relaxed">
+        <div className="px-4 py-3 bg-white rounded-2xl rounded-tl-none border-2 border-slate-100 shadow-sm text-slate-700 leading-relaxed">
           <div className="text-sm [&_p]:mb-3 [&_p]:leading-relaxed [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:my-3 [&_ul]:space-y-1.5 [&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:my-3 [&_ol]:space-y-1.5 [&_li]:leading-relaxed [&_li]:mb-1 [&_h3]:text-base [&_h3]:font-bold [&_h3]:mt-4 [&_h3]:mb-2 [&_h2]:text-lg [&_h2]:font-bold [&_h2]:mt-4 [&_h2]:mb-2 [&_strong]:font-bold [&_code]:bg-slate-100 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-xs [&_pre]:bg-slate-100 [&_pre]:p-3 [&_pre]:rounded-lg [&_pre]:overflow-x-auto [&_pre]:my-3 [&_blockquote]:border-l-4 [&_blockquote]:border-slate-300 [&_blockquote]:pl-3 [&_blockquote]:italic [&_blockquote]:text-slate-600 [&_a]:text-blue-500 [&_a]:underline">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>
               {message.content}
             </ReactMarkdown>
           </div>
         </div>
+
+        {/* Expert Consultation Banner - Show when AI has low confidence */}
+        {hasNoData && (
+          <div className="mt-4 p-4 bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-200 rounded-2xl">
+            <div className="flex items-start gap-3">
+              <div className="w-12 h-12 bg-gradient-to-br from-amber-400 to-orange-500 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg">
+                <span className="material-symbols-outlined text-xl text-white">psychology</span>
+              </div>
+              <div className="flex-1">
+                <h4 className="text-sm font-bold text-amber-800 mb-1">
+                  {language === 'vi' ? 'Khong tim thay thong tin phu hop?' : 
+                   language === 'en' ? 'Can\'t find relevant information?' :
+                   'Need expert help?'}
+                </h4>
+                <p className="text-xs text-amber-700 mb-3">
+                  {language === 'vi' ? 'Doi ngu chuyen gia MADA co the ho tro ban chi tiet hon.' :
+                   language === 'en' ? 'MADA expert team can help you with more details.' :
+                   'Our experts can provide detailed assistance.'}
+                </p>
+                <button
+                  onClick={onRequestConsultation}
+                  className="inline-flex items-center gap-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white px-4 py-2 rounded-full text-xs font-bold hover:shadow-lg hover:scale-105 transition-all"
+                >
+                  <span className="material-symbols-outlined text-sm">support_agent</span>
+                  {language === 'vi' ? 'Gui yeu cau tu van' :
+                   language === 'en' ? 'Request Expert Consultation' :
+                   'Consult Expert'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Confidence Bar */}
         <div className="mt-4 flex items-center gap-4">
@@ -2310,22 +3460,26 @@ function MessageBubble({
             className="flex items-center gap-2 bg-slate-900 text-white px-5 py-2 rounded-full text-xs font-bold hover:opacity-90 transition-all"
           >
             <span className="material-symbols-outlined text-sm">support_agent</span>
-            {isEndUser 
-              ? (language === 'vi' ? 'Tư vấn Chuyên gia' : language === 'en' ? 'Request Specialist' : language === 'ar' ? 'طلب خبير' : 'Demander un spécialiste')
-              : 'Request Specialist'
-            }
+            {language === 'vi' ? 'Tư vấn Chuyên gia' : language === 'en' ? 'Request Specialist' : language === 'ar' ? 'طلب خبير' : 'Demander un spécialiste'}
           </button>
         </div>
 
-        {/* Product Cards - Show for assistant messages */}
-        <div className="mt-4">
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
-            <Star className="w-4 h-4" />
-            {language === 'vi' ? 'Thiết bị được gợi ý' : language === 'en' ? 'Recommended Devices' : language === 'ar' ? 'الأجهزة الموصى بها' : 'Appareils recommandés'}
-          </p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {/* Smart Product Suggestions - Enhanced with Match Score & Reasons */}
+        <div className="mt-5">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-6 h-6 bg-gradient-to-br from-violet-500 to-purple-600 rounded-lg flex items-center justify-center shadow-md">
+              <span className="text-white text-xs font-bold">💡</span>
+            </div>
+            <p className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+              {language === 'vi' ? 'GỢI Ý PHÙ HỢP' : language === 'en' ? 'RECOMMENDED' : language === 'ar' ? 'التوصيات' : 'RECOMMANDÉ'}
+            </p>
+            <span className="text-[9px] text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
+              {language === 'vi' ? 'Dựa trên nhu cầu của bạn' : language === 'en' ? 'Based on your needs' : language === 'ar' ? 'بناءً على احتياجاتك' : 'Basé sur vos besoins'}
+            </span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {sampleProducts.slice(0, 2).map((product, idx) => (
-              <ProductCard key={idx} product={product} viewMode={viewMode} />
+              <SmartProductCard key={idx} product={product} rank={idx + 1} language={language} />
             ))}
           </div>
         </div>

@@ -13,3 +13,4 @@ export { AdminAnalytics } from './admin/AdminAnalytics';
 export { AdminSettings } from './admin/AdminSettings';
 export { AdminAgents } from './admin/AdminAgents';
 export { AdminConsultations } from './admin/AdminConsultations';
+export { AdminProducts } from './admin/AdminProducts';

@@ -49,6 +49,7 @@ interface AuthState {
   // API actions
   loginWithEmail: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   registerWithEmail: (email: string, password: string, name: string) => Promise<{ success: boolean; error?: string }>;
+  loginWithGoogle: (data: { accessToken: string; refreshToken: string; expiresAt: string }) => Promise<void>;
   refreshUser: () => Promise<void>;
 }
 
@@ -147,6 +148,18 @@ export const useAuthStore = create<AuthState>()(
 
       refreshUser: async () => {
         if (!getAccessToken()) return;
+        const res = await authApi.me();
+        if (res.success) {
+          const user = apiUserToUser(res.data.user);
+          set({ user, isAuthenticated: true });
+        }
+      },
+
+      loginWithGoogle: async (data) => {
+        // Set tokens from Google OAuth callback
+        setTokens(data.accessToken, data.refreshToken);
+        
+        // Fetch user info
         const res = await authApi.me();
         if (res.success) {
           const user = apiUserToUser(res.data.user);
@@ -545,6 +558,11 @@ interface SystemSettingsState {
   anonymousLimit: number; // -1 = unlimited
   defaultPlanLimit: number; // -1 = unlimited for default free plan
   
+  // File Upload Limits
+  maxFilesPerSession: number; // max 10 files per chat session
+  maxFilesTotal: number; // max 100 files total
+  maxFileSizeMB: number; // max file size in MB (default 50)
+  
   // Website URL for data collection
   websiteUrl: string;
   
@@ -552,6 +570,9 @@ interface SystemSettingsState {
   setAnonymousLimit: (limit: number) => void;
   setDefaultPlanLimit: (limit: number) => void;
   setWebsiteUrl: (url: string) => void;
+  setMaxFilesPerSession: (limit: number) => void;
+  setMaxFilesTotal: (limit: number) => void;
+  setMaxFileSizeMB: (size: number) => void;
 }
 
 export const useSystemSettingsStore = create<SystemSettingsState>()(
@@ -560,10 +581,18 @@ export const useSystemSettingsStore = create<SystemSettingsState>()(
       anonymousLimit: -1, // Mặc định không giới hạn
       defaultPlanLimit: -1, // Mặc định không giới hạn cho plan
       websiteUrl: '',
+      
+      // File upload limits - theo yêu cầu sếp
+      maxFilesPerSession: 10,
+      maxFilesTotal: 100,
+      maxFileSizeMB: 50,
 
       setAnonymousLimit: (limit) => set({ anonymousLimit: limit }),
       setDefaultPlanLimit: (limit) => set({ defaultPlanLimit: limit }),
       setWebsiteUrl: (url) => set({ websiteUrl: url }),
+      setMaxFilesPerSession: (limit) => set({ maxFilesPerSession: limit }),
+      setMaxFilesTotal: (limit) => set({ maxFilesTotal: limit }),
+      setMaxFileSizeMB: (size) => set({ maxFileSizeMB: size }),
     }),
     { name: 'mada-system-settings' }
   )

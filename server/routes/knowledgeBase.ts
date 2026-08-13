@@ -87,19 +87,29 @@ router.get('/items', (req, res) => {
     const rows = db.prepare(`
       SELECT id, title, description, source, source_type, url, category,
              iso_codes, wcag_level, who_gate_area, confidence, status,
-             chunk_count, indexed, language, created_at, updated_at
+             chunk_count, indexed, language, created_at, updated_at, metadata
       FROM knowledge_items
       ${whereStr}
       ORDER BY ${sortCol} ${sortOrder}
       LIMIT ? OFFSET ?
     `).all(...params, lim, off);
 
+    // Parse metadata and extract thumbnailUrl for each item
+    const items = rows.map((row: any) => {
+      const parsed = JSON.parse(row.metadata || '{}');
+      return {
+        ...row,
+        metadata: parsed,
+        image_url: parsed?.thumbnailUrl || parsed?.galleryImages?.[0] || null,
+      };
+    });
+
     const countRow = db.prepare(`SELECT COUNT(*) as total FROM knowledge_items ${whereStr}`).get(...params) as any;
 
     res.json({
       success: true,
       data: {
-        items: rows,
+        items,
         total: countRow.total,
         limit: lim,
         offset: off,
@@ -119,7 +129,9 @@ router.get('/items/:id', (req, res) => {
 
     // Parse JSON fields
     row.iso_codes = JSON.parse(row.iso_codes || '[]');
-    row.metadata = JSON.parse(row.metadata || '{}');
+    const parsed = JSON.parse(row.metadata || '{}');
+    row.metadata = parsed;
+    row.image_url = parsed?.thumbnailUrl || parsed?.galleryImages?.[0] || null;
 
     res.json({ success: true, data: row });
   } catch (err: any) {

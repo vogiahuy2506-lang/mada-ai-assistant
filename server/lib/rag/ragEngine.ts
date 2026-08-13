@@ -1,7 +1,42 @@
 // @ts-nocheck
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenerativeAI, type FunctionDeclaration } from '@google/generative-ai';
 import { vectorStore } from './vectorStore';
 import { rerankService, type RerankableItem } from './rerankService';
+
+// ============ SCHEMA DEFINITIONS ============
+
+/**
+ * Structured output schema for RAG chat response (Task 5)
+ * Ensures model returns JSON with predictable structure
+ */
+const RAG_RESPONSE_SCHEMA: FunctionDeclaration = {
+  name: 'rag_response',
+  description: 'MADA AI RAG response với cấu trúc JSON chuẩn',
+  parameters: {
+    type: 'object',
+    properties: {
+      replyText: {
+        type: 'string',
+        description: 'Câu trả lời chính bằng ngôn ngữ của user, tối đa 5 câu, có markdown formatting'
+      },
+      confidence: {
+        type: 'number',
+        description: 'Độ tin cậy từ 0.0 đến 1.0, dựa trên context và relevance'
+      },
+      devices: {
+        type: 'array',
+        description: 'Danh sách thiết bị AT được đề cập',
+        items: { type: 'string' }
+      },
+      standardsHighlight: {
+        type: 'array',
+        description: 'Tiêu chuẩn ISO/WHO/WCAG được đề cập',
+        items: { type: 'string' }
+      }
+    },
+    required: ['replyText', 'confidence']
+  }
+};
 
 // System prompt CHOÁNG - Ngắn gọn, cụ thể, action-oriented
 const SYSTEM_PROMPT = `Ban la MADA AI - chuyen gia Cong nghe Ho tro Nguoi khuyet tat.
@@ -61,11 +96,11 @@ Tra loi:
 
 🍀 NEU KHONG CHAC CHAN:
 
-Noi: "Toi khong chac chan ve dieu nay. Ban nen hoi them chuyen gia y te."
+Noi: "Toi khong chac chan ve dieu nay. Ban nen lien he chuyen gia CNHT (Cong nghe Ho tro) de duoc tu van chi tiet."
 
-THOAT NGAY khoi man hinh. Neu nguoi hoi ve y te/chuan doan/benh, tra loi:
+Neu nguoi dung hoi cac van de y te/chuan doan/benh ly, tra loi:
 
-"Xin loi, toi chi tu van ve Cong nghe Ho tro. Ve van de y te, ban nen lien he bac si chuyen nghiep."`;
+"Xin loi, toi chi tu van ve Cong nghe Ho tro (AT). Ve cac van de y te, ban nen lien he chuyen gia y te chuyen nghiep de duoc ho tro."`;
 
 interface RAGResponse {
   answer: string;
@@ -86,6 +121,12 @@ interface RAGConfig {
   topK?: number;
   maxOutputTokens?: number;
   systemInstruction?: string;
+  /** ⭐ MỚI: Filter RAG theo bot ID (e.g. 'bot-hearing') */
+  botId?: string;
+  /** ⭐ MỚI: Filter RAG theo MADA category slug (e.g. 'sensory-hearing') */
+  madaCategory?: string;
+  /** ⭐ MỚI: Nếu true → ưu tiên KB theo filter, nếu thiếu thì fallback toàn bộ KB */
+  priority?: boolean;
 }
 
 /**
@@ -121,19 +162,21 @@ function postProcessMarkdown(text: string): string {
 
 class RAGEngine {
   private genAI: GoogleGenerativeAI | null = null;
-  private isConfigured = false;
+  private _isConfigured = false;
+
+  get isConfigured(): boolean {
+    return this._isConfigured;
+  }
 
   initialize(): void {
     const apiKey = process.env.GEMINI_API_KEY;
 
     if (!apiKey || apiKey === 'your_gemini_api_key_here') {
-      console.warn('⚠️ Gemini API key not configured. Using mock mode.');
-      this.isConfigured = false;
-      return;
+      throw new Error('GEMINI_API_KEY is missing or invalid. Set it in .env to enable RAG.');
     }
 
     this.genAI = new GoogleGenerativeAI(apiKey);
-    this.isConfigured = true;
+    this._isConfigured = true;
     console.log('✅ RAG Engine initialized with Gemini');
   }
 
@@ -142,16 +185,16 @@ class RAGEngine {
     conversationHistory: Array<{ role: string; content: string }> = [],
     config: RAGConfig = {}
   ): Promise<RAGResponse> {
-    const { topK = 10, systemInstruction } = config; // Increased from 5 to 10
+    const { topK = 10, systemInstruction, botId, madaCategory, priority = false } = config;
 
     try {
       // Initialize if not already
-      if (!this.isConfigured) {
+      if (!this._isConfigured) {
         this.initialize();
       }
 
-      // Retrieve relevant documents - get more for better context
-      const relevantDocs = await vectorStore.search(userQuery, topK * 4); // Get 4x more for richer context
+      // ⚡ PERFORMANCE OPTIMIZATION: Reduce docs retrieved (was topK * 4, now topK * 2)
+      let relevantDocs = await this.retrieveDocuments(userQuery, topK * 2, { botId, madaCategory, priority });
 
       // Apply re-ranking if available
       let finalDocs = relevantDocs;
@@ -198,42 +241,173 @@ class RAGEngine {
       const prompt = this.buildPrompt(userQuery, context, conversationHistory, hasContext, systemInstruction);
 
       // Generate response
-      if (this.isConfigured && this.genAI) {
-        const model = this.genAI.getGenerativeModel({
-          model: 'gemini-2.5-flash',
-          generationConfig: {
-            temperature: 0.3, // Low temp = focused, faster
-            maxOutputTokens: config.maxOutputTokens || 8192, // Tăng lên cho file dài
-            topP: 0.8,
-            topK: 20,
-          },
-        });
-
-        const result = await model.generateContent(prompt);
-        const rawAnswer = result.response.text();
-        const answer = postProcessMarkdown(rawAnswer);
-
-        return {
-          answer,
-          confidence: this.calculateConfidence(finalDocs, hasContext),
-          sources: finalDocs.map((doc) => ({
-            content: doc.content?.slice(0, 200) + (doc.content?.length > 200 ? '...' : ''),
-            source: doc.metadata?.source || 'Unknown',
-            metadata: doc.metadata,
-            rerankScore: doc.metadata?.rerankScore,
-            rerankReason: doc.metadata?.rerankReason,
-          })),
-          contextUsed: hasContext,
-          usedRerank,
-        };
-      } else {
-        // Fallback to mock response
-        return this.mockResponse(userQuery, relevantDocs);
+      if (!this._isConfigured || !this.genAI) {
+        throw new Error('RAG Engine is not initialized. Set GEMINI_API_KEY in .env.');
       }
+
+      const model = this.genAI.getGenerativeModel({
+        model: 'gemini-3.5-flash', // ⚡ Stable & Fast
+        generationConfig: {
+          temperature: 0.3, // Low temp = focused, faster
+          maxOutputTokens: config.maxOutputTokens || 2048, // ⚡ Reduced for faster response
+          topP: 0.8,
+          topK: 20,
+        },
+        tools: [{
+          functionDeclarations: [RAG_RESPONSE_SCHEMA]
+        }],
+      });
+
+      // Use structured output (Task 5)
+      let structuredResponse: any = null;
+      let answer: string;
+      let confidence: number;
+
+      try {
+        const result = await model.generateContent(prompt);
+        const response = result.response;
+
+        // Try structured JSON first
+        if (response.functionCalls?.length > 0) {
+          const fnCall = response.functionCalls()[0];
+          if (fnCall.name === 'rag_response') {
+            structuredResponse = fnCall.args;
+            answer = postProcessMarkdown(structuredResponse.replyText || '');
+            confidence = structuredResponse.confidence || this.calculateConfidence(finalDocs, hasContext);
+          } else {
+            // Fallback to text
+            const rawAnswer = response.text();
+            answer = postProcessMarkdown(rawAnswer);
+            confidence = this.calculateConfidence(finalDocs, hasContext);
+          }
+        } else {
+          // No function call - use text and parse fallback
+          const rawAnswer = response.text() || '';
+          answer = postProcessMarkdown(rawAnswer);
+          confidence = this.calculateConfidence(finalDocs, hasContext);
+        }
+      } catch (schemaError: any) {
+        // Schema parsing failed - fallback to text
+        console.warn('⚠️ Schema parsing failed, using text fallback:', schemaError.message?.slice(0, 80));
+        try {
+          const result = await model.generateContent(prompt);
+          const rawAnswer = result.response.text();
+          answer = postProcessMarkdown(rawAnswer);
+          confidence = this.calculateConfidence(finalDocs, hasContext);
+        } catch (textError) {
+          throw textError;
+        }
+      }
+
+      return {
+        answer,
+        confidence,
+        devices: structuredResponse?.devices || [],
+        standardsHighlight: structuredResponse?.standardsHighlight || [],
+        sources: finalDocs.map((doc) => ({
+          content: doc.content?.slice(0, 200) + (doc.content?.length > 200 ? '...' : ''),
+          source: doc.metadata?.source || 'Unknown',
+          metadata: doc.metadata,
+          rerankScore: doc.metadata?.rerankScore,
+          rerankReason: doc.metadata?.rerankReason,
+        })),
+        contextUsed: hasContext,
+        usedRerank,
+      };
     } catch (error) {
       console.error('❌ RAG query failed:', error);
       throw error;
     }
+  }
+
+  /**
+   * Stream query - returns streaming response for real-time updates
+   */
+  async queryStream(
+    userQuery: string,
+    conversationHistory: Array<{ role: string; content: string }> = [],
+    config: RAGConfig = {}
+  ): Promise<{
+    stream: AsyncGenerator<{ text: () => string }>;
+    sources: RAGResponse['sources'];
+    confidence: number;
+    answer: string;
+  }> {
+    if (!this.initialized) {
+      await this.initialize();
+    }
+
+    const topK = config.topK || 10;
+    const { botId, madaCategory, priority = false } = config;
+
+    // Retrieve relevant documents (với filter MADA nếu có)
+    const relevantDocs = await this.retrieveDocuments(userQuery, topK * 4, { botId, madaCategory, priority });
+
+    // Build context
+    let context = '';
+    if (relevantDocs.length > 0) {
+      context = relevantDocs
+        .map((doc, index) => `[Document ${index + 1}] (Nguồn: ${doc.metadata?.title || doc.metadata?.source || 'Unknown'})\n${doc.content}`)
+        .join('\n\n');
+    }
+
+    // Build prompt
+    const hasContext = context.length > 0;
+    const prompt = this.buildPrompt(userQuery, context, conversationHistory, hasContext, config.systemInstruction);
+
+    // Format sources
+    const sources = relevantDocs.map((doc) => ({
+      content: doc.content?.slice(0, 200) + (doc.content?.length > 200 ? '...' : ''),
+      source: doc.metadata?.source || 'Unknown',
+      metadata: doc.metadata,
+      rerankScore: doc.metadata?.rerankScore,
+      rerankReason: doc.metadata?.rerankReason,
+    }));
+
+    const confidence = this.calculateConfidence(relevantDocs, hasContext);
+
+    // Generate streaming response
+    if (!this._isConfigured || !this.genAI) {
+      throw new Error('RAG Engine is not initialized. Set GEMINI_API_KEY in .env.');
+    }
+
+    const model = this.genAI.getGenerativeModel({
+      model: 'gemini-3.5-flash',
+      generationConfig: {
+        temperature: 0.3,
+        maxOutputTokens: config.maxOutputTokens || 8192,
+        topP: 0.8,
+        topK: 20,
+      },
+    });
+
+    // Collect full answer for history
+    let fullAnswer = '';
+
+    const stream = (async function* () {
+      try {
+        const result = await model.generateContentStream({
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        });
+
+        for await (const chunk of result.stream) {
+          const text = chunk.text();
+          fullAnswer += text;
+          yield { text: () => text };
+        }
+      } catch (error) {
+        console.error('❌ Stream generation error:', error);
+        yield { text: () => '' };
+      }
+    })();
+
+    // Return stream with sources and confidence
+    return {
+      stream,
+      sources,
+      confidence,
+      answer: '', // Will be populated as chunks come in
+    };
   }
 
   private buildPrompt(
@@ -283,58 +457,6 @@ ${historyStr}
     return 65;
   }
 
-  private async mockResponse(query: string, docs: any[]): Promise<RAGResponse> {
-    const category = this.detectCategory(query);
-
-    if (docs.length > 0) {
-      const mainDoc = docs[0];
-      const title = mainDoc.metadata?.title || 'Tai lieu tham khao';
-      const content = mainDoc.content || '';
-
-      const categoryIntro: Record<string, string> = {
-        mobility: 'Ve thiet bi van dong va xe lan, ',
-        vision: 'Ve thiet bi ho tro thi giac, ',
-        hearing: 'Ve thiet bi ho tro thinh giac, ',
-        cognition: 'Ve thiet bi ho tro nhan thuc, ',
-        communication: 'Ve thiet bi giao tiep, ',
-        daily_living: 'Ve thiet bi ho tro sinh hoat, ',
-        education: 'Ve thiet bi giao duc, ',
-        general: '',
-      };
-
-      const summary = content
-        .split('\n')
-        .filter((l) => l.trim() && !l.startsWith('#'))
-        .slice(0, 4)
-        .join('\n');
-
-      const answer = postProcessMarkdown(
-        `${categoryIntro[category] || ''}**${title}**:\n\n${summary}\n\n---\n\n*Nguon: ${mainDoc.metadata?.source || 'Unknown'}*`
-      );
-
-      return {
-        answer,
-        confidence: 75,
-        sources: docs.map((doc) => ({
-          content: doc.content.slice(0, 200) + (doc.content.length > 200 ? '...' : ''),
-          source: doc.metadata?.source || 'Unknown',
-          metadata: doc.metadata,
-        })),
-        contextUsed: true,
-        usedRerank: false,
-      };
-    }
-
-    return {
-      answer:
-        'Xin loi, toi chua co du lieu ve chu de nay. Ban co the:\n\n1. Upload them tai lieu vao Knowledge Base\n2. Scrape them nguon tu web\n3. Lien he chuyen gia neu can',
-      confidence: 30,
-      sources: [],
-      contextUsed: false,
-      usedRerank: false,
-    };
-  }
-
   private detectCategory(query: string): string {
     const lowerQuery = query.toLowerCase();
 
@@ -377,6 +499,66 @@ ${historyStr}
     }
 
     return 'general';
+  }
+
+  /**
+   * ⭐ MỚI: Retrieve documents với priority mode
+   *
+   * Nếu priority=true và có filter (botId/madaCategory):
+   *   - Pass 1: search với filter (chỉ lấy KB của bot đó)
+   *   - Pass 2: nếu không đủ topK → fallback search toàn bộ KB
+   *
+   * Nếu priority=false (default):
+   *   - Search toàn bộ KB với filter (nếu có)
+   */
+  private async retrieveDocuments(
+    userQuery: string,
+    topK: number,
+    options: { botId?: string; madaCategory?: string; priority?: boolean }
+  ): Promise<any[]> {
+    const { botId, madaCategory, priority = false } = options;
+    const filter = (botId || madaCategory) ? { botId, madaCategory } : undefined;
+
+    // Pass 1: search theo filter (nếu có)
+    let primary: any[] = [];
+    if (filter) {
+      try {
+        primary = await vectorStore.search(userQuery, { topK, filter });
+        console.log(`🔍 [RAG] Filter search (botId=${botId}, madaCategory=${madaCategory}): ${primary.length} docs`);
+      } catch (err) {
+        console.warn('⚠️ [RAG] Filter search failed:', err);
+      }
+    }
+
+    // Nếu priority mode VÀ chưa đủ → fallback search toàn bộ KB
+    if (priority && filter && primary.length < topK) {
+      const need = topK - primary.length;
+      console.log(`🔁 [RAG] Priority fallback: cần thêm ${need} docs từ toàn bộ KB`);
+      try {
+        const fallback = await vectorStore.search(userQuery, { topK: need, filter: undefined });
+        // Merge, tránh trùng
+        const primaryIds = new Set(primary.map((d: any) => d.id || d.metadata?.source));
+        const merged = [...primary];
+        for (const doc of fallback) {
+          const id = doc.id || doc.metadata?.source;
+          if (!primaryIds.has(id)) {
+            merged.push(doc);
+            primaryIds.add(id);
+          }
+          if (merged.length >= topK) break;
+        }
+        return merged;
+      } catch (err) {
+        console.warn('⚠️ [RAG] Fallback search failed:', err);
+      }
+    }
+
+    // Nếu không có filter hoặc không priority → trả về primary hoặc search toàn bộ
+    if (!filter) {
+      return await vectorStore.search(userQuery, topK);
+    }
+
+    return primary;
   }
 }
 

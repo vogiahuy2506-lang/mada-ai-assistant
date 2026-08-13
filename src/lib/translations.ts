@@ -78,10 +78,10 @@ export const translations = {
     'sources.noSources': 'Không có nguồn',
     
     // Safety
-    'safety.medical.title': 'Cảnh báo',
-    'safety.medical.message': 'Tôi không phải bác sĩ. Về vấn đề y tế, hãy liên hệ chuyên gia y khoa.',
+    'safety.medical.title': 'Thông báo quan trọng',
+    'safety.medical.message': 'Tôi là trợ lý AI về Công nghệ Hỗ trợ (AT). Về các vấn đề sức khỏe cá nhân, vui lòng tham khảo chuyên gia y tế có chuyên môn.',
     'safety.medical.ok': 'Tôi hiểu',
-    
+
     // Consultation
     'consult.title': 'Yêu cầu Tư vấn Chuyên gia',
     'consult.subtitle': 'MADA Center, Doha, Qatar',
@@ -153,8 +153,9 @@ export const translations = {
     'input.placeholder.endUser': 'Message MADA AI...',
     'input.placeholder.specialist': 'Ask AT Specialist...',
     
-    // Disclaimer
-    'disclaimer': 'MADA AI CAN MAKE MISTAKES. VERIFY IMPORTANT INFO.',
+    // Footer
+    'disclaimer': 'MADA AI - HỖ TRỢ TƯ VẤN CHUYÊN GIA AT',
+    'poweredBy': 'Được hỗ trợ bởi Multi-modal AI & RAG Framework',
     
     // Top nav
     'nav.models': 'Mô hình',
@@ -237,8 +238,8 @@ export const translations = {
     'sources.noSources': 'No sources',
     
     // Safety
-    'safety.medical.title': 'Warning',
-    'safety.medical.message': 'I am not a doctor. For medical issues, please consult a healthcare professional.',
+    'safety.medical.title': 'Important Notice',
+    'safety.medical.message': 'I am an AI assistant for assistive technology information. For personal health-related questions, please consult a qualified specialist.',
     'safety.medical.ok': 'I understand',
     
     // Consultation
@@ -314,6 +315,7 @@ export const translations = {
     
     // Disclaimer
     'disclaimer': 'MADA AI CAN MAKE MISTAKES. VERIFY IMPORTANT INFO.',
+    'poweredBy': 'Powered by Multi-modal AI & RAG Framework',
     
     // Top nav
     'nav.models': 'Models',
@@ -396,9 +398,9 @@ export const translations = {
     'sources.noSources': 'لا توجد مراجع',
     
     // Safety
-    'safety.medical.title': 'تحذير',
-    'safety.medical.message': 'أنا لست طبيباً. للمشاكل الطبية، يرجى استشارة متخصص.',
-    'safety.medical.ok': 'أفهم',
+    'safety.medical.title': 'تنبيه مهم',
+    'safety.medical.message': 'أنا مساعد ذكاء اصطناعي متخصص في تكنولوجيا المساعدة (AT). للاستفسارات الصحية الشخصية، يرجى استشارة أخصائي مؤهل.',
+    'safety.medical.ok': 'فهمت',
     
     // Consultation
     'consult.title': 'طلب استشارة خبير',
@@ -473,6 +475,7 @@ export const translations = {
     
     // Disclaimer
     'disclaimer': 'MADA AI CAN MAKE MISTAKES. VERIFY IMPORTANT INFO.',
+    'poweredBy': 'مدعوم من Multi-modal AI و RAG Framework',
     
     // Top nav
     'nav.models': 'النماذج',
@@ -555,8 +558,8 @@ export const translations = {
     'sources.noSources': 'Pas de références',
     
     // Safety
-    'safety.medical.title': 'Avertissement',
-    'safety.medical.message': 'Je ne suis pas médecin. Pour les problèmes médicaux, consultez un professionnel.',
+    'safety.medical.title': 'Avis important',
+    'safety.medical.message': 'Je suis un assistant IA spécialisé en technologies d\'assistance (AT). Pour toute question de santé personnelle, veuillez consulter un spécialiste qualifié.',
     'safety.medical.ok': 'Je comprends',
     
     // Consultation
@@ -632,6 +635,7 @@ export const translations = {
     
     // Disclaimer
     'disclaimer': 'MADA AI CAN MAKE MISTAKES. VERIFY IMPORTANT INFO.',
+    'poweredBy': 'Alimenté par Multi-modal AI & RAG Framework',
     
     // Top nav
     'nav.models': 'Modèles',

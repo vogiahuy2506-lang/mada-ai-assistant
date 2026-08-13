@@ -37,10 +37,10 @@ class ChromaDBClient {
         console.log('✅ ChromaDB connected successfully');
         this.initialized = true;
       } else {
-        console.warn('⚠️ ChromaDB not available, using mock mode');
+        console.warn('⚠️ ChromaDB not available');
       }
     } catch {
-      console.warn('⚠️ ChromaDB not available, using mock mode');
+      console.warn('⚠️ ChromaDB not available');
     }
   }
 

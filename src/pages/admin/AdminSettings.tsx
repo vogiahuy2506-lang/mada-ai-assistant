@@ -2,28 +2,468 @@ import { useState, useEffect } from 'react';
 import { AdminLayout } from './AdminLayout';
 import { adminApi, UserStats, KnowledgeStats } from './adminApi';
 import { useSystemSettingsStore } from '@/stores';
+import { useLanguageStore } from '@/stores';
 import clsx from 'clsx';
+import { systemApi } from '@/lib/api';
+import { CheckCircle, Loader2, AlertCircle } from 'lucide-react';
 
 type Tab = 'general' | 'plans' | 'security' | 'ai' | 'integrations' | 'live';
+type Language = 'vi' | 'en' | 'ar' | 'fr';
+
+// Translation object
+const t = {
+  vi: {
+    title: 'Cấu hình Hệ thống',
+    subtitle: 'Điều chỉnh các tham số cốt lõi của MADA AI: gói giá, bảo mật, mô hình AI và tích hợp bên thứ ba.',
+    tabs: {
+      general: 'Chung',
+      plans: 'Gói & Quota',
+      security: 'Bảo mật',
+      ai: 'AI Models',
+      integrations: 'Tích hợp',
+      live: 'Trạng thái thật',
+    },
+    general: {
+      sectionTitle: 'Thông tin chung',
+      systemName: 'Tên hệ thống',
+      systemUrl: 'URL hệ thống',
+      contactEmail: 'Email liên hệ',
+      defaultLanguage: 'Ngôn ngữ mặc định',
+      description: 'Mô tả hệ thống',
+      saveChanges: 'Lưu thay đổi',
+      saving: 'Đang lưu...',
+      savedAt: 'Đã lưu lúc',
+      saveFailed: 'Lưu thất bại',
+      connectionError: 'Lỗi kết nối server',
+    },
+    plans: {
+      sectionTitle: 'Cấu hình Gói & Quota',
+      anonQuota: 'Quota cho người dùng ẩn danh',
+      unlimited: 'Không giới hạn',
+      messagesPerSession: 'tin nhắn/phiên',
+      anonQuotaDesc: 'Người dùng chưa đăng nhập sẽ có giới hạn này. Đặt "Không giới hạn" để bỏ giới hạn.',
+      fileUploadLimits: 'Giới hạn Upload File',
+      filePerSession: 'File/phiên chat:',
+      totalFiles: 'Tổng file:',
+      fileSize: 'Dung lượng/file:',
+      maxPerSession: 'Tối đa file cho mỗi cuộc trò chuyện',
+      maxTotalFiles: 'Tổng số file tối đa cho tất cả phiên',
+      maxFileSize: 'Kích thước tối đa cho mỗi file',
+      supportedFormats: 'Định dạng hỗ trợ:',
+      planQuotas: 'Quota theo Gói dịch vụ',
+      pricePerMonth: 'Giá (VND/tháng)',
+      quotaPerMonth: 'Quota/tháng',
+      current: 'HIỆN TẠI',
+      saveConfig: 'Lưu cấu hình',
+    },
+    security: {
+      sectionTitle: 'Bảo mật',
+      require2FA: 'Bắt buộc 2FA cho Admin',
+      require2FADesc: 'Tất cả tài khoản admin phải bật xác thực 2 yếu tố.',
+      allowGoogle: 'Cho phép đăng nhập Google',
+      allowGoogleDesc: 'Người dùng có thể đăng nhập bằng tài khoản Google.',
+      ipWhitelist: 'Giới hạn IP Whitelist',
+      ipWhitelistDesc: 'Chỉ cho phép admin đăng nhập từ IP được phê duyệt.',
+      auditLog: 'Audit log chi tiết',
+      auditLogDesc: 'Ghi lại mọi hành động admin vào bảng admin_audit_log.',
+      autoLock: 'Tự động khóa sau 5 lần sai',
+      autoLockDesc: 'Khóa tài khoản sau 5 lần đăng nhập thất bại.',
+      jwtSecret: 'JWT Secret (chỉ hiển thị một lần)',
+      saveConfig: 'Lưu cấu hình',
+    },
+    ai: {
+      sectionTitle: 'Cấu hình AI Models',
+      madaLLM: 'MADA-LLM',
+      madaLLMDesc: 'Mô hình ngôn ngữ chính cho trợ lý ảo.',
+      madaVision: 'MADA-Vision',
+      madaVisionDesc: 'Nhận diện hình ảnh thiết bị hỗ trợ.',
+      madaVoice: 'MADA-Voice',
+      madaVoiceDesc: 'TTS/STT đa ngôn ngữ (Vi, En, Fr, Ar).',
+      update: 'Cập nhật',
+      temperature: 'Temperature (0–1)',
+      maxTokens: 'Max tokens',
+      saveConfig: 'Lưu cấu hình',
+    },
+    integrations: {
+      sectionTitle: 'Tích hợp bên thứ ba',
+      openai: 'OpenAI API',
+      openaiDesc: 'GPT-4 cho RAG fallback',
+      googleCloud: 'Google Cloud',
+      googleCloudDesc: 'Storage & Translation',
+      stripe: 'Stripe',
+      stripeDesc: 'Thanh toán Pro/Enterprise',
+      sendgrid: 'SendGrid',
+      sendgridDesc: 'Email thông báo',
+      sentry: 'Sentry',
+      sentryDesc: 'Error tracking',
+      connected: 'Connected',
+      disconnect: 'Ngắt',
+      connect: 'Kết nối',
+    },
+    live: {
+      sectionTitle: 'Trạng thái hệ thống (real-time)',
+      sectionDesc: 'Dữ liệu đọc trực tiếp từ backend MADA AI.',
+      users: 'Người dùng',
+      total: 'Tổng',
+      active: 'Active',
+      suspended: 'Suspended',
+      pending: 'Pending',
+      knowledgeBase: 'Knowledge Base',
+      totalDocs: 'Tổng tài liệu',
+      categories: 'Danh mục',
+      storageSize: 'Dung lượng',
+      endpoints: 'Endpoints',
+      loading: 'Đang tải...',
+    },
+    languages: ['Tiếng Việt', 'English', 'Français', 'العربية'],
+  },
+  en: {
+    title: 'System Configuration',
+    subtitle: 'Adjust core parameters of MADA AI: pricing plans, security, AI models and third-party integrations.',
+    tabs: {
+      general: 'General',
+      plans: 'Plans & Quota',
+      security: 'Security',
+      ai: 'AI Models',
+      integrations: 'Integrations',
+      live: 'Live Status',
+    },
+    general: {
+      sectionTitle: 'General Information',
+      systemName: 'System Name',
+      systemUrl: 'System URL',
+      contactEmail: 'Contact Email',
+      defaultLanguage: 'Default Language',
+      description: 'System Description',
+      saveChanges: 'Save Changes',
+      saving: 'Saving...',
+      savedAt: 'Saved at',
+      saveFailed: 'Save failed',
+      connectionError: 'Server connection error',
+    },
+    plans: {
+      sectionTitle: 'Plans & Quota Configuration',
+      anonQuota: 'Anonymous User Quota',
+      unlimited: 'Unlimited',
+      messagesPerSession: 'messages/session',
+      anonQuotaDesc: 'Unauthenticated users will have this limit. Set "Unlimited" to remove limit.',
+      fileUploadLimits: 'File Upload Limits',
+      filePerSession: 'Files/session:',
+      totalFiles: 'Total files:',
+      fileSize: 'File size:',
+      maxPerSession: 'Maximum files per conversation',
+      maxTotalFiles: 'Maximum total files across all sessions',
+      maxFileSize: 'Maximum size per file',
+      supportedFormats: 'Supported formats:',
+      planQuotas: 'Quota by Service Plan',
+      pricePerMonth: 'Price (VND/month)',
+      quotaPerMonth: 'Quota/month',
+      current: 'CURRENT',
+      saveConfig: 'Save Configuration',
+    },
+    security: {
+      sectionTitle: 'Security',
+      require2FA: 'Require 2FA for Admin',
+      require2FADesc: 'All admin accounts must enable two-factor authentication.',
+      allowGoogle: 'Allow Google Login',
+      allowGoogleDesc: 'Users can log in using Google accounts.',
+      ipWhitelist: 'IP Whitelist Limit',
+      ipWhitelistDesc: 'Only allow admin login from approved IPs.',
+      auditLog: 'Detailed Audit Log',
+      auditLogDesc: 'Record all admin actions to admin_audit_log table.',
+      autoLock: 'Auto-lock after 5 failures',
+      autoLockDesc: 'Lock account after 5 failed login attempts.',
+      jwtSecret: 'JWT Secret (shown once)',
+      saveConfig: 'Save Configuration',
+    },
+    ai: {
+      sectionTitle: 'AI Models Configuration',
+      madaLLM: 'MADA-LLM',
+      madaLLMDesc: 'Main language model for virtual assistant.',
+      madaVision: 'MADA-Vision',
+      madaVisionDesc: 'Recognize assistive device images.',
+      madaVoice: 'MADA-Voice',
+      madaVoiceDesc: 'Multilingual TTS/STT (Vi, En, Fr, Ar).',
+      update: 'Update',
+      temperature: 'Temperature (0–1)',
+      maxTokens: 'Max tokens',
+      saveConfig: 'Save Configuration',
+    },
+    integrations: {
+      sectionTitle: 'Third-party Integrations',
+      openai: 'OpenAI API',
+      openaiDesc: 'GPT-4 for RAG fallback',
+      googleCloud: 'Google Cloud',
+      googleCloudDesc: 'Storage & Translation',
+      stripe: 'Stripe',
+      stripeDesc: 'Pro/Enterprise payments',
+      sendgrid: 'SendGrid',
+      sendgridDesc: 'Email notifications',
+      sentry: 'Sentry',
+      sentryDesc: 'Error tracking',
+      connected: 'Connected',
+      disconnect: 'Disconnect',
+      connect: 'Connect',
+    },
+    live: {
+      sectionTitle: 'System Status (real-time)',
+      sectionDesc: 'Data read directly from MADA AI backend.',
+      users: 'Users',
+      total: 'Total',
+      active: 'Active',
+      suspended: 'Suspended',
+      pending: 'Pending',
+      knowledgeBase: 'Knowledge Base',
+      totalDocs: 'Total Documents',
+      categories: 'Categories',
+      storageSize: 'Storage Size',
+      endpoints: 'Endpoints',
+      loading: 'Loading...',
+    },
+    languages: ['Tiếng Việt', 'English', 'Français', 'العربية'],
+  },
+  ar: {
+    title: 'إعدادات النظام',
+    subtitle: 'ضبط المعلمات الأساسية لـ MADA AI: خطط التسعير والأمان ونماذج الذكاء الاصطناعي والتكاملات الخارجية.',
+    tabs: {
+      general: 'عام',
+      plans: 'الخطط والحصص',
+      security: 'الأمان',
+      ai: 'نماذج الذكاء',
+      integrations: 'التكاملات',
+      live: 'الحالة المباشرة',
+    },
+    general: {
+      sectionTitle: 'المعلومات العامة',
+      systemName: 'اسم النظام',
+      systemUrl: 'رابط النظام',
+      contactEmail: 'البريد الإلكتروني',
+      defaultLanguage: 'اللغة الافتراضية',
+      description: 'وصف النظام',
+      saveChanges: 'حفظ التغييرات',
+      saving: 'جاري الحفظ...',
+      savedAt: 'تم الحفظ في',
+      saveFailed: 'فشل الحفظ',
+      connectionError: 'خطأ في الاتصال بالخادم',
+    },
+    plans: {
+      sectionTitle: 'إعدادات الخطط والحصص',
+      anonQuota: 'حصة المستخدم المجهول',
+      unlimited: 'غير محدود',
+      messagesPerSession: 'رسائل/جلسة',
+      anonQuotaDesc: 'المستخدمون غير المصادق عليهم سيكون لديهم هذا الحد. اضبط "غير محدود" لإزالة الحد.',
+      fileUploadLimits: 'حدود رفع الملفات',
+      filePerSession: 'ملفات/جلسة:',
+      totalFiles: 'إجمالي الملفات:',
+      fileSize: 'حجم الملف:',
+      maxPerSession: 'الحد الأقصى للملفات لكل محادثة',
+      maxTotalFiles: 'الحد الأقصى لإجمالي الملفات عبر جميع الجلسات',
+      maxFileSize: 'الحد الأقصى لحجم كل ملف',
+      supportedFormats: 'التنسيقات المدعومة:',
+      planQuotas: 'الحصص حسب خطة الخدمة',
+      pricePerMonth: 'السعر (فيتنامdong/شهر)',
+      quotaPerMonth: 'الحصة/شهر',
+      current: 'الحالي',
+      saveConfig: 'حفظ الإعدادات',
+    },
+    security: {
+      sectionTitle: 'الأمان',
+      require2FA: 'طلب المصادقة الثنائية للمدير',
+      require2FADesc: 'يجب على جميع حسابات المديرين تمكين المصادقة الثنائية.',
+      allowGoogle: 'السماح بتسجيل الدخول بجوجل',
+      allowGoogleDesc: 'يمكن للمستخدمين تسجيل الدخول باستخدام حسابات جوجل.',
+      ipWhitelist: 'قائمة بيضاء IP',
+      ipWhitelistDesc: 'السماح فقط بتسجيل دخول المدير من IPs المعتمدة.',
+      auditLog: 'سجل التدقيق المفصل',
+      auditLogDesc: 'تسجيل جميع إجراءات المدير في جدول سجل التدقيق.',
+      autoLock: 'القفل التلقائي بعد 5 محاولات فاشلة',
+      autoLockDesc: 'قفل الحساب بعد 5 محاولات تسجيل دخول فاشلة.',
+      jwtSecret: 'JWT Secret (يُعرض مرة واحدة)',
+      saveConfig: 'حفظ الإعدادات',
+    },
+    ai: {
+      sectionTitle: 'إعدادات نماذج الذكاء الاصطناعي',
+      madaLLM: 'MADA-LLM',
+      madaLLMDesc: 'نموذج اللغة الرئيسي للمساعد الافتراضي.',
+      madaVision: 'MADA-Vision',
+      madaVisionDesc: 'التعرف على صور الأجهزة المساعدة.',
+      madaVoice: 'MADA-Voice',
+      madaVoiceDesc: 'تحويل النص إلى كلام / التعرف على الكلام متعدد اللغات.',
+      update: 'تحديث',
+      temperature: 'درجة الحرارة (0–1)',
+      maxTokens: 'الحد الأقصى للرموز',
+      saveConfig: 'حفظ الإعدادات',
+    },
+    integrations: {
+      sectionTitle: 'التكاملات الخارجية',
+      openai: 'OpenAI API',
+      openaiDesc: 'GPT-4 للانعكاس',
+      googleCloud: 'Google Cloud',
+      googleCloudDesc: 'التخزين والترجمة',
+      stripe: 'Stripe',
+      stripeDesc: 'مدفوعات برو/المؤسسات',
+      sendgrid: 'SendGrid',
+      sendgridDesc: 'إشعارات البريد الإلكتروني',
+      sentry: 'Sentry',
+      sentryDesc: 'تتبع الأخطاء',
+      connected: 'متصل',
+      disconnect: 'قطع الاتصال',
+      connect: 'اتصال',
+    },
+    live: {
+      sectionTitle: 'حالة النظام (الوقت الفعلي)',
+      sectionDesc: 'البيانات مقروءة مباشرة من خلفية MADA AI.',
+      users: 'المستخدمون',
+      total: 'المجموع',
+      active: 'نشط',
+      suspended: 'موقوف',
+      pending: 'قيد الانتظار',
+      knowledgeBase: 'قاعدة المعرفة',
+      totalDocs: 'إجمالي المستندات',
+      categories: 'الفئات',
+      storageSize: 'حجم التخزين',
+      endpoints: 'نقاط النهاية',
+      loading: 'جاري التحميل...',
+    },
+    languages: ['Tiếng Việt', 'English', 'Français', 'العربية'],
+  },
+  fr: {
+    title: 'Configuration du Système',
+    subtitle: 'Ajustez les paramètres essentiels de MADA AI: forfaits tarifaires, sécurité, modèles d\'IA et intégrations tierces.',
+    tabs: {
+      general: 'Général',
+      plans: 'Forfaits & Quotas',
+      security: 'Sécurité',
+      ai: 'Modèles IA',
+      integrations: 'Intégrations',
+      live: 'État en Direct',
+    },
+    general: {
+      sectionTitle: 'Informations Générales',
+      systemName: 'Nom du Système',
+      systemUrl: 'URL du Système',
+      contactEmail: 'Email de Contact',
+      defaultLanguage: 'Langue par Défaut',
+      description: 'Description du Système',
+      saveChanges: 'Enregistrer les Modifications',
+      saving: 'Enregistrement...',
+      savedAt: 'Enregistré à',
+      saveFailed: 'Échec de l\'enregistrement',
+      connectionError: 'Erreur de connexion au serveur',
+    },
+    plans: {
+      sectionTitle: 'Configuration des Forfaits & Quotas',
+      anonQuota: 'Quota Utilisateur Anonyme',
+      unlimited: 'Illimité',
+      messagesPerSession: 'messages/session',
+      anonQuotaDesc: 'Les utilisateurs non authentifiés auront cette limite. Définissez "Illimité" pour supprimer la limite.',
+      fileUploadLimits: 'Limites de Téléversement',
+      filePerSession: 'Fichiers/session:',
+      totalFiles: 'Total fichiers:',
+      fileSize: 'Taille fichier:',
+      maxPerSession: 'Fichiers maximum par conversation',
+      maxTotalFiles: 'Fichiers totaux maximum pour toutes les sessions',
+      maxFileSize: 'Taille maximum par fichier',
+      supportedFormats: 'Formats supportés:',
+      planQuotas: 'Quota par Forfait de Service',
+      pricePerMonth: 'Prix (VND/mois)',
+      quotaPerMonth: 'Quota/mois',
+      current: 'ACTUEL',
+      saveConfig: 'Enregistrer la Configuration',
+    },
+    security: {
+      sectionTitle: 'Sécurité',
+      require2FA: 'Exiger 2FA pour Admin',
+      require2FADesc: 'Tous les comptes admin doivent activer l\'authentification à deux facteurs.',
+      allowGoogle: 'Autoriser Connexion Google',
+      allowGoogleDesc: 'Les utilisateurs peuvent se connecter avec un compte Google.',
+      ipWhitelist: 'Liste Blanche IP',
+      ipWhitelistDesc: 'Autoriser uniquement la connexion admin depuis des IPs approuvées.',
+      auditLog: 'Journal d\'Audit Détaillé',
+      auditLogDesc: 'Enregistrer toutes les actions admin dans la table admin_audit_log.',
+      autoLock: 'Verrouillage auto après 5 échecs',
+      autoLockDesc: 'Verrouiller le compte après 5 tentatives de connexion échouées.',
+      jwtSecret: 'JWT Secret (affiché une fois)',
+      saveConfig: 'Enregistrer la Configuration',
+    },
+    ai: {
+      sectionTitle: 'Configuration des Modèles IA',
+      madaLLM: 'MADA-LLM',
+      madaLLMDesc: 'Modèle de langage principal pour l\'assistant virtuel.',
+      madaVision: 'MADA-Vision',
+      madaVisionDesc: 'Reconnaissance d\'images d\'appareils d\'assistance.',
+      madaVoice: 'MADA-Voice',
+      madaVoiceDesc: 'TTS/STT multilingue (Vi, En, Fr, Ar).',
+      update: 'Mettre à jour',
+      temperature: 'Température (0–1)',
+      maxTokens: 'Tokens max',
+      saveConfig: 'Enregistrer la Configuration',
+    },
+    integrations: {
+      sectionTitle: 'Intégrations Tierces',
+      openai: 'OpenAI API',
+      openaiDesc: 'GPT-4 pour repli RAG',
+      googleCloud: 'Google Cloud',
+      googleCloudDesc: 'Stockage & Traduction',
+      stripe: 'Stripe',
+      stripeDesc: 'Paiements Pro/Entreprise',
+      sendgrid: 'SendGrid',
+      sendgridDesc: 'Notifications email',
+      sentry: 'Sentry',
+      sentryDesc: 'Suivi des erreurs',
+      connected: 'Connecté',
+      disconnect: 'Déconnecter',
+      connect: 'Connecter',
+    },
+    live: {
+      sectionTitle: 'État du Système (temps réel)',
+      sectionDesc: 'Données lues directement depuis le backend MADA AI.',
+      users: 'Utilisateurs',
+      total: 'Total',
+      active: 'Actif',
+      suspended: 'Suspendu',
+      pending: 'En attente',
+      knowledgeBase: 'Base de Connaissances',
+      totalDocs: 'Documents Totaux',
+      categories: 'Catégories',
+      storageSize: 'Taille Stockage',
+      endpoints: 'Points de Terminaison',
+      loading: 'Chargement...',
+    },
+    languages: ['Tiếng Việt', 'English', 'Français', 'العربية'],
+  },
+};
 
 export function AdminSettings() {
   const [tab, setTab] = useState<Tab>('general');
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [userStats, setUserStats] = useState<UserStats | null>(null);
   const [kbStats, setKbStats] = useState<KnowledgeStats | null>(null);
-  
-  const { 
-    anonymousLimit, 
-    defaultPlanLimit, 
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const language = useLanguageStore((s) => s.language) as Language;
+  const lang = t[language] || t.vi;
+
+  const {
+    anonymousLimit,
+    defaultPlanLimit,
     maxFilesPerSession,
     maxFilesTotal,
     maxFileSizeMB,
-    setAnonymousLimit, 
+    setAnonymousLimit,
     setDefaultPlanLimit,
     setMaxFilesPerSession,
     setMaxFilesTotal,
     setMaxFileSizeMB,
+    loadFromBackend,
+    setAllSettings,
   } = useSystemSettingsStore();
+
+  // Load settings from backend on mount
+  useEffect(() => {
+    loadFromBackend();
+  }, []);
 
   useEffect(() => {
     if (tab === 'live') {
@@ -34,15 +474,38 @@ export function AdminSettings() {
     }
   }, [tab]);
 
-  const save = () => {
-    setSavedAt(new Date().toLocaleTimeString('vi-VN'));
-    setTimeout(() => setSavedAt(null), 3000);
+  const save = async () => {
+    setIsSaving(true);
+    setSaveError(null);
+
+    try {
+      const res = await systemApi.updateSettings({
+        anonymousLimit,
+        defaultPlanLimit,
+        maxFilesPerSession,
+        maxFilesTotal,
+        maxFileSizeMB,
+      });
+
+      if (res.success) {
+        setAllSettings(res.data);
+        setSavedAt(new Date().toLocaleTimeString());
+        setTimeout(() => setSavedAt(null), 3000);
+      } else {
+        setSaveError(lang.general.saveFailed);
+      }
+    } catch (e) {
+      console.error('Save error:', e);
+      setSaveError(lang.general.connectionError);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
     <AdminLayout
-      title="Cấu hình Hệ thống"
-      subtitle="Điều chỉnh các tham số cốt lõi của MADA AI: gói giá, bảo mật, mô hình AI và tích hợp bên thứ ba."
+      title={lang.title}
+      subtitle={lang.subtitle}
       showLayoutTitle={false}
     >
       {/* Hero Banner Section */}
@@ -52,10 +515,10 @@ export function AdminSettings() {
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-primary/10 via-transparent to-transparent rounded-3xl"></div>
           <div className="max-w-2xl relative z-10 py-8 px-6">
             <h2 className="text-4xl font-black text-on-surface mb-4 tracking-tight">
-              Cấu hình Hệ thống
+              {lang.title}
             </h2>
             <p className="text-lg font-medium text-on-surface-variant border-l-4 border-primary pl-6 py-2 bg-white/40 backdrop-blur-sm rounded-r-xl">
-              Điều chỉnh các tham số cốt lõi của MADA AI: gói giá, bảo mật, mô hình AI và tích hợp bên thứ ba.
+              {lang.subtitle}
             </p>
           </div>
         </div>
@@ -65,12 +528,12 @@ export function AdminSettings() {
       <div className="flex items-center gap-3 p-1.5 bg-white/60 backdrop-blur-xl rounded-full border-2 border-black mb-12 w-fit">
         {(
           [
-            { id: 'general', label: 'Chung', icon: 'tune' },
-            { id: 'plans', label: 'Gói & Quota', icon: 'workspace_premium' },
-            { id: 'security', label: 'Bảo mật', icon: 'shield' },
-            { id: 'ai', label: 'AI Models', icon: 'psychology' },
-            { id: 'integrations', label: 'Tích hợp', icon: 'extension' },
-            { id: 'live', label: 'Trạng thái thật', icon: 'monitor_heart' },
+            { id: 'general', label: lang.tabs.general, icon: 'tune' },
+            { id: 'plans', label: lang.tabs.plans, icon: 'workspace_premium' },
+            { id: 'security', label: lang.tabs.security, icon: 'shield' },
+            { id: 'ai', label: lang.tabs.ai, icon: 'psychology' },
+            { id: 'integrations', label: lang.tabs.integrations, icon: 'extension' },
+            { id: 'live', label: lang.tabs.live, icon: 'monitor_heart' },
           ] as { id: Tab; label: string; icon: string }[]
         ).map((t) => (
           <button
@@ -94,25 +557,25 @@ export function AdminSettings() {
         <div className="relative bg-gradient-to-br from-white/80 to-white/40 backdrop-blur-xl rounded-3xl border-3 border-black p-8 md:p-12 shadow-[12px_12px_0px_0px_#000]">
           <div className="absolute inset-0 bg-gradient-to-b from-white/40 to-transparent rounded-3xl"></div>
           <div className="relative z-10 space-y-6">
-            <h3 className="text-xl font-black text-on-surface mb-6">Thông tin chung</h3>
+            <h3 className="text-xl font-black text-on-surface mb-6">{lang.general.sectionTitle}</h3>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Tên hệ thống</label>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">{lang.general.systemName}</label>
                 <input
                   defaultValue="MADA AI"
                   className="w-full px-4 py-3 rounded-xl bg-white/60 border-2 border-black text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">URL hệ thống</label>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">{lang.general.systemUrl}</label>
                 <input
                   defaultValue="https://mada.ai"
                   className="w-full px-4 py-3 rounded-xl bg-white/60 border-2 border-black text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary/30"
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Email liên hệ</label>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">{lang.general.contactEmail}</label>
                 <input
                   type="email"
                   defaultValue="contact@mada.vn"
@@ -120,18 +583,18 @@ export function AdminSettings() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Ngôn ngữ mặc định</label>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">{lang.general.defaultLanguage}</label>
                 <select className="w-full px-4 py-3 rounded-xl bg-white/60 border-2 border-black text-sm focus:outline-none focus:ring-2 focus:ring-primary/30">
-                  <option>Tiếng Việt</option>
-                  <option>English</option>
-                  <option>Français</option>
-                  <option>العربية</option>
+                  <option>{lang.languages[0]}</option>
+                  <option>{lang.languages[1]}</option>
+                  <option>{lang.languages[2]}</option>
+                  <option>{lang.languages[3]}</option>
                 </select>
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Mô tả hệ thống</label>
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">{lang.general.description}</label>
               <textarea
                 rows={3}
                 defaultValue="MADA AI - Trợ lý ảo thông minh hỗ trợ người khuyết tật tiếp cận công nghệ."
@@ -142,13 +605,28 @@ export function AdminSettings() {
             <div className="flex items-center gap-3 pt-4">
               <button
                 onClick={save}
-                className="px-6 py-3 rounded-xl bg-primary text-white font-bold text-sm border-2 border-black shadow-[4px_4px_0px_0px_#000] hover:-translate-x-1 hover:-translate-y-1 hover:shadow-[5px_5px_0px_0px_#000] transition-all"
+                disabled={isSaving}
+                className="px-6 py-3 rounded-xl bg-primary text-white font-bold text-sm border-2 border-black shadow-[4px_4px_0px_0px_#000] hover:-translate-x-1 hover:-translate-y-1 hover:shadow-[5px_5px_0px_0px_#000] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
-                Lưu thay đổi
+                {isSaving ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    {lang.general.saving}
+                  </>
+                ) : (
+                  lang.general.saveChanges
+                )}
               </button>
               {savedAt && (
-                <span className="font-bold text-secondary animate-pulse">
-                  ✓ Đã lưu lúc {savedAt}
+                <span className="font-bold text-secondary flex items-center gap-1 animate-pulse">
+                  <CheckCircle className="w-4 h-4" />
+                  {lang.general.savedAt} {savedAt}
+                </span>
+              )}
+              {saveError && (
+                <span className="font-bold text-error flex items-center gap-1">
+                  <AlertCircle className="w-4 h-4" />
+                  {saveError}
                 </span>
               )}
             </div>
@@ -161,11 +639,11 @@ export function AdminSettings() {
         <div className="relative bg-gradient-to-br from-white/80 to-white/40 backdrop-blur-xl rounded-3xl border-3 border-black p-8 md:p-12 shadow-[12px_12px_0px_0px_#000]">
           <div className="absolute inset-0 bg-gradient-to-b from-white/40 to-transparent rounded-3xl"></div>
           <div className="relative z-10 space-y-8">
-            <h3 className="text-xl font-black text-on-surface mb-6">Cấu hình Gói & Quota</h3>
+            <h3 className="text-xl font-black text-on-surface mb-6">{lang.plans.sectionTitle}</h3>
 
             {/* Anonymous User Quota */}
             <div className="p-6 rounded-2xl bg-white/60 border-2 border-black shadow-[4px_4px_0px_0px_#000]">
-              <h4 className="font-bold text-on-surface mb-4">Quota cho người dùng ẩn danh</h4>
+              <h4 className="font-bold text-on-surface mb-4">{lang.plans.anonQuota}</h4>
               <div className="flex items-center gap-4 flex-wrap">
                 <div className="flex items-center gap-2">
                   <input
@@ -176,7 +654,7 @@ export function AdminSettings() {
                     className="w-5 h-5 rounded accent-primary"
                   />
                   <label htmlFor="anonUnlimited" className="font-medium text-on-surface">
-                    Không giới hạn
+                    {lang.plans.unlimited}
                   </label>
                 </div>
                 {!anonymousLimit || anonymousLimit !== -1 ? (
@@ -188,22 +666,22 @@ export function AdminSettings() {
                       onChange={(e) => setAnonymousLimit(parseInt(e.target.value) || 10)}
                       className="w-24 px-4 py-2 rounded-xl bg-white border-2 border-black text-sm font-mono text-center"
                     />
-                    <span className="text-sm text-on-surface-variant">tin nhắn/phiên</span>
+                    <span className="text-sm text-on-surface-variant">{lang.plans.messagesPerSession}</span>
                   </div>
                 ) : null}
               </div>
               <p className="text-xs text-on-surface-variant mt-2">
-                Người dùng chưa đăng nhập sẽ có giới hạn này. Đặt "Không giới hạn" để bỏ giới hạn.
+                {lang.plans.anonQuotaDesc}
               </p>
             </div>
 
             {/* File Upload Limits */}
             <div className="p-6 rounded-2xl bg-white/60 border-2 border-black shadow-[4px_4px_0px_0px_#000]">
-              <h4 className="font-bold text-on-surface mb-4">Giới hạn Upload File</h4>
+              <h4 className="font-bold text-on-surface mb-4">{lang.plans.fileUploadLimits}</h4>
               <div className="space-y-4">
                 <div className="flex items-center gap-4">
                   <div className="flex items-center gap-2 flex-1">
-                    <label className="font-medium text-on-surface whitespace-nowrap">File/phiên chat:</label>
+                    <label className="font-medium text-on-surface whitespace-nowrap">{lang.plans.filePerSession}</label>
                     <input
                       type="number"
                       min="1"
@@ -214,13 +692,13 @@ export function AdminSettings() {
                     />
                   </div>
                   <p className="text-xs text-on-surface-variant flex-shrink-0">
-                    Tối đa file cho mỗi cuộc trò chuyện
+                    {lang.plans.maxPerSession}
                   </p>
                 </div>
                 
                 <div className="flex items-center gap-4">
                   <div className="flex items-center gap-2 flex-1">
-                    <label className="font-medium text-on-surface whitespace-nowrap">Tổng file:</label>
+                    <label className="font-medium text-on-surface whitespace-nowrap">{lang.plans.totalFiles}</label>
                     <input
                       type="number"
                       min="10"
@@ -231,13 +709,13 @@ export function AdminSettings() {
                     />
                   </div>
                   <p className="text-xs text-on-surface-variant flex-shrink-0">
-                    Tổng số file tối đa cho tất cả phiên
+                    {lang.plans.maxTotalFiles}
                   </p>
                 </div>
                 
                 <div className="flex items-center gap-4">
                   <div className="flex items-center gap-2 flex-1">
-                    <label className="font-medium text-on-surface whitespace-nowrap">Dung lượng/file:</label>
+                    <label className="font-medium text-on-surface whitespace-nowrap">{lang.plans.fileSize}</label>
                     <input
                       type="number"
                       min="1"
@@ -249,13 +727,13 @@ export function AdminSettings() {
                     <span className="font-medium text-on-surface-variant">MB</span>
                   </div>
                   <p className="text-xs text-on-surface-variant flex-shrink-0">
-                    Kích thước tối đa cho mỗi file
+                    {lang.plans.maxFileSize}
                   </p>
                 </div>
               </div>
               
               <div className="mt-4 pt-4 border-t-2 border-black/10">
-                <p className="text-sm text-on-surface-variant mb-2">Định dạng hỗ trợ:</p>
+                <p className="text-sm text-on-surface-variant mb-2">{lang.plans.supportedFormats}</p>
                 <div className="flex flex-wrap gap-2">
                   {['PDF', 'DOCX', 'TXT', 'PNG', 'JPEG', 'JPG', 'PPTX'].map((fmt) => (
                     <span
@@ -271,7 +749,7 @@ export function AdminSettings() {
 
             {/* Plan Quotas */}
             <div className="space-y-4">
-              <h4 className="font-bold text-on-surface">Quota theo Gói dịch vụ</h4>
+              <h4 className="font-bold text-on-surface">{lang.plans.planQuotas}</h4>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {[
                   { name: 'Free', color: 'gray', price: '0', current: false, planKey: 'free' },
@@ -288,20 +766,20 @@ export function AdminSettings() {
                       <span className="text-xl font-black">{p.name}</span>
                       {p.current && (
                         <span className="px-2.5 py-1 rounded-full bg-primary text-white text-xs font-bold border-2 border-black">
-                          HIỆN TẠI
+                          {lang.plans.current}
                         </span>
                       )}
                     </div>
                     <div className="space-y-3">
                       <div>
-                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Giá (VND/tháng)</label>
+                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">{lang.plans.pricePerMonth}</label>
                         <input
                           defaultValue={p.price}
                           className="w-full px-3 py-2 rounded-xl bg-white border-2 border-black text-sm font-mono"
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Quota/tháng</label>
+                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">{lang.plans.quotaPerMonth}</label>
                         <div className="flex items-center gap-2">
                           <input
                             type="checkbox"
@@ -309,7 +787,7 @@ export function AdminSettings() {
                             onChange={(e) => setDefaultPlanLimit(e.target.checked ? -1 : 50)}
                             className="w-4 h-4 rounded accent-primary"
                           />
-                          <span className="text-xs text-on-surface-variant">Không giới hạn</span>
+                          <span className="text-xs text-on-surface-variant">{lang.plans.unlimited}</span>
                         </div>
                       </div>
                     </div>
@@ -320,10 +798,30 @@ export function AdminSettings() {
 
             <button
               onClick={save}
-              className="px-6 py-3 rounded-xl bg-primary text-white font-bold text-sm border-2 border-black shadow-[4px_4px_0px_0px_#000] hover:-translate-x-1 hover:-translate-y-1 hover:shadow-[5px_5px_0px_0px_#000] transition-all"
+              disabled={isSaving}
+              className="px-6 py-3 rounded-xl bg-primary text-white font-bold text-sm border-2 border-black shadow-[4px_4px_0px_0px_#000] hover:-translate-x-1 hover:-translate-y-1 hover:shadow-[5px_5px_0px_0px_#000] transition-all disabled:opacity-50 flex items-center gap-2"
             >
-              Lưu cấu hình
+              {isSaving ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  {lang.general.saving}
+                </>
+              ) : (
+                lang.plans.saveConfig
+              )}
             </button>
+            {savedAt && (
+              <span className="font-bold text-secondary flex items-center gap-1 animate-pulse">
+                <CheckCircle className="w-4 h-4" />
+                {lang.general.savedAt} {savedAt}
+              </span>
+            )}
+            {saveError && (
+              <span className="font-bold text-error flex items-center gap-1">
+                <AlertCircle className="w-4 h-4" />
+                {saveError}
+              </span>
+            )}
           </div>
         </div>
       )}
@@ -333,32 +831,32 @@ export function AdminSettings() {
         <div className="relative bg-gradient-to-br from-white/80 to-white/40 backdrop-blur-xl rounded-3xl border-3 border-black p-8 md:p-12 shadow-[12px_12px_0px_0px_#000]">
           <div className="absolute inset-0 bg-gradient-to-b from-white/40 to-transparent rounded-3xl"></div>
           <div className="relative z-10 space-y-6">
-            <h3 className="text-xl font-black text-on-surface mb-6">Bảo mật</h3>
+            <h3 className="text-xl font-black text-on-surface mb-6">{lang.security.sectionTitle}</h3>
 
             {([
               {
-                label: 'Bắt buộc 2FA cho Admin',
-                desc: 'Tất cả tài khoản admin phải bật xác thực 2 yếu tố.',
+                label: lang.security.require2FA,
+                desc: lang.security.require2FADesc,
                 value: true,
               },
               {
-                label: 'Cho phép đăng nhập Google',
-                desc: 'Người dùng có thể đăng nhập bằng tài khoản Google.',
+                label: lang.security.allowGoogle,
+                desc: lang.security.allowGoogleDesc,
                 value: true,
               },
               {
-                label: 'Giới hạn IP Whitelist',
-                desc: 'Chỉ cho phép admin đăng nhập từ IP được phê duyệt.',
+                label: lang.security.ipWhitelist,
+                desc: lang.security.ipWhitelistDesc,
                 value: false,
               },
               {
-                label: 'Audit log chi tiết',
-                desc: 'Ghi lại mọi hành động admin vào bảng admin_audit_log.',
+                label: lang.security.auditLog,
+                desc: lang.security.auditLogDesc,
                 value: true,
               },
               {
-                label: 'Tự động khóa sau 5 lần sai',
-                desc: 'Khóa tài khoản sau 5 lần đăng nhập thất bại.',
+                label: lang.security.autoLock,
+                desc: lang.security.autoLockDesc,
                 value: true,
               },
             ] as { label: string; desc: string; value: boolean }[]
@@ -368,7 +866,7 @@ export function AdminSettings() {
 
             <div>
               <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
-                JWT Secret (chỉ hiển thị một lần)
+                {lang.security.jwtSecret}
               </label>
               <div className="flex gap-2">
                 <input
@@ -384,10 +882,30 @@ export function AdminSettings() {
 
             <button
               onClick={save}
-              className="px-6 py-3 rounded-xl bg-primary text-white font-bold text-sm border-2 border-black shadow-[4px_4px_0px_0px_#000] hover:-translate-x-1 hover:-translate-y-1 hover:shadow-[5px_5px_0px_0px_#000] transition-all"
+              disabled={isSaving}
+              className="px-6 py-3 rounded-xl bg-primary text-white font-bold text-sm border-2 border-black shadow-[4px_4px_0px_0px_#000] hover:-translate-x-1 hover:-translate-y-1 hover:shadow-[5px_5px_0px_0px_#000] transition-all disabled:opacity-50 flex items-center gap-2"
             >
-              Lưu cấu hình
+              {isSaving ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  {lang.general.saving}
+                </>
+              ) : (
+                lang.security.saveConfig
+              )}
             </button>
+            {savedAt && (
+              <span className="font-bold text-secondary flex items-center gap-1 animate-pulse">
+                <CheckCircle className="w-4 h-4" />
+                {lang.general.savedAt} {savedAt}
+              </span>
+            )}
+            {saveError && (
+              <span className="font-bold text-error flex items-center gap-1">
+                <AlertCircle className="w-4 h-4" />
+                {saveError}
+              </span>
+            )}
           </div>
         </div>
       )}
@@ -397,28 +915,28 @@ export function AdminSettings() {
         <div className="relative bg-gradient-to-br from-white/80 to-white/40 backdrop-blur-xl rounded-3xl border-3 border-black p-8 md:p-12 shadow-[12px_12px_0px_0px_#000]">
           <div className="absolute inset-0 bg-gradient-to-b from-white/40 to-transparent rounded-3xl"></div>
           <div className="relative z-10 space-y-6">
-            <h3 className="text-xl font-black text-on-surface mb-6">Cấu hình AI Models</h3>
+            <h3 className="text-xl font-black text-on-surface mb-6">{lang.ai.sectionTitle}</h3>
 
             {([
               {
-                name: 'MADA-LLM',
+                name: lang.ai.madaLLM,
                 version: 'v4.2.1',
                 status: 'active',
-                desc: 'Mô hình ngôn ngữ chính cho trợ lý ảo.',
+                desc: lang.ai.madaLLMDesc,
                 color: 'primary',
               },
               {
-                name: 'MADA-Vision',
+                name: lang.ai.madaVision,
                 version: 'v2.0',
                 status: 'active',
-                desc: 'Nhận diện hình ảnh thiết bị hỗ trợ.',
+                desc: lang.ai.madaVisionDesc,
                 color: 'tertiary',
               },
               {
-                name: 'MADA-Voice',
+                name: lang.ai.madaVoice,
                 version: 'v1.5',
                 status: 'beta',
-                desc: 'TTS/STT đa ngôn ngữ (Vi, En, Fr, Ar).',
+                desc: lang.ai.madaVoiceDesc,
                 color: 'secondary',
               },
             ] as { name: string; version: string; status: string; desc: string; color: string }[]
@@ -447,14 +965,14 @@ export function AdminSettings() {
                   <p className="text-sm text-on-surface-variant">{m.desc}</p>
                 </div>
                 <button className="px-4 py-2 rounded-xl bg-primary text-white text-sm font-bold border-2 border-black shadow-[2px_2px_0px_0px_#000] hover:-translate-y-1 hover:shadow-[3px_3px_0px_0px_#000] transition-all">
-                  Cập nhật
+                  {lang.ai.update}
                 </button>
               </div>
             ))}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Temperature (0–1)</label>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">{lang.ai.temperature}</label>
                 <input
                   type="range"
                   min="0"
@@ -465,7 +983,7 @@ export function AdminSettings() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Max tokens</label>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">{lang.ai.maxTokens}</label>
                 <input
                   type="number"
                   defaultValue="2048"
@@ -478,7 +996,7 @@ export function AdminSettings() {
               onClick={save}
               className="px-6 py-3 rounded-xl bg-primary text-white font-bold text-sm border-2 border-black shadow-[4px_4px_0px_0px_#000] hover:-translate-x-1 hover:-translate-y-1 hover:shadow-[5px_5px_0px_0px_#000] transition-all"
             >
-              Lưu cấu hình
+              {lang.ai.saveConfig}
             </button>
           </div>
         </div>
@@ -489,14 +1007,14 @@ export function AdminSettings() {
         <div className="relative bg-gradient-to-br from-white/80 to-white/40 backdrop-blur-xl rounded-3xl border-3 border-black p-8 md:p-12 shadow-[12px_12px_0px_0px_#000]">
           <div className="absolute inset-0 bg-gradient-to-b from-white/40 to-transparent rounded-3xl"></div>
           <div className="relative z-10 space-y-4">
-            <h3 className="text-xl font-black text-on-surface mb-6">Tích hợp bên thứ ba</h3>
+            <h3 className="text-xl font-black text-on-surface mb-6">{lang.integrations.sectionTitle}</h3>
 
             {([
-              { name: 'OpenAI API', desc: 'GPT-4 cho RAG fallback', icon: 'auto_awesome', connected: true, color: 'primary' },
-              { name: 'Google Cloud', desc: 'Storage & Translation', icon: 'cloud', connected: true, color: 'tertiary' },
-              { name: 'Stripe', desc: 'Thanh toán Pro/Enterprise', icon: 'credit_card', connected: false, color: 'secondary' },
-              { name: 'SendGrid', desc: 'Email thông báo', icon: 'mail', connected: true, color: 'error' },
-              { name: 'Sentry', desc: 'Error tracking', icon: 'bug_report', connected: true, color: 'primary' },
+              { name: lang.integrations.openai, desc: lang.integrations.openaiDesc, icon: 'auto_awesome', connected: true, color: 'primary' },
+              { name: lang.integrations.googleCloud, desc: lang.integrations.googleCloudDesc, icon: 'cloud', connected: true, color: 'tertiary' },
+              { name: lang.integrations.stripe, desc: lang.integrations.stripeDesc, icon: 'credit_card', connected: false, color: 'secondary' },
+              { name: lang.integrations.sendgrid, desc: lang.integrations.sendgridDesc, icon: 'mail', connected: true, color: 'error' },
+              { name: lang.integrations.sentry, desc: lang.integrations.sentryDesc, icon: 'bug_report', connected: true, color: 'primary' },
             ] as { name: string; desc: string; icon: string; connected: boolean; color: string }[]
             ).map((s) => (
               <div
@@ -516,7 +1034,7 @@ export function AdminSettings() {
                     {s.connected && (
                       <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-xs font-bold border border-green-300">
                         <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
-                        Connected
+                        {lang.integrations.connected}
                       </span>
                     )}
                   </div>
@@ -530,7 +1048,7 @@ export function AdminSettings() {
                       : 'bg-primary text-white hover:-translate-y-1 hover:shadow-[3px_3px_0px_0px_#000]'
                   )}
                 >
-                  {s.connected ? 'Ngắt' : 'Kết nối'}
+                  {s.connected ? lang.integrations.disconnect : lang.integrations.connect}
                 </button>
               </div>
             ))}
@@ -544,9 +1062,9 @@ export function AdminSettings() {
           <div className="absolute inset-0 bg-gradient-to-b from-white/40 to-transparent rounded-3xl"></div>
           <div className="relative z-10 space-y-6">
             <div>
-              <h3 className="text-xl font-black text-on-surface">Trạng thái hệ thống (real-time)</h3>
+              <h3 className="text-xl font-black text-on-surface">{lang.live.sectionTitle}</h3>
               <p className="text-sm text-on-surface-variant mt-1">
-                Dữ liệu đọc trực tiếp từ backend MADA AI.
+                {lang.live.sectionDesc}
               </p>
             </div>
 
@@ -554,56 +1072,56 @@ export function AdminSettings() {
               <div className="p-6 rounded-2xl bg-primary/10 border-2 border-primary/30 shadow-[4px_4px_0px_0px_#000]">
                 <div className="flex items-center gap-2 mb-4">
                   <span className="material-symbols-outlined text-primary text-xl">group</span>
-                  <h4 className="font-bold text-on-surface">Người dùng</h4>
+                  <h4 className="font-bold text-on-surface">{lang.live.users}</h4>
                 </div>
                 {userStats ? (
                   <div className="grid grid-cols-2 gap-3">
                     <div className="p-3 rounded-xl bg-white/60 border border-black/10">
-                      <p className="text-xs text-on-surface-variant">Tổng</p>
+                      <p className="text-xs text-on-surface-variant">{lang.live.total}</p>
                       <p className="text-xl font-black">{userStats.total}</p>
                     </div>
                     <div className="p-3 rounded-xl bg-white/60 border border-black/10">
-                      <p className="text-xs text-on-surface-variant">Active</p>
+                      <p className="text-xs text-on-surface-variant">{lang.live.active}</p>
                       <p className="text-xl font-black text-secondary">{userStats.active}</p>
                     </div>
                     <div className="p-3 rounded-xl bg-white/60 border border-black/10">
-                      <p className="text-xs text-on-surface-variant">Suspended</p>
+                      <p className="text-xs text-on-surface-variant">{lang.live.suspended}</p>
                       <p className="text-xl font-black text-error">{userStats.suspended}</p>
                     </div>
                     <div className="p-3 rounded-xl bg-white/60 border border-black/10">
-                      <p className="text-xs text-on-surface-variant">Pending</p>
+                      <p className="text-xs text-on-surface-variant">{lang.live.pending}</p>
                       <p className="text-xl font-black text-tertiary">{userStats.pending}</p>
                     </div>
                   </div>
                 ) : (
-                  <p className="text-on-surface-variant py-4 text-center">Đang tải...</p>
+                  <p className="text-on-surface-variant py-4 text-center">{lang.live.loading}</p>
                 )}
               </div>
 
               <div className="p-6 rounded-2xl bg-secondary/10 border-2 border-secondary/30 shadow-[4px_4px_0px_0px_#000]">
                 <div className="flex items-center gap-2 mb-4">
                   <span className="material-symbols-outlined text-secondary text-xl">storage</span>
-                  <h4 className="font-bold text-on-surface">Knowledge Base</h4>
+                  <h4 className="font-bold text-on-surface">{lang.live.knowledgeBase}</h4>
                 </div>
                 {kbStats ? (
                   <div className="space-y-3">
                     <div className="flex justify-between p-3 rounded-xl bg-white/60 border border-black/10">
-                      <span className="text-sm text-on-surface-variant">Tổng tài liệu</span>
+                      <span className="text-sm text-on-surface-variant">{lang.live.totalDocs}</span>
                       <span className="text-lg font-black text-primary">{kbStats.totalDocuments}</span>
                     </div>
                     <div className="flex justify-between p-3 rounded-xl bg-white/60 border border-black/10">
-                      <span className="text-sm text-on-surface-variant">Danh mục</span>
+                      <span className="text-sm text-on-surface-variant">{lang.live.categories}</span>
                       <span className="text-lg font-black text-secondary">{kbStats.totalCategories}</span>
                     </div>
                     {kbStats.totalSize !== undefined && (
                       <div className="flex justify-between p-3 rounded-xl bg-white/60 border border-black/10">
-                        <span className="text-sm text-on-surface-variant">Dung lượng</span>
+                        <span className="text-sm text-on-surface-variant">{lang.live.storageSize}</span>
                         <span className="text-lg font-black text-tertiary">{(kbStats.totalSize / 1024).toFixed(2)} KB</span>
                       </div>
                     )}
                   </div>
                 ) : (
-                  <p className="text-on-surface-variant py-4 text-center">Đang tải...</p>
+                  <p className="text-on-surface-variant py-4 text-center">{lang.live.loading}</p>
                 )}
               </div>
             </div>
@@ -611,7 +1129,7 @@ export function AdminSettings() {
             <div className="p-6 rounded-2xl bg-tertiary/10 border-2 border-tertiary/30 shadow-[4px_4px_0px_0px_#000]">
               <div className="flex items-center gap-2 mb-4">
                 <span className="material-symbols-outlined text-tertiary text-xl">api</span>
-                <h4 className="font-bold text-on-surface">Endpoints</h4>
+                <h4 className="font-bold text-on-surface">{lang.live.endpoints}</h4>
               </div>
               <div className="font-mono text-sm space-y-1 text-on-surface-variant p-4 bg-white/60 rounded-xl border border-black/10">
                 <p>• GET /api/health</p>
@@ -646,7 +1164,7 @@ function ToggleRow({ label, desc, value }: { label: string; desc: string; value:
         <span
           className={clsx(
             'absolute top-1 w-5 h-5 rounded-full bg-white shadow-md transition-transform border border-black/20',
-            enabled ? 'translate-x-6' : 'translate-x-1'
+            enabled ? 'translate-x-7' : 'translate-x-1'
           )}
         />
       </button>

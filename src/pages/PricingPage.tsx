@@ -3,8 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { Check, Sparkles, Building2, Loader2, Crown, ArrowRight, Zap } from 'lucide-react';
 import { Header } from '@/components/Header';
 import { Footer } from '@/components/Footer';
-import { AuthModal } from '@/components/auth/AuthModal';
-import { PaywallModal } from '@/components/auth/PaywallModal';
 import { useAuthStore, useAuthModalStore, usePaywallModalStore } from '@/stores';
 import type { UserPlan } from '@/types';
 
@@ -318,9 +316,6 @@ export function PricingPage() {
       </section>
 
       <Footer />
-
-      <AuthModal />
-      <PaywallModal />
     </div>
   );
 }

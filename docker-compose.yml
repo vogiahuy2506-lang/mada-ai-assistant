@@ -70,7 +70,7 @@ services:
   # ============== Attractiveness Service (Milvus UI) ==============
   attractiveness:
     container_name: mada-attractiveness
-    image: milvusdb/attu:v2.3
+    image: zilliz/attu:v2.3
     environment:
       - MILVUS_URL=milvus:19530
     depends_on:
@@ -90,10 +90,10 @@ services:
     container_name: mada-ai-app
     restart: unless-stopped
     ports:
-      - "3001:3001"
+      - "3000:3000"
     environment:
       - NODE_ENV=production
-      - PORT=3001
+      - PORT=3000
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - VECTOR_DB_PROVIDER=${VECTOR_DB_PROVIDER:-none}
       - MILVUS_HOST=milvus
@@ -103,7 +103,7 @@ services:
     networks:
       - mada-network
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/api/health"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3

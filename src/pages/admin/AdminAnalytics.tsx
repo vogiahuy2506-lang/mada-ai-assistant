@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { AdminLayout } from './AdminLayout';
 import { adminApi, UserStats, KnowledgeStats } from './adminApi';
 import clsx from 'clsx';
@@ -9,6 +9,18 @@ interface ApiAnalytics {
   kb: KnowledgeStats;
   logs: { total: number; byLevel: Record<string, number> };
   server: { uptime: number; memory: any; nodeVersion: string; platform: string };
+}
+
+// Extended analytics for advanced dashboard
+interface ChatMetrics {
+  totalChats: number;
+  avgResponseTime: number;
+  avgConfidence: number;
+  topQueries: Array<{ query: string; count: number }>;
+  chatsByHour: Array<{ hour: number; count: number }>;
+  categoryUsage: Array<{ category: string; count: number }>;
+  languageDistribution: Array<{ language: string; count: number; color?: string }>;
+  errorRate: number;
 }
 
 function bytesToMB(b: number) {
@@ -22,26 +34,86 @@ function formatUptime(seconds: number) {
   return `${h}h ${m}m ${s}s`;
 }
 
+// Simple bar chart component
+function BarChart({ data, maxValue }: { data: Array<{ label: string; value: number }>; maxValue: number }) {
+  return (
+    <div className="flex items-end gap-1 h-32">
+      {data.map((item, i) => (
+        <div key={i} className="flex-1 flex flex-col items-center">
+          <div
+            className="w-full bg-gradient-to-t from-primary to-secondary rounded-t-sm transition-all hover:opacity-80"
+            style={{ height: `${(item.value / maxValue) * 100}%`, minHeight: item.value > 0 ? '4px' : '0' }}
+            title={`${item.label}: ${item.value}`}
+          />
+          <span className="text-[8px] text-gray-500 mt-1 truncate w-full text-center">{item.label}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Pie chart component
+function PieChart({ data }: { data: Array<{ label: string; value: number; color: string }> }) {
+  const total = data.reduce((sum, item) => sum + item.value, 0);
+  let currentAngle = 0;
+
+  return (
+    <div className="flex items-center gap-4">
+      <div className="relative w-24 h-24">
+        <svg viewBox="0 0 100 100" className="transform -rotate-90">
+          {data.map((item, i) => {
+            const angle = (item.value / total) * 360;
+            const startAngle = currentAngle;
+            currentAngle += angle;
+            const largeArc = angle > 180 ? 1 : 0;
+            const x1 = 50 + 45 * Math.cos((startAngle * Math.PI) / 180);
+            const y1 = 50 + 45 * Math.sin((startAngle * Math.PI) / 180);
+            const x2 = 50 + 45 * Math.cos((currentAngle * Math.PI) / 180);
+            const y2 = 50 + 45 * Math.sin((currentAngle * Math.PI) / 180);
+            const path = `M 50 50 L ${x1} ${y1} A 45 45 0 ${largeArc} 1 ${x2} ${y2} Z`;
+            return <path key={i} d={path} fill={item.color} className="hover:opacity-80 transition-opacity" />;
+          })}
+          <circle cx="50" cy="50" r="20" fill="white" />
+        </svg>
+      </div>
+      <div className="space-y-1">
+        {data.slice(0, 5).map((item, i) => (
+          <div key={i} className="flex items-center gap-2 text-xs">
+            <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: item.color }} />
+            <span className="text-gray-600">{item.label}</span>
+            <span className="font-bold">{Math.round((item.value / total) * 100)}%</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function AdminAnalytics() {
   const [range, setRange] = useState<TimeRange>('7d');
   const [userStats, setUserStats] = useState<UserStats | null>(null);
   const [analytics, setAnalytics] = useState<ApiAnalytics | null>(null);
+  const [chatMetrics, setChatMetrics] = useState<ChatMetrics | null>(null);
   const [loading, setLoading] = useState(true);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
+  // Load analytics data
   useEffect(() => {
     const load = async () => {
-      const [us, an] = await Promise.all([
+      const [us, an, cm] = await Promise.all([
         adminApi.getUserStats(),
         adminApi.getAnalytics(),
+        adminApi.getChatMetrics(range),
       ]);
       if (us.success && us.data) setUserStats(us.data);
       if (an.success && an.data) setAnalytics(an.data);
+      if (cm.success && cm.data) setChatMetrics(cm.data as ChatMetrics);
       setLoading(false);
     };
     load();
     const id = setInterval(() => { void load(); }, 10000);
     return () => clearInterval(id);
-  }, []);
+  }, [range]);
 
   const kb = analytics?.kb;
   const logs = analytics?.logs;
@@ -51,7 +123,7 @@ export function AdminAnalytics() {
     { level: 'info', count: logs?.byLevel.info || 0, color: 'bg-primary' },
     { level: 'success', count: logs?.byLevel.success || 0, color: 'bg-secondary' },
     { level: 'warn', count: logs?.byLevel.warn || 0, color: 'bg-tertiary' },
-    { level: 'error', count: logs?.byLevel.error || 0, color: 'bg-error' },
+    { level: 'error', count: logs?.byLevel.error || 0, color: 'bg-red-500' },
   ];
   const maxLog = Math.max(...logLevelBars.map((l) => l.count), 1);
 
@@ -95,7 +167,125 @@ export function AdminAnalytics() {
         ))}
       </div>
 
-      {/* Metrics Row */}
+      {/* ====== NEW ADVANCED METRICS ROW ====== */}
+      <section className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 mb-8">
+        {/* Total Chats */}
+        <div className="bg-gradient-to-br from-violet-50 to-violet-100 rounded-2xl p-3 border-2 border-violet-200">
+          <p className="text-[10px] font-bold text-violet-600 uppercase">Tổng chat</p>
+          <p className="text-xl font-black text-violet-700">{chatMetrics?.totalChats.toLocaleString() || '—'}</p>
+          <p className="text-[10px] text-violet-500">Hội thoại</p>
+        </div>
+
+        {/* Avg Response Time */}
+        <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl p-3 border-2 border-blue-200">
+          <p className="text-[10px] font-bold text-blue-600 uppercase">Phản hồi TB</p>
+          <p className="text-xl font-black text-blue-700">{chatMetrics ? Math.round(chatMetrics.avgResponseTime / 100) / 10 + 's' : '—'}</p>
+          <p className="text-[10px] text-blue-500">Mili giây</p>
+        </div>
+
+        {/* Avg Confidence */}
+        <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-2xl p-3 border-2 border-green-200">
+          <p className="text-[10px] font-bold text-green-600 uppercase">Độ tin cậy TB</p>
+          <p className="text-xl font-black text-green-700">{chatMetrics ? chatMetrics.avgConfidence.toFixed(0) + '%' : '—'}</p>
+          <p className="text-[10px] text-green-500">Confidence</p>
+        </div>
+
+        {/* Error Rate */}
+        <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-2xl p-3 border-2 border-red-200">
+          <p className="text-[10px] font-bold text-red-600 uppercase">Tỷ lệ lỗi</p>
+          <p className="text-xl font-black text-red-700">{chatMetrics ? chatMetrics.errorRate.toFixed(1) + '%' : '—'}</p>
+          <p className="text-[10px] text-red-500">Thất bại</p>
+        </div>
+
+        {/* Total Users */}
+        <div className="bg-gradient-to-br from-primary/10 to-primary/5 rounded-2xl p-3 border-2 border-primary/20">
+          <p className="text-[10px] font-bold text-primary uppercase">Tổng user</p>
+          <p className="text-xl font-black text-primary">{userStats?.total ?? '—'}</p>
+          <p className="text-[10px] text-primary/70">Người dùng</p>
+        </div>
+
+        {/* KB Documents */}
+        <div className="bg-gradient-to-br from-secondary/10 to-secondary/5 rounded-2xl p-3 border-2 border-secondary/20">
+          <p className="text-[10px] font-bold text-secondary uppercase">Tài liệu KB</p>
+          <p className="text-xl font-black text-secondary">{kb?.totalDocuments ?? '—'}</p>
+          <p className="text-[10px] text-secondary/70">Documents</p>
+        </div>
+      </section>
+
+      {/* ====== CHARTS ROW ====== */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        {/* Hourly Activity Chart */}
+        <div className="bg-white rounded-2xl border-2 border-black p-6 shadow-[4px_4px_0px_0px_#000]">
+          <h3 className="text-lg font-bold mb-4">Hoạt động theo giờ</h3>
+          <BarChart
+            data={chatMetrics?.chatsByHour.map(h => ({
+              label: h.hour.toString().padStart(2, '0') + 'h',
+              value: h.count,
+            })) || []}
+            maxValue={Math.max(...(chatMetrics?.chatsByHour.map(h => h.count) || [1]))}
+          />
+        </div>
+
+        {/* Category Distribution */}
+        <div className="bg-white rounded-2xl border-2 border-black p-6 shadow-[4px_4px_0px_0px_#000]">
+          <h3 className="text-lg font-bold mb-4">Phân bố danh mục AT</h3>
+          <PieChart
+            data={chatMetrics?.categoryUsage.map((c, i) => ({
+              label: c.category,
+              value: c.count,
+              color: ['#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#6366f1'][i % 7],
+            })) || []}
+          />
+        </div>
+      </div>
+
+      {/* ====== TOP QUERIES & LANGUAGE ====== */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        {/* Top Queries */}
+        <div className="lg:col-span-2 bg-white rounded-2xl border-2 border-black p-6 shadow-[4px_4px_0px_0px_#000]">
+          <h3 className="text-lg font-bold mb-4">Câu hỏi phổ biến nhất</h3>
+          <div className="space-y-2">
+            {chatMetrics?.topQueries.map((q, i) => (
+              <div key={i} className="flex items-center gap-3 p-2 bg-gray-50 rounded-lg">
+                <span className={clsx(
+                  'w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold',
+                  i === 0 ? 'bg-primary text-white' : i === 1 ? 'bg-secondary text-white' : 'bg-gray-200 text-gray-600'
+                )}>
+                  {i + 1}
+                </span>
+                <span className="flex-1 text-sm truncate">{q.query}</span>
+                <span className="text-sm font-bold text-gray-500">{q.count}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Language Distribution */}
+        <div className="bg-white rounded-2xl border-2 border-black p-6 shadow-[4px_4px_0px_0px_#000]">
+          <h3 className="text-lg font-bold mb-4">Ngôn ngữ sử dụng</h3>
+          <div className="space-y-3">
+            {chatMetrics?.languageDistribution.map((l, i) => (
+              <div key={i}>
+                <div className="flex justify-between mb-1">
+                  <span className="text-sm font-medium">{l.language}</span>
+                  <span className="text-sm font-bold">{l.count}</span>
+                </div>
+                <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all"
+                    style={{
+                      width: `${(l.count / (chatMetrics?.totalChats || 1)) * 100}%`,
+                      backgroundColor: l.color,
+                    }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ====== LEGACY METRICS ROW ====== */}
       <section className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
         <div className="relative bg-gradient-to-br from-primary/10 to-primary/5 backdrop-blur-xl rounded-2xl p-4 border-3 border-black flex items-center gap-3 transform rotate-[-0.5deg] hover:rotate-0 transition-transform shadow-[6px_6px_0px_0px_#000] hover:shadow-[8px_8px_0px_0px_#000]">
           <div className="w-10 h-10 rounded-xl bg-primary/20 border-2 border-black flex items-center justify-center shadow-[3px_3px_0px_0px_#000]">

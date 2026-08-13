@@ -1,12 +1,75 @@
 import { useNavigate } from 'react-router-dom';
-import { CATEGORY_INFO, type ATCategory } from '@/types';
-import { useSidebarStore, useChatStore } from '@/stores';
+import { CATEGORY_INFO, SAMPLE_QUESTIONS, type ATCategory, type ViewMode, type Language } from '@/types';
+import { useSidebarStore, useChatStore, useViewModeStore, useLanguageStore } from '@/stores';
 import clsx from 'clsx';
+
+// Helper function để lấy category name theo ngôn ngữ
+const getCategoryName = (category: ATCategory, lang: Language): string => {
+  const info = CATEGORY_INFO[category];
+  switch (lang) {
+    case 'en': return info.nameEn;
+    case 'ar': return info.nameAr;
+    case 'fr': return info.nameFr;
+    default: return info.nameVi;
+  }
+};
+
+// Helper function để lấy menu labels theo ngôn ngữ
+const getMenuLabels = (lang: Language) => {
+  const labels: Record<Language, Record<string, string>> = {
+    vi: {
+      newchat: 'Trò chuyện mới',
+      history: 'Lịch sử',
+      favorites: 'Yêu thích',
+      profile: 'Hồ sơ',
+      settings: 'Cài đặt',
+      categories: '📂 Danh mục AT',
+      questions: '💡 Câu hỏi gợi ý',
+      selectCategory: 'Chọn danh mục để xem câu hỏi gợi ý',
+      seeMore: 'Xem thêm',
+    },
+    en: {
+      newchat: 'New Chat',
+      history: 'History',
+      favorites: 'Favorites',
+      profile: 'Profile',
+      settings: 'Settings',
+      categories: '📂 AT Categories',
+      questions: '💡 Suggested Questions',
+      selectCategory: 'Select a category to see suggested questions',
+      seeMore: 'See more',
+    },
+    ar: {
+      newchat: 'محادثة جديدة',
+      history: 'السجل',
+      favorites: 'المفضلة',
+      profile: 'الملف الشخصي',
+      settings: 'الإعدادات',
+      categories: '📂 فئات AT',
+      questions: '💡 أسئلة مقترحة',
+      selectCategory: 'اختر فئة لرؤية الأسئلة المقترحة',
+      seeMore: 'المزيد',
+    },
+    fr: {
+      newchat: 'Nouveau chat',
+      history: 'Historique',
+      favorites: 'Favoris',
+      profile: 'Profil',
+      settings: 'Paramètres',
+      categories: '📂 Catégories AT',
+      questions: '💡 Questions suggérées',
+      selectCategory: 'Sélectionnez une catégorie pour voir les questions suggérées',
+      seeMore: 'Voir plus',
+    },
+  };
+  return labels[lang];
+};
 
 const categories = Object.keys(CATEGORY_INFO) as ATCategory[];
 
 interface SidebarProps {
   variant?: 'user' | 'expert' | 'data_manager' | 'admin';
+  onSelectQuestion?: (question: string) => void;
 }
 
 interface MenuItem {
@@ -57,10 +120,130 @@ const getMenuItems = (variant: string, onNewChat: () => void): MenuItem[] => {
   return baseMenus[variant] || [];
 };
 
-export function Sidebar({ variant = 'user' }: SidebarProps) {
+// Sample Questions Component
+interface SampleQuestionsProps {
+  category: ATCategory | null;
+  viewMode: ViewMode;
+  language: Language;
+  onSelectQuestion: (question: string) => void;
+  isCollapsed?: boolean;
+}
+
+function SampleQuestions({ category, viewMode, language, onSelectQuestion, isCollapsed = false }: SampleQuestionsProps) {
+  const labels = getMenuLabels(language);
+  const questions = category ? SAMPLE_QUESTIONS[category]?.[viewMode]?.[language] || [] : [];
+  const categoryColor = category ? CATEGORY_INFO[category].color : 'text-violet-600';
+  const categoryBgColor = category ? CATEGORY_INFO[category].bgColor : 'bg-violet-50';
+  
+  if (isCollapsed) return null;
+  
+  if (questions.length === 0) {
+    return (
+      <div className="px-3 py-2 text-xs text-slate-400 italic">
+        {labels.selectCategory}
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-3 px-2">
+      <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 px-2 py-1.5">
+        {labels.questions}
+      </p>
+      <div className="flex flex-col gap-0.5 mt-1">
+        {questions.slice(0, 4).map((question, idx) => (
+          <button
+            key={idx}
+            onClick={() => onSelectQuestion(question)}
+            className={clsx(
+              'flex items-start gap-2 px-2 py-1.5 rounded-lg',
+              'text-xs text-left text-slate-600',
+              `hover:${categoryBgColor} hover:${categoryColor}`,
+              'transition-colors duration-200',
+              'group'
+            )}
+          >
+            <span className={clsx('text-slate-400 group-hover:text-violet-500 mt-0.5 flex-shrink-0', `group-hover:${categoryColor.replace('text-', 'text-')}`)}>
+              •
+            </span>
+            <span className="line-clamp-2">{question}</span>
+          </button>
+        ))}
+        {questions.length > 4 && (
+          <button className={clsx('flex items-center gap-1 px-2 py-1 text-xs font-medium', categoryColor)}>
+            {labels.seeMore} {questions.length - 4} câu
+            <span className="material-symbols-outlined text-sm">expand_more</span>
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// View Mode Toggle Component
+interface ViewModeToggleProps {
+  viewMode: ViewMode;
+  onToggle: () => void;
+  isCollapsed?: boolean;
+}
+
+function ViewModeToggle({ viewMode, onToggle, isCollapsed = false }: ViewModeToggleProps) {
+  if (isCollapsed) return null;
+  
+  return (
+    <div className="px-3 py-2">
+      <div className="bg-slate-100 rounded-xl p-0.5 flex">
+        <button
+          onClick={viewMode === 'end_user' ? undefined : onToggle}
+          className={clsx(
+            'flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-xs font-medium transition-all duration-200',
+            viewMode === 'end_user' 
+              ? 'bg-white text-blue-600 shadow-sm' 
+              : 'text-slate-500 hover:text-slate-700'
+          )}
+        >
+          <span className="material-symbols-outlined text-sm">person</span>
+          <span>Người dùng</span>
+        </button>
+        <button
+          onClick={viewMode === 'at_specialist' ? undefined : onToggle}
+          className={clsx(
+            'flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-xs font-medium transition-all duration-200',
+            viewMode === 'at_specialist' 
+              ? 'bg-white text-violet-600 shadow-sm' 
+              : 'text-slate-500 hover:text-slate-700'
+          )}
+        >
+          <span className="material-symbols-outlined text-sm">engineering</span>
+          <span>Chuyên gia</span>
+        </button>
+      </div>
+      {/* Tooltip khi collapsed */}
+      <p className="text-[9px] text-slate-400 text-center mt-1.5">
+        {viewMode === 'end_user' ? 'Chế độ thân thiện' : 'Chế độ chuyên sâu'}
+      </p>
+    </div>
+  );
+}
+
+// Category Icon với emoji fallback
+const categoryEmojis: Record<ATCategory, string> = {
+  vision: '👁️',
+  hearing: '👂',
+  mobility: '🦽',
+  cognition: '🧠',
+  communication: '💬',
+  daily_living: '🏠',
+  education: '📚',
+};
+
+export function Sidebar({ variant = 'user', onSelectQuestion }: SidebarProps) {
   const navigate = useNavigate();
   const { isCollapsed, activeCategory, toggleCollapse, setActiveCategory } = useSidebarStore();
+  const { viewMode, toggleViewMode } = useViewModeStore();
   const { clearMessages } = useChatStore();
+  const { language } = useLanguageStore();
+  const labels = getMenuLabels(language);
 
   const handleNewChat = () => {
     clearMessages();
@@ -68,6 +251,14 @@ export function Sidebar({ variant = 'user' }: SidebarProps) {
   };
 
   const items = getMenuItems(variant, handleNewChat);
+
+  const handleCategoryClick = (category: ATCategory) => {
+    if (activeCategory === category) {
+      setActiveCategory(null);
+    } else {
+      setActiveCategory(category);
+    }
+  };
 
   return (
     <aside
@@ -77,7 +268,7 @@ export function Sidebar({ variant = 'user' }: SidebarProps) {
         'border-r-2 border-zinc-200 dark:border-zinc-800',
         'transition-all duration-300',
         'overflow-y-auto hidden md:block',
-        isCollapsed ? 'w-16' : 'w-52'
+        isCollapsed ? 'w-16' : 'w-56'
       )}
     >
       {/* Logo Area */}
@@ -86,6 +277,15 @@ export function Sidebar({ variant = 'user' }: SidebarProps) {
           {isCollapsed ? 'M' : 'MADA'}
         </a>
       </div>
+
+      {/* View Mode Toggle - Chỉ hiển thị cho user variant */}
+      {variant === 'user' && (
+        <ViewModeToggle 
+          viewMode={viewMode} 
+          onToggle={toggleViewMode} 
+          isCollapsed={isCollapsed}
+        />
+      )}
 
       {/* Menu Items */}
       <nav className="p-2 flex flex-col gap-0.5">
@@ -117,34 +317,54 @@ export function Sidebar({ variant = 'user' }: SidebarProps) {
       {/* Categories Section (for user variant) */}
       {variant === 'user' && (
         <>
-          <div className="px-4 py-3">
+          <div className="px-4 py-2">
             <div className="h-px bg-zinc-200 dark:bg-zinc-700" />
           </div>
 
-          <nav className="px-2 pb-3 flex flex-col gap-0.5">
+          <nav className="px-2 pb-2 flex flex-col gap-0.5">
             {!isCollapsed && (
               <p className="text-[10px] font-semibold uppercase tracking-widest text-zinc-400 px-3 py-1.5">
-                Danh mục AT
+                {labels.categories}
               </p>
             )}
-            {categories.map((category) => (
-              <button
-                key={category}
-                onClick={() => setActiveCategory(activeCategory === category ? null : category)}
-                className={clsx(
-                  'flex items-center gap-3 px-3 py-2 rounded-lg',
-                  'text-sm transition-colors duration-200',
-                  'hover:bg-zinc-100 dark:hover:bg-zinc-800',
-                  activeCategory === category && 'bg-violet-50 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400'
-                )}
-              >
-                <span className="material-symbols-outlined text-base w-5 text-center flex-shrink-0">
-                  {CATEGORY_INFO[category].icon}
-                </span>
-                {!isCollapsed && <span className="truncate text-xs">{CATEGORY_INFO[category].nameVi}</span>}
-              </button>
-            ))}
+            {isCollapsed && (
+              <p className="text-[10px] text-center text-zinc-400 py-1.5">📂</p>
+            )}
+            {categories.map((category) => {
+              const categoryInfo = CATEGORY_INFO[category];
+              const isActive = activeCategory === category;
+              return (
+                <button
+                  key={category}
+                  onClick={() => handleCategoryClick(category)}
+                  className={clsx(
+                    'flex items-center gap-3 px-3 py-2 rounded-lg',
+                    'text-sm transition-all duration-200',
+                    'hover:bg-zinc-100 dark:hover:bg-zinc-800',
+                    isActive 
+                      ? `${categoryInfo.bgColor} ${categoryInfo.color} border-l-2 ${categoryInfo.borderColor} font-medium` 
+                      : 'text-slate-600 dark:text-slate-400'
+                  )}
+                >
+                  <span className="text-base w-5 text-center flex-shrink-0">
+                    {categoryEmojis[category]}
+                  </span>
+                  {!isCollapsed && (
+                    <span className="truncate text-xs">{getCategoryName(category, language)}</span>
+                  )}
+                </button>
+              );
+            })}
           </nav>
+
+          {/* Sample Questions - Hiển thị khi có category được chọn */}
+          <SampleQuestions 
+            category={activeCategory as ATCategory | null}
+            viewMode={viewMode}
+            language={language}
+            onSelectQuestion={onSelectQuestion || (() => {})}
+            isCollapsed={isCollapsed}
+          />
         </>
       )}
 

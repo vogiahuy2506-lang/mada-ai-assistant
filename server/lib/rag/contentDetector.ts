@@ -1,6 +1,49 @@
 // Content Detector - AI-powered content analysis and classification
 
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenerativeAI, type FunctionDeclaration } from '@google/generative-ai';
+
+// ============ SCHEMA DEFINITIONS ============
+
+/**
+ * Structured output schema for CONTENT DETECTION (Task 5)
+ */
+const CONTENT_DETECTION_SCHEMA: FunctionDeclaration = {
+  name: 'content_detection',
+  description: 'Phân tích và phân loại nội dung AT',
+  parameters: {
+    type: 'object',
+    properties: {
+      type: {
+        type: 'string',
+        enum: ['product', 'regulation', 'guide', 'article', 'standard', 'unknown'],
+        description: 'Loại nội dung'
+      },
+      confidence: {
+        type: 'number',
+        description: 'Độ tin cậy từ 0.0 đến 1.0'
+      },
+      isoCodes: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Mã ISO 9999 được đề cập'
+      },
+      wcagLevel: {
+        type: 'string',
+        enum: ['A', 'AA', 'AAA'],
+        description: 'Mức độ WCAG'
+      },
+      whoGateCategory: {
+        type: 'string',
+        description: 'Danh mục WHO GATE'
+      },
+      summary: {
+        type: 'string',
+        description: 'Tóm tắt nội dung'
+      }
+    },
+    required: ['type', 'confidence']
+  }
+};
 
 export interface ContentType {
   type: 'product' | 'regulation' | 'guide' | 'article' | 'standard' | 'unknown';
@@ -52,7 +95,7 @@ class ContentDetector {
     }
 
     this.genAI = new GoogleGenerativeAI(apiKey);
-    this.model = this.genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    this.model = this.genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
     console.log('✅ Content Detector initialized with Gemini');
   }
 
@@ -65,28 +108,61 @@ class ContentDetector {
     try {
       const prompt = SYSTEM_PROMPT + '\n\n' + USER_PROMPT.replace('{content}', content.slice(0, 2000));
 
-      const result = await this.model.generateContent(prompt);
-      const response = await result.response;
-      const text = response.text();
+      // Try structured output first
+      let parsed: any = null;
 
-      // Parse JSON response
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0]);
-        return {
-          contentType: {
-            type: parsed.type || 'unknown',
-            confidence: parsed.confidence || 0.5,
+      try {
+        const result = await this.model.generateContent({
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.1,
+            maxOutputTokens: 512,
           },
-          metadata: {
-            title,
-            isoCodes: parsed.isoCodes || [],
-            wcagLevel: parsed.wcagLevel,
-            whoGateCategory: parsed.whoGateCategory,
-            summary: parsed.summary,
-          },
-          suggestedCategory: parsed.whoGateCategory,
-          rawAnalysis: text,
+          tools: [{
+            functionDeclarations: [CONTENT_DETECTION_SCHEMA]
+          }]
+        });
+
+        const response = result.response;
+
+        if (response.functionCalls?.length > 0) {
+          const fnCall = response.functionCalls()[0];
+          if (fnCall.name === 'content_detection') {
+            parsed = fnCall.args;
+          }
+        }
+      } catch (schemaError: any) {
+        console.warn('⚠️ Content detector schema failed, using text fallback:', schemaError.message?.slice(0, 80));
+      }
+
+      // Fallback: parse text if schema didn't work
+      if (!parsed) {
+        const result = await this.model.generateContent(prompt);
+        const response = await result.response;
+        const text = response.text();
+
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          parsed = JSON.parse(jsonMatch[0]);
+        } else {
+          parsed = { type: 'unknown', confidence: 0.5 };
+        }
+      }
+
+      return {
+        contentType: {
+          type: parsed.type || 'unknown',
+          confidence: parsed.confidence || 0.5,
+        },
+        metadata: {
+          title,
+          isoCodes: parsed.isoCodes || [],
+          wcagLevel: parsed.wcagLevel,
+          whoGateCategory: parsed.whoGateCategory,
+          summary: parsed.summary,
+        },
+        suggestedCategory: parsed.whoGateCategory,
+        rawAnalysis: JSON.stringify(parsed),
         };
       }
     } catch (error) {

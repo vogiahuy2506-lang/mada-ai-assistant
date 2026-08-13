@@ -1,13 +1,11 @@
-import { RobotLogo } from './icons/RobotLogo';
+import madaLogo from '../assets/mada-logo.png';
 
 export function Footer() {
   return (
     <footer className="w-full flex flex-col md:flex-row justify-between items-start md:items-end p-6 md:p-8 gap-6 bg-zinc-900 text-zinc-100">
       <div className="flex flex-col gap-3 max-w-md">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-blue-500 flex items-center justify-center p-1.5">
-            <RobotLogo variant="white" className="w-full h-full" />
-          </div>
+          <img src={madaLogo} alt="MADA" className="h-10" />
           <div className="font-black text-2xl tracking-tight">MADA AI</div>
         </div>
         <p className="text-sm text-zinc-400">

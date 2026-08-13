@@ -12,16 +12,22 @@ export interface Agent {
   createdBy: 'admin' | 'user';
   createdAt: number;
   updatedAt: number;
+  /** ⭐ MỚI: MADA category slug (e.g. 'sensory-hearing') để hiển thị + filter */
+  madaCategory?: string;
+  /** ⭐ MỚI: Bot ID (e.g. 'bot-hearing') để RAG filter theo domain */
+  botId?: string;
 }
 
 interface AgentState {
   agents: Agent[];
-  
+
   // Actions
   getActiveAgents: () => Agent[];
   getAgentsByCreator: (creator: 'admin' | 'user') => Agent[];
   getAgentById: (id: string) => Agent | undefined;
   addAgent: (agent: Omit<Agent, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  /** ⭐ MỚI: Add agent với ID cố định (dùng cho seed import) */
+  addAgentWithId: (agent: Agent) => void;
   updateAgent: (id: string, updates: Partial<Agent>) => void;
   deleteAgent: (id: string) => void;
   setActiveAgent: (id: string) => void;
@@ -74,6 +80,16 @@ export const useAgentStore = create<AgentState>()(
         set((state) => ({
           agents: [...state.agents, newAgent],
         }));
+      },
+
+      // ⭐ MỚI: Thêm agent với ID cố định (cho seed MADA bots)
+      addAgentWithId: (agent: Agent) => {
+        set((state) => {
+          if (state.agents.some(a => a.id === agent.id)) {
+            return state; // skip duplicate
+          }
+          return { agents: [...state.agents, agent] };
+        });
       },
 
       updateAgent: (id, updates) => {

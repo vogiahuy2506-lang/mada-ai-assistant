@@ -1,0 +1,52 @@
+{
+  "name": "MADA AI Assistant",
+  "short_name": "MADA AI",
+  "description": "Hệ thống tư vấn công nghệ hỗ trợ người khuyết tật bằng AI",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#006572",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "lang": "vi",
+  "categories": ["healthcare", "education", "productivity"],
+  "icons": [
+    {
+      "src": "/mada-logo.png",
+      "sizes": "256x256",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/favicon.svg",
+      "sizes": "64x64",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Bắt đầu chat",
+      "short_name": "Chat",
+      "description": "Mở giao diện trò chuyện với MADA AI",
+      "url": "/?action=chat",
+      "icons": [{ "src": "/favicon.svg", "sizes": "any" }]
+    },
+    {
+      "name": "7 Danh mục AT",
+      "short_name": "Danh mục",
+      "description": "Xem các danh mục công nghệ hỗ trợ",
+      "url": "/?action=categories",
+      "icons": [{ "src": "/favicon.svg", "sizes": "any" }]
+    }
+  ],
+  "related_applications": [],
+  "prefer_related_applications": false
+}

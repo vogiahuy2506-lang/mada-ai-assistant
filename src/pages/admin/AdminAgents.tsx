@@ -1,10 +1,31 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AdminLayout } from './AdminLayout';
-import { useAgentStore, type Agent } from '@/stores';
+import { adminApi } from './adminApi';
+import { MADA_BOTS } from '@/lib/madaBots';
 import clsx from 'clsx';
 
+interface Agent {
+  id: string;
+  name: string;
+  description: string;
+  avatar: string;
+  system_prompt?: string;
+  systemPrompt?: string;
+  capabilities: string[];
+  is_active?: boolean;
+  isActive?: boolean;
+  mada_category?: string;
+  created_by?: string;
+  createdAt?: number;
+  updatedAt?: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export function AdminAgents() {
-  const { agents, addAgent, updateAgent, deleteAgent, toggleAgentActive } = useAgentStore();
+  const [agents, setAgents] = useState<Agent[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<string | null>(null);
@@ -14,53 +35,114 @@ export function AdminAgents() {
     name: '',
     description: '',
     avatar: '🤖',
-    systemPrompt: '',
+    system_prompt: '',
     capabilities: [] as string[],
   });
+
+  // Load agents from API
+  const loadAgents = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const res = await adminApi.getAgents();
+      if (res.success && res.data) {
+        setAgents(res.data);
+      } else {
+        setError(res.error || 'Failed to load agents');
+      }
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadAgents();
+  }, []);
 
   const save = () => {
     setSavedAt(new Date().toLocaleTimeString('vi-VN'));
     setTimeout(() => setSavedAt(null), 3000);
   };
 
-  const handleSubmit = () => {
-    if (!formData.name.trim() || !formData.systemPrompt.trim()) return;
+  const handleSubmit = async () => {
+    if (!formData.name.trim() || !formData.system_prompt.trim()) return;
 
-    if (editingId) {
-      updateAgent(editingId, {
-        ...formData,
-        createdBy: 'admin',
-      });
+    try {
+      const agentData = {
+        name: formData.name,
+        description: formData.description,
+        avatar: formData.avatar,
+        system_prompt: formData.system_prompt,
+        capabilities: formData.capabilities,
+      };
+
+      if (editingId) {
+        const res = await adminApi.updateAgent(editingId, agentData);
+        if (res.success) {
+          await loadAgents();
+        } else {
+          alert(res.error);
+        }
+      } else {
+        const res = await adminApi.createAgent(agentData);
+        if (res.success) {
+          await loadAgents();
+        } else {
+          alert(res.error);
+        }
+      }
+
+      setFormData({ name: '', description: '', avatar: '🤖', system_prompt: '', capabilities: [] });
+      setShowForm(false);
       setEditingId(null);
-    } else {
-      addAgent({
-        ...formData,
-        isActive: true,
-        createdBy: 'admin',
-      });
+      save();
+    } catch (err: any) {
+      alert(err.message);
     }
-
-    setFormData({ name: '', description: '', avatar: '🤖', systemPrompt: '', capabilities: [] });
-    setShowForm(false);
-    save();
   };
 
   const handleEdit = (agent: Agent) => {
     setFormData({
       name: agent.name,
-      description: agent.description,
+      description: agent.description || '',
       avatar: agent.avatar,
-      systemPrompt: agent.systemPrompt,
+      system_prompt: agent.system_prompt || agent.systemPrompt || '',
       capabilities: agent.capabilities,
     });
     setEditingId(agent.id);
     setShowForm(true);
   };
 
-  const handleDelete = (id: string) => {
-    if (confirm('Bạn có chắc muốn xóa Agent này?')) {
-      deleteAgent(id);
-      save();
+  const handleDelete = async (id: string) => {
+    if (!confirm('Bạn có chắc muốn xóa Agent này?')) return;
+    try {
+      const res = await adminApi.deleteAgent(id);
+      if (res.success) {
+        await loadAgents();
+        save();
+      } else {
+        alert(res.error);
+      }
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
+  const toggleAgentActive = async (id: string) => {
+    const agent = agents.find(a => a.id === id);
+    if (!agent) return;
+    const newActive = !(agent.is_active || agent.isActive);
+    try {
+      const res = await adminApi.updateAgent(id, { is_active: newActive });
+      if (res.success) {
+        await loadAgents();
+      } else {
+        alert(res.error);
+      }
+    } catch (err: any) {
+      alert(err.message);
     }
   };
 
@@ -80,6 +162,44 @@ export function AdminAgents() {
         ? prev.capabilities.filter(c => c !== cap)
         : [...prev.capabilities, cap],
     }));
+  };
+
+  // Import 7 bot MADA mẫu từ database
+  const importMadaBots = async () => {
+    if (!confirm('Import 7 bot MADA mặc định? (Sẽ bỏ qua các bot đã tồn tại)')) return;
+
+    let imported = 0;
+    let skipped = 0;
+
+    for (const bot of MADA_BOTS) {
+      // Check duplicate
+      const exists = agents.some(a => a.id === bot.id);
+      if (exists) {
+        skipped++;
+        continue;
+      }
+
+      try {
+        const res = await adminApi.createAgent({
+          id: bot.id,
+          name: bot.name,
+          description: `${bot.description} (ISO: ${bot.isoCodes.join(', ') || 'general'})`,
+          avatar: bot.avatar,
+          system_prompt: `Bạn là ${bot.nameVi} của MADA AI Assistant.\n\nChuyên môn: ${bot.description}\n\nURL MADA: ${bot.madaUrl}\n\nTiêu chuẩn ISO: ${bot.isoCodes.join(', ') || 'general'}\n\nKhi user hỏi ngoài domain, lịch sự hướng dẫn chọn bot phù hợp khác.`,
+          capabilities: ['chat', 'device_recommendation', ...bot.isoCodes.slice(0, 2).map(c => `iso_${c.replace(/\./g, '_')}`)],
+          is_active: true,
+          mada_category: bot.madaCategory,
+          bot_id: bot.id,
+        });
+        if (res.success) imported++;
+      } catch {
+        skipped++;
+      }
+    }
+
+    if (imported > 0) await loadAgents();
+    save();
+    alert(`✅ Đã import ${imported} bot MADA${skipped ? ` (bỏ qua ${skipped} bot trùng)` : ''}`);
   };
 
   return (
@@ -138,22 +258,41 @@ export function AdminAgents() {
       </section>
 
       {/* Action Bar */}
-      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-6 gap-3 flex-wrap">
         <span className="text-sm text-on-surface-variant font-medium">
-          {agents.length} Agent(s)
+          {loading ? 'Đang tải...' : `${agents.length} Agent(s)`}
         </span>
-        <button
-          onClick={() => {
-            setFormData({ name: '', description: '', avatar: '🤖', systemPrompt: '', capabilities: [] });
-            setEditingId(null);
-            setShowForm(true);
-          }}
-          className="flex items-center gap-2 bg-primary text-white px-4 py-2 rounded-full font-bold text-xs border-2 border-black shadow-[3px_3px_0px_0px_#000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[4px_4px_0px_0px_#000] transition-all"
-        >
-          <span className="material-symbols-outlined text-sm">add</span>
-          Thêm Agent
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Import 7 bot MADA mẫu */}
+          <button
+            onClick={importMadaBots}
+            className="flex items-center gap-2 bg-secondary text-white px-4 py-2 rounded-full font-bold text-xs border-2 border-black shadow-[3px_3px_0px_0px_#000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[4px_4px_0px_0px_#000] transition-all"
+            title="Import 7 bot MADA: Hearing, Vision, Speech, Cognitive, Movement, Mobility, Regulatory"
+          >
+            <span className="material-symbols-outlined text-sm">download</span>
+            Import 7 bot MADA
+          </button>
+          <button
+            onClick={() => {
+              setFormData({ name: '', description: '', avatar: '🤖', system_prompt: '', capabilities: [] });
+              setEditingId(null);
+              setShowForm(true);
+            }}
+            className="flex items-center gap-2 bg-primary text-white px-4 py-2 rounded-full font-bold text-xs border-2 border-black shadow-[3px_3px_0px_0px_#000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[4px_4px_0px_0px_#000] transition-all"
+          >
+            <span className="material-symbols-outlined text-sm">add</span>
+            Thêm Agent
+          </button>
+        </div>
       </div>
+
+      {/* Error state */}
+      {error && (
+        <div className="mb-6 p-4 bg-red-50 border-2 border-red-300 rounded-xl text-red-700">
+          <p className="font-medium">{error}</p>
+          <button onClick={loadAgents} className="mt-2 text-sm underline">Thử lại</button>
+        </div>
+      )}
 
       {/* Agent Form Modal */}
       {showForm && (
@@ -180,8 +319,13 @@ export function AdminAgents() {
               </div>
             </div>
 
-            {/* Modal Content */}
-            <div className="p-4 space-y-4">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleSubmit();
+              }}
+              className="p-4 space-y-4"
+            >
               {/* Avatar */}
               <div>
                 <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2">Icon Agent</label>
@@ -193,6 +337,7 @@ export function AdminAgents() {
                     {['🤖', '👨‍🏫', '👩‍💻', '🔧', '💡', '🎯'].map(emoji => (
                       <button
                         key={emoji}
+                        type="button"
                         onClick={() => setFormData(prev => ({ ...prev, avatar: emoji }))}
                         className={clsx(
                           'w-9 h-9 rounded-lg text-lg flex items-center justify-center transition-all border-2 border-black shadow-[2px_2px_0px_0px_#000]',
@@ -235,8 +380,8 @@ export function AdminAgents() {
               <div>
                 <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">System Prompt <span className="text-red-500">*</span></label>
                 <textarea
-                  value={formData.systemPrompt}
-                  onChange={e => setFormData(prev => ({ ...prev, systemPrompt: e.target.value }))}
+                  value={formData.system_prompt}
+                  onChange={e => setFormData(prev => ({ ...prev, system_prompt: e.target.value }))}
                   placeholder="VD: Bạn là trợ lý ảo của MADA..."
                   rows={3}
                   className="w-full px-3 py-2 rounded-lg bg-white/60 border-2 border-black text-sm resize-none font-mono focus:outline-none focus:ring-2 focus:ring-primary/30"
@@ -263,7 +408,7 @@ export function AdminAgents() {
                   ))}
                 </div>
               </div>
-            </div>
+            </form>
 
             {/* Modal Footer */}
             <div className="p-4 border-t-2 border-black bg-white/80 backdrop-blur-xl flex items-center gap-2">
@@ -274,8 +419,9 @@ export function AdminAgents() {
                 Hủy
               </button>
               <button
+                type="button"
                 onClick={handleSubmit}
-                disabled={!formData.name.trim() || !formData.systemPrompt.trim()}
+                disabled={!formData.name.trim() || !formData.system_prompt.trim()}
                 className="flex-1 px-3 py-2 rounded-lg bg-primary text-white font-bold text-xs border-2 border-black shadow-[2px_2px_0px_0px_#000] hover:-translate-y-0.5 hover:shadow-[3px_3px_0px_0px_#000] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {editingId ? 'Lưu' : 'Tạo'}
@@ -289,25 +435,28 @@ export function AdminAgents() {
       <div className="relative bg-gradient-to-br from-white/80 to-white/40 backdrop-blur-xl rounded-2xl border-2 border-black p-5 shadow-[6px_6px_0px_0px_#000]">
         <div className="absolute inset-0 bg-gradient-to-b from-white/40 to-transparent rounded-2xl"></div>
         
-        {agents.length === 0 ? (
+        {loading ? (
+          <div className="relative z-10 flex flex-col items-center justify-center py-12">
+            <div className="w-16 h-16 rounded-xl bg-gray-100 border-2 border-black flex items-center justify-center mb-4 text-gray-400 shadow-[4px_4px_0px_0px_#000] animate-pulse">
+              <span className="material-symbols-outlined text-3xl">hourglass_empty</span>
+            </div>
+            <p className="text-lg font-bold text-gray-500">Đang tải...</p>
+          </div>
+        ) : agents.length === 0 ? (
           <div className="relative z-10 flex flex-col items-center justify-center py-12">
             <div className="w-16 h-16 rounded-xl bg-gray-100 border-2 border-black flex items-center justify-center mb-4 text-gray-400 shadow-[4px_4px_0px_0px_#000]">
               <span className="material-symbols-outlined text-3xl">smart_toy</span>
             </div>
             <h4 className="text-lg font-black text-on-surface mb-1">Chưa có Agent nào</h4>
             <p className="text-sm text-on-surface-variant text-center mb-4">
-              Tạo Agent đầu tiên để bắt đầu.
+              Tạo Agent đầu tiên hoặc import 7 bot MADA mẫu.
             </p>
             <button
-              onClick={() => {
-                setFormData({ name: '', description: '', avatar: '🤖', systemPrompt: '', capabilities: [] });
-                setEditingId(null);
-                setShowForm(true);
-              }}
-              className="px-4 py-2 rounded-full bg-primary text-white font-bold text-xs border-2 border-black shadow-[3px_3px_0px_0px_#000] hover:-translate-y-0.5 hover:shadow-[4px_4px_0px_0px_#000] transition-all"
+              onClick={importMadaBots}
+              className="px-4 py-2 rounded-full bg-secondary text-white font-bold text-xs border-2 border-black shadow-[3px_3px_0px_0px_#000] hover:-translate-y-0.5 hover:shadow-[4px_4px_0px_0px_#000] transition-all"
             >
-              <span className="material-symbols-outlined text-xs mr-1">add</span>
-              Tạo Agent
+              <span className="material-symbols-outlined text-xs mr-1">download</span>
+              Import 7 bot MADA
             </button>
           </div>
         ) : (
@@ -317,7 +466,7 @@ export function AdminAgents() {
                 key={agent.id}
                 className={clsx(
                   'p-4 rounded-xl border-2 border-black transition-all shadow-[4px_4px_0px_0px_#000] hover:shadow-[5px_5px_0px_0px_#000]',
-                  agent.isActive
+                  (agent.is_active || agent.isActive)
                     ? 'bg-gradient-to-br from-primary/10 to-primary/5'
                     : 'bg-gray-50'
                 )}
@@ -331,10 +480,15 @@ export function AdminAgents() {
                       <h4 className="font-bold text-on-surface truncate text-sm">{agent.name}</h4>
                       <span className={clsx(
                         'px-2 py-0.5 rounded-full text-[9px] font-bold border border-black',
-                        agent.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
+                        (agent.is_active || agent.isActive) ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
                       )}>
-                        {agent.isActive ? 'ON' : 'OFF'}
+                        {(agent.is_active || agent.isActive) ? 'ON' : 'OFF'}
                       </span>
+                      {agent.mada_category && (
+                        <span className="px-2 py-0.5 rounded-full text-[9px] font-bold border border-black bg-blue-100 text-blue-700">
+                          🏷️ {agent.mada_category}
+                        </span>
+                      )}
                     </div>
                     <p className="text-[10px] text-on-surface-variant mt-0.5 line-clamp-1">
                       {agent.description || 'Không có mô tả'}
@@ -344,9 +498,9 @@ export function AdminAgents() {
 
                 {/* Capabilities */}
                 <div className="flex flex-wrap gap-1 mb-3">
-                  {agent.capabilities.slice(0, 3).map(cap => (
+                  {agent.capabilities.slice(0, 3).map((cap, i) => (
                     <span
-                      key={cap}
+                      key={i}
                       className="px-1.5 py-0.5 rounded bg-white border border-black/20 text-[9px] text-on-surface-variant"
                     >
                       {capabilityOptions.find(c => c.value === cap)?.label || cap}
@@ -360,12 +514,12 @@ export function AdminAgents() {
                     onClick={() => toggleAgentActive(agent.id)}
                     className={clsx(
                       'flex-1 py-1.5 rounded-lg font-bold text-xs border border-black transition-all shadow-[2px_2px_0px_0px_#000]',
-                      agent.isActive
+                      (agent.is_active || agent.isActive)
                         ? 'bg-yellow-100 text-yellow-700 hover:shadow-[3px_3px_0px_0px_#000]'
                         : 'bg-green-100 text-green-700 hover:shadow-[3px_3px_0px_0px_#000]'
                     )}
                   >
-                    {agent.isActive ? 'Tắt' : 'Bật'}
+                    {(agent.is_active || agent.isActive) ? 'Tắt' : 'Bật'}
                   </button>
                   <button
                     onClick={() => handleEdit(agent)}

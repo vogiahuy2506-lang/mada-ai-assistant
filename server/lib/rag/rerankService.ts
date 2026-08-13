@@ -4,7 +4,33 @@
  * Dùng Gemini để đánh giá lại mức độ liên quan của documents đã retrieve
  */
 
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenerativeAI, type FunctionDeclaration } from '@google/generative-ai';
+
+// ============ SCHEMA DEFINITIONS ============
+
+/**
+ * Structured output schema for RERANK response (Task 5)
+ * Ensures model returns JSON with predictable structure
+ */
+const RERANK_RESPONSE_SCHEMA: FunctionDeclaration = {
+  name: 'rerank_response',
+  description: 'Gemini rerank response với scores và reasons',
+  parameters: {
+    type: 'object',
+    properties: {
+      scores: {
+        type: 'array',
+        description: 'Mảng scores từ 0.0 đến 1.0 cho mỗi item theo thứ tự input',
+        items: { type: 'number' }
+      },
+      reasoning: {
+        type: 'string',
+        description: 'Giải thích ngắn gọn về phương pháp scoring'
+      }
+    },
+    required: ['scores']
+  }
+};
 
 export interface RerankableItem {
   id: string;
@@ -79,18 +105,42 @@ export class RerankService {
       const prompt = this.buildRerankPrompt(query, items);
 
       const model = this.client.getGenerativeModel({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3.5-flash',
         generationConfig: {
           temperature: 0.1,
           maxOutputTokens: 2048,
         },
+        tools: [{
+          functionDeclarations: [RERANK_RESPONSE_SCHEMA]
+        }],
       });
 
-      const result = await model.generateContent(prompt);
-      const text = result.response.text().trim();
+      let scores: number[] = [];
 
-      // Parse JSON scores từ response
-      const scores = this.parseScores(text, items.length);
+      try {
+        const result = await model.generateContent(prompt);
+        const response = result.response;
+
+        // Try structured JSON first
+        if (response.functionCalls?.length > 0) {
+          const fnCall = response.functionCalls()[0];
+          if (fnCall.name === 'rerank_response') {
+            scores = fnCall.args.scores || [];
+          }
+        }
+
+        // Fallback: if no structured response, parse text
+        if (scores.length === 0) {
+          const text = response.text().trim();
+          scores = this.parseScores(text, items.length);
+        }
+      } catch (schemaError: any) {
+        // Schema failed - fallback to text parsing
+        console.warn('⚠️ Rerank schema parsing failed, using text fallback:', schemaError.message?.slice(0, 80));
+        const result = await model.generateContent(prompt);
+        const text = result.response.text().trim();
+        scores = this.parseScores(text, items.length);
+      }
 
       // Map scores vào items, sort theo rerank score
       const reranked: RerankResult<T>[] = items.map((item, idx) => {

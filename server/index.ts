@@ -1,10 +1,34 @@
 import express from 'express';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
 import fs from 'fs';
 import session from 'express-session';
+
+// ============== HELPERS ==============
+// Fallback images for products without MADA thumbnails
+const FALLBACK_IMAGES: Record<string, string> = {
+  'victor-reader-stratus4-m-daisy-and-mp3-player': 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/6c/Media-player.svg/200px-Media-player.svg.png',
+};
+
+// Convert MADA image URL to proxy URL to avoid hotlink protection
+// If no MADA image, try to get fallback image
+function toProxyImageUrl(madaUrl: string, slug?: string): string {
+  if (madaUrl && madaUrl.includes('mada.org.qa')) {
+    return `/api/mada-image?url=${encodeURIComponent(madaUrl)}`;
+  }
+  // Try fallback image
+  if (slug && FALLBACK_IMAGES[slug]) {
+    return FALLBACK_IMAGES[slug];
+  }
+  return '';
+}
 
 // RAG imports
 import { vectorStore } from './lib/rag/vectorStore';
@@ -13,6 +37,9 @@ import { dataIngestion } from './lib/rag/dataIngestion';
 import type { DataSource } from './lib/rag/dataIngestion';
 import { guardrails } from './lib/guardrails';
 
+// Scheduler imports
+import { startScheduler } from './lib/scraping-scheduler';
+
 // Auth imports
 import './lib/db'; // Initialize DB
 import db from './lib/db';
@@ -20,13 +47,229 @@ import authRoutes from './routes/auth';
 import userRoutes from './routes/users';
 import kbRoutes from './routes/knowledgeBase';
 import scraperRoutes from './routes/scraper';
+import madaScraperRoutes from './routes/mada-scraper';
+import approvalRoutes from './routes/admin-approval';
+import scraperScheduleRoutes from './routes/scraper-schedule';
 import paymentRoutes from './routes/payments';
 import productsRoutes from './routes/products';
+import consultationRoutes from './routes/consultation';
+import adminRoutes from './routes/admin';
 
-dotenv.config();
+// Load .env from project root (mada-ai-assistant/.env), not just cwd
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
+dotenv.config(); // fallback to local .env if any
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3000;
+
+// Middleware
+app.use(express.json({ limit: '50mb' })); // Support large files
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+// ============== RATE LIMITING (Task 4 - Bảo vệ API) ==============
+// Áp dụng cho /api/* để chống spam
+import { createRateLimiter } from './lib/middleware/rate-limiter';
+const apiRateLimiter = createRateLimiter({
+  windowMs: 60 * 1000, // 1 phút
+  max: 100, // Tối đa 100 requests / phút / IP
+});
+app.use('/api/', apiRateLimiter);
+
+// Rate limit chặt hơn cho các endpoint đắt tài nguyên (chat, recommend, rag)
+const heavyApiRateLimiter = createRateLimiter({
+  windowMs: 60 * 1000,
+  max: 20, // 20 requests / phút / IP cho AI endpoints
+});
+app.use('/api/recommend', heavyApiRateLimiter);
+app.use('/api/chat', heavyApiRateLimiter);
+
+// ============== PERFORMANCE MONITORING ==============
+// In-memory storage for performance metrics
+const performanceMetrics = {
+  requests: [] as Array<{
+    method: string;
+    path: string;
+    statusCode: number;
+    responseTime: number;
+    timestamp: number;
+  }>,
+  // API Response time thresholds (ms)
+  thresholds: {
+    chat: 2000,      // Chat API: < 2s
+    rag: 1000,       // RAG Search: < 1s
+    recommend: 1500, // Recommendations: < 1.5s
+    default: 2000,   // Default: < 2s
+  },
+  // Add request to metrics
+  addRequest(method: string, path: string, statusCode: number, responseTime: number) {
+    this.requests.push({ method, path, statusCode, responseTime, timestamp: Date.now() });
+    // Keep only last 1000 requests
+    if (this.requests.length > 1000) {
+      this.requests = this.requests.slice(-1000);
+    }
+  },
+  // Get stats for specific endpoint
+  getStats(endpoint?: string) {
+    const filtered = endpoint 
+      ? this.requests.filter(r => r.path.includes(endpoint))
+      : this.requests;
+    
+    if (filtered.length === 0) return null;
+    
+    const times = filtered.map(r => r.responseTime);
+    return {
+      count: filtered.length,
+      avg: Math.round(times.reduce((a, b) => a + b, 0) / times.length),
+      min: Math.min(...times),
+      max: Math.max(...times),
+      p50: times.sort((a, b) => a - b)[Math.floor(times.length * 0.5)],
+      p95: times.sort((a, b) => a - b)[Math.floor(times.length * 0.95)],
+      p99: times.sort((a, b) => a - b)[Math.floor(times.length * 0.99)],
+      successRate: (filtered.filter(r => r.statusCode < 400).length / filtered.length * 100).toFixed(1),
+    };
+  },
+  // Check if response time meets threshold
+  checkThreshold(path: string, responseTime: number): boolean {
+    if (path.includes('/chat')) return responseTime < this.thresholds.chat;
+    if (path.includes('/rag')) return responseTime < this.thresholds.rag;
+    if (path.includes('/recommend')) return responseTime < this.thresholds.recommend;
+    return responseTime < this.thresholds.default;
+  },
+  // Reset metrics
+  reset() {
+    this.requests = [];
+  }
+};
+
+// Performance monitoring middleware
+app.use((req, res, next) => {
+  const startTime = Date.now();
+  
+  // Capture original end function
+  const originalEnd = res.end;
+  
+  res.end = function(...args: any[]) {
+    const responseTime = Date.now() - startTime;
+    const path = req.route?.path || req.path;
+    
+    // Record metric
+    performanceMetrics.addRequest(req.method, path, res.statusCode, responseTime);
+    
+    // Log slow requests (>= 1.5s)
+    if (responseTime >= 1500) {
+      console.warn(`⚠️  Slow request: ${req.method} ${path} - ${responseTime}ms`);
+    }
+    
+    return originalEnd.apply(this, args as any);
+  };
+  
+  next();
+});
+
+// ============== SYSTEM SETTINGS (In-memory, admin can update) ==============
+interface SystemSettings {
+  anonymousLimit: number;      // -1 = unlimited, else max messages for anonymous
+  defaultPlanLimit: number;    // -1 = unlimited for default free plan
+  maxFilesPerSession: number;  // max files per chat session
+  maxFilesTotal: number;       // max files total per user
+  maxFileSizeMB: number;       // max file size in MB
+  websiteUrl: string;         // website URL for data collection
+}
+
+let systemSettings: SystemSettings = {
+  anonymousLimit: -1,        // Mặc định không giới hạn (theo yêu cầu sếp)
+  defaultPlanLimit: -1,
+  maxFilesPerSession: 10,
+  maxFilesTotal: 100,
+  maxFileSizeMB: 50,
+  websiteUrl: '',
+};
+
+// API endpoint to get system settings
+app.get('/api/system/settings', (req, res) => {
+  res.json({ success: true, data: systemSettings });
+});
+
+// API endpoint to update system settings (admin only)
+app.put('/api/system/settings', (req, res) => {
+  // TODO: Add admin authentication check
+  const { anonymousLimit, defaultPlanLimit, maxFilesPerSession, maxFilesTotal, maxFileSizeMB, websiteUrl } = req.body;
+
+  if (anonymousLimit !== undefined) systemSettings.anonymousLimit = anonymousLimit;
+  if (defaultPlanLimit !== undefined) systemSettings.defaultPlanLimit = defaultPlanLimit;
+  if (maxFilesPerSession !== undefined) systemSettings.maxFilesPerSession = maxFilesPerSession;
+  if (maxFilesTotal !== undefined) systemSettings.maxFilesTotal = maxFilesTotal;
+  if (maxFileSizeMB !== undefined) systemSettings.maxFileSizeMB = maxFileSizeMB;
+  if (websiteUrl !== undefined) systemSettings.websiteUrl = websiteUrl;
+
+  console.log('📝 System settings updated:', systemSettings);
+  res.json({ success: true, data: systemSettings });
+});
+
+// Helper function to get settings
+function getSystemSettings(): SystemSettings {
+  return systemSettings;
+}
+
+// Performance metrics endpoint
+app.get('/api/performance/metrics', (req, res) => {
+  const endpoint = req.query.endpoint as string | undefined;
+  res.json({
+    success: true,
+    data: {
+      summary: performanceMetrics.getStats(),
+      chat: performanceMetrics.getStats('/chat'),
+      rag: performanceMetrics.getStats('/rag'),
+      recommend: performanceMetrics.getStats('/recommend'),
+      recentRequests: performanceMetrics.requests.slice(-20),
+    }
+  });
+});
+
+// Performance health check endpoint
+app.get('/api/performance/health', (req, res) => {
+  const stats = performanceMetrics.getStats();
+  const isHealthy = stats ? parseFloat(stats.successRate) >= 95 : true;
+  
+  res.status(isHealthy ? 200 : 503).json({
+    success: isHealthy,
+    status: isHealthy ? 'healthy' : 'degraded',
+    averageResponseTime: stats?.avg || 0,
+    successRate: stats?.successRate || '100',
+    thresholds: performanceMetrics.thresholds,
+  });
+});
+
+// Get threshold status for an endpoint
+app.get('/api/performance/threshold/:endpoint', (req, res) => {
+  const endpoint = req.params.endpoint;
+  const stats = performanceMetrics.getStats(endpoint);
+  
+  if (!stats) {
+    return res.json({ success: true, status: 'no_data', message: 'No data for this endpoint' });
+  }
+  
+  let threshold = performanceMetrics.thresholds.default;
+  if (endpoint.includes('chat')) threshold = performanceMetrics.thresholds.chat;
+  else if (endpoint.includes('rag')) threshold = performanceMetrics.thresholds.rag;
+  else if (endpoint.includes('recommend')) threshold = performanceMetrics.thresholds.recommend;
+  
+  const meetsThreshold = stats.p95 <= threshold;
+  
+  res.json({
+    success: true,
+    endpoint,
+    threshold,
+    stats: {
+      avg: stats.avg,
+      p50: stats.p50,
+      p95: stats.p95,
+      p99: stats.p99,
+    },
+    meetsThreshold,
+    status: meetsThreshold ? '✅ PASS' : '❌ FAIL',
+  });
+});
 
 // ============== SESSION SETUP ==============
 app.use(session({
@@ -56,7 +299,6 @@ app.use(cors({
   },
   credentials: true,
 }));
-app.use(express.json({ limit: '50mb' })); // Support large files
 
 // ============== AUTH ROUTES ==============
 app.use('/api/auth', authRoutes);
@@ -65,6 +307,47 @@ app.use('/api/kb', kbRoutes);
 app.use('/api/scraper', scraperRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/admin/products', productsRoutes);
+
+// ============== MADA IMAGE PROXY ==============
+// Proxy requests to MADA images to avoid hotlink protection
+app.get('/api/mada-image', async (req, res) => {
+  const { url } = req.query;
+  
+  if (!url || typeof url !== 'string') {
+    return res.status(400).json({ error: 'Missing url parameter' });
+  }
+  
+  // Validate URL is from MADA
+  if (!url.includes('mada.org.qa')) {
+    return res.status(400).json({ error: 'Only MADA images are allowed' });
+  }
+  
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
+        'Referer': 'https://at.mada.org.qa/',
+      }
+    });
+    
+    if (!response.ok) {
+      return res.status(404).json({ error: 'Image not found' });
+    }
+    
+    const buffer = await response.arrayBuffer();
+    const contentType = response.headers.get('content-type') || 'image/jpeg';
+    
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache for 1 day
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    
+    res.send(Buffer.from(buffer));
+  } catch (err: any) {
+    console.error('MADA image proxy error:', err);
+    res.status(500).json({ error: 'Failed to fetch image' });
+  }
+});
 
 // ============== IN-MEMORY ACTIVITY LOG ==============
 interface ActivityLog {
@@ -98,12 +381,18 @@ export function logActivity(level: ActivityLog['level'], message: string, source
 }
 
 // Seed bootstrapping logs
-logActivity('info', 'MADA AI Server started on port ' + (process.env.PORT || 3001), 'System');
+logActivity('info', 'MADA AI Server started on port ' + (process.env.PORT || 3000), 'System');
 logActivity('info', 'Vector store initialized with 65 documents', 'RAG Engine');
 logActivity('success', 'Auth service configured (SQLite + JWT + bcrypt)', 'Auth Service');
 logActivity('info', 'CORS policy: any localhost port allowed (dev)', 'Security');
 
 // ============== ADMIN ROUTES ==============
+app.use('/api/scraper', scraperRoutes);
+app.use('/api/scraper', scraperScheduleRoutes);
+app.use('/api/mada-scraper', madaScraperRoutes);
+app.use('/api/admin', approvalRoutes);
+app.use('/api/consultation', consultationRoutes);
+app.use('/api/admin', adminRoutes);
 app.get('/api/admin/logs', async (req, res) => {
   try {
     const { level, source, limit = '100' } = req.query;
@@ -166,6 +455,86 @@ app.get('/api/admin/analytics', async (_req, res) => {
       },
     });
   } catch (error) {
+    console.error('[GET /api/admin/analytics] failed:', error);
+    res.status(500).json({ success: false, error: 'Internal server error', message: (error as Error).message });
+  }
+});
+
+// Chat analytics aggregated from real activity logs
+app.get('/api/admin/chat-metrics', async (req, res) => {
+  try {
+    const { range = '24h' } = req.query as { range?: string };
+    const now = Date.now();
+    const rangeMs: Record<string, number> = {
+      '24h': 24 * 60 * 60 * 1000,
+      '7d': 7 * 24 * 60 * 60 * 1000,
+      '30d': 30 * 24 * 60 * 60 * 1000,
+      '90d': 90 * 24 * 60 * 60 * 1000,
+    };
+    const window = rangeMs[range] ?? rangeMs['24h'];
+
+    const chatLogs = activityLogs.filter((l) => {
+      const t = new Date(l.timestamp ?? 0).getTime();
+      return l.source === 'Chat' && now - t <= window;
+    });
+
+    const totalChats = chatLogs.length;
+    const hourlyBuckets = new Array(24).fill(0).map((_, i) => ({ hour: i, count: 0 }));
+    chatLogs.forEach((l) => {
+      const hour = new Date(l.timestamp ?? now).getHours();
+      hourlyBuckets[hour].count += 1;
+    });
+
+    const topQueryCounts = new Map<string, number>();
+    chatLogs.forEach((l) => {
+      const msg = l.message ?? '';
+      const match = msg.match(/question[:\s]+["']?([^"'\n]+)/i);
+      const q = (match?.[1] ?? '').trim().slice(0, 60);
+      if (q.length > 0) topQueryCounts.set(q, (topQueryCounts.get(q) ?? 0) + 1);
+    });
+    const topQueries = Array.from(topQueryCounts.entries())
+      .map(([query, count]) => ({ query, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+
+    const langCounts: Record<string, number> = {
+      'Tiếng Việt': 0,
+      'English': 0,
+      'العربية': 0,
+      'Français': 0,
+    };
+    chatLogs.forEach((l) => {
+      const lang = (l as any).language ?? (l.message?.includes('lang:en') ? 'English' : l.message?.includes('lang:ar') ? 'العربية' : l.message?.includes('lang:fr') ? 'Français' : 'Tiếng Việt');
+      langCounts[lang] = (langCounts[lang] ?? 0) + 1;
+    });
+    const languageDistribution = [
+      { language: 'Tiếng Việt', count: langCounts['Tiếng Việt'] ?? 0, color: '#ef4444' },
+      { language: 'English', count: langCounts['English'] ?? 0, color: '#3b82f6' },
+      { language: 'العربية', count: langCounts['العربية'] ?? 0, color: '#10b981' },
+      { language: 'Français', count: langCounts['Français'] ?? 0, color: '#f59e0b' },
+    ];
+
+    const errorCount = activityLogs.filter((l) => {
+      const t = new Date(l.timestamp ?? 0).getTime();
+      return l.level === 'error' && now - t <= window;
+    }).length;
+    const errorRate = totalChats > 0 ? (errorCount / totalChats) * 100 : 0;
+
+    res.json({
+      success: true,
+      data: {
+        totalChats,
+        avgResponseTime: 0,
+        avgConfidence: 0,
+        topQueries,
+        chatsByHour: hourlyBuckets,
+        categoryUsage: [],
+        languageDistribution,
+        errorRate,
+      },
+    });
+  } catch (error) {
+    console.error('Chat metrics error:', error);
     res.status(500).json({ success: false, error: 'Internal server error' });
   }
 });
@@ -211,6 +580,9 @@ async function initializeServices() {
     ragInitialized = true;
     console.log('🚀 RAG system ready');
     console.log('🛡️ Guardrails system ready');
+    
+    // Start scraping scheduler
+    startScheduler();
   } catch (error) {
     console.error('Failed to initialize services:', error);
   }
@@ -221,6 +593,21 @@ initializeServices();
 // In-memory storage
 const consultations: any[] = [];
 const chatHistory: Map<string, any[]> = new Map();
+
+/**
+ * ⭐ MỚI: Mapping Agent ID → MADA Category để RAG filter theo domain
+ * Mapping này dùng để khi user chọn 1 bot, RAG chỉ search KB thuộc domain đó
+ * (kèm priority fallback về toàn bộ KB nếu thiếu)
+ */
+const AGENT_TO_MADA: Record<string, { botId: string; madaCategory: string }> = {
+  'bot-hearing':    { botId: 'bot-hearing',    madaCategory: 'sensory-hearing' },
+  'bot-vision':     { botId: 'bot-vision',     madaCategory: 'sensory-vision' },
+  'bot-speech':     { botId: 'bot-speech',     madaCategory: 'voice-and-speech' },
+  'bot-cognitive':  { botId: 'bot-cognitive',  madaCategory: 'mental-cognitive' },
+  'bot-neuro':      { botId: 'bot-neuro',      madaCategory: 'neuromusculoskeletal-movement' },
+  'bot-mobility':   { botId: 'bot-mobility',   madaCategory: 'mobility-and-transportation' },
+  'bot-regulatory': { botId: 'bot-regulatory', madaCategory: 'regulatory-standards' },
+};
 
 // ============== COMPREHENSIVE KNOWLEDGE BASE ==============
 
@@ -1100,15 +1487,15 @@ Tiêu chuẩn: ISO 9999:09.09, ISO 9999:09.12, ISO 9999:15.03`,
 
 **Ứng dụng sức khỏe:**
 
-*Medicare/Medication reminder*
+*Hỗ trợ thuốc*
 - Nhắc uống thuốc
-- Theo dõi thuốc
-- Kết nối với bác sĩ
+- Theo dõi lịch uống thuốc
+- Kết nối với chuyên gia y tế
 
-*Telehealth*
-- Khám bệnh từ xa
-- Video call với bác sĩ
-- Theo dõi sức khỏe tại nhà
+*Hỗ trợ từ xa*
+- Tư vấn chuyên gia CNHT từ xa
+- Video call với chuyên gia
+- Theo dõi tiến trình sử dụng thiết bị hỗ trợ tại nhà
 
 **Thiết bị giao tiếp:*
 - Điện thoại màn hình lớn
@@ -1481,20 +1868,66 @@ app.get('/api/health', (_req, res) => {
   });
 });
 
+// ============== LANGUAGE DETECTION ==============
+/**
+ * Detect language from user message
+ * Priority: Arabic > Vietnamese > French > English
+ */
+function detectMessageLanguage(message: string): 'vi' | 'en' | 'ar' | 'fr' {
+  const text = message || '';
+  
+  // Check for Arabic characters
+  if (/[\u0600-\u06FF]/.test(text)) {
+    return 'ar';
+  }
+  
+  // Check for Vietnamese diacritics
+  const viDiacritics = /[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/i;
+  const viMatches = text.match(viDiacritics);
+  if (viMatches && viMatches.length >= 2) {
+    return 'vi';
+  }
+  
+  // Check for French common words
+  const frWords = /\b(je|tu|il|elle|nous|vous|ils|elles|bonjour|merci|oui|non|parce que|s'il vous plaît|désolé|excusez-moi|vous êtes|je suis|estre|être)\b/i;
+  if (frWords.test(text)) {
+    return 'fr';
+  }
+  
+  // Default to English
+  return 'en';
+}
+
 // ============== CHAT ENDPOINTS ==============
 
 app.post('/api/chat', async (req, res) => {
   try {
-    const { message, conversationId, language = 'vi', agentId, agentPrompt } = req.body;
+    const { message, conversationId, language: uiLanguage = 'vi', agentId, agentPrompt } = req.body;
 
-    console.log('📩 Chat request:', { message: message?.slice(0, 50), language, agentId });
+    // 🎯 USE UI LANGUAGE AS PRIMARY - Falls back to detected only if UI lang is not set
+    const rawLanguage = req.body.language || uiLanguage;
+    const detectedLanguage = detectMessageLanguage(message);
+    
+    // If UI language is set, use it. Otherwise use detected language
+    // This ensures user setting takes priority over auto-detection
+    const effectiveLanguage = (rawLanguage && ['vi', 'en', 'ar', 'fr'].includes(rawLanguage)) 
+      ? rawLanguage 
+      : detectedLanguage;
+    
+    console.log('🌍 Language settings:', { 
+      uiLanguage, 
+      rawLanguage,
+      detectedLanguage, 
+      effectiveLanguage,
+      messagePreview: message?.slice(0, 30) 
+    });
 
     if (!message) {
       return res.status(400).json({ success: false, error: 'Message is required' });
     }
 
     // Check with Guardrails first
-    const guardrailsResult = guardrails.analyzeQuery(message, language);
+    const guardrailsResult = guardrails.analyzeQuery(message, effectiveLanguage);
     const safetyScore = guardrails.calculateSafetyScore(message);
 
     console.log('🛡️ Guardrails result:', { shouldRedirect: guardrailsResult.shouldRedirect, pattern: guardrailsResult.detectedPattern });
@@ -1522,17 +1955,26 @@ app.post('/api/chat', async (req, res) => {
     }
     chatHistory.get(convId)!.push({ role: 'user', content: message });
 
-    // Build system instruction with agent prompt if provided
+    // Build system instruction based on DETECTED LANGUAGE (not UI language!)
     const languageInstructions: Record<string, string> = {
-      vi: 'Bạn là trợ lý ảo MADA. Hãy trả lời bằng tiếng Việt.',
-      en: 'You are MADA AI assistant. Always respond in English.',
-      ar: 'أنت مساعد MADA الذكي. أجب دائمًا باللغة العربية.',
-      fr: 'Vous êtes l\'assistant MADA. Répondez toujours en français.',
+      vi: 'Bạn là trợ lý ảo MADA - chuyên gia về Công nghệ Hỗ trợ (AT). Hãy trả lời BẰNG TIẾNG VIỆT cho tất cả câu trả lời. Không trả lời bằng ngôn ngữ khác.',
+      en: 'You are MADA AI assistant - an Assistive Technology (AT) specialist. Respond in ENGLISH only. Never respond in any other language.',
+      ar: 'أنت مساعد MADA الذكي - متخصص في التكنولوجيا المساعدة (AT). أجب بالعربية فقط. لا تجب بلغة أخرى.',
+      fr: 'Vous êtes l\'assistant MADA - un spécialiste en Technologie d\'Assistance (TA). Répondez en FRANÇAIS uniquement. Ne répondez jamais dans une autre langue.',
     };
     
-    const baseInstruction = languageInstructions[language] || languageInstructions.vi;
+    const baseInstruction = languageInstructions[effectiveLanguage] || languageInstructions.vi;
     const agentInstruction = agentPrompt ? `${baseInstruction} ${agentPrompt}` : baseInstruction;
-    const ragConfig = { systemInstruction: agentInstruction };
+
+    // ⭐ MỚI: Lấy botId/madaCategory từ agentId
+    const madaMapping = agentId ? AGENT_TO_MADA[agentId] : null;
+
+    const ragConfig: any = { systemInstruction: agentInstruction };
+    if (madaMapping) {
+      ragConfig.botId = madaMapping.botId;
+      ragConfig.madaCategory = madaMapping.madaCategory;
+      ragConfig.priority = true;  // Ưu tiên KB của bot, fallback toàn bộ
+    }
 
     // Query RAG engine with agent context
     const ragResponse = await ragEngine.query(message, chatHistory.get(convId) || [], ragConfig);
@@ -1540,6 +1982,164 @@ app.post('/api/chat', async (req, res) => {
     // Validate response with guardrails
     if (!guardrails.validateResponse(ragResponse.answer)) {
       ragResponse.answer = guardrailsResult.redirectResponse || 'Response filtered by safety guardrails.';
+    }
+
+    // ========== AUTO-RECOMMEND PRODUCTS (always, based on RAG sources or MADA KB) ==========
+    let suggestedProducts: any[] = [];
+    try {
+      const ragSources = ragResponse.sources || [];
+      if (ragSources.length > 0) {
+        // Lấy source URLs để query DB lấy thumbnailUrl
+        const sourceUrls = ragSources.slice(0, 4).map((src: any) => src.source || src.metadata?.source || '').filter(Boolean);
+        
+        // Query DB để lấy thumbnailUrl
+        let thumbnailMap: Record<string, string> = {};
+        if (sourceUrls.length > 0) {
+          try {
+            const placeholders = sourceUrls.map(() => '?').join(',');
+            const thumbnailRows = db.prepare(`
+              SELECT url, json_extract(metadata, '$.thumbnailUrl') as thumbnail 
+              FROM knowledge_items 
+              WHERE url IN (${placeholders}) OR source IN (${placeholders})
+            `).all(...sourceUrls, ...sourceUrls) as any[];
+            
+            for (const row of thumbnailRows) {
+              if (row.thumbnail) {
+                thumbnailMap[row.url] = row.thumbnail;
+              }
+            }
+          } catch (e) {
+            console.log('⚠️ Error fetching thumbnails:', e);
+          }
+        }
+        
+        suggestedProducts = ragSources.slice(0, 4).map((src: any, idx: number) => {
+          const meta = src.metadata || {};
+          const sourceUrl = meta.source || meta.url || src.source || '';
+          // Lấy thumbnail từ map, fallback vào empty string
+          const thumbnail = thumbnailMap[sourceUrl] || '';
+          
+          return {
+            id: src.id || `src-${idx}`,
+            title: meta.title || 'Assistive Technology',
+            title_en: meta.title,
+            description: (src.content || '').slice(0, 200),
+            description_en: (src.content || '').slice(0, 200),
+            category: meta.category || 'hearing',
+            brand: meta.brand || 'MADA Qatar AT Portal',
+            price_range: 'Contact MADA Center',
+            product_url: sourceUrl,
+            source_url: sourceUrl,
+            image_url: toProxyImageUrl(thumbnail),
+            confidence: src.score,
+            match_reason: 'Tìm thấy trong MADA Knowledge Base',
+          };
+        });
+        console.log('🔵 /api/chat Suggested from RAG sources:', suggestedProducts.length, 'with thumbnails:', suggestedProducts.filter((p: any) => p.image_url).length);
+      }
+
+      if (suggestedProducts.length === 0) {
+        const contentLower = message.toLowerCase();
+        const categoryKeywords: Record<string, string[]> = {
+          hearing: ['deaf', 'hear', 'ear', 'sound', 'điếc', 'thính', 'thính giác', 'hearing loss', 'audio', 'fm system', 'microphone', 'amplifier'],
+          vision: ['blind', 'visual', 'eye', 'sight', 'mắt', 'thị giác', 'blindness', 'low vision'],
+          mobility: ['wheelchair', 'walk', 'move', 'physical', 'mobility', 'vận động', 'di chuyển'],
+          communication: ['speak', 'talk', 'communicate', 'voice', 'speech', 'giao tiếp', 'ngôn ngữ', 'aac'],
+          cognition: ['memory', 'learn', 'cognitive', 'think', 'nhận thức', 'học tập'],
+          daily_living: ['daily', 'living', 'self-care', 'sinh hoạt', 'ăn uống'],
+          education: ['education', 'school', 'study', 'giáo dục', 'học'],
+        };
+        let detectedCat: string | null = null;
+        for (const [cat, keywords] of Object.entries(categoryKeywords)) {
+          if (keywords.some(kw => contentLower.includes(kw.toLowerCase()))) {
+            detectedCat = cat;
+            break;
+          }
+        }
+        if (detectedCat) {
+          try {
+            const madaItems = db.prepare(`
+              SELECT id, title, content, source, url, category, language, metadata
+              FROM knowledge_items
+              WHERE category = ? AND source LIKE '%mada.org.qa%' AND status IN ('draft','published','approved')
+              ORDER BY confidence DESC, created_at DESC
+              LIMIT 4
+            `).all(detectedCat) as any[];
+
+            suggestedProducts = madaItems.map((item: any) => {
+              const url = item.url || item.source || '';
+              // ✅ Extract thumbnailUrl from metadata JSON
+              let thumbnail = '';
+              try {
+                const meta = typeof item.metadata === 'string' ? JSON.parse(item.metadata) : item.metadata;
+                thumbnail = meta?.thumbnailUrl || '';
+                // Validate URL
+                if (thumbnail && !thumbnail.startsWith('http')) thumbnail = '';
+              } catch { /* ignore */ }
+
+              return {
+                id: item.id,
+                title: item.title,
+                title_en: item.title,
+                description: (item.content || '').slice(0, 200),
+                description_en: (item.content || '').slice(0, 200),
+                category: item.category,
+                brand: 'MADA Qatar AT Portal',
+                price_range: 'Contact MADA Center',
+                product_url: url,
+                source_url: url,
+                image_url: toProxyImageUrl(thumbnail),
+                confidence: 0.7,
+                match_reason: `Phù hợp category: ${detectedCat}`,
+              };
+            });
+            console.log('🔵 /api/chat Suggested from MADA KB items:', suggestedProducts.length);
+          } catch (dbErr) {
+            console.log('⚠️ DB query for MADA items failed:', dbErr);
+          }
+        }
+      }
+
+      // ✅ Strategy 3: Always ensure we have at least 1 product (random MADA item)
+      if (suggestedProducts.length === 0) {
+        try {
+          const randomMada = db.prepare(`
+            SELECT id, title, content, source, url, category, language, metadata
+            FROM knowledge_items
+            WHERE source LIKE '%mada.org.qa%' AND status IN ('draft','published','approved')
+            ORDER BY RANDOM()
+            LIMIT 4
+          `).all() as any[];
+          suggestedProducts = randomMada.map((item: any) => {
+            const url = item.url || item.source || '';
+            let thumbnail = '';
+            try {
+              const meta = typeof item.metadata === 'string' ? JSON.parse(item.metadata) : item.metadata;
+              thumbnail = meta?.thumbnailUrl || '';
+              if (thumbnail && !thumbnail.startsWith('http')) thumbnail = '';
+            } catch { /* ignore */ }
+            return {
+              id: item.id,
+              title: item.title,
+              title_en: item.title,
+              description: (item.content || '').slice(0, 200),
+              category: item.category,
+              brand: 'MADA Qatar AT Portal',
+              price_range: 'Contact MADA Center',
+              product_url: url,
+              source_url: url,
+              image_url: toProxyImageUrl(thumbnail),
+              confidence: 0.6,
+              match_reason: 'Sản phẩm từ MADA Knowledge Base',
+            };
+          });
+          console.log('🔵 /api/chat Suggested from random MADA:', suggestedProducts.length);
+        } catch (dbErr) {
+          console.log('⚠️ Random MADA query failed:', dbErr);
+        }
+      }
+    } catch (err) {
+      console.log('⚠️ Could not get product suggestions:', err);
     }
 
     // Store assistant response
@@ -1560,6 +2160,8 @@ app.post('/api/chat', async (req, res) => {
         conversationId: convId,
         safetyScore,
         agentId,
+        detectedLanguage: effectiveLanguage, // Return effective language for UI feedback
+        suggestedProducts, // NEW: Auto-suggested products from MADA KB
       },
     });
   } catch (error) {
@@ -1573,7 +2175,22 @@ app.post('/api/chat', async (req, res) => {
 
 app.post('/api/chat-with-file', async (req, res) => {
   try {
-    const { message, conversationId, language = 'vi', agentId, agentPrompt, attachments } = req.body;
+    const { message, conversationId, language: uiLanguage = 'vi', agentId, agentPrompt, attachments } = req.body;
+    
+    // 🎯 USE UI LANGUAGE AS PRIMARY - Falls back to detected only if UI lang is not set
+    const rawLanguage = req.body.language;
+    const detectedLanguage = detectMessageLanguage(message);
+    const effectiveLanguage = (rawLanguage && ['vi', 'en', 'ar', 'fr'].includes(rawLanguage)) 
+      ? rawLanguage 
+      : (uiLanguage && ['vi', 'en', 'ar', 'fr'].includes(uiLanguage) ? uiLanguage : detectedLanguage);
+    
+    console.log('🌍 Language settings (with file):', { 
+      uiLanguage, 
+      rawLanguage,
+      detectedLanguage, 
+      effectiveLanguage, 
+      messagePreview: message?.slice(0, 30) 
+    });
     
     // Write to log file
     fs.appendFileSync('/tmp/chatlog.txt', `=== ${new Date().toISOString()} ===\n`);
@@ -1643,15 +2260,56 @@ app.post('/api/chat-with-file', async (req, res) => {
             const buffer = Buffer.from(att.base64, 'base64');
             const tempPath = `/tmp/${Date.now()}_${att.name || 'file.docx'}`;
             fs.writeFileSync(tempPath, buffer);
-            
+
             const { parseDocxFile } = await import('./lib/rag/fileParsers');
             const text = await parseDocxFile(tempPath);
             fs.unlinkSync(tempPath);
-            
+
             fileContext += `\n\n=== FILE: ${att.name || 'Document.docx'} ===\n${text}\n`;
           } catch (e) {
             console.error('DOCX parse error:', e);
             fileContext += `\n\n=== FILE: ${att.name || 'Document.docx'} ===\n[Không thể đọc nội dung DOCX]\n`;
+          }
+        } else if (
+          (att.type === 'xlsx' || 
+           att.type === 'xls' ||
+           att.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+           att.type === 'application/vnd.ms-excel' ||
+           att.name?.endsWith('.xlsx') || 
+           att.name?.endsWith('.xls') ||
+           att.name?.toLowerCase().includes('sheet'))
+        ) {
+          // Excel/Spreadsheet - decode base64 and parse
+          try {
+            const buffer = Buffer.from(att.base64, 'base64');
+            const ext = att.name?.endsWith('.xlsx') ? 'xlsx' : (att.name?.endsWith('.xls') ? 'xls' : 'xlsx');
+            const tempPath = `/tmp/${Date.now()}_${att.name || 'file.' + ext}`;
+            fs.writeFileSync(tempPath, buffer);
+
+            const { parseExcelFile } = await import('./lib/rag/fileParsers');
+            const text = await parseExcelFile(tempPath);
+            fs.unlinkSync(tempPath);
+
+            fileContext += `\n\n=== SPREADSHEET: ${att.name || 'Spreadsheet'} ===\n${text}\n`;
+          } catch (e) {
+            console.error('Excel parse error:', e);
+            fileContext += `\n\n=== SPREADSHEET: ${att.name || 'Spreadsheet'} ===\n[Không thể đọc nội dung file Excel/Spreadsheet]\n`;
+          }
+        } else if (att.type === 'csv' || att.type === 'text/csv' || att.name?.endsWith('.csv')) {
+          // CSV - decode base64 and parse
+          try {
+            const buffer = Buffer.from(att.base64, 'base64');
+            const tempPath = `/tmp/${Date.now()}_${att.name || 'file.csv'}`;
+            fs.writeFileSync(tempPath, buffer);
+
+            const { parseCSVFile } = await import('./lib/rag/fileParsers');
+            const text = await parseCSVFile(tempPath);
+            fs.unlinkSync(tempPath);
+
+            fileContext += `\n\n=== CSV: ${att.name || 'Data.csv'} ===\n${text}\n`;
+          } catch (e) {
+            console.error('CSV parse error:', e);
+            fileContext += `\n\n=== CSV: ${att.name || 'Data.csv'} ===\n[Không thể đọc nội dung CSV]\n`;
           }
         }
       }
@@ -1661,7 +2319,7 @@ app.post('/api/chat-with-file', async (req, res) => {
     
     console.log('📎 Final fileContext:', fileContext.slice(0, 200));
     // Guardrails check
-    const guardrailsResult = guardrails.analyzeQuery(message, language);
+    const guardrailsResult = guardrails.analyzeQuery(message, effectiveLanguage);
     if (guardrailsResult.shouldRedirect) {
       return res.json({
         success: true,
@@ -1720,7 +2378,7 @@ app.post('/api/chat-with-file', async (req, res) => {
       }
     };
     
-    const promptTemplate = filePromptTemplates[language] || filePromptTemplates.vi;
+    const promptTemplate = filePromptTemplates[effectiveLanguage] || filePromptTemplates.vi;
     
     if (fileContext) {
       enhancedMessage = `${promptTemplate.task}
@@ -1745,7 +2403,7 @@ ${promptTemplate.respondNow}`;
       fr: 'Vous êtes l\'assistant MADA pour l\'analyse de documents. Répondez en français et en détail.',
     };
     
-    const langInstruction = languageInstructions[language] || languageInstructions.vi;
+    const langInstruction = languageInstructions[effectiveLanguage] || languageInstructions.vi;
     
     const ragConfig: any = {};
     
@@ -1763,9 +2421,108 @@ ${promptTemplate.respondNow}`;
     console.log('🔵 RAG response length:', ragResponse.answer.length);
     console.log('🔵 RAG sources:', ragResponse.sources?.length || 0);
 
+    // ========== AUTO-RECOMMEND PRODUCTS (always, based on RAG sources or MADA KB) ==========
+    let suggestedProducts: any[] = [];
+    try {
+      // Strategy 1: Build from RAG sources (most relevant to query)
+      const ragSources = ragResponse.sources || [];
+      if (ragSources.length > 0) {
+        // Query DB để lấy thumbnailUrl cho các source
+        const sourceUrls = ragSources.slice(0, 4).map((src: any) => src.source || src.metadata?.source || '').filter(Boolean);
+        let thumbnailMap: Record<string, string> = {};
+        if (sourceUrls.length > 0) {
+          try {
+            const placeholders = sourceUrls.map(() => '?').join(',');
+            const thumbnailRows = db.prepare(`
+              SELECT url, json_extract(metadata, '$.thumbnailUrl') as thumbnail 
+              FROM knowledge_items 
+              WHERE url IN (${placeholders}) OR source IN (${placeholders})
+            `).all(...sourceUrls, ...sourceUrls) as any[];
+            for (const row of thumbnailRows) {
+              if (row.thumbnail) thumbnailMap[row.url] = row.thumbnail;
+            }
+          } catch (e) { /* ignore */ }
+        }
+        
+        suggestedProducts = ragSources.slice(0, 4).map((src: any, idx: number) => {
+          const meta = src.metadata || {};
+          const sourceUrl = meta.source || meta.url || src.source || '';
+          return {
+            id: src.id || `src-${idx}`,
+            title: meta.title || 'Assistive Technology',
+            title_en: meta.title,
+            description: (src.content || '').slice(0, 200),
+            description_en: (src.content || '').slice(0, 200),
+            category: meta.category || 'hearing',
+            brand: meta.brand || 'MADA Qatar AT Portal',
+            price_range: 'Contact MADA Center',
+            product_url: sourceUrl,
+            source_url: sourceUrl,
+            image_url: toProxyImageUrl(thumbnailMap[sourceUrl] || ''),
+            confidence: src.score,
+            match_reason: 'Tìm thấy trong MADA Knowledge Base',
+          };
+        });
+        console.log('🔵 Suggested from RAG sources:', suggestedProducts.length);
+      }
+
+      // Strategy 2: If still empty, query MADA KB items directly by category detection
+      if (suggestedProducts.length === 0) {
+        const contentLower = (message + ' ' + (fileContext || '').slice(0, 1000)).toLowerCase();
+        const categoryKeywords: Record<string, string[]> = {
+          hearing: ['deaf', 'hear', 'ear', 'sound', 'điếc', 'thính', 'thính giác', 'hearing loss', 'audio', 'fm system', 'microphone', 'amplifier'],
+          vision: ['blind', 'visual', 'eye', 'sight', 'mắt', 'thị giác', 'blindness', 'low vision'],
+          mobility: ['wheelchair', 'walk', 'move', 'physical', 'mobility', 'vận động', 'di chuyển', 'standing'],
+          communication: ['speak', 'talk', 'communicate', 'voice', 'speech', 'giao tiếp', 'ngôn ngữ', 'aac'],
+          cognition: ['memory', 'learn', 'cognitive', 'think', 'nhận thức', 'học tập', 'learning', 'dementia'],
+          daily_living: ['daily', 'living', 'self-care', 'eat', 'dress', 'sinh hoạt', 'ăn uống'],
+          education: ['education', 'school', 'study', 'giáo dục', 'học', 'reading'],
+        };
+
+        let detectedCat: string | null = null;
+        for (const [cat, keywords] of Object.entries(categoryKeywords)) {
+          if (keywords.some(kw => contentLower.includes(kw.toLowerCase()))) {
+            detectedCat = cat;
+            break;
+          }
+        }
+        if (detectedCat) {
+          const madaItems = db.prepare(`
+            SELECT id, title, content, source, url, category, language
+            FROM knowledge_items
+            WHERE category = ? AND source LIKE '%mada.org.qa%' AND status IN ('draft','published','approved')
+            ORDER BY confidence DESC, created_at DESC
+            LIMIT 4
+          `).all(detectedCat) as any[];
+
+          suggestedProducts = madaItems.map((item: any) => {
+            const url = item.url || item.source || '';
+            return {
+              id: item.id,
+              title: item.title,
+              title_en: item.title,
+              description: (item.content || '').slice(0, 200),
+              description_en: (item.content || '').slice(0, 200),
+              category: item.category,
+              brand: 'MADA Qatar AT Portal',
+              price_range: 'Contact MADA Center',
+              product_url: url,
+              source_url: url,
+              image_url: '',
+              confidence: 0.7,
+              match_reason: `Phù hợp category: ${detectedCat}`,
+            };
+          });
+          console.log('🔵 Suggested from MADA KB items:', suggestedProducts.length);
+        }
+      }
+    } catch (err) {
+      console.log('⚠️ Could not get product suggestions:', err);
+    }
+
     // Store response
     chatHistory.get(convId)!.push({ role: 'assistant', content: ragResponse.answer });
-
+    
     res.json({
       success: true,
       data: {
@@ -1774,10 +2531,279 @@ ${promptTemplate.respondNow}`;
         contextUsed: true,
         fileContextIncluded: !!fileContext,
         conversationId: convId,
+        suggestedProducts, // NEW: Auto-suggested products based on content
       },
     });
   } catch (error) {
     console.error('❌ Chat file error:', error);
+    res.status(500).json({ success: false, error: `Error: ${error instanceof Error ? error.message : 'Unknown'}` });
+  }
+});
+
+// ============== REAL-TIME STREAMING CHAT ENDPOINT ==============
+// Server-Sent Events (SSE) endpoint for real-time AI responses
+app.post('/api/chat/stream', async (req: Request, res: Response) => {
+  try {
+    const { message, conversationId, language: uiLanguage = 'vi', agentId, agentPrompt } = req.body;
+
+    // Set headers for SSE
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering if used
+
+    const sendEvent = (data: any) => {
+      res.write(`data: ${JSON.stringify(data)}\n\n`);
+    };
+
+    // Send initial connection event
+    sendEvent({ type: 'connected', timestamp: Date.now() });
+
+    // ===== ANONYMOUS QUOTA CHECK =====
+    // Check if anonymous user has exceeded their limit
+    const isAuthenticated = req.headers.authorization?.startsWith('Bearer ');
+    if (!isAuthenticated) {
+      const systemSettings = getSystemSettings();
+      const anonymousLimit = systemSettings.anonymousLimit;
+
+      if (anonymousLimit !== -1) {
+        // Get anonymous quota from header (sent by frontend)
+        const anonQuotaHeader = req.headers['x-anon-quota'] ? parseInt(req.headers['x-anon-quota'] as string) : 0;
+
+        if (anonQuotaHeader >= anonymousLimit) {
+          console.log(`❌ Anonymous quota exceeded: ${anonQuotaHeader}/${anonymousLimit}`);
+          sendEvent({
+            type: 'done',
+            answer: `⚠️ Bạn đã sử dụng hết ${anonymousLimit} lần trò chuyện miễn phí. Vui lòng đăng nhập để tiếp tục sử dụng, hoặc liên hệ admin để được hỗ trợ.`,
+            sources: [],
+            quotaExceeded: true,
+          });
+          return res.end();
+        }
+      }
+    }
+    // ===== END QUOTA CHECK =====
+
+    // Detect language
+    const rawLanguage = req.body.language || uiLanguage;
+    const detectedLanguage = detectMessageLanguage(message);
+    const effectiveLanguage = (rawLanguage && ['vi', 'en', 'ar', 'fr'].includes(rawLanguage))
+      ? rawLanguage
+      : detectedLanguage;
+
+    // Guardrails check (non-streaming)
+    const guardrailsResult = guardrails.analyzeQuery(message, effectiveLanguage);
+    if (guardrailsResult.shouldRedirect) {
+      sendEvent({ type: 'done', answer: guardrailsResult.redirectResponse, sources: [] });
+      return res.end();
+    }
+
+    // Store conversation
+    const convId = conversationId || uuidv4();
+    if (!chatHistory.has(convId)) {
+      chatHistory.set(convId, []);
+    }
+    chatHistory.get(convId)!.push({ role: 'user', content: message });
+
+    // Build prompt
+    const languageInstructions: Record<string, string> = {
+      vi: 'Ban la tro ly AI MADA ho tro cong nghe ho tro nguoi khuyet tat. Tra loi chi tiet tieng Viet.',
+      en: 'You are MADA AI assistant for assistive technology. Respond in English.',
+      ar: 'أنت مساعد MADA الذكي. أجب دائمًا باللغة العربية.',
+      fr: 'Vous êtes l\'assistant MADA. Répondez en français.',
+    };
+
+    let ragConfig: any = {
+      systemInstruction: languageInstructions[effectiveLanguage] || languageInstructions.vi,
+    };
+
+    if (agentPrompt) {
+      ragConfig.systemInstruction += ` ${agentPrompt}`;
+    }
+
+    // ⭐ MỚI: Lấy botId/madaCategory từ agentId cho RAG filter
+    const madaMapping = agentId ? AGENT_TO_MADA[agentId] : null;
+    if (madaMapping) {
+      ragConfig.botId = madaMapping.botId;
+      ragConfig.madaCategory = madaMapping.madaCategory;
+      ragConfig.priority = true;  // Ưu tiên KB của bot, fallback toàn bộ
+    }
+
+    // Check if Gemini is configured
+    if (!ragEngine.isConfigured) {
+      sendEvent({
+        type: 'done',
+        answer: '❌ Gemini API chưa được cấu hình. Vui lòng liên hệ admin để thiết lập GEMINI_API_KEY trong .env.',
+        sources: [],
+        error: 'gemini_not_configured',
+      });
+      return res.end();
+    }
+
+    // Stream from RAG engine
+    try {
+      const streamResult = await ragEngine.queryStream(message, chatHistory.get(convId) || [], ragConfig);
+
+      // Send sources when available
+      if (streamResult.sources && streamResult.sources.length > 0) {
+        sendEvent({ type: 'sources', sources: streamResult.sources });
+      }
+
+      // ✅ Build suggestedProducts from RAG sources (same logic as /api/chat)
+      let suggestedProducts: any[] = [];
+      try {
+        const ragSources = streamResult.sources || [];
+        if (ragSources.length > 0) {
+          // Query DB để lấy thumbnailUrl
+          const sourceUrls = ragSources.slice(0, 4).map((src: any) => src.source || src.metadata?.source || '').filter(Boolean);
+          let thumbnailMap: Record<string, string> = {};
+          if (sourceUrls.length > 0) {
+            try {
+              const placeholders = sourceUrls.map(() => '?').join(',');
+              const thumbnailRows = db.prepare(`
+                SELECT url, json_extract(metadata, '$.thumbnailUrl') as thumbnail 
+                FROM knowledge_items 
+                WHERE url IN (${placeholders}) OR source IN (${placeholders})
+              `).all(...sourceUrls, ...sourceUrls) as any[];
+              for (const row of thumbnailRows) {
+                if (row.thumbnail) thumbnailMap[row.url] = row.thumbnail;
+              }
+            } catch (e) { /* ignore */ }
+          }
+          
+          suggestedProducts = ragSources.slice(0, 4).map((src: any, idx: number) => {
+            const meta = src.metadata || {};
+            const sourceUrl = meta.source || meta.url || src.source || '';
+            return {
+              id: src.id || `src-${idx}`,
+              title: meta.title || 'Assistive Technology',
+              title_en: meta.title || 'Assistive Technology',
+              description: '',
+              category: meta.category || 'general',
+              brand: meta.brand || 'MADA Qatar AT Portal',
+              price_range: 'Contact MADA Center',
+              product_url: sourceUrl,
+              source_url: sourceUrl,
+              image_url: toProxyImageUrl(thumbnailMap[sourceUrl] || ''),
+              confidence: src.score || 0.7,
+              match_reason: 'Tìm thấy trong MADA Knowledge Base',
+            };
+          });
+        }
+
+        // Fallback: query DB by detected category
+        if (suggestedProducts.length === 0) {
+          const contentLower = message.toLowerCase();
+          const categoryKeywords: Record<string, string[]> = {
+            hearing: ['deaf', 'hear', 'ear', 'sound', 'điếc', 'thính', 'thính giác', 'hearing loss', 'audio', 'fm system', 'microphone', 'amplifier'],
+            vision: ['blind', 'visual', 'eye', 'sight', 'mắt', 'thị giác', 'blindness', 'low vision'],
+            mobility: ['wheelchair', 'walk', 'move', 'physical', 'mobility', 'vận động', 'di chuyển'],
+            communication: ['speak', 'talk', 'communicate', 'voice', 'speech', 'giao tiếp', 'ngôn ngữ', 'aac'],
+            cognition: ['memory', 'learn', 'cognitive', 'think', 'nhận thức', 'học tập'],
+            daily_living: ['daily', 'living', 'self-care', 'sinh hoạt', 'ăn uống'],
+            education: ['education', 'school', 'study', 'giáo dục', 'học'],
+          };
+          let detectedCat: string | null = null;
+          for (const [cat, keywords] of Object.entries(categoryKeywords)) {
+            if (keywords.some(kw => contentLower.includes(kw.toLowerCase()))) {
+              detectedCat = cat;
+              break;
+            }
+          }
+          if (detectedCat) {
+            const madaItems = db.prepare(`
+              SELECT id, title, content, source, url, category, language, metadata
+              FROM knowledge_items
+              WHERE category = ? AND source LIKE '%mada.org.qa%' AND status IN ('draft','published','approved')
+              ORDER BY confidence DESC, created_at DESC
+              LIMIT 4
+            `).all(detectedCat) as any[];
+            suggestedProducts = madaItems.map((item: any) => {
+              const url = item.url || item.source || '';
+              let thumbnail = '';
+              try {
+                const meta = typeof item.metadata === 'string' ? JSON.parse(item.metadata) : item.metadata;
+                thumbnail = meta?.thumbnailUrl || '';
+                if (thumbnail && !thumbnail.startsWith('http')) thumbnail = '';
+              } catch { /* ignore */ }
+              return {
+                id: item.id, title: item.title, title_en: item.title,
+                description: (item.content || '').slice(0, 200),
+                category: item.category, brand: 'MADA Qatar AT Portal',
+                price_range: 'Contact MADA Center', product_url: url, source_url: url,
+                image_url: toProxyImageUrl(thumbnail), confidence: 0.7,
+                match_reason: `Phù hợp category: ${detectedCat}`,
+              };
+            });
+          }
+        }
+
+        // Strategy 3: Random MADA item
+        if (suggestedProducts.length === 0) {
+          const randomMada = db.prepare(`
+            SELECT id, title, content, source, url, category, language, metadata
+            FROM knowledge_items
+            WHERE source LIKE '%mada.org.qa%' AND status IN ('draft','published','approved')
+            ORDER BY RANDOM() LIMIT 4
+          `).all() as any[];
+          suggestedProducts = randomMada.map((item: any) => {
+            const url = item.url || item.source || '';
+            let thumbnail = '';
+            try {
+              const meta = typeof item.metadata === 'string' ? JSON.parse(item.metadata) : item.metadata;
+              thumbnail = meta?.thumbnailUrl || '';
+              if (thumbnail && !thumbnail.startsWith('http')) thumbnail = '';
+            } catch { /* ignore */ }
+            return {
+              id: item.id, title: item.title, title_en: item.title,
+              description: (item.content || '').slice(0, 200),
+              category: item.category, brand: 'MADA Qatar AT Portal',
+              price_range: 'Contact MADA Center', product_url: url, source_url: url,
+              image_url: toProxyImageUrl(thumbnail), confidence: 0.6,
+              match_reason: 'Sản phẩm từ MADA Knowledge Base',
+            };
+          });
+        }
+
+        if (suggestedProducts.length > 0) {
+          sendEvent({ type: 'suggestedProducts', suggestedProducts });
+          console.log(`🔵 /api/chat/stream Suggested: ${suggestedProducts.length}`);
+        }
+      } catch (suggErr) {
+        console.log('⚠️ /api/chat/stream suggestedProducts error:', suggErr);
+      }
+
+      // Stream the response chunks
+      if (streamResult.stream) {
+        for await (const chunk of streamResult.stream) {
+          const chunkText = chunk.text();
+          if (chunkText) {
+            sendEvent({ type: 'chunk', chunk: chunkText });
+          }
+        }
+      } else if (streamResult.answer) {
+        // Fallback: send whole answer if not streaming
+        sendEvent({ type: 'chunk', chunk: streamResult.answer });
+      }
+
+      // Send completion
+      sendEvent({
+        type: 'done',
+        conversationId: convId,
+        confidence: streamResult.confidence || 0.5,
+      });
+
+      // Store assistant response in history
+      chatHistory.get(convId)!.push({ role: 'assistant', content: streamResult.answer || '' });
+
+    } catch (streamError) {
+      console.error('❌ Stream error:', streamError);
+      sendEvent({ type: 'error', error: streamError instanceof Error ? streamError.message : 'Stream failed' });
+    }
+
+    return res.end();
+  } catch (error) {
+    console.error('❌ Chat stream error:', error);
     res.status(500).json({ success: false, error: `Error: ${error instanceof Error ? error.message : 'Unknown'}` });
   }
 });
@@ -2313,7 +3339,8 @@ app.get('/api/stats', async (_req, res) => {
       },
     });
   } catch (error) {
-    res.status(500).json({ success: false, error: 'Internal server error' });
+    console.error('[GET /api/stats] failed:', error);
+    res.status(500).json({ success: false, error: 'Internal server error', message: (error as Error).message });
   }
 });
 
@@ -2593,6 +3620,240 @@ app.patch('/api/consultation/:id', async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+});
+
+// ============== AI SUGGESTIONS AFTER SCRAPE ==============
+
+/**
+ * Generate AI suggestions after scraping/content upload
+ * Returns related questions, topics, and product recommendations
+ */
+app.post('/api/kb/suggest', async (req, res) => {
+  try {
+    const { content, category, title, language = 'vi' } = req.body;
+
+    if (!content || content.length < 50) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Nội dung quá ngắn để tạo đề xuất (tối thiểu 50 ký tự)' 
+      });
+    }
+
+    console.log(`💡 Generating suggestions for: ${title || 'Untitled'} (category: ${category})`);
+
+    // Truncate content for prompt
+    const truncatedContent = content.slice(0, 3000);
+    
+    // Detect category for suggestions
+    const detectedCategory = category || 'general';
+    
+    // Language-specific prompts
+    const suggestionPrompts: Record<string, { intro: string; questions: string; topics: string; products: string }> = {
+      vi: {
+        intro: `Bạn là chuyên gia về Công nghệ Hỗ trợ (AT). Dựa vào nội dung sau, hãy đề xuất:`,
+        questions: `- 3 câu hỏi mà người dùng có thể hỏi về chủ đề này
+- Câu hỏi phải ngắn gọn, thực tế, phù hợp với người khuyết tật hoặc gia đình họ
+- Format: mỗi câu hỏi trên 1 dòng`,
+        topics: `- 3 chủ đề liên quan mà người dùng nên tìm hiểu thêm
+- Các chủ đề phải liên quan trực tiếp đến nội dung
+- Format: mỗi chủ đề trên 1 dòng`,
+        products: `- 2-3 thiết bị/sản phẩm AT phù hợp với nội dung này
+- Nếu nội dung về thị giác → đề xuất: phần mềm đọc màn hình, kính thông minh, màn hình Braille
+- Nếu nội dung về thính giác → đề xuất: máy trợ thính, thiết bị FM, phụ đề
+- Nếu nội dung về vận động → đề xuất: xe lăn, khung đi, nạng
+- Nếu nội dung về nhận thức/giao tiếp → đề xuất: thiết bị AAC, ứng dụng giao tiếp
+- Format: Tên sản phẩm - mô tả ngắn`
+      },
+      en: {
+        intro: `You are an Assistive Technology (AT) specialist. Based on the following content, please suggest:`,
+        questions: `- 3 questions users might ask about this topic
+- Questions should be concise, practical, and relevant for people with disabilities or their families
+- Format: one question per line`,
+        topics: `- 3 related topics users should explore further
+- Topics must be directly related to the content
+- Format: one topic per line`,
+        products: `- 2-3 AT devices/products suitable for this content
+- Format: Product name - brief description`
+      },
+      ar: {
+        intro: `أنت متخصص في التكنولوجيا المساعدة (AT). بناءً على المحتوى التالي، يرجى اقتراح:`,
+        questions: `- 3 أسئلة قد يسألها المستخدمون حول هذا الموضوع
+- يجب أن تكون الأسئلة موجزة وعملية
+- التنسيق: سؤال واحد في كل سطر`,
+        topics: `- 3 مواضيع ذات صلة يجب على المستخدمين استكشافها
+- التنسيق: موضوع واحد في كل سطر`,
+        products: `- 2-3 أجهزة/منتجات AT مناسبة لهذا المحتوى
+- التنسيق: اسم المنتج - وصف موجز`
+      },
+      fr: {
+        intro: `Vous êtes spécialiste en Technologie d'Assistance (TA). Basé sur le contenu suivant, veuillez suggérer:`,
+        questions: `- 3 questions que les utilisateurs pourraient poser sur ce sujet
+- Format: une question par ligne`,
+        topics: `- 3 sujets connexes que les utilisateurs devraient explorer
+- Format: un sujet par ligne`,
+        products: `- 2-3 dispositifs/produits TA adaptés à ce contenu
+- Format: Nom du produit - description brève`
+      }
+    };
+
+    const prompt = suggestionPrompts[language] || suggestionPrompts.vi;
+
+    // Build the full prompt
+    const fullPrompt = `${prompt.intro}
+
+NỘI DUNG:
+${truncatedContent}
+
+1. CÂU HỎI GỢI Ý:
+${prompt.questions}
+
+2. CHỦ ĐỀ LIÊN QUAN:
+${prompt.topics}
+
+3. SẢN PHẨM ĐỀ XUẤT:
+${prompt.products}
+
+Hãy trả lời theo format trên, không thêm giải thích.`;
+
+    // Use RAG engine to generate suggestions
+    const ragResponse = await ragEngine.query(fullPrompt, [], {
+      systemInstruction: 'Bạn là trợ lý AI chuyên về Công nghệ Hỗ trợ. Trả lời ngắn gọn, thực tế, theo đúng format yêu cầu.',
+      maxOutputTokens: 1024
+    });
+
+    // Parse the response to extract structured suggestions
+    const response = ragResponse.answer;
+    
+    const suggestions = {
+      questions: [] as string[],
+      topics: [] as string[],
+      products: [] as { name: string; description: string }[],
+      raw: response
+    };
+
+    // Parse questions
+    const questionsMatch = response.match(/1\.\s*CÂU HỎI[^\n]*\n([\s\S]*?)(?=2\.|CHỦ ĐỀ|SẢN PHẨM|$)/i);
+    if (questionsMatch) {
+      suggestions.questions = questionsMatch[1]
+        .split('\n')
+        .map((q: string) => q.replace(/^[-•*]\s*/, '').trim())
+        .filter((q: string) => q.length > 10);
+    }
+
+    // Parse topics
+    const topicsMatch = response.match(/2\.\s*CHỦ ĐỀ[^\n]*\n([\s\S]*?)(?=3\.|SẢN PHẨM|$)/i);
+    if (topicsMatch) {
+      suggestions.topics = topicsMatch[1]
+        .split('\n')
+        .map((t: string) => t.replace(/^[-•*]\s*/, '').trim())
+        .filter((t: string) => t.length > 5);
+    }
+
+    // Parse products
+    const productsMatch = response.match(/3\.\s*SẢN PHẨM[^\n]*\n([\s\S]*?)$/i);
+    if (productsMatch) {
+      const productLines = productsMatch[1].split('\n').filter((p: string) => p.trim().length > 3);
+      suggestions.products = productLines.map((p: string) => {
+        const parts = p.replace(/^[-•*]\s*/, '').split('-');
+        return {
+          name: parts[0]?.trim() || p.trim(),
+          description: parts[1]?.trim() || ''
+        };
+      });
+    }
+
+    // If parsing failed, try alternative parsing
+    if (suggestions.questions.length === 0) {
+      // Try to extract any lines that look like questions
+      const lines = response.split('\n').filter((l: string) => l.trim());
+      suggestions.questions = lines.slice(0, 3).map((q: string) => q.replace(/^[-•*\d.]\s*/, '').trim());
+    }
+
+    console.log(`✅ Generated suggestions: ${suggestions.questions.length} questions, ${suggestions.topics.length} topics, ${suggestions.products.length} products`);
+
+    res.json({
+      success: true,
+      data: {
+        title,
+        category: detectedCategory,
+        suggestions,
+        generatedAt: new Date().toISOString()
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Suggestion generation error:', error);
+    res.status(500).json({ success: false, error: 'Không thể tạo đề xuất' });
+  }
+});
+
+// ============== SCRAPE WITH SUGGESTIONS ==============
+
+/**
+ * Scrape URL and return content WITH AI suggestions
+ */
+app.post('/api/kb/scrape-with-suggest', async (req, res) => {
+  try {
+    const { url, title, language = 'vi' } = req.body;
+
+    if (!url || !url.match(/^https?:\/\//)) {
+      return res.status(400).json({ success: false, error: 'URL không hợp lệ' });
+    }
+
+    // First, scrape the content
+    const source: DataSource = {
+      type: 'web',
+      content: '',
+      source: url,
+      title,
+      language,
+    };
+
+    const result = await dataIngestion.ingestData(source);
+
+    if (!result.success) {
+      return res.json({ 
+        success: false, 
+        error: result.message 
+      });
+    }
+
+    // Get the scraped content from the item
+    const item = db.prepare('SELECT * FROM knowledge_items WHERE id = ?').get(result.itemId) as any;
+    if (!item) {
+      return res.status(500).json({ success: false, error: 'Không tìm thấy item' });
+    }
+
+    // Generate suggestions
+    const suggestionsRes = await fetch(`http://localhost:${PORT}/api/kb/suggest`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        content: item.content,
+        category: item.category,
+        title: item.title,
+        language
+      })
+    });
+
+    const suggestionsData = await suggestionsRes.json();
+
+    res.json({
+      success: true,
+      data: {
+        itemId: result.itemId,
+        title: item.title,
+        category: item.category,
+        documentsAdded: result.documentsAdded,
+        suggestions: suggestionsData.success ? suggestionsData.data.suggestions : null,
+        message: result.message
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Scrape with suggestions error:', error);
+    res.status(500).json({ success: false, error: 'Lỗi khi scrape và tạo đề xuất' });
   }
 });
 

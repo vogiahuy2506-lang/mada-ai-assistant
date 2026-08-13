@@ -8,10 +8,10 @@ interface RobotLogoProps {
 const palette = {
   brand: {
     body: 'url(#robot-brand-body)',
-    accent: '#7c3aed',
-    accentSoft: '#a78bfa',
+    accent: '#006572',
+    accentSoft: '#008B8B',
     eye: '#0f172a',
-    glow: '#c4b5fd',
+    glow: '#40E0D0',
   },
   mono: {
     body: '#0f172a',
@@ -42,8 +42,8 @@ export function RobotLogo({ className, variant = 'brand' }: RobotLogoProps) {
       {variant === 'brand' && (
         <defs>
           <linearGradient id="robot-brand-body" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor="#8b5cf6" />
-            <stop offset="100%" stopColor="#3b82f6" />
+            <stop offset="0%" stopColor="#006572" />
+            <stop offset="100%" stopColor="#008B8B" />
           </linearGradient>
         </defs>
       )}

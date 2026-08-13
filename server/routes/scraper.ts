@@ -4,6 +4,7 @@
 
 // @ts-nocheck
 import express from 'express';
+import { dataIngestion } from '../lib/rag/dataIngestion';
 
 const router = express.Router();
 
@@ -167,8 +168,6 @@ router.post('/run-all', async (req, res) => {
 
     // Run in background
     (async () => {
-      const { dataIngestion } = await import('../rag/dataIngestion');
-      
       let successCount = 0;
       let failCount = 0;
       let totalDocs = 0;

@@ -124,24 +124,6 @@ li a,
   min-height: unset;
 }
 
-/* ============== SKIP LINK (WCAG 2.4.1) ============== */
-.skip-link {
-  position: absolute;
-  top: -100%;
-  left: 0;
-  background: var(--color-primary);
-  color: var(--color-text-inverse);
-  padding: 0.75rem 1.5rem;
-  z-index: 9999;
-  text-decoration: none;
-  font-weight: 600;
-  border-radius: 0 0 var(--radius-md) 0;
-}
-
-.skip-link:focus {
-  top: 0;
-}
-
 /* ============== TEXT SELECTION ============== */
 ::selection {
   background: var(--color-primary);

@@ -5,7 +5,6 @@ import { LANGUAGE_NAMES, type Language } from '@/types';
 import { t } from '@/lib/translations';
 import { Menu, X, Moon, Sun, LogIn, LogOut, User, ChevronDown, Sparkles } from 'lucide-react';
 import clsx from 'clsx';
-import { RobotLogo } from './icons/RobotLogo';
 
 export function Header() {
   const { language, setLanguage } = useLanguageStore();
@@ -162,12 +161,12 @@ export function Header() {
         )}
       >
         <Link to="/" className="flex items-center gap-2">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-500 to-blue-500 flex items-center justify-center p-1.5">
-            <RobotLogo variant="white" className="w-full h-full" />
-          </div>
+          <img src="/mada-logo.png" alt="MADA" className="h-8" />
           <div className="font-black text-xl tracking-tight">
             MADA AI
           </div>
+          <span className="hidden xl:inline-flex items-center text-on-surface-variant/40 text-xs mx-1">×</span>
+          <img src="/digiso-logo.svg" alt="DIGISO" className="hidden xl:block h-7" />
         </Link>
 
         <div className="hidden lg:flex gap-8 items-center">
@@ -192,17 +191,49 @@ export function Header() {
           ))}
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
+          {/* Language Selector */}
+          <div className="hidden lg:flex items-center gap-1">
+            {languages.map((lang) => (
+              <button
+                key={lang}
+                onClick={() => setLanguage(lang)}
+                className={clsx(
+                  'px-2 py-1 rounded-md text-[10px] font-mono uppercase tracking-wider transition-all',
+                  language === lang 
+                    ? 'bg-primary text-on-primary font-bold' 
+                    : 'text-on-surface-variant hover:text-primary'
+                )}
+              >
+                {lang.toUpperCase()}
+              </button>
+            ))}
+          </div>
+          
+          <div className="w-px h-5 bg-outline-variant/50"></div>
+
+          {/* Theme Toggle */}
           <button
             onClick={toggleTheme}
-            className="p-2 rounded-lg hover:bg-surface-container transition-colors"
-            aria-label="Toggle theme"
-          >
-            {isDark ? (
-              <Sun className="w-4 h-4 text-surface-variant" />
-            ) : (
-              <Moon className="w-4 h-4 text-on-surface-variant" />
+            className={clsx(
+              'relative p-2 rounded-xl transition-all duration-300',
+              'hover:bg-surface-container active:scale-90',
+              isDark 
+                ? 'bg-violet-500/20 hover:bg-violet-500/30' 
+                : 'bg-slate-100 hover:bg-slate-200'
             )}
+            aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+          >
+            <div className="relative w-5 h-5">
+              {isDark ? (
+                <Sun className="w-5 h-5 text-amber-400 absolute inset-0 transition-all duration-300 rotate-0 scale-100" />
+              ) : (
+                <Moon className="w-5 h-5 text-indigo-500 absolute inset-0 transition-all duration-300 rotate-0 scale-100" />
+              )}
+            </div>
+            <span className="absolute -bottom-7 left-1/2 -translate-x-1/2 text-[9px] font-medium text-on-surface-variant whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+              {isDark ? 'Sáng' : 'Tối'}
+            </span>
           </button>
 
           {renderAuthSection()}
@@ -220,20 +251,31 @@ export function Header() {
         )}
       >
         <Link to="/" className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-violet-500 to-blue-500 flex items-center justify-center p-1">
-            <RobotLogo variant="white" className="w-full h-full" />
-          </div>
+          <img src="/mada-logo.png" alt="MADA" className="h-8" />
           <div className="font-black text-xl tracking-tight">
             MADA AI
           </div>
+          <span className="hidden xl:inline-flex items-center text-on-surface-variant/40 text-xs mx-1">×</span>
+          <img src="/digiso-logo.svg" alt="DIGISO" className="hidden xl:block h-7" />
         </Link>
 
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-2">
+          {/* Theme Toggle - Mobile */}
           <button
             onClick={toggleTheme}
-            className="p-2 rounded-lg hover:bg-surface-container transition-colors"
+            className={clsx(
+              'p-2.5 rounded-xl transition-all duration-300',
+              isDark 
+                ? 'bg-violet-500/20' 
+                : 'bg-slate-100'
+            )}
+            aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
           >
-            {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            {isDark ? (
+              <Sun className="w-5 h-5 text-amber-400" />
+            ) : (
+              <Moon className="w-5 h-5 text-indigo-500" />
+            )}
           </button>
 
           <button

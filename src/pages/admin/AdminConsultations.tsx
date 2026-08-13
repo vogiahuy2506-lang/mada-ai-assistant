@@ -1,65 +1,55 @@
 import { useState, useEffect } from 'react';
 import { AdminLayout } from './AdminLayout';
+import { adminApi } from './adminApi';
 import clsx from 'clsx';
 
-interface ConsultationRequest {
-  id: string;
-  name: string;
-  email: string;
-  phone: string;
-  message: string;
-  timestamp: string;
-  status: 'pending' | 'reviewed' | 'contacted';
-}
-
 export function AdminConsultations() {
-  const [requests, setRequests] = useState<ConsultationRequest[]>([]);
+  const [requests, setRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedRequest, setSelectedRequest] = useState<ConsultationRequest | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedRequest, setSelectedRequest] = useState<any | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('all');
-
-  useEffect(() => {
-    fetchRequests();
-  }, []);
 
   const fetchRequests = async () => {
     try {
-      const response = await fetch('/api/consultation');
-      const data = await response.json();
-      if (data.success) {
-        setRequests(data.data);
+      setLoading(true);
+      setError(null);
+      const res = await adminApi.getConsultations({ 
+        status: statusFilter !== 'all' ? statusFilter : undefined 
+      });
+      if (res.success && res.data) {
+        setRequests(res.data);
+      } else {
+        setError(res.error || 'Failed to load consultations');
       }
-    } catch (error) {
-      console.error('Error fetching consultations:', error);
+    } catch (err: any) {
+      setError(err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const updateStatus = async (id: string, status: ConsultationRequest['status']) => {
+  useEffect(() => {
+    fetchRequests();
+  }, [statusFilter]);
+
+  const updateStatus = async (id: string, status: 'pending' | 'reviewed' | 'contacted') => {
     try {
-      const response = await fetch(`/api/consultation/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status }),
-      });
-      const data = await response.json();
-      if (data.success) {
-        setRequests(prev =>
-          prev.map(r => (r.id === id ? { ...r, status } : r))
-        );
+      const res = await adminApi.updateConsultation(id, { status });
+      if (res.success) {
+        setRequests(prev => prev.map(r => r.id === id ? { ...r, status } : r));
         if (selectedRequest?.id === id) {
           setSelectedRequest({ ...selectedRequest, status });
         }
+      } else {
+        alert(res.error);
       }
-    } catch (error) {
-      console.error('Error updating status:', error);
+    } catch (err: any) {
+      alert(err.message);
     }
   };
 
-  const filteredRequests = statusFilter === 'all'
-    ? requests
-    : requests.filter(r => r.status === statusFilter);
+  const filteredRequests = requests;
 
   const statusColors = {
     pending: 'bg-yellow-100 text-yellow-800 border-yellow-300',
@@ -252,7 +242,7 @@ export function AdminConsultations() {
                   
                   <div className="flex items-center gap-3 flex-wrap">
                     <span className="px-3 py-1.5 rounded-full text-xs font-bold uppercase border-2 bg-gray-50 border-black">
-                      {new Date(request.timestamp).toLocaleDateString('vi-VN', {
+                      {new Date(request.created_at).toLocaleDateString('vi-VN', {
                         day: '2-digit',
                         month: '2-digit',
                         year: 'numeric',
@@ -344,7 +334,7 @@ export function AdminConsultations() {
                 <div className="bg-white/60 backdrop-blur-xl rounded-2xl p-4 border-2 border-black shadow-[3px_3px_0px_0px_#000]">
                   <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Ngày gửi</label>
                   <p className="font-bold text-on-surface">
-                    {new Date(selectedRequest.timestamp).toLocaleString('vi-VN', {
+                    {new Date(selectedRequest.created_at).toLocaleString('vi-VN', {
                       day: '2-digit',
                       month: '2-digit',
                       year: 'numeric',

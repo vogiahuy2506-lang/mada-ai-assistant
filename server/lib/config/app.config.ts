@@ -13,7 +13,7 @@ const envSchema = z.object({
 
   // Gemini
   GEMINI_API_KEY: z.string().optional(),
-  GEMINI_MODEL: z.string().default('gemini-2.5-flash'),
+  GEMINI_MODEL: z.string().default('gemini-3.5-flash'),
   GEMINI_TEMPERATURE: z.coerce.number().min(0).max(1).default(0.3),
   GEMINI_MAX_TOKENS: z.coerce.number().min(1).default(8192),
 

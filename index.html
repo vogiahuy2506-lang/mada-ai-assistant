@@ -2,8 +2,22 @@
 <html lang="vi" class="light">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0%25' stop-color='%238b5cf6'/%3E%3Cstop offset='100%25' stop-color='%233b82f6'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cline x1='32' y1='9' x2='32' y2='16' stroke='%237c3aed' stroke-width='2.5' stroke-linecap='round'/%3E%3Ccircle cx='32' cy='7' r='2.5' fill='%237c3aed'/%3E%3Crect x='11' y='16' width='42' height='30' rx='9' fill='url(%23g)' stroke='%237c3aed' stroke-width='2'/%3E%3Crect x='7' y='24' width='4' height='14' rx='2' fill='%237c3aed'/%3E%3Crect x='53' y='24' width='4' height='14' rx='2' fill='%237c3aed'/%3E%3Ccircle cx='22' cy='30' r='4' fill='%230f172a'/%3E%3Ccircle cx='42' cy='30' r='4' fill='%230f172a'/%3E%3Cpath d='M 24 38 Q 32 42 40 38' stroke='%230f172a' stroke-width='2' stroke-linecap='round' fill='none'/%3E%3Crect x='27' y='46' width='10' height='4' rx='1.5' fill='%237c3aed'/%3E%3Crect x='15' y='50' width='34' height='8' rx='3' fill='url(%23g)' stroke='%237c3aed' stroke-width='2'/%3E%3Ccircle cx='32' cy='54' r='2' fill='%23c4b5fd'/%3E%3C/svg%3E" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#006572" />
+    <meta name="description" content="MADA AI Assistant - Hệ thống tư vấn công nghệ hỗ trợ người khuyết tật" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="MADA AI" />
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json" />
+
+    <!-- PWA Icons -->
+    <link rel="apple-touch-icon" href="/mada-logo.png" />
+
     <title>MADA AI Assistant</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -13,5 +27,20 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+
+    <!-- Service Worker Registration -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then((registration) => {
+              console.log('SW registered:', registration.scope);
+            })
+            .catch((error) => {
+              console.log('SW registration failed:', error);
+            });
+        });
+      }
+    </script>
   </body>
 </html>

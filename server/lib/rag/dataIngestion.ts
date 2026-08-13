@@ -196,6 +196,16 @@ class DataIngestionService {
           createdAt: now,
           itemId,
           category: classification.category,
+          // ⭐ MỚI: Gắn MADA category + botId cho RAG filter theo domain
+          madaCategory: source.metadata?.madaCategory,
+          botId: source.metadata?.botId,
+          // ✅ Copy MADA-specific metadata so RAG responses include image_url
+          thumbnailUrl: source.metadata?.thumbnailUrl,
+          galleryImages: source.metadata?.galleryImages,
+          postId: source.metadata?.postId,
+          slug: source.metadata?.slug,
+          product_url: source.metadata?.url,
+          brand: source.metadata?.brand,
         },
       }));
 

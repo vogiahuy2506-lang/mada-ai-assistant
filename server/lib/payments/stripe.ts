@@ -235,7 +235,7 @@ export const PLANS: SubscriptionPlan[] = [
 
 export async function createCustomer(email, name, metadata) {
   if (!process.env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY === 'sk_test_placeholder') {
-    return { id: `mock_cust_${Date.now()}`, email, name };
+    throw new Error('Stripe is not configured. Set STRIPE_SECRET_KEY in .env to manage customers.');
   }
 
   return await stripe.customers.create({

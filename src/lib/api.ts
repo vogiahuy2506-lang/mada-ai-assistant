@@ -168,3 +168,25 @@ export const usersApi = {
 };
 
 export { API_BASE };
+
+// ============== SYSTEM SETTINGS ==============
+export interface SystemSettings {
+  anonymousLimit: number;      // -1 = unlimited
+  defaultPlanLimit: number;    // -1 = unlimited for default free plan
+  maxFilesPerSession: number;  // max files per chat session
+  maxFilesTotal: number;       // max files total per user
+  maxFileSizeMB: number;       // max file size in MB
+  websiteUrl: string;          // website URL for data collection
+}
+
+export const systemApi = {
+  async getSettings(): Promise<{ success: boolean; data: SystemSettings }> {
+    return request<SystemSettings>('/system/settings');
+  },
+  async updateSettings(updates: Partial<SystemSettings>): Promise<{ success: boolean; data: SystemSettings }> {
+    return request<SystemSettings>('/system/settings', {
+      method: 'PUT',
+      body: JSON.stringify(updates),
+    });
+  },
+};

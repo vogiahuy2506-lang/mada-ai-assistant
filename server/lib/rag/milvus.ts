@@ -15,10 +15,10 @@ export const milvusConfig = {
   indexType: 'IVF_FLAT' as IndexType,
   metricType: 'COSINE' as MetricType,
   indexParams: {
-    nlist: 1024,
+    nlist: 16,  // Smaller for small datasets; auto-scales when collection grows
   },
   searchParams: {
-    nprobe: 20,
+    nprobe: 8,  // Lower for small nlist
   },
   consistencyLevel: 'Eventually' as const,
   autoCreate: process.env.MILVUS_AUTO_CREATE !== 'false',
@@ -74,11 +74,22 @@ export class MilvusVectorClient {
 
   async hasCollection(): Promise<boolean> {
     this.ensureConnected();
-    
+
     try {
-      const collections = await this.client!.listCollections();
-      const collectionNames = collections.map((c: any) => c.name);
-      return collectionNames.includes(this.collectionName);
+      const result: any = await this.client!.listCollections();
+      // SDK may return { data: string[] } or { collection_names: [] } or array
+      let collections: any[] = [];
+      if (Array.isArray(result)) {
+        collections = result;
+      } else if (Array.isArray(result?.data)) {
+        collections = Array.isArray(result.data[0]) ? result.data : result.data.map((n: string) => ({ name: n }));
+      } else if (Array.isArray(result?.collection_names)) {
+        collections = result.collection_names.map((n: string) => ({ name: n }));
+      }
+      return collections.some((c: any) => {
+        const name = typeof c === 'string' ? c : c?.name;
+        return name === this.collectionName;
+      });
     } catch (error) {
       console.error('Error checking collection:', error);
       return false;
@@ -95,57 +106,71 @@ export class MilvusVectorClient {
     }
 
     try {
-      // Create schema
+      // Create schema — use raw int types (DataType.X constants map to ints in this SDK)
+      // 21 = VarChar, 101 = FloatVector
       await this.client!.createCollection({
         collection_name: this.collectionName,
         description: 'MADA AI Knowledge Base Vector Collection',
         fields: [
           {
             name: 'id',
-            data_type: DataType.VarChar,
+            data_type: 21,
             max_length: 256,
             description: 'Document ID',
             is_primary_key: true,
           },
           {
             name: 'content',
-            data_type: DataType.VarChar,
+            data_type: 21,
             max_length: 65535,
             description: 'Document content chunk',
           },
           {
             name: 'embedding',
-            data_type: DataType.FloatVector,
-            dimension: milvusConfig.dimension,
+            data_type: 101,
+            dim: milvusConfig.dimension,
             description: 'Vector embedding',
           },
           {
             name: 'source',
-            data_type: DataType.VarChar,
+            data_type: 21,
             max_length: 512,
             description: 'Document source',
           },
           {
             name: 'type',
-            data_type: DataType.VarChar,
+            data_type: 21,
             max_length: 32,
             description: 'Document type (pdf, web, text, etc)',
           },
           {
             name: 'title',
-            data_type: DataType.VarChar,
+            data_type: 21,
             max_length: 512,
             description: 'Document title',
           },
           {
             name: 'category',
-            data_type: DataType.VarChar,
+            data_type: 21,
             max_length: 128,
             description: 'AT category',
           },
+          // ⭐ MỚI: Filter fields cho 7 bot MADA
+          {
+            name: 'madaCategory',
+            data_type: 21,
+            max_length: 64,
+            description: 'MADA category slug (e.g. sensory-hearing)',
+          },
+          {
+            name: 'botId',
+            data_type: 21,
+            max_length: 64,
+            description: 'Bot ID (e.g. bot-hearing)',
+          },
           {
             name: 'createdAt',
-            data_type: DataType.VarChar,
+            data_type: 21,
             max_length: 64,
             description: 'Creation timestamp',
           },
@@ -207,6 +232,8 @@ export class MilvusVectorClient {
     type: string;
     title?: string;
     category?: string;
+    madaCategory?: string;
+    botId?: string;
   }>): Promise<number> {
     this.ensureConnected();
 
@@ -221,6 +248,8 @@ export class MilvusVectorClient {
         type: v.type || 'text',
         title: v.title || '',
         category: v.category || 'general',
+        madaCategory: v.madaCategory || '',
+        botId: v.botId || '',
         createdAt: new Date().toISOString(),
       }));
 
@@ -239,7 +268,8 @@ export class MilvusVectorClient {
 
   async search(
     queryEmbedding: number[],
-    topK: number = 5
+    topK: number = 5,
+    filter?: { botId?: string; madaCategory?: string }
   ): Promise<Array<{
     id: string;
     content: string;
@@ -247,26 +277,48 @@ export class MilvusVectorClient {
     type: string;
     title: string;
     category: string;
+    madaCategory?: string;
+    botId?: string;
     distance: number;
   }>> {
     this.ensureConnected();
 
     try {
-      const results = await this.client!.search({
+      // ⭐ MỚI: Build Milvus filter expression
+      let expr: string | undefined;
+      const conditions: string[] = [];
+      if (filter?.botId) {
+        conditions.push(`botId == "${filter.botId}"`);
+      }
+      if (filter?.madaCategory) {
+        conditions.push(`madaCategory == "${filter.madaCategory}"`);
+      }
+      if (conditions.length > 0) {
+        expr = conditions.join(' && ');
+      }
+
+      const rawResults = await this.client!.search({
         collection_name: this.collectionName,
         vector: queryEmbedding,
         limit: topK,
-        output_fields: ['id', 'content', 'source', 'type', 'title', 'category'],
+        output_fields: ['id', 'content', 'source', 'type', 'title', 'category', 'madaCategory', 'botId'],
         params: milvusConfig.searchParams,
+        ...(expr ? { expr } : {}),
       });
 
-      return results.map((match: any) => ({
+      // Handle different SDK response formats
+      // New SDK: { results: [...] }  |  Old SDK: [...]
+      const resultsArr = Array.isArray(rawResults) ? rawResults : (rawResults?.results || []);
+
+      return resultsArr.map((match: any) => ({
         id: match.id,
-        content: match.entity?.content || '',
-        source: match.entity?.source || '',
-        type: match.entity?.type || 'text',
-        title: match.entity?.title || '',
-        category: match.entity?.category || 'general',
+        content: match.entity?.content || match.content || '',
+        source: match.entity?.source || match.source || '',
+        type: match.entity?.type || match.type || 'text',
+        title: match.entity?.title || match.title || '',
+        category: match.entity?.category || match.category || 'general',
+        madaCategory: match.entity?.madaCategory || match.madaCategory || '',
+        botId: match.entity?.botId || match.botId || '',
         distance: match.distance || 0,
       }));
     } catch (error: any) {

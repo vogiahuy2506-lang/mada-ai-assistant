@@ -10,6 +10,7 @@
 
 // @ts-nocheck
 
+import 'dotenv/config';
 import path from 'path';
 import fs from 'fs';
 import { Pinecone } from '@pinecone-database/pinecone';
@@ -141,6 +142,12 @@ async function migrateToPinecone() {
             batch.map(d => d.content)
           );
 
+          console.log(`   Debug: batch=${batch.length}, embeddings=${embeddings.length}`);
+          if (embeddings.length > 0) {
+            const first = embeddings[0];
+            console.log(`   Debug: first embedding length=${first?.length}, isArray=${Array.isArray(first)}, nulls=${first?.filter(v => v === null || v === undefined).length}`);
+          }
+
           // Prepare vectors
           const vectors = batch.map((doc, idx) => ({
             id: doc.id,
@@ -155,9 +162,16 @@ async function migrateToPinecone() {
             },
           }));
 
-          // Upsert to Pinecone
-          await index.upsert(vectors);
-          
+          console.log(`   Debug: vectors to upsert=${vectors.length}`);
+          if (vectors.length > 0) {
+            const firstVec = vectors[0];
+            const hasEmptyValues = vectors.some(v => !v.values || !Array.isArray(v.values) || v.values.length === 0);
+            console.log(`   Debug: firstVector.id=${firstVec.id}, values_length=${firstVec.values?.length}, all_valid=${!hasEmptyValues}`);
+          }
+
+          // Upsert to Pinecone (v8 SDK requires { records: [...] } format)
+          await index.upsert({ records: vectors });
+
           migrated += batch.length;
           console.log(`✅ Done (${migrated}/${documents.length})`);
         } catch (err: any) {

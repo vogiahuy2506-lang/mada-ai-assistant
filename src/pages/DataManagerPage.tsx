@@ -4,7 +4,7 @@ import {
   CloudUpload, Globe, FileText,
   Loader2, CheckCircle, AlertCircle, Trash2, Eye,
   Search, Filter, Plus, Clock, Database, Brain, Upload, FilePlus, Sparkles,
-  X, Link, BookOpen, RefreshCw, Trash, FileCheck
+  X, Link, BookOpen, RefreshCw, Trash, FileCheck, Lightbulb, MessageCircle, Package
 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -16,6 +16,14 @@ interface KnowledgeItem {
   status: 'pending' | 'processing' | 'completed' | 'failed';
   documentsAdded?: number;
   date: string;
+  category?: string;
+}
+
+interface AISuggestion {
+  questions: string[];
+  topics: string[];
+  products: { name: string; description: string }[];
+  raw?: string;
 }
 
 interface KnowledgeStats {
@@ -41,12 +49,58 @@ export function DataManagerPage() {
   const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  
+  // AI Suggestions state
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [suggestions, setSuggestions] = useState<AISuggestion | null>(null);
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
+  const [lastCollectedTitle, setLastCollectedTitle] = useState('');
+  const [lastCollectedCategory, setLastCollectedCategory] = useState('');
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch stats and items on mount
   useEffect(() => {
     fetchKnowledgeBase();
   }, []);
+
+  // Fetch suggestions for a knowledge item
+  const fetchSuggestions = async (itemId: string, title: string, category?: string) => {
+    setIsLoadingSuggestions(true);
+    setShowSuggestions(true);
+    setSuggestions(null);
+    
+    try {
+      // Get the item content first
+      const itemRes = await fetch(`/api/kb/items/${itemId}`);
+      const itemData = await itemRes.json();
+      
+      if (itemData.success && itemData.data.content) {
+        // Call the suggestion endpoint
+        const suggestRes = await fetch('/api/kb/suggest', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            content: itemData.data.content,
+            category: itemData.data.category,
+            title: itemData.data.title
+          })
+        });
+        
+        const suggestData = await suggestRes.json();
+        
+        if (suggestData.success) {
+          setSuggestions(suggestData.data.suggestions);
+          setLastCollectedTitle(itemData.data.title);
+          setLastCollectedCategory(itemData.data.category);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch suggestions:', error);
+    } finally {
+      setIsLoadingSuggestions(false);
+    }
+  };
 
   const fetchKnowledgeBase = async () => {
     setIsLoading(true);
@@ -85,7 +139,7 @@ export function DataManagerPage() {
     setIsCollecting(true);
 
     try {
-      const response = await fetch('/api/data/collect', {
+      const response = await fetch('/api/kb/scrape-with-suggest', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: websiteUrl }),
@@ -95,15 +149,25 @@ export function DataManagerPage() {
 
       if (data.success) {
         const newItem: KnowledgeItem = {
-          id: data.data.taskId,
-          title: new URL(websiteUrl).hostname,
+          id: data.data.itemId,
+          title: data.data.title || new URL(websiteUrl).hostname,
           source: websiteUrl,
           type: 'web',
-          status: data.data.status === 'completed' ? 'completed' : 'processing',
+          status: 'completed',
           documentsAdded: data.data.documentsAdded,
           date: new Date().toLocaleDateString('vi-VN'),
+          category: data.data.category,
         };
         setKnowledgeItems(prev => [newItem, ...prev]);
+        
+        // Show AI suggestions
+        if (data.data.suggestions) {
+          setSuggestions(data.data.suggestions);
+          setLastCollectedTitle(data.data.title || new URL(websiteUrl).hostname);
+          setLastCollectedCategory(data.data.category);
+          setShowSuggestions(true);
+        }
+        
         setWebsiteUrl('');
         await fetchKnowledgeBase();
       }
@@ -416,11 +480,135 @@ export function DataManagerPage() {
               <div className="mt-4 p-4 bg-surface-container dark:bg-surface-container-high rounded-xl">
                 <div className="flex items-center gap-4 mb-2">
                   <Loader2 className="w-5 h-5 animate-spin text-primary" />
-                  <span className="text-body-md">Đang thu thập dữ liệu...</span>
+                  <span className="text-body-md">Đang thu thập và phân tích nội dung...</span>
                 </div>
                 <div className="h-2 bg-outline rounded-full overflow-hidden">
                   <div className="h-full bg-primary animate-pulse" style={{ width: '60%' }} />
                 </div>
+              </div>
+            )}
+
+            {/* AI Suggestions Panel */}
+            {showSuggestions && (suggestions || isLoadingSuggestions) && (
+              <div className="mt-4 p-6 bg-gradient-to-br from-violet-50 to-indigo-50 dark:from-violet-900/20 dark:to-indigo-900/20 rounded-xl border-2 border-violet-200 dark:border-violet-700">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-gradient-to-br from-violet-500 to-indigo-600 rounded-xl flex items-center justify-center">
+                      <Sparkles className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-lg">AI Đã phân tích xong!</h3>
+                      <p className="text-sm text-on-surface-variant">
+                        {lastCollectedTitle && `Chủ đề: ${lastCollectedTitle}`}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setShowSuggestions(false)}
+                    className="p-2 hover:bg-white/50 rounded-lg transition-colors"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {isLoadingSuggestions ? (
+                  <div className="flex items-center gap-3 py-4">
+                    <Loader2 className="w-6 h-6 animate-spin text-violet-600" />
+                    <span>AI đang phân tích và tạo đề xuất...</span>
+                  </div>
+                ) : suggestions && (
+                  <div className="space-y-6">
+                    {/* Questions */}
+                    {suggestions.questions && suggestions.questions.length > 0 && (
+                      <div>
+                        <h4 className="flex items-center gap-2 font-bold mb-3 text-violet-700 dark:text-violet-300">
+                          <MessageCircle className="w-5 h-5" />
+                          Câu hỏi gợi ý
+                        </h4>
+                        <div className="space-y-2">
+                          {suggestions.questions.slice(0, 3).map((q, idx) => (
+                            <div
+                              key={idx}
+                              className="flex items-center gap-3 p-3 bg-white dark:bg-slate-800 rounded-xl border border-violet-100 dark:border-violet-800 hover:border-violet-300 dark:hover:border-violet-600 transition-colors cursor-pointer"
+                              onClick={() => {
+                                // Copy to clipboard or use in chat
+                                navigator.clipboard.writeText(q);
+                              }}
+                            >
+                              <span className="w-7 h-7 bg-violet-100 dark:bg-violet-900 rounded-lg flex items-center justify-center text-xs font-bold text-violet-600 dark:text-violet-300">
+                                {idx + 1}
+                              </span>
+                              <span className="flex-1 text-sm">{q}</span>
+                              <span className="text-xs text-on-surface-variant">Click để copy</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Related Topics */}
+                    {suggestions.topics && suggestions.topics.length > 0 && (
+                      <div>
+                        <h4 className="flex items-center gap-2 font-bold mb-3 text-indigo-700 dark:text-indigo-300">
+                          <Lightbulb className="w-5 h-5" />
+                          Chủ đề liên quan
+                        </h4>
+                        <div className="flex flex-wrap gap-2">
+                          {suggestions.topics.slice(0, 4).map((topic, idx) => (
+                            <button
+                              key={idx}
+                              className="px-4 py-2 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 rounded-full text-sm font-medium hover:bg-indigo-200 dark:hover:bg-indigo-900 transition-colors border border-indigo-200 dark:border-indigo-800"
+                            >
+                              {topic}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Products */}
+                    {suggestions.products && suggestions.products.length > 0 && (
+                      <div>
+                        <h4 className="flex items-center gap-2 font-bold mb-3 text-purple-700 dark:text-purple-300">
+                          <Package className="w-5 h-5" />
+                          Sản phẩm đề xuất
+                        </h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {suggestions.products.slice(0, 4).map((product, idx) => (
+                            <div
+                              key={idx}
+                              className="p-4 bg-white dark:bg-slate-800 rounded-xl border border-purple-100 dark:border-purple-800"
+                            >
+                              <h5 className="font-bold text-purple-700 dark:text-purple-300">{product.name}</h5>
+                              {product.description && (
+                                <p className="text-sm text-on-surface-variant mt-1">{product.description}</p>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Action buttons */}
+                    <div className="flex gap-3 pt-2">
+                      <button
+                        onClick={() => setShowSuggestions(false)}
+                        className="flex-1 py-2 px-4 border-2 border-violet-300 dark:border-violet-600 text-violet-600 dark:text-violet-300 rounded-xl font-medium hover:bg-violet-50 dark:hover:bg-violet-900/30 transition-colors"
+                      >
+                        Đóng
+                      </button>
+                      <button
+                        onClick={() => {
+                          // Navigate to chat with suggestions
+                          window.location.href = '/chat';
+                        }}
+                        className="flex-1 py-2 px-4 bg-gradient-to-r from-violet-500 to-indigo-600 text-white rounded-xl font-bold hover:shadow-lg transition-all"
+                      >
+                        Hỏi MADA về chủ đề này
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -531,6 +719,18 @@ export function DataManagerPage() {
                         <td className="p-4 text-on-surface-variant">{item.date}</td>
                         <td className="p-4 text-right">
                           <div className="flex items-center justify-end gap-2">
+                            <button 
+                              className="p-2 rounded-lg hover:bg-violet-100 dark:hover:bg-violet-900/30 text-violet-600 transition-colors" 
+                              title="Xem đề xuất từ AI"
+                              onClick={() => {
+                                const itemStatus = item.status === 'completed';
+                                if (itemStatus) {
+                                  fetchSuggestions(item.id, item.title, item.category);
+                                }
+                              }}
+                            >
+                              <Sparkles className="w-5 h-5" />
+                            </button>
                             <button className="p-2 rounded-lg hover:bg-surface-container transition-colors" title="Xem chi tiết">
                               <Eye className="w-5 h-5" />
                             </button>

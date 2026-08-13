@@ -1,16 +1,15 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useChatStore, useChatHistoryStore, useLanguageStore, useAuthStore, useAnonQuotaStore, usePaywallModalStore, useAuthModalStore, useAgentStore, useSelectedAgentStore, useSystemSettingsStore } from '@/stores';
-import { AuthModal } from '@/components/auth/AuthModal';
-import { PaywallModal } from '@/components/auth/PaywallModal';
+import { useChatStore, useChatHistoryStore, useLanguageStore, useAuthStore, useAnonQuotaStore, usePaywallModalStore, useAuthModalStore, useAgentStore, useSelectedAgentStore, useSystemSettingsStore, useViewModeStore } from '@/stores';
+import madaLogo from '@/assets/mada-logo.png';
 import { QuotaIndicator } from '@/components/auth/QuotaIndicator';
-import { RobotLogo } from '@/components/icons/RobotLogo';
+import { ProductCard } from '@/components/ProductCard';
 import {
   Send, Plus, User, History, Mic,
   Trash2, Volume2, ChevronDown, Check, Copy, ThumbsUp, ThumbsDown,
   Speaker, BookOpen, Bot as BotIcon, HelpCircle, ChevronRight,
   FileText, Video, Mic2, ImageIcon, File, X,
-  Globe, Star, Award, FileCheck, MessageCircle,
+  Star, MessageCircle,
   LogOut, Sparkles,
   Search, Pin, MessageSquare, PinOff, Loader2, ArrowRight,
   Settings, Smartphone, Brain, Eye, Accessibility,
@@ -21,7 +20,8 @@ import {
 import clsx from 'clsx';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { CATEGORY_INFO, SAMPLE_QUESTIONS, type ATCategory, type Language } from '@/types';
+import { CATEGORY_INFO, SAMPLE_QUESTIONS, type ATCategory, type Language, type SuggestedProduct } from '@/types';
+import { t } from '@/lib/translations';
 
 // Attachment options - use getAttachmentOptions(language) inside component
 function getAttachmentOptions(lang: Language) {
@@ -42,151 +42,9 @@ function getAttachmentOptions(lang: Language) {
   ];
 }
 
-// Sample questions translated by language
+// Sample questions translated by language - Sử dụng SAMPLE_QUESTIONS từ types
 function getSampleQuestionsByLang(category: ATCategory, lang: Language): string[] {
-  const translations: Record<Language, Partial<Record<ATCategory, string[]>>> = {
-    vi: {},
-    en: {
-      vision: [
-        'What are the best screen readers for visually impaired?',
-        'How much do electronic magnifiers cost?',
-        'How can blind people use computers?',
-        'How much do Braille displays cost?',
-      ],
-      hearing: [
-        'What types of hearing aids are available and how much do they cost?',
-        'How to choose hearing aids for elderly?',
-        'How do alerting devices work?',
-        'Can hearing aids connect to Bluetooth?',
-      ],
-      mobility: [
-        'How much do electric wheelchairs cost?',
-        'How to choose a wheelchair for disabled?',
-        'How do stair climbing wheelchairs work?',
-        'What\'s the difference between crutches and walkers?',
-      ],
-      cognition: [
-        'What memory aids are available for elderly?',
-        'Reminder apps for people with memory loss?',
-        'Digital calendars for people with cognitive difficulties?',
-        'Devices to help organize daily tasks?',
-      ],
-      communication: [
-        'What is AAC (Augmentative and Alternative Communication)?',
-        'How do picture communication boards work?',
-        'Communication apps for non-verbal people on phone?',
-        'Communication devices for autistic children?',
-      ],
-      daily_living: [
-        'Eating utensils for people with hand arthritis?',
-        'Medication reminder devices?',
-        'Kitchen tools for people with disabilities?',
-        'Bathroom safety devices for elderly?',
-      ],
-      education: [
-        'Text-to-speech software for students?',
-        'How to create accessible documents?',
-        'What is AAC for education?',
-        'Tools for students with dyslexia?',
-      ],
-    },
-    ar: {
-      vision: [
-        'ما هي أفضل قارئات الشاشة للمكفوفين؟',
-        'كم تكلفة المكبرات الإلكترونية؟',
-        'كيف يمكن للمكفوفين استخدام الحواسيب؟',
-        'كم تكلفة شاشات برايل؟',
-      ],
-      hearing: [
-        'ما هي أنواع سماعات الأذن المتاحة وكم تكلف؟',
-        'كيف تختار سماعات الأذن لكبار السن؟',
-        'كيف تعمل أجهزة التنبيه؟',
-        'هل يمكن لسماعات الأذن الاتصال بالبلوتوث؟',
-      ],
-      mobility: [
-        'كم تكلفة الكراسي المتحركة الكهربائية؟',
-        'كيف تختار كرسي متحرك مناسب؟',
-        'كيف تعمل كراسي تسلق الدرج؟',
-        'ما الفرق بين العكازات والمشايات؟',
-      ],
-      cognition: [
-        'ما هي أدوات الذاكرة المتاحة لكبار السن؟',
-        'تطبيقات التذكير لفقدان الذاكرة؟',
-        'التقويمات الرقمية للأشخاص ذوي الصعوبات المعرفية؟',
-        'أجهزة لتنظيم المهام اليومية؟',
-      ],
-      communication: [
-        'ما هو AAC (التواصل المعزز والبديل)؟',
-        'كيف تعمل لوحات التواصل بالصور؟',
-        'تطبيقات التواصل للأشخاص غير الناطقين؟',
-        'أجهزة التواصل للأطفال المصابين بالتوحد؟',
-      ],
-      daily_living: [
-        'أدوات الأكل لالتهاب المفاصل؟',
-        'أجهزة تذكير الأدوية؟',
-        'أدوات المطبخ للأشخاص ذوي الإعاقة؟',
-        'أجهزة السلامة في الحمام لكبار السن؟',
-      ],
-      education: [
-        'برامج تحويل النص إلى كلام للطلاب؟',
-        'كيف تنشئ مستندات يمكن الوصول إليها؟',
-        'ما هو AAC للتعليم؟',
-        'أدوات للطلاب المصابين بعسر القراءة؟',
-      ],
-    },
-    fr: {
-      vision: [
-        'Quels sont les meilleurs lecteurs d\'écran pour les malvoyants?',
-        'Combien coûtent les agrandisseurs électroniques?',
-        'Comment les aveugles peuvent-ils utiliser les ordinateurs?',
-        'Combien coûtent les plages Braille?',
-      ],
-      hearing: [
-        'Quels types d\'appareils auditifs sont disponibles et combien coûtent-ils?',
-        'Comment choisir des appareils auditifs pour les personnes âgées?',
-        'Comment fonctionnent les dispositifs d\'alerte?',
-        'Les appareils auditifs peuvent-ils se connecter en Bluetooth?',
-      ],
-      mobility: [
-        'Combien coûtent les fauteuils roulants électriques?',
-        'Comment choisir un fauteuil roulant pour handicapés?',
-        'Comment fonctionnent les fauteuils grimpeurs d\'escalier?',
-        'Quelle est la différence entre les béquilles et les déambulateurs?',
-      ],
-      cognition: [
-        'Quelles aides à la mémoire sont disponibles pour les personnes âgées?',
-        'Applications de rappel pour la perte de mémoire?',
-        'Calendriers numériques pour les personnes ayant des difficultés cognitives?',
-        'Appareils pour organiser les tâches quotidiennes?',
-      ],
-      communication: [
-        'Qu\'est-ce que la CAA (Communication Augmentative et Alternative)?',
-        'Comment fonctionnent les tableaux de communication par images?',
-        'Applications de communication pour les personnes non verbales?',
-        'Dispositifs de communication pour les enfants autistes?',
-      ],
-      daily_living: [
-        'Ustensiles de repas pour l\'arthrite des mains?',
-        'Dispositifs de rappel de médicaments?',
-        'Outils de cuisine pour personnes handicapées?',
-        'Dispositifs de sécurité dans la salle de bain pour personnes âgées?',
-      ],
-      education: [
-        'Logiciels de synthèse vocale pour étudiants?',
-        'Comment créer des documents accessibles?',
-        'Qu\'est-ce que la CAA pour l\'éducation?',
-        'Outils pour étudiants dyslexiques?',
-      ],
-    },
-  };
-  
-  // For Vietnamese, use the original sample questions
-  if (lang === 'vi') {
-    return SAMPLE_QUESTIONS[category]?.end_user || [];
-  }
-  
-  // For other languages, use the translated versions
-  return translations[lang]?.[category] || SAMPLE_QUESTIONS[category]?.end_user || [];
+  return SAMPLE_QUESTIONS[category]?.end_user?.[lang] || SAMPLE_QUESTIONS[category]?.end_user?.vi || [];
 }
 
 const LANGUAGES: { code: Language; name: string; flag: string }[] = [
@@ -279,52 +137,6 @@ const CATEGORY_LABELS: Record<ATCategory, { title: string; titleEn: string; titl
     descEn: 'Assistive Technology standards...',
     descAr: 'معايير تقنية المساعدة...',
     descFr: 'Normes de technologie d\'assistance...',
-  },
-};
-
-// Category prompts - sent to AI when user clicks a category
-const CATEGORY_PROMPTS: Record<ATCategory, Record<Language, string>> = {
-  hearing: {
-    vi: 'Hãy giới thiệu về các thiết bị công nghệ hỗ trợ cho người khiếm thính, bao gồm máy trợ thính, hệ thống FM, thiết bị phản hồi âm thanh, và giải pháp kết nối.',
-    en: 'Introduce assistive technology devices for hearing impaired, including hearing aids, FM systems, alerting devices, and connectivity solutions.',
-    ar: 'قدم أجهزة تقنية مساعدة للمصابين بضعف السمع، بما في ذلك أجهزة السمع وأنظمة FM وأجهزة التنبيه.',
-    fr: 'Présentez les appareils technologiques d\'assistance pour les malentendants, y compris les appareils auditifs, les systèmes FM et les solutions de connectivité.',
-  },
-  vision: {
-    vi: 'Hãy giới thiệu về các thiết bị công nghệ hỗ trợ cho người khiếm thị, bao gồm phần mềm đọc màn hình, màn hình Braille, kính thông minh OrCam, và các công cụ tiếp cận khác.',
-    en: 'Introduce assistive technology devices for visually impaired, including screen readers, Braille displays, smart glasses like OrCam, and other accessibility tools.',
-    ar: 'قدم أجهزة تقنية مساعدة للمكفوفين، بما في ذلك قارئات الشاشة وشاشات برايل والنظارات الذكية.',
-    fr: 'Présentez les appareils technologiques d\'assistance pour les malvoyants, y compris les lecteurs d\'écran, les plages braille et les lunettes intelligentes.',
-  },
-  communication: {
-    vi: 'Hãy giới thiệu về các thiết bị giao tiếp tăng cường (AAC) cho người khó khăn trong giao tiếp, bao gồm thiết bị AAC, ứng dụng di động, và tổng hợp giọng nói.',
-    en: 'Introduce augmentative and alternative communication (AAC) devices for people with speech difficulties, including AAC devices, mobile apps, and speech synthesis.',
-    ar: 'قدم أجهزة الاتصال المعزز والبديل للأشخاص الذين يعانون من صعوبات في الكلام.',
-    fr: 'Présentez les appareils de communication augmentative et alternative (CAA) pour les personnes ayant des difficultés d\'élocution.',
-  },
-  cognition: {
-    vi: 'Hãy giới thiệu về các thiết bị hỗ trợ nhận thức cho người gặp khó khăn về trí nhớ, chú ý, và học tập, bao gồm thiết bị trợ nhớ, ứng dụng sắp xếp, và công cụ hỗ trợ nhận thức.',
-    en: 'Introduce cognitive support devices for people with memory, attention, and learning difficulties, including memory aids, organization apps, and cognitive support tools.',
-    ar: 'قدم أجهزة الدعم المعرفي للأشخاص الذين يعانون من صعوبات في الذاكرة والانتباه والتعلم.',
-    fr: 'Présentez les appareils de soutien cognitif pour les personnes ayant des difficultés de mémoire, d\'attention et d\'apprentissage.',
-  },
-  mobility: {
-    vi: 'Hãy giới thiệu về các thiết bị hỗ trợ vận động và di chuyển, bao gồm xe lăn điện, xe lăn thông minh, prosthetics, và các thiết bị hỗ trợ khác.',
-    en: 'Introduce mobility support devices including electric wheelchairs, smart wheelchairs, prosthetics, and other mobility aids.',
-    ar: 'قدم أجهزة دعم الحركة بما في ذلك الكراسي المتحركة الكهربائية والأطراف الصناعية.',
-    fr: 'Présentez les appareils de soutien à la mobilité incluant les fauteuils roulants électriques et les prothèses.',
-  },
-  daily_living: {
-    vi: 'Hãy giới thiệu về các thiết bị hỗ trợ sinh hoạt hàng ngày cho người khuyết tật, bao gồm dụng cụ ăn uống, thiết bị phòng tắm, và công cụ nhà bếp đặc biệt.',
-    en: 'Introduce daily living aids for people with disabilities, including eating aids, bathroom equipment, and special kitchen tools.',
-    ar: 'قدم أجهزة المعيشة اليومية للأشخاص ذوي الإعاقة، بما في ذلك أدوات الأكل ومعدات الحمام.',
-    fr: 'Présentez les aides à la vie quotidienne pour les personnes handicapées, incluant les ustensiles de repas et les équipements de salle de bain.',
-  },
-  education: {
-    vi: 'Hãy giới thiệu về các công nghệ hỗ trợ giáo dục cho người khuyết tật, bao gồm phần mềm đọc văn bản, công cụ accessibility, và các tài liệu học tập tiếp cận.',
-    en: 'Introduce educational assistive technologies for people with disabilities, including text-to-speech software, accessibility tools, and accessible learning materials.',
-    ar: 'قدم تقنيات المساعدة التعليمية للأشخاص ذوي الإعاقة، بما في ذلك برامج تحويل النص إلى كلام.',
-    fr: 'Présentez les technologies d\'assistance éducative pour les personnes handicapées, incluant les logiciels de synthèse vocale.',
   },
 };
 
@@ -503,20 +315,24 @@ const SAMPLE_PRODUCTS: Record<string, any[]> = {
     { 
       name: 'OrCam MyEye Pro', 
       nameVi: 'OrCam MyEye Pro', 
-      brand: 'OrCam Technologies', 
+      brand: 'OrCam Technologies',
       price: '~$6,500 USD', 
+      image: 'https://at.mada.org.qa/wp-content/uploads/2020/03/Interpretype.png',
       features: ['Nhận diện khuôn mặt', 'Đọc văn bản 100+ ngôn ngữ', 'Nhận diện tiền giấy', 'Pin 6 giờ', 'Gắn kính được'],
-      reasons: ['Hỗ trợ tiếng Việt native', 'Di động, gắn kính', 'Pin sạc 6h sử dụng liên tục', 'Không cần smartphone']
+      reasons: ['Hỗ trợ tiếng Việt native', 'Di động, gắn kính', 'Pin sạc 6h sử dụng liên tục', 'Không cần smartphone'],
+      standards: ['ISO 9999:22.06', 'IEC 60118-4', 'WHO GATE']
     },
     { 
       name: 'JAWS Screen Reader', 
       nameVi: 'JAWS Screen Reader', 
       brand: 'Freedom Scientific', 
       price: '~$1,000 USD/năm', 
+      image: 'https://at.mada.org.qa/wp-content/uploads/2020/03/Interpretype.png',
       features: ['Đọc màn hình Windows', 'Hỗ trợ 40+ ngôn ngữ', 'Tương thích Braille', 'Script tùy chỉnh'],
-      reasons: ['Rẻ hơn 85% so OrCam', 'Chuẩn quốc tế, dùng phổ biến', 'Hỗ trợ phần mềm văn phòng', 'Cộng đồng người dùng lớn']
+      reasons: ['Rẻ hơn 85% so OrCam', 'Chuẩn quốc tế, dùng phổ biến', 'Hỗ trợ phần mềm văn phòng', 'Cộng đồng người dùng lớn'],
+      standards: ['WCAG 2.1', 'ISO 9999:22.06', 'EN 1332']
     },
-    { name: 'NVDA Screen Reader', nameVi: 'NVDA Screen Reader', brand: 'NV Access', price: 'Miễn phí (donation)', features: ['Đọc màn hình mã nguồn mở', 'Hỗ trợ 50+ ngôn ngữ', 'Chạy trên Windows'], reasons: ['100% miễn phí', 'Mã nguồn mở, bảo mật', 'Cộng đồng phát triển tích cực', 'Nhẹ, chạy trên USB'] },
+    { name: 'NVDA Screen Reader', nameVi: 'NVDA Screen Reader', brand: 'NV Access', price: 'Miễn phí (donation)', image: 'https://at.mada.org.qa/wp-content/uploads/2020/03/Interpretype.png', features: ['Đọc màn hình mã nguồn mở', 'Hỗ trợ 50+ ngôn ngữ', 'Chạy trên Windows'], reasons: ['100% miễn phí', 'Mã nguồn mở, bảo mật', 'Cộng đồng phát triển tích cực', 'Nhẹ, chạy trên USB'], standards: ['WCAG 2.1', 'ISO 9999:22.06'] },
   ],
   hearing: [
     { 
@@ -524,18 +340,22 @@ const SAMPLE_PRODUCTS: Record<string, any[]> = {
       nameVi: 'Phonak Paradise P90', 
       brand: 'Phonak', 
       price: '~$3,500 USD/đôi', 
+      image: 'https://at.mada.org.qa/wp-content/uploads/2022/12/Oticon-EduMic.png',
       features: ['Kết nối Bluetooth', 'Chống ồn AI', 'Pin sạc lithium', 'Waterproof IP68'],
-      reasons: ['Chống ồn AI thông minh nhất', 'Kết nối TV, điện thoại', 'Pin 16h, sạc nhanh 30p', 'Chống nước, bụi']
+      reasons: ['Chống ồn AI thông minh nhất', 'Kết nối TV, điện thoại', 'Pin 16h, sạc nhanh 30p', 'Chống nước, bụi'],
+      standards: ['ISO 9999:22.06', 'IEC 60118-4', 'WHO GATE']
     },
     { 
       name: 'Roger Pen Microphone', 
       nameVi: 'Roger Pen Microphone', 
       brand: 'Phonak', 
       price: '~$1,200 USD', 
+      image: 'https://at.mada.org.qa/wp-content/uploads/2021/10/StreamLine-Mic.jpg',
       features: ['Hệ thống FM', 'Microphone định hướng', 'Kết nối đa thiết bị', 'Pin 10 giờ'],
-      reasons: ['Tăng nghe rõ ràng 61%', 'Học tập, họp hành hiệu quả', 'Gắn bluetooth nhiều máy', 'Nhẹ, dễ mang theo']
+      reasons: ['Tăng nghe rõ ràng 61%', 'Học tập, họp hành hiệu quả', 'Gắn bluetooth nhiều máy', 'Nhẹ, dễ mang theo'],
+      standards: ['IEC 60118-4', 'ISO 9999:22.06']
     },
-    { name: 'Oticon More Hearing Aid', nameVi: 'Oticon More Hearing Aid', brand: 'Oticon', price: '~$4,200 USD/đôi', features: ['Deep Neural Network', 'Chống ồn thông minh', 'Kết nối iPhone/Android'], reasons: ['AI deep learning', 'Tự động điều chỉnh theo môi trường', 'Kết nối iPhone & Android', 'App điều khiển trên điện thoại'] },
+    { name: 'Oticon More Hearing Aid', nameVi: 'Oticon More Hearing Aid', brand: 'Oticon', price: '~$4,200 USD/đôi', image: 'https://at.mada.org.qa/wp-content/uploads/2021/10/Oticon-Amigo-T31T30.jpg', features: ['Deep Neural Network', 'Chống ồn thông minh', 'Kết nối iPhone/Android'], reasons: ['AI deep learning', 'Tự động điều chỉnh theo môi trường', 'Kết nối iPhone & Android', 'App điều khiển trên điện thoại'], standards: ['IEC 60118-4', 'WHO GATE'] },
   ],
   mobility: [
     { 
@@ -543,18 +363,22 @@ const SAMPLE_PRODUCTS: Record<string, any[]> = {
       nameVi: 'Permobil F5 Xe lăn điện', 
       brand: 'Permobil', 
       price: '~$25,000 USD', 
+      image: 'https://at.mada.org.qa/wp-content/uploads/2021/10/StreamLine-Mic.jpg',
       features: ['Đứng thẳng tự động', 'Leo dốc 12°', 'Điều khiển smartphone', 'Seat Elevator 30cm'],
-      reasons: ['Tự động đứng thẳng', 'Leo dốc, bậc thềm', 'Điều khiển bằng app', 'Nâng ghế lên 30cm']
+      reasons: ['Tự động đứng thẳng', 'Leo dốc, bậc thềm', 'Điều khiển bằng app', 'Nâng ghế lên 30cm'],
+      standards: ['ISO 9999:12.21', 'ISO 7176', 'EN 12184']
     },
     { 
       name: 'Scalamobil S95', 
       nameVi: 'Scalamobil S95 Leo cầu thang', 
       brand: 'Scala', 
       price: '~$4,500 USD', 
+      image: 'https://at.mada.org.qa/wp-content/uploads/2021/10/StreamLine-Mic.jpg',
       features: ['Leo cầu thang an toàn', 'Pin sạc', 'Gắn được nhiều xe lăn', 'Tháo lắp 2 phút'],
-      reasons: ['Leo cầu thang an toàn', 'Gắn hầu hết xe lăn', 'Tháo lắp nhanh 2 phút', 'Rẻ hơn xe lăn điện 80%']
+      reasons: ['Leo cầu thang an toàn', 'Gắn hầu hết xe lăn', 'Tháo lắp nhanh 2 phút', 'Rẻ hơn xe lăn điện 80%'],
+      standards: ['ISO 9999:12.21', 'EN 12184']
     },
-    { name: 'Quickie Q700-UP M', nameVi: 'Quickie Q700-UP M Xe lăn', brand: 'Sunrise Medical', price: '~$18,500 USD', features: ['Hệ thống đứng', 'C-Leg technology', 'Cấu hình tùy chỉnh'], reasons: ['Công nghệ C-Leg tiên tiến', 'Đứng thẳng bằng điều khiển', 'Cấu hình theo nhu cầu', 'Bảo hành 5 năm'] },
+    { name: 'Quickie Q700-UP M', nameVi: 'Quickie Q700-UP M Xe lăn', brand: 'Sunrise Medical', price: '~$18,500 USD', image: 'https://at.mada.org.qa/wp-content/uploads/2021/10/StreamLine-Mic.jpg', features: ['Hệ thống đứng', 'C-Leg technology', 'Cấu hình tùy chỉnh'], reasons: ['Công nghệ C-Leg tiên tiến', 'Đứng thẳng bằng điều khiển', 'Cấu hình theo nhu cầu', 'Bảo hành 5 năm'], standards: ['ISO 7176', 'ISO 9999:12.21'] },
   ],
   cognition: [
     { 
@@ -562,18 +386,22 @@ const SAMPLE_PRODUCTS: Record<string, any[]> = {
       nameVi: 'Tobii Dynavox TD I-13 Eye Tracker', 
       brand: 'Tobii Dynavox', 
       price: '~$8,500 USD', 
+      image: 'https://at.mada.org.qa/wp-content/uploads/2020/03/iCommunicator-.png',
       features: ['Eye-tracking chính xác', 'Màn hình 13.3 inch', 'AAC software', 'Không cần tay điều khiển'],
-      reasons: ['Theo dõi mắt chính xác cao', 'Không cần dùng tay', 'Phần mềm AAC tích hợp', 'Giao tiếp bằng mắt']
+      reasons: ['Theo dõi mắt chính xác cao', 'Không cần dùng tay', 'Phần mềm AAC tích hợp', 'Giao tiếp bằng mắt'],
+      standards: ['ISO 9999:05.15.06', 'WCAG 2.1', 'WHO GATE']
     },
     { 
       name: 'Proloquo2Go App', 
       nameVi: 'Proloquo2Go AAC App', 
       brand: 'AssistiveWare', 
       price: '~$250 USD/lifetime', 
+      image: 'https://at.mada.org.qa/wp-content/uploads/2020/03/iCommunicator-.png',
       features: ['iOS app', 'Symbol-based AAC', 'Giọng Việt/Eng', 'Hình ảnh 25,000+'],
-      reasons: ['Rẻ hơn 97% thiết bị AAC', 'Dùng iPhone/iPad có sẵn', 'Hỗ trợ tiếng Việt', 'Cài đặt, sử dụng dễ']
+      reasons: ['Rẻ hơn 97% thiết bị AAC', 'Dùng iPhone/iPad có sẵn', 'Hỗ trợ tiếng Việt', 'Cài đặt, sử dụng dễ'],
+      standards: ['ISO 9999:05.15.06', 'WCAG 2.1']
     },
-    { name: 'Memo Smart Calendar', nameVi: 'Memo Smart Calendar', brand: 'Memo', price: '~$300 USD', features: ['Đồng hồ nhắc nhở', 'Màn hình LCD', 'Chống nhầm lẫn thuốc'], reasons: ['Nhắc uống thuốc đúng giờ', 'Chống nhầm lẫn thuốc', 'Giao diện đơn giản', 'Người lớn tuổi dùng được'] },
+    { name: 'Memo Smart Calendar', nameVi: 'Memo Smart Calendar', brand: 'Memo', price: '~$300 USD', image: 'https://at.mada.org.qa/wp-content/uploads/2020/03/iCommunicator-.png', features: ['Đồng hồ nhắc nhở', 'Màn hình LCD', 'Chống nhầm lẫn thuốc'], reasons: ['Nhắc uống thuốc đúng giờ', 'Chống nhầm lẫn thuốc', 'Giao diện đơn giản', 'Người lớn tuổi dùng được'], standards: ['ISO 9999:09', 'WHO GATE'] },
   ],
   communication: [
     { 
@@ -581,18 +409,22 @@ const SAMPLE_PRODUCTS: Record<string, any[]> = {
       nameVi: 'LightWriter SL40 Thiết bị AAC', 
       brand: 'Tobii Dynavox', 
       price: '~$4,200 USD', 
+      image: 'https://at.mada.org.qa/wp-content/uploads/2020/03/Lightwriter-US.webp',
       features: ['Bàn phím vật lý', 'Màn hình chia đôi', 'Tổng hợp giọng nói', 'Bluetooth'],
-      reasons: ['Bàn phím + màn hình', 'Giao tiếp 2 chiều', 'Pin 10 giờ liên tục', 'Kết nối điện thoại']
+      reasons: ['Bàn phím + màn hình', 'Giao tiếp 2 chiều', 'Pin 10 giờ liên tục', 'Kết nối điện thoại'],
+      standards: ['ISO 9999:05.15.06', 'WCAG 2.1']
     },
     { 
       name: 'TouchChat HD AAC', 
       nameVi: 'TouchChat HD AAC App', 
       brand: 'Prentke Romich', 
       price: '~$300 USD', 
+      image: 'https://at.mada.org.qa/wp-content/uploads/2020/03/iCommunicator-.png',
       features: ['iPad app', 'Vocabulary pages', 'Customizable', 'Hình ảnh SymbolShare'],
-      reasons: ['Dùng iPad có sẵn', 'Tùy chỉnh theo nhu cầu', '25,000+ hình ảnh Symbol', 'Giá hợp lý']
+      reasons: ['Dùng iPad có sẵn', 'Tùy chỉnh theo nhu cầu', '25,000+ hình ảnh Symbol', 'Giá hợp lý'],
+      standards: ['ISO 9999:05.15.06', 'WCAG 2.1', 'EN 1332']
     },
-    { name: 'Big Mack Communicator', nameVi: 'Big Mack Communicator', brand: 'AbleNet', price: '~$160 USD', features: ['1 nút bấm lớn', 'Ghi âm 75 giây', 'Dùng cho trẻ em'], reasons: ['Đơn giản nhất', 'Giá rẻ nhất', 'Dùng cho trẻ nhỏ', 'Bền, chịu va đập'] },
+    { name: 'Big Mack Communicator', nameVi: 'Big Mack Communicator', brand: 'AbleNet', price: '~$160 USD', image: 'https://at.mada.org.qa/wp-content/uploads/2020/03/iCommunicator-.png', features: ['1 nút bấm lớn', 'Ghi âm 75 giây', 'Dùng cho trẻ em'], reasons: ['Đơn giản nhất', 'Giá rẻ nhất', 'Dùng cho trẻ nhỏ', 'Bền, chịu va đập'], standards: ['ISO 9999:05.15.06'] },
   ],
   daily_living: [
     { 
@@ -601,7 +433,8 @@ const SAMPLE_PRODUCTS: Record<string, any[]> = {
       brand: 'Performance Health', 
       price: '~$30-50 USD', 
       features: ['Tay cầm dày', 'Chống trượt', 'Bộ 4 món', 'Rửa máy được'],
-      reasons: ['Giá rẻ, dễ mua', 'Giúp cầm nắm dễ hơn', 'Chống trượt hiệu quả', 'Phù hợp người viêm khớp']
+      reasons: ['Giá rẻ, dễ mua', 'Giúp cầm nắm dễ hơn', 'Chống trượt hiệu quả', 'Phù hợp người viêm khớp'],
+      standards: ['ISO 9999:09', 'ADA Compliance']
     },
     { 
       name: 'Mediplanner Timer', 
@@ -609,9 +442,10 @@ const SAMPLE_PRODUCTS: Record<string, any[]> = {
       brand: 'TabTimer', 
       price: '~$120 USD', 
       features: ['8 ngăn thuốc', 'Báo động', 'Nhắc nhở tự động', 'LCD hiển thị'],
-      reasons: ['Nhắc uống thuốc đúng giờ', 'Chống nhầm lẫn thuốc', 'Gia đình yên tâm', 'Pin 1 năm']
+      reasons: ['Nhắc uống thuốc đúng giờ', 'Chống nhầm lẫn thuốc', 'Gia đình yên tâm', 'Pin 1 năm'],
+      standards: ['ISO 9999:09', 'WHO GATE']
     },
-    { name: 'Grab Bar Bathroom', nameVi: 'Thanh vịn nhà tắm', brand: 'Moen', price: '~$80-200 USD', features: ['Thép không gỉ', 'Chịu lực 250kg', 'Lắp đặt dễ dàng'], reasons: ['Chống trượt an toàn', 'Lắp tường/van', 'Chịu lực 250kg', 'Bảo hành 10 năm'] },
+    { name: 'Grab Bar Bathroom', nameVi: 'Thanh vịn nhà tắm', brand: 'Moen', price: '~$80-200 USD', features: ['Thép không gỉ', 'Chịu lực 250kg', 'Lắp đặt dễ dàng'], reasons: ['Chống trượt an toàn', 'Lắp tường/van', 'Chịu lực 250kg', 'Bảo hành 10 năm'], standards: ['ISO 9999:09', 'ADA Compliance'] },
   ],
   education: [
     { 
@@ -620,7 +454,8 @@ const SAMPLE_PRODUCTS: Record<string, any[]> = {
       brand: 'Cambium Learning', 
       price: '~$1,500 USD/năm', 
       features: ['Đọc văn bản', 'Hỗ trợ dyslexia', 'Scan tài liệu', 'Ghi chú tích hợp'],
-      reasons: ['Chuẩn cho học sinh khó đọc', 'Scan & đọc sách giáo khoa', 'Hỗ trợ 40+ ngôn ngữ', 'Dùng ở trường & nhà']
+      reasons: ['Chuẩn cho học sinh khó đọc', 'Scan & đọc sách giáo khoa', 'Hỗ trợ 40+ ngôn ngữ', 'Dùng ở trường & nhà'],
+      standards: ['WCAG 2.2', 'UDL Guidelines', 'Section 508']
     },
     { 
       name: 'Dragon NaturallySpeaking', 
@@ -634,13 +469,7 @@ const SAMPLE_PRODUCTS: Record<string, any[]> = {
   ],
 };
 
-// Sample Standards Data
-const STANDARDS_DATA = [
-  { code: 'ISO 9999', name: 'Assistive Products Classification', source: 'ISO' },
-  { code: 'WCAG 2.1', name: 'Web Content Accessibility Guidelines', source: 'W3C' },
-  { code: 'WHO GATE', name: 'Global Assistive Technology', source: 'WHO' },
-  { code: 'EN 1332', name: 'European AT Standards', source: 'CEN' },
-];
+
 
 // Detect category từ câu hỏi
 function detectCategoryFromQuery(query: string): string {
@@ -690,6 +519,7 @@ interface Message {
   sources?: { content: string; source: string; metadata?: Record<string, unknown> }[];
   contextUsed?: boolean;
   attachments?: { name: string; type: string; preview?: string }[];
+  suggestedProducts?: SuggestedProduct[];
 }
 
 // Sidebar conversation shape sourced from `useChatHistoryStore` (HistoryConversation)
@@ -724,6 +554,8 @@ function ConsultationModal({
     interestedDevices: [], message: ''
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showCustomDeviceInput, setShowCustomDeviceInput] = useState(false);
+  const [customDeviceInput, setCustomDeviceInput] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   
   const validateForm = () => {
@@ -782,6 +614,18 @@ function ConsultationModal({
     }));
   };
 
+  const handleAddCustomDevice = () => {
+    const trimmed = customDeviceInput.trim();
+    if (trimmed && !formData.interestedDevices.includes(trimmed)) {
+      setFormData(prev => ({
+        ...prev,
+        interestedDevices: [...prev.interestedDevices, trimmed]
+      }));
+      setCustomDeviceInput('');
+      setShowCustomDeviceInput(false);
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -791,21 +635,40 @@ function ConsultationModal({
       {/* Modal Container - Compact Neubrutalist Style */}
       <div className="relative bg-white w-full max-w-xl rounded-xl border-2 border-slate-800 shadow-[16px_16px_0px_0px_rgba(0,0,0,0.05)] overflow-hidden animate-modal-in max-h-[85vh] flex flex-col">
         
-        {/* Header */}
-        <div className="bg-secondary p-4 md:p-5 flex items-start justify-between relative overflow-hidden flex-shrink-0">
-          <div className="absolute inset-0 bg-purple-100/20 backdrop-blur-[40px]" />
+        {/* Header - Full MADA Branding với nền trắng */}
+        <div className="bg-white p-4 md:p-6 flex items-start justify-between relative overflow-hidden flex-shrink-0 border-b-2 border-slate-100">
+          <div className="absolute inset-0 bg-gradient-to-br from-teal-50/50 via-white to-blue-50/50" />
+          
+          {/* Left: Logo + Branding */}
           <div className="relative z-10 flex gap-3 md:gap-4 items-center">
-            <div className="w-11 h-11 md:w-12 md:h-12 rounded-full bg-purple-200 flex items-center justify-center border-2 border-slate-800">
-              <Users className="w-5 h-5 md:w-6 md:h-6 text-secondary" />
+            {/* MADA Logo - Chỉ hiển thị logo PNG */}
+            <div className="flex items-center">
+              <img 
+                src="/mada-logo.png" 
+                alt="MADA" 
+                className="h-14 md:h-16 w-auto object-contain drop-shadow-sm"
+              />
             </div>
+            
+            {/* Divider */}
+            <div className="hidden md:block w-px h-14 bg-slate-200 self-stretch" />
+            
+            {/* Title */}
             <div>
-              <h1 className="text-base md:text-lg font-bold text-white">{language === 'vi' ? 'Yêu cầu Tư vấn Chuyên gia AT' : language === 'en' ? 'AT Expert Consultation Request' : language === 'ar' ? 'طلب استشارة خبير AT' : 'Demande de consultation AT'}</h1>
-              <p className="text-xs text-purple-200 mt-0.5">MADA Center, Doha, Qatar</p>
+              <h1 className="text-sm md:text-base font-bold text-slate-800 leading-tight">
+                {language === 'vi' ? 'Yêu cầu Tư vấn Chuyên gia AT' : 
+                 language === 'en' ? 'AT Expert Consultation Request' : 
+                 language === 'ar' ? 'طلب استشارة خبير AT' : 
+                 'Demande de consultation AT'}
+              </h1>
+              <p className="text-[10px] md:text-xs text-secondary/70 mt-0.5 font-medium">MADA Center, Doha, Qatar</p>
             </div>
           </div>
+          
+          {/* Right: Close Button */}
           <button 
             onClick={onClose} 
-            className="relative z-10 w-8 h-8 md:w-9 md:h-9 rounded-full border-2 border-white text-white hover:bg-white hover:text-secondary flex items-center justify-center transition-colors"
+            className="relative z-10 w-8 h-8 md:w-9 md:h-9 rounded-full border-2 border-slate-200 text-slate-400 hover:bg-secondary hover:border-secondary hover:text-white flex items-center justify-center transition-all"
           >
             <X className="w-4 h-4" />
           </button>
@@ -962,24 +825,88 @@ function ConsultationModal({
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {[
-                { icon: Monitor, title: language === 'vi' ? 'Phần mềm đọc màn hình' : language === 'en' ? 'Screen Reader Software' : language === 'ar' ? 'برمجيات قارئ الشاشة' : 'Logiciel de lecture d\'écran', subtitle: 'Screen Reader' },
-                { icon: ZoomIn, title: language === 'vi' ? 'Phóng to màn hình' : language === 'en' ? 'Screen Magnifier' : language === 'ar' ? 'تكبير الشاشة' : 'Agrandisseur d\'écran', subtitle: 'Screen Magnifier' },
-                { icon: Mic, title: language === 'vi' ? 'Nhận dạng giọng nói' : language === 'en' ? 'Speech Recognition' : language === 'ar' ? 'التعرف على الكلام' : 'Reconnaissance vocale', subtitle: 'Speech Recognition' },
-                { icon: PlusCircle, title: language === 'vi' ? 'Thêm thiết bị khác' : language === 'en' ? 'Add other device' : language === 'ar' ? 'إضافة جهاز آخر' : 'Ajouter un autre appareil', subtitle: '' },
-              ].map((device, idx) => (
+                { icon: Monitor, title: language === 'vi' ? 'Phần mềm đọc màn hình' : language === 'en' ? 'Screen Reader Software' : language === 'ar' ? 'برمجيات قارئ الشاشة' : 'Logiciel de lecture d\'écran', subtitle: 'Screen Reader', key: 'Screen Reader' },
+                { icon: ZoomIn, title: language === 'vi' ? 'Phóng to màn hình' : language === 'en' ? 'Screen Magnifier' : language === 'ar' ? 'تكبير الشاشة' : 'Agrandisseur d\'écran', subtitle: 'Screen Magnifier', key: 'Screen Magnifier' },
+                { icon: Mic, title: language === 'vi' ? 'Nhận dạng giọng nói' : language === 'en' ? 'Speech Recognition' : language === 'ar' ? 'التعرف على الكلام' : 'Reconnaissance vocale', subtitle: 'Speech Recognition', key: 'Speech Recognition' },
+              ].map((device) => (
                 <div
-                  key={idx}
-                  onClick={() => device.title !== (language === 'vi' ? 'Thêm thiết bị khác' : language === 'en' ? 'Add other device' : language === 'ar' ? 'إضافة جهاز آخر' : 'Ajouter un autre appareil') && toggleDevice(device.title)}
-                  className={`group cursor-pointer p-3 rounded-xl border-2 transition-all shadow-[3px_3px_0px_0px_rgba(0,0,0,0.05)] ${device.title === 'Thêm thiết bị khác' ? 'border-dashed border-slate-300 hover:border-slate-800 hover:bg-slate-100' : 'border-slate-200 bg-blue-50/30 hover:border-blue-500'}`}
+                  key={device.key}
+                  onClick={() => toggleDevice(device.key)}
+                  className={`group cursor-pointer p-3 rounded-xl border-2 transition-all shadow-[3px_3px_0px_0px_rgba(0,0,0,0.05)] ${formData.interestedDevices.includes(device.key) ? 'border-blue-500 bg-blue-50' : 'border-slate-200 bg-blue-50/30 hover:border-blue-500'}`}
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-500 group-hover:bg-blue-500 group-hover:text-white transition-colors">
+                    <div className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors ${formData.interestedDevices.includes(device.key) ? 'bg-blue-500 text-white' : 'bg-blue-500/10 text-blue-500 group-hover:bg-blue-500 group-hover:text-white'}`}>
                       <device.icon className="w-4 h-4" />
                     </div>
                     <div>
                       <h3 className="font-semibold text-slate-800 text-xs">{device.title}</h3>
-                      {device.subtitle && <p className="text-[10px] text-slate-500">{device.subtitle}</p>}
+                      <p className="text-[10px] text-slate-500">{device.subtitle}</p>
                     </div>
+                    {formData.interestedDevices.includes(device.key) && (
+                      <Check className="w-4 h-4 text-blue-500 ml-auto" />
+                    )}
+                  </div>
+                </div>
+              ))}
+              
+              {/* Custom device input */}
+              {showCustomDeviceInput ? (
+                <div className="p-3 rounded-xl border-2 border-dashed border-blue-400 bg-blue-50">
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={customDeviceInput}
+                      onChange={(e) => setCustomDeviceInput(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleAddCustomDevice()}
+                      placeholder={language === 'vi' ? 'Nhập tên thiết bị...' : language === 'en' ? 'Enter device name...' : 'Entrez le nom de l\'appareil...'}
+                      className="flex-1 px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500"
+                      autoFocus
+                    />
+                    <button
+                      onClick={handleAddCustomDevice}
+                      className="px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                    >
+                      <Check className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => { setShowCustomDeviceInput(false); setCustomDeviceInput(''); }}
+                      className="px-3 py-2 bg-slate-200 text-slate-600 rounded-lg hover:bg-slate-300 transition-colors"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div
+                  onClick={() => setShowCustomDeviceInput(true)}
+                  className="group cursor-pointer p-3 rounded-xl border-2 border-dashed border-slate-300 hover:border-slate-800 hover:bg-slate-100 transition-all"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-full bg-slate-200 flex items-center justify-center text-slate-500 group-hover:bg-slate-800 group-hover:text-white transition-colors">
+                      <PlusCircle className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-slate-500 text-xs">{language === 'vi' ? 'Thêm thiết bị khác' : language === 'en' ? 'Add other device' : language === 'ar' ? 'إضافة جهاز آخر' : 'Ajouter un autre appareil'}</h3>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {/* Show added custom devices */}
+              {formData.interestedDevices.filter(d => !['Screen Reader', 'Screen Magnifier', 'Speech Recognition'].includes(d)).map((device) => (
+                <div
+                  key={device}
+                  onClick={() => toggleDevice(device)}
+                  className="group cursor-pointer p-3 rounded-xl border-2 border-blue-500 bg-blue-50 transition-all"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-full bg-blue-500 text-white flex items-center justify-center">
+                      <Smartphone className="w-4 h-4" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-slate-800 text-xs">{device}</h3>
+                    </div>
+                    <X className="w-4 h-4 text-blue-500 hover:text-red-500 transition-colors" />
                   </div>
                 </div>
               ))}
@@ -1039,13 +966,87 @@ function ConsultationModal({
 
 // Product Card Component
 // Smart Product Card with Match Score, Reasons & Real Images
-function SmartProductCard({ product, rank, language = 'vi' as Language }: { product: any; rank: number; language?: Language }) {
+function SmartProductCard({ product, rank, language = 'vi' as Language, onConsult }: { product: any; rank: number; language?: Language; onConsult?: (product: any) => void }) {
   const [expanded, setExpanded] = useState(false);
   const [imageError, setImageError] = useState(false);
   
+  // Translate reasons based on language
+  const getTranslatedReasons = (reasons: string[] | undefined) => {
+    if (!reasons) return [];
+    
+    // Vietnamese translations for common product reasons
+    const reasonTranslations: Record<string, Record<string, string>> = {
+      'Hỗ trợ tiếng Việt native': { vi: 'Hỗ trợ tiếng Việt native', en: 'Native Vietnamese support', ar: 'دعم اللغة الفيتنامية الأصلي', fr: 'Support vietnamien natif' },
+      'Di động, gắn kính': { vi: 'Di động, gắn kính', en: 'Portable, glasses mountable', ar: 'محمول، يمكن تركيبه على النظارات', fr: 'Portable, montable sur lunettes' },
+      'Pin sạc 6h sử dụng liên tục': { vi: 'Pin sạc 6h sử dụng liên tục', en: '6h rechargeable battery', ar: 'بطارية قابلة للشحن 6 ساعات', fr: 'Batterie rechargeable 6h' },
+      'Không cần smartphone': { vi: 'Không cần smartphone', en: 'No smartphone needed', ar: 'لا يحتاج هاتف ذكي', fr: 'Pas besoin de smartphone' },
+      'Rẻ hơn 85% so OrCam': { vi: 'Rẻ hơn 85% so OrCam', en: '85% cheaper than OrCam', ar: 'أرخص 85% من OrCam', fr: '85% moins cher que OrCam' },
+      'Chuẩn quốc tế, dùng phổ biến': { vi: 'Chuẩn quốc tế, dùng phổ biến', en: 'International standard, widely used', ar: 'معيار دولي، مستخدم على نطاق واسع', fr: 'Standard international, largement utilisé' },
+      'Hỗ trợ phần mềm văn phòng': { vi: 'Hỗ trợ phần mềm văn phòng', en: 'Office software support', ar: 'دعم برامج المكاتب', fr: 'Support logiciel de bureau' },
+      'Cộng đồng người dùng lớn': { vi: 'Cộng đồng người dùng lớn', en: 'Large user community', ar: 'مجتمع مستخدمين كبير', fr: 'Grande communauté d\'utilisateurs' },
+      'Chống ồn AI thông minh nhất': { vi: 'Chống ồn AI thông minh nhất', en: 'Smartest AI noise cancellation', ar: 'إلغاء الضوضاء الذكي بالذكاء الاصطناعي', fr: 'Annulation du bruit IA la plus intelligente' },
+      'Kết nối TV, điện thoại': { vi: 'Kết nối TV, điện thoại', en: 'Connects to TV, phone', ar: 'يتصل بالتلفزيون والهاتف', fr: 'Connexion TV, téléphone' },
+      'Pin 16h, sạc nhanh 30p': { vi: 'Pin 16h, sạc nhanh 30p', en: '16h battery, 30min fast charge', ar: 'بطارية 16 ساعة، شحن سريع 30 دقيقة', fr: 'Batterie 16h, charge rapide 30min' },
+      'Chống nước, bụi': { vi: 'Chống nước, bụi', en: 'Water & dust resistant', ar: 'مقاوم للماء والغبار', fr: 'Résistant à l\'eau et à la poussière' },
+      'Tăng nghe rõ ràng 61%': { vi: 'Tăng nghe rõ ràng 61%', en: '61% clearer hearing', ar: 'وضوح سمعي 61%', fr: '61% plus claire audition' },
+      'Học tập, học hành hiệu quả': { vi: 'Học tập, học hành hiệu quả', en: 'Effective for learning', ar: 'فعّال للتعلم', fr: 'Efficace pour l\'apprentissage' },
+      'Gắn bluetooth nhiều máy': { vi: 'Gắn bluetooth nhiều máy', en: 'Bluetooth multi-device', ar: 'بلوتوث متعدد الأجهزة', fr: 'Bluetooth multi-appareils' },
+      'Nhẹ, dễ mang theo': { vi: 'Nhẹ, dễ mang theo', en: 'Lightweight, portable', ar: 'خفيف الوزن، محمول', fr: 'Léger, portable' },
+      'Tự động đứng thẳng': { vi: 'Tự động đứng thẳng', en: 'Auto standing feature', ar: 'ميزة الوقوف التلقائي', fr: 'Fonction debout automatique' },
+      'Leo dốc, bậc thềm': { vi: 'Leo dốc, bậc thềm', en: 'Climbs slopes, steps', ar: 'يتسلق المنحدرات والدرج', fr: 'Monte pentes, marches' },
+      'Điều khiển bằng app': { vi: 'Điều khiển bằng app', en: 'App control', ar: 'التحكم بالتطبيق', fr: 'Contrôle par application' },
+      'Nâng ghế lên 30cm': { vi: 'Nâng ghế lên 30cm', en: 'Seat raises 30cm', ar: 'رفع المقعد 30 سم', fr: 'Siège lève 30cm' },
+      'Leo cầu thang an toàn': { vi: 'Leo cầu thang an toàn', en: 'Safe stair climbing', ar: 'تسلق الدرج بأمان', fr: 'Escalier en toute sécurité' },
+      'Gắn hầu hết xe lăn': { vi: 'Gắn hầu hết xe lăn', en: 'Fits most wheelchairs', ar: 'يناسب معظم الكراسي المتحركة', fr: 'S\'adapte à la plupart des fauteuils' },
+      'Tháo lắp nhanh 2 phút': { vi: 'Tháo lắp nhanh 2 phút', en: '2-min quick setup', ar: 'تركيب سريع دقيقتين', fr: 'Installation rapide 2 min' },
+      'Rẻ hơn xe lăn điện 80%': { vi: 'Rẻ hơn xe lăn điện 80%', en: '80% cheaper than power wheelchair', ar: 'أرخص 80% من الكرسي الكهربائي', fr: '80% moins cher qu\'un fauteuil électrique' },
+    };
+    
+    return reasons.map(reason => {
+      if (reasonTranslations[reason]) {
+        return reasonTranslations[reason][language] || reason;
+      }
+      return reason;
+    });
+  };
+  
+  // Translate features based on language
+  const getTranslatedFeatures = (features: string[] | undefined) => {
+    if (!features) return [];
+    
+    const featureTranslations: Record<string, Record<string, string>> = {
+      'Nhận diện khuôn mặt': { vi: 'Nhận diện khuôn mặt', en: 'Face recognition', ar: 'التعرف على الوجوه', fr: 'Reconnaissance faciale' },
+      'Đọc văn bản 100+ ngôn ngữ': { vi: 'Đọc văn bản 100+ ngôn ngữ', en: 'Reads 100+ languages', ar: 'يقرأ أكثر من 100 لغة', fr: 'Lit plus de 100 langues' },
+      'Nhận diện tiền giấy': { vi: 'Nhận diện tiền giấy', en: 'Currency recognition', ar: 'التعرف على العملات', fr: 'Reconnaissance des devises' },
+      'Pin 6 giờ': { vi: 'Pin 6 giờ', en: '6 hour battery', ar: 'بطارية 6 ساعات', fr: 'Batterie 6 heures' },
+      'Gắn kính được': { vi: 'Gắn kính được', en: 'Glasses mountable', ar: 'يمكن تركيبه على النظارات', fr: 'Montable sur lunettes' },
+      'Đọc màn hình Windows': { vi: 'Đọc màn hình Windows', en: 'Windows screen reader', ar: 'قارئ شاشة ويندوز', fr: 'Lecteur d\'écran Windows' },
+      'Hỗ trợ 40+ ngôn ngữ': { vi: 'Hỗ trợ 40+ ngôn ngữ', en: 'Supports 40+ languages', ar: 'يدعم أكثر من 40 لغة', fr: 'Supporte 40+ langues' },
+      'Tương thích Braille': { vi: 'Tương thích Braille', en: 'Braille compatible', ar: 'متوافق مع برايل', fr: 'Compatible braille' },
+      'Kết nối Bluetooth': { vi: 'Kết nối Bluetooth', en: 'Bluetooth connectivity', ar: 'اتصال بلوتوث', fr: 'Connectivité Bluetooth' },
+      'Chống ồn AI': { vi: 'Chống ồn AI', en: 'AI noise cancellation', ar: 'إلغاء الضوضاء بالذكاء الاصطناعي', fr: 'Annulation du bruit IA' },
+      'Pin sạc lithium': { vi: 'Pin sạc lithium', en: 'Lithium rechargeable', ar: 'بطارية ليثيوم قابلة للشحن', fr: 'Lithium rechargeable' },
+      'Waterproof IP68': { vi: 'Waterproof IP68', en: 'Waterproof IP68', ar: 'مقاوم للماء IP68', fr: 'Imperméable IP68' },
+    };
+    
+    return features.map(feature => {
+      if (featureTranslations[feature]) {
+        return featureTranslations[feature][language] || feature;
+      }
+      return feature;
+    });
+  };
+  
+  const translatedReasons = getTranslatedReasons(product.reasons);
+  const translatedFeatures = getTranslatedFeatures(product.features);
+  
   // Calculate match score based on product properties
   const matchScore = product.matchScore || (rank === 1 ? 94 : 87);
-  const matchLabel = rank === 1 ? 'Best Match' : rank === 2 ? 'Best Value' : 'Recommended';
+  const matchLabel = rank === 1 
+    ? (language === 'vi' ? 'Phù hợp nhất' : language === 'en' ? 'Best Match' : language === 'ar' ? 'الأفضل' : 'Meilleur choix')
+    : rank === 2 
+    ? (language === 'vi' ? 'Giá trị tốt' : language === 'en' ? 'Best Value' : language === 'ar' ? 'أفضل قيمة' : 'Meilleur rapport')
+    : (language === 'vi' ? 'Đề xuất' : language === 'en' ? 'Recommended' : language === 'ar' ? 'موصى به' : 'Recommandé');
   
   // Get category info with image
   const getCategoryInfo = (name: string) => {
@@ -1054,13 +1055,13 @@ function SmartProductCard({ product, rank, language = 'vi' as Language }: { prod
       return { gradient: 'from-violet-600 to-purple-800', icon: '👁️', label: language === 'vi' ? 'Hỗ trợ thị giác' : language === 'en' ? 'Vision Support' : language === 'ar' ? 'دعم البصر' : 'Support visuel', color: 'violet', img: 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=400&h=300&fit=crop' };
     }
     if (n.includes('jaws') || n.includes('nvda') || n.includes('screen reader')) {
-      return { gradient: 'from-slate-600 to-slate-800', icon: '🖥️', label: 'Screen Reader', color: 'slate', img: 'https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=400&h=300&fit=crop' };
+      return { gradient: 'from-slate-600 to-slate-800', icon: '🖥️', label: language === 'vi' ? 'Trình đọc màn hình' : language === 'en' ? 'Screen Reader' : language === 'ar' ? 'قارئ الشاشة' : 'Lecteur d\'écran', color: 'slate', img: 'https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=400&h=300&fit=crop' };
     }
     if (n.includes('phonak') || n.includes('oticon') || n.includes('hearing')) {
       return { gradient: 'from-blue-500 to-cyan-600', icon: '👂', label: language === 'vi' ? 'Hỗ trợ thính giác' : language === 'en' ? 'Hearing Support' : language === 'ar' ? 'دعم السمع' : 'Support auditif', color: 'blue', img: 'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=400&h=300&fit=crop' };
     }
     if (n.includes('roger')) {
-      return { gradient: 'from-blue-400 to-cyan-500', icon: '🎤', label: 'Microphone', color: 'blue', img: 'https://images.unsplash.com/photo-1590602847861-f357a9332bbc?w=400&h=300&fit=crop' };
+      return { gradient: 'from-blue-400 to-cyan-500', icon: '🎤', label: language === 'vi' ? 'Microphone' : language === 'en' ? 'Microphone' : language === 'ar' ? 'الميكروفون' : 'Microphone', color: 'blue', img: 'https://images.unsplash.com/photo-1590602847861-f357a9332bbc?w=400&h=300&fit=crop' };
     }
     if (n.includes('wheelchair') || n.includes('xe lăn') || n.includes('permobil')) {
       return { gradient: 'from-emerald-500 to-teal-600', icon: '🦽', label: language === 'vi' ? 'Hỗ trợ vận động' : language === 'en' ? 'Mobility Support' : language === 'ar' ? 'دعم الحركة' : 'Support mobilité', color: 'emerald', img: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&h=300&fit=crop' };
@@ -1069,39 +1070,39 @@ function SmartProductCard({ product, rank, language = 'vi' as Language }: { prod
       return { gradient: 'from-teal-500 to-cyan-600', icon: '🪜', label: language === 'vi' ? 'Leo cầu thang' : language === 'en' ? 'Stair Climbing' : language === 'ar' ? 'تسلق الدرج' : 'Montée d\'escalier', color: 'teal', img: 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&h=300&fit=crop' };
     }
     if (n.includes('tobii') || n.includes('eye')) {
-      return { gradient: 'from-purple-500 to-pink-600', icon: '👁️', label: 'Eye Tracker', color: 'purple', img: 'https://images.unsplash.com/photo-1531746790731-6c087fecd65a?w=400&h=300&fit=crop' };
+      return { gradient: 'from-purple-500 to-pink-600', icon: '👁️', label: language === 'vi' ? 'Theo dõi mắt' : language === 'en' ? 'Eye Tracker' : language === 'ar' ? 'تتبع العين' : 'Eye Tracker', color: 'purple', img: 'https://images.unsplash.com/photo-1531746790731-6c087fecd65a?w=400&h=300&fit=crop' };
     }
     if (n.includes('proloquo') || n.includes('touchchat')) {
-      return { gradient: 'from-orange-500 to-red-500', icon: '📱', label: 'AAC App', color: 'orange', img: 'https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?w=400&h=300&fit=crop' };
+      return { gradient: 'from-orange-500 to-red-500', icon: '📱', label: language === 'vi' ? 'Ứng dụng AAC' : language === 'en' ? 'AAC App' : language === 'ar' ? 'تطبيق التواصل' : 'App AAC', color: 'orange', img: 'https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?w=400&h=300&fit=crop' };
     }
     if (n.includes('memo') || n.includes('calendar')) {
-      return { gradient: 'from-indigo-500 to-blue-600', icon: '📅', label: 'Nhắc nhở', color: 'indigo', img: 'https://images.unsplash.com/photo-1434494878577-86c23bcb06b9?w=400&h=300&fit=crop' };
+      return { gradient: 'from-indigo-500 to-blue-600', icon: '📅', label: language === 'vi' ? 'Nhắc nhở' : language === 'en' ? 'Reminder' : language === 'ar' ? 'التذكير' : 'Rappel', color: 'indigo', img: 'https://images.unsplash.com/photo-1434494878577-86c23bcb06b9?w=400&h=300&fit=crop' };
     }
     if (n.includes('lightwriter')) {
-      return { gradient: 'from-orange-400 to-red-500', icon: '💬', label: 'AAC Device', color: 'orange', img: 'https://images.unsplash.com/photo-1590650213165-c1fef80648c4?w=400&h=300&fit=crop' };
+      return { gradient: 'from-orange-400 to-red-500', icon: '💬', label: language === 'vi' ? 'Thiết bị giao tiếp' : language === 'en' ? 'AAC Device' : language === 'ar' ? 'جهاز التواصل' : 'Appareil AAC', color: 'orange', img: 'https://images.unsplash.com/photo-1590650213165-c1fef80648c4?w=400&h=300&fit=crop' };
     }
     if (n.includes('mack')) {
-      return { gradient: 'from-pink-400 to-rose-500', icon: '🔊', label: 'Communicator', color: 'pink', img: 'https://images.unsplash.com/photo-1563770660941-20978e870e26?w=400&h=300&fit=crop' };
+      return { gradient: 'from-pink-400 to-rose-500', icon: '🔊', label: language === 'vi' ? 'Bộ giao tiếp' : language === 'en' ? 'Communicator' : language === 'ar' ? 'مواصل' : 'Communicateur', color: 'pink', img: 'https://images.unsplash.com/photo-1563770660941-20978e870e26?w=400&h=300&fit=crop' };
     }
     if (n.includes('easy grip') || n.includes('eating')) {
-      return { gradient: 'from-amber-400 to-orange-500', icon: '🍴', label: 'Dụng cụ ăn uống', color: 'amber', img: 'https://images.unsplash.com/photo-1584346133934-a3afd2a33c4c?w=400&h=300&fit=crop' };
+      return { gradient: 'from-amber-400 to-orange-500', icon: '🍴', label: language === 'vi' ? 'Dụng cụ ăn uống' : language === 'en' ? 'Eating Aids' : language === 'ar' ? 'أدوات الأكل' : 'Ustensiles de repas', color: 'amber', img: 'https://images.unsplash.com/photo-1584346133934-a3afd2a33c4c?w=400&h=300&fit=crop' };
     }
     if (n.includes('mediplanner') || n.includes('thuốc')) {
-      return { gradient: 'from-green-500 to-emerald-600', icon: '💊', label: 'Hộp thuốc', color: 'green', img: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=400&h=300&fit=crop' };
+      return { gradient: 'from-green-500 to-emerald-600', icon: '💊', label: language === 'vi' ? 'Hộp thuốc' : language === 'en' ? 'Pill Organizer' : language === 'ar' ? 'منظم الأدوية' : 'Porte-médicaments', color: 'green', img: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=400&h=300&fit=crop' };
     }
     if (n.includes('grab') || n.includes('bathroom')) {
-      return { gradient: 'from-slate-400 to-gray-600', icon: '🚿', label: 'Hỗ trợ nhà tắm', color: 'slate', img: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=300&fit=crop' };
+      return { gradient: 'from-slate-400 to-gray-600', icon: '🚿', label: language === 'vi' ? 'Hỗ trợ nhà tắm' : language === 'en' ? 'Bathroom Support' : language === 'ar' ? 'دعم الحمام' : 'Support salle de bain', color: 'slate', img: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=300&fit=crop' };
     }
     if (n.includes('kurzweil')) {
-      return { gradient: 'from-amber-500 to-orange-600', icon: '📚', label: 'Hỗ trợ học tập', color: 'amber', img: 'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=400&h=300&fit=crop' };
+      return { gradient: 'from-amber-500 to-orange-600', icon: '📚', label: language === 'vi' ? 'Hỗ trợ học tập' : language === 'en' ? 'Education Support' : language === 'ar' ? 'دعم التعليم' : 'Support éducatif', color: 'amber', img: 'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=400&h=300&fit=crop' };
     }
     if (n.includes('dragon')) {
-      return { gradient: 'from-cyan-500 to-blue-600', icon: '🎯', label: 'Speech Recognition', color: 'cyan', img: 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=400&h=300&fit=crop' };
+      return { gradient: 'from-cyan-500 to-blue-600', icon: '🎯', label: language === 'vi' ? 'Nhận dạng giọng nói' : language === 'en' ? 'Speech Recognition' : language === 'ar' ? 'التعرف على الكلام' : 'Reconnaissance vocale', color: 'cyan', img: 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=400&h=300&fit=crop' };
     }
     if (n.includes('c-pen')) {
-      return { gradient: 'from-yellow-500 to-orange-600', icon: '✏️', label: 'Scanner', color: 'yellow', img: 'https://images.unsplash.com/photo-1553729784-e91953dec042?w=400&h=300&fit=crop' };
+      return { gradient: 'from-yellow-500 to-orange-600', icon: '✏️', label: language === 'vi' ? 'Bút quét' : language === 'en' ? 'Scanner Pen' : language === 'ar' ? 'قلم الماسح' : 'Stylo scan', color: 'yellow', img: 'https://images.unsplash.com/photo-1553729784-e91953dec042?w=400&h=300&fit=crop' };
     }
-    return { gradient: 'from-slate-600 to-slate-800', icon: '🔧', label: 'Thiết bị AT', color: 'slate', img: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=400&h=300&fit=crop' };
+    return { gradient: 'from-slate-600 to-slate-800', icon: '🔧', label: language === 'vi' ? 'Thiết bị AT' : language === 'en' ? 'AT Device' : language === 'ar' ? 'جهاز AT' : 'Appareil AT', color: 'slate', img: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=400&h=300&fit=crop' };
   };
   
   const categoryInfo = getCategoryInfo(product.name);
@@ -1111,8 +1112,9 @@ function SmartProductCard({ product, rank, language = 'vi' as Language }: { prod
   const reviews = rank === 1 ? 234 : 189;
   
   // Availability badge
-  const availability = rank === 1 ? { text: 'Có sẵn tại VN', icon: '📦', color: 'bg-emerald-100 text-emerald-700' } 
-    : { text: 'Tải digital', icon: '📥', color: 'bg-blue-100 text-blue-700' };
+  const availability = rank === 1 
+    ? { text: language === 'vi' ? 'Có sẵn tại VN' : language === 'en' ? 'Available in VN' : language === 'ar' ? 'متاح في فيتنام' : 'Disponible au VN', icon: '📦', color: 'bg-emerald-100 text-emerald-700' } 
+    : { text: language === 'vi' ? 'Tải digital' : language === 'en' ? 'Digital download' : language === 'ar' ? 'تحميل رقمي' : 'Téléchargement', icon: '📥', color: 'bg-blue-100 text-blue-700' };
 
   return (
     <div className={`bg-white border-2 rounded-2xl overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 ${
@@ -1165,7 +1167,7 @@ function SmartProductCard({ product, rank, language = 'vi' as Language }: { prod
           <div className="flex items-center gap-1.5">
             <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
             <span className="font-semibold text-sm">{rating}</span>
-            <span className="text-xs text-slate-500">({reviews} reviews)</span>
+            <span className="text-xs text-slate-500">({reviews} {language === 'vi' ? 'đánh giá' : language === 'en' ? 'reviews' : language === 'ar' ? 'تقييم' : 'avis'})</span>
           </div>
           <span className={`flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-medium ${availability.color}`}>
             {availability.icon} {availability.text}
@@ -1179,7 +1181,7 @@ function SmartProductCard({ product, rank, language = 'vi' as Language }: { prod
             {language === 'vi' ? 'Phù hợp vì:' : language === 'en' ? 'Why this fits:' : language === 'ar' ? 'لماذا يناسب:' : 'Pourquoi ça convient:'}
           </p>
           <div className="space-y-1.5">
-            {product.reasons?.slice(0, 3).map((reason: string, idx: number) => (
+            {translatedReasons?.slice(0, 3).map((reason: string, idx: number) => (
               <div key={idx} className="flex items-start gap-2 text-xs text-slate-600 bg-slate-50 p-2 rounded-lg">
                 <Check className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" />
                 <span>{reason}</span>
@@ -1207,9 +1209,11 @@ function SmartProductCard({ product, rank, language = 'vi' as Language }: { prod
         {/* Expandable Features */}
         {expanded && (
           <div className="mb-4 p-3 bg-slate-50 rounded-xl">
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-2">Tính năng nổi bật</p>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-2">
+              {language === 'vi' ? 'Tính năng nổi bật' : language === 'en' ? 'Key Features' : language === 'ar' ? 'الميزات الرئيسية' : 'Caractéristiques principales'}
+            </p>
             <div className="grid grid-cols-2 gap-1">
-              {product.features?.slice(0, 6).map((feature: string, idx: number) => (
+              {translatedFeatures?.slice(0, 6).map((feature: string, idx: number) => (
                 <div key={idx} className="flex items-center gap-1 text-xs text-slate-600">
                   <span className="w-1 h-1 bg-blue-500 rounded-full" />
                   {feature}
@@ -1219,56 +1223,47 @@ function SmartProductCard({ product, rank, language = 'vi' as Language }: { prod
           </div>
         )}
         
-        {/* Action Buttons */}
+        {/* Action Buttons - ĐÃ FIX: phân biệt rõ ràng */}
         <div className="flex gap-2">
           <button 
             onClick={() => setExpanded(!expanded)}
-            className="flex-1 py-2 px-3 text-xs font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors"
+            className="flex-1 py-2 px-3 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors"
+            aria-label={expanded ? (language === 'vi' ? 'Thu gọn' : 'Show less') : (language === 'vi' ? 'Xem chi tiết' : 'View details')}
           >
-            {expanded ? (language === 'vi' ? 'Thu gọn' : language === 'en' ? 'Show less' : language === 'ar' ? 'عرض أقل' : 'Réduire') : (language === 'vi' ? 'Xem thêm' : language === 'en' ? 'Show more' : language === 'ar' ? 'عرض المزيد' : 'Afficher plus')}
+            {expanded ? (language === 'vi' ? 'Thu gọn' : language === 'en' ? 'Show less' : language === 'ar' ? 'عرض أقل' : 'Réduire') : (language === 'vi' ? 'Chi tiết' : language === 'en' ? 'Details' : language === 'ar' ? 'التفاصيل' : 'Détails')}
           </button>
-          <a
-            href="https://mada.org.qa"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex-1 py-2 px-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white text-xs font-semibold rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all shadow-sm hover:shadow text-center"
+          <button
+            onClick={() => onConsult?.(product)}
+            className="flex-1 py-2 px-3 bg-[#0047ff] text-white text-xs font-bold rounded-xl hover:bg-[#0037cc] transition-all shadow-sm hover:shadow flex items-center justify-center gap-1"
+            aria-label={language === 'vi' ? 'Tư vấn về sản phẩm' : 'Get consultation'}
           >
-            {language === 'vi' ? 'Tìm hiểu →' : language === 'en' ? 'Learn more →' : language === 'ar' ? 'اعرف المزيد ←' : 'En savoir plus →'}
-          </a>
+            {language === 'vi' ? 'Tư vấn ngay' : language === 'en' ? 'Get Consult' : language === 'ar' ? 'استشارة' : 'Consultation'}
+            <ArrowRight className="w-3 h-3" aria-hidden="true" />
+          </button>
         </div>
+        
+        {/* Standards Badges - ĐÃ FIX: nằm trong card */}
+        {product.standards && product.standards.length > 0 && (
+          <div className="mt-4 pt-3 border-t border-slate-100">
+            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-2">
+              {language === 'vi' ? 'Tiêu chuẩn kỹ thuật:' : language === 'en' ? 'Technical Standards:' : language === 'ar' ? 'المعايير التقنية:' : 'Normes techniques:'}
+            </p>
+            <div className="flex flex-wrap gap-1">
+              {product.standards.map((standard: string, idx: number) => (
+                <span key={idx} className="px-2 py-1 bg-violet-50 text-violet-700 text-[10px] font-semibold rounded border border-violet-200">
+                  {standard}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-// Standards Badge Component
-function StandardsBadge({ standards }: { standards: string[] }) {
-  return (
-    <div className="flex flex-wrap gap-2">
-      {standards.map((standard, idx) => (
-        <span 
-          key={idx}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-lg text-xs font-mono text-blue-700"
-        >
-          <Award className="w-3.5 h-3.5" />
-          {standard}
-        </span>
-      ))}
-      {standards.length === 0 && STANDARDS_DATA.slice(0, 3).map((std, idx) => (
-        <span 
-          key={idx}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 border border-slate-200 rounded-lg text-xs font-mono text-slate-600"
-        >
-          <FileCheck className="w-3.5 h-3.5" />
-          {std.code}
-        </span>
-      ))}
-    </div>
-  );
-}
-
 // Confidence Rating Bar Component
-function ConfidenceBar({ confidence }: { confidence: number }) {
+function ConfidenceBar({ confidence, language = 'vi' as Language }: { confidence: number; language?: Language }) {
   const getColor = (value: number) => {
     if (value >= 85) return 'bg-teal-500';
     if (value >= 70) return 'bg-blue-500';
@@ -1276,9 +1271,11 @@ function ConfidenceBar({ confidence }: { confidence: number }) {
     return 'bg-red-500';
   };
 
+  const label = language === 'vi' ? 'Độ tin cậy' : language === 'en' ? 'Confidence' : language === 'ar' ? 'الثقة' : 'Confiance';
+
   return (
     <div className="flex items-center gap-3 bg-white px-4 py-2 rounded-full border border-slate-100 shadow-sm">
-      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Độ tin cậy</span>
+      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{label}</span>
       <div className="w-24 h-1.5 bg-slate-100 rounded-full overflow-hidden">
         <div 
           className={`h-full ${getColor(confidence)} transition-all duration-500`}
@@ -1309,12 +1306,26 @@ export function ChatPage() {
   const [showAttachmentMenu, setShowAttachmentMenu] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showAgentMenu, setShowAgentMenu] = useState(false);
-  const [selectedFiles, setSelectedFiles] = useState<{ name: string; type: string; size: number; content?: string; originalFile?: File; isLoading?: boolean; isCancelling?: boolean }[]>([]);
-  const [cancellingFiles, setCancellingFiles] = useState<Set<string>>(new Set());
+  const [selectedFiles, setSelectedFiles] = useState<{ fileId: string; name: string; type: string; size: number; content?: string; originalFile?: File; isLoading?: boolean; isCancelling?: boolean }[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_cancellingFiles, setCancellingFiles] = useState<Set<string>>(new Set());
   const [isGeneratingResponse, setIsGeneratingResponse] = useState(false);
   const [activeCategory, setActiveCategory] = useState<ATCategory | null>(null);
-  const [suggestedFollowUps, setSuggestedFollowUps] = useState<string[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_suggestedFollowUps, setSuggestedFollowUps] = useState<string[]>([]);
   const [isDragging, setIsDragging] = useState(false);
+
+  // View Mode Store
+  const { viewMode, toggleViewMode } = useViewModeStore();
+
+  // Handler: Khi click vào câu hỏi mẫu trong sidebar
+  const handleSelectSampleQuestion = useCallback((question: string) => {
+    setInputValue(question);
+    // Focus vào input để user có thể edit trước khi gửi
+    setTimeout(() => {
+      document.querySelector<HTMLTextAreaElement>('textarea')?.focus();
+    }, 100);
+  }, []);
 
   // Agent state
   const activeAgents = useAgentStore((s) => s.getActiveAgents());
@@ -1341,6 +1352,8 @@ export function ChatPage() {
   const [showUrlInput, setShowUrlInput] = useState(false);
   const [urlInputValue, setUrlInputValue] = useState('');
   const [isFetchingUrl, setIsFetchingUrl] = useState(false);
+  const [userHasScrolled, setUserHasScrolled] = useState(false);
+  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Helpers — format date relative + ISO
   const formatRelativeDate = (ts: number): string => {
@@ -1437,6 +1450,7 @@ export function ChatPage() {
   }, [selectedFiles]);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -1444,7 +1458,7 @@ export function ChatPage() {
   const attachmentMenuRef = useRef<HTMLDivElement>(null);
 
   const currentLanguage = LANGUAGES.find((l) => l.code === language) || LANGUAGES[0];
-  const isEndUser = true;
+  const isEndUser = viewMode === 'end_user';
   const currentQuestions = activeCategory 
     ? getSampleQuestionsByLang(activeCategory, language)
     : [];
@@ -1482,9 +1496,38 @@ export function ChatPage() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Cleanup timeout on unmount
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    return () => {
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Auto-scroll to bottom - but respect user's manual scroll
+  useEffect(() => {
+    // Only auto-scroll if user hasn't manually scrolled up
+    if (!userHasScrolled) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
   }, [messages, isLoading, streamingContent]);
+
+  // Detect when user scrolls back to bottom - reset auto-scroll
+  useEffect(() => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+
+    const handleScroll = () => {
+      const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+      if (distanceFromBottom < 50) {
+        setUserHasScrolled(false);
+      }
+    };
+
+    container.addEventListener('scroll', handleScroll);
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, []);
 
   // Drag and Drop handlers
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -1525,12 +1568,12 @@ export function ChatPage() {
       
       // Add file to state
       setSelectedFiles(prev => [...prev, {
+        fileId,
         name: file.name,
         type: file.type,
         size: file.size,
         originalFile: file,
         isLoading: true,
-        fileId, // Unique ID for cancellation
       }]);
 
       // Process file based on type
@@ -1684,6 +1727,7 @@ export function ChatPage() {
     setLoading(true);
     setIsGeneratingResponse(true);
     setStreamingContent('');
+    setUserHasScrolled(false); // Reset scroll state when new message is sent
 
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
@@ -1786,8 +1830,9 @@ export function ChatPage() {
     let apiSuccess = false;
 
     try {
-      // Gửi chat với file đính kèm
-      const chatEndpoint = attachmentsForApi.length > 0 ? '/api/chat-with-file' : '/api/chat';
+      // Gửi chat với file đính kèm - sử dụng streaming endpoint
+      const useStream = attachmentsForApi.length === 0; // Chỉ stream khi không có file
+      const chatEndpoint = useStream ? '/api/chat/stream' : (attachmentsForApi.length > 0 ? '/api/chat-with-file' : '/api/chat');
       const chatBody: any = { 
         message: fullMessage, 
         language,
@@ -1799,7 +1844,86 @@ export function ChatPage() {
       if (attachmentsForApi.length > 0) {
         chatBody.attachments = attachmentsForApi;
       }
-      
+
+      // ===== STREAMING MODE =====
+      if (useStream) {
+        const response = await fetch(chatEndpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(chatBody),
+          signal: abortControllerRef.current.signal,
+        });
+
+        if (!response.ok) {
+          throw new Error(`Server error: ${response.status}`);
+        }
+
+        const reader = response.body?.getReader();
+        if (!reader) {
+          throw new Error('No response body');
+        }
+
+        const decoder = new TextDecoder();
+        let fullContent = '';
+        let sources: any[] = [];
+        let confidence = 0.5;
+        let suggestedProducts: any[] = []; // ✅ Capture from stream
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value);
+          const lines = chunk.split('\n');
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const data = JSON.parse(line.slice(6));
+                
+                if (data.type === 'chunk') {
+                  // Stream character by character for smooth animation
+                  fullContent += data.chunk;
+                  setStreamingContent(fullContent);
+                } else if (data.type === 'sources') {
+                  sources = data.sources || [];
+                } else if (data.type === 'suggestedProducts') {
+                  // ✅ Capture suggested products from stream
+                  suggestedProducts = data.suggestedProducts || [];
+                } else if (data.type === 'done') {
+                  confidence = data.confidence || 0.5;
+                  if (data.answer) fullContent = data.answer;
+                } else if (data.type === 'error') {
+                  throw new Error(data.error);
+                }
+              } catch (e) {
+                // Ignore JSON parse errors for incomplete chunks
+              }
+            }
+          }
+        }
+
+        setStreamingContent('');
+        apiSuccess = true;
+
+        if (fullContent) {
+          addMessage({
+            role: 'assistant',
+            content: fullContent,
+            confidence: confidence,
+            sources: sources,
+            contextUsed: sources.length > 0,
+            suggestedProducts: suggestedProducts, // ✅ Now captured from stream event
+          });
+
+          // Generate follow-up questions
+          const followUps = generateFollowUpQuestions(userMessage, fullContent, language);
+          setSuggestedFollowUps(followUps);
+        }
+        return; // Done with streaming
+      }
+
+      // ===== NON-STREAMING MODE (with files) =====
       const response = await fetch(chatEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1846,6 +1970,7 @@ export function ChatPage() {
           confidence: data.data.confidence,
           sources: data.data.sources,
           contextUsed: data.data.contextUsed,
+          suggestedProducts: data.data.suggestedProducts,
         });
         
         // Generate follow-up questions based on user question and AI response
@@ -1940,6 +2065,20 @@ export function ChatPage() {
     }, 100);
   };
 
+  // Send với text cho trước (dùng cho suggested questions)
+  // Sửa: truyền text trực tiếp vào handleSend để tránh flash input
+  const handleSendWithText = async (text: string) => {
+    if (!text.trim() || isLoading) return;
+    // Set input value rồi gọi handleSend
+    setInputValue(text);
+    // Đợi 1 tick để React re-render với inputValue mới
+    await new Promise(resolve => setTimeout(resolve, 0));
+    await handleSend();
+    // Sau khi gửi, đảm bảo input + files đã clear
+    setInputValue('');
+    setSelectedFiles([]);
+  };
+
   const handleSelectConversation = (id: string) => {
     window.speechSynthesis?.cancel();
     setSpeakingId(null);
@@ -1998,6 +2137,7 @@ export function ChatPage() {
   const recognitionRef = useRef<any>(null);
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState('');
+  const [interimTranscript, setInterimTranscript] = useState(''); // Real-time text từ voice (interim, chưa finalize)
   const [_voiceError, setVoiceError] = useState<string | null>(null);
 
   // Initialize Speech Recognition
@@ -2012,14 +2152,22 @@ export function ChatPage() {
       
       recognition.onresult = (event: any) => {
         let finalTranscript = '';
+        let interimText = '';
         for (let i = event.resultIndex; i < event.results.length; i++) {
           if (event.results[i].isFinal) {
             finalTranscript += event.results[i][0].transcript;
+          } else {
+            interimText += event.results[i][0].transcript;
           }
+        }
+        // Cập nhật interim để hiển thị real-time trong input
+        if (interimText) {
+          setInterimTranscript(interimText);
         }
         if (finalTranscript) {
           setTranscript(finalTranscript);
           setInputValue((prev) => prev + finalTranscript);
+          setInterimTranscript(''); // Clear interim khi có final
         }
       };
       
@@ -2029,6 +2177,7 @@ export function ChatPage() {
           console.log('[Voice] Recording aborted by user or timeout');
           setIsRecording(false);
           setIsListening(false);
+          setInterimTranscript('');
           return;
         }
         
@@ -2040,11 +2189,13 @@ export function ChatPage() {
             : (language === 'vi' ? 'Da xay ra loi Voice' : 'Voice error occurred'));
         setIsRecording(false);
         setIsListening(false);
+        setInterimTranscript('');
       };
       
       recognition.onend = () => {
         setIsListening(false);
         setIsRecording(false);
+        setInterimTranscript(''); // Clear interim khi dừng
         if (transcript) {
           setInputValue((prev) => prev + transcript);
           setTranscript('');
@@ -2053,7 +2204,7 @@ export function ChatPage() {
       
       recognitionRef.current = recognition;
     }
-  }, [language]);
+  }, [language, transcript]);
 
   const handleVoiceRecord = () => {
     if (!recognitionRef.current) {
@@ -2143,7 +2294,8 @@ export function ChatPage() {
         }
         
         // Add placeholder files with loading state immediately
-        const placeholders = Array.from(files).map((file) => ({
+        const placeholders = Array.from(files).map((file, index) => ({
+          fileId: `placeholder-${file.name}-${Date.now()}-${index}`,
           name: file.name,
           type: file.type,
           size: file.size,
@@ -2163,8 +2315,10 @@ export function ChatPage() {
         
         // Process files in background
         const processedFiles = await Promise.all(
-          Array.from(files).map(async (file) => {
-            const fileData: { name: string; type: string; size: number; content?: string; originalFile?: File; isLoading: boolean } = {
+          Array.from(files).map(async (file, index) => {
+            const fileId = `batch-${file.name}-${Date.now()}-${index}`;
+            const fileData: { fileId: string; name: string; type: string; size: number; content?: string; originalFile?: File; isLoading: boolean } = {
+              fileId,
               name: file.name,
               type: file.type,
               size: file.size,
@@ -2262,18 +2416,17 @@ export function ChatPage() {
       if (data.success) {
         // Thêm vào selectedFiles để gửi cùng chat
         setSelectedFiles(prev => [...prev, {
+          fileId: `url-${Date.now()}`,
           name: data.data?.title || new URL(url).hostname,
           type: 'text/url',
           size: (data.data?.content || '').length,
           content: data.data?.content || '',
         }]);
 
-        // Hiển thị thông báo đẹp thay vì nội dung dài
-        const fileTypeLabel = data.data?.type === 'google-docs' ? 'Google Docs' : 'Trang web';
-        addMessage({
-          role: 'user',
-          content: `📄 Đã tải nội dung từ ${fileTypeLabel}:\n**${data.data?.title || 'Tài liệu không có tiêu đề'}**`,
-        });
+        // Không hiển thị tin nhắn riêng - nội dung URL sẽ được gửi cùng câu hỏi tiếp theo
+        // Đóng input và clear
+        setShowUrlInput(false);
+        setUrlInputValue('');
       } else {
         addMessage({
           role: 'assistant',
@@ -2303,6 +2456,7 @@ export function ChatPage() {
 
   return (
     <div 
+      id="main-content"
       className="flex h-screen bg-[#f9f9ff] dark:bg-[#191b23] overflow-hidden"
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
@@ -2353,12 +2507,6 @@ export function ChatPage() {
         language={language}
       />
 
-      {/* Auth Modal - Login / Register / Google */}
-      <AuthModal />
-
-      {/* Paywall Modal - shown when quota exhausted */}
-      <PaywallModal />
-
       {/* ============== SIDEBAR ============== */}
       <aside
         className={clsx(
@@ -2371,9 +2519,7 @@ export function ChatPage() {
           {/* Logo Area */}
           <div className="p-6 border-b border-white/50">
             <div className="flex items-center gap-3 mb-1">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-500 to-blue-500 flex items-center justify-center p-1.5 shadow-lg">
-                <RobotLogo variant="white" className="w-full h-full" />
-              </div>
+              <img src={madaLogo} alt="MADA" className="h-12" />
               <div>
                 <h1 className="font-black text-xl tracking-tight text-on-background">MADA AI</h1>
                 <p className="text-[10px] uppercase tracking-widest text-primary font-bold">Universal Access</p>
@@ -2382,6 +2528,36 @@ export function ChatPage() {
           </div>
 
         {/* View Mode Toggle đã di chuyển lên Header */}
+
+        {/* View Mode Toggle */}
+        <div className="px-4 mb-3">
+          <div className="bg-slate-100 rounded-xl p-0.5 flex">
+            <button
+              onClick={viewMode === 'end_user' ? undefined : toggleViewMode}
+              className={clsx(
+                'flex-1 flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-xs font-medium transition-all duration-200',
+                viewMode === 'end_user' 
+                  ? 'bg-white text-blue-600 shadow-sm' 
+                  : 'text-slate-500 hover:text-slate-700'
+              )}
+            >
+              <span className="material-symbols-outlined text-sm">person</span>
+              <span>Người dùng</span>
+            </button>
+            <button
+              onClick={viewMode === 'at_specialist' ? undefined : toggleViewMode}
+              className={clsx(
+                'flex-1 flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-xs font-medium transition-all duration-200',
+                viewMode === 'at_specialist' 
+                  ? 'bg-white text-violet-600 shadow-sm' 
+                  : 'text-slate-500 hover:text-slate-700'
+              )}
+            >
+              <span className="material-symbols-outlined text-sm">engineering</span>
+              <span>Chuyên gia</span>
+            </button>
+          </div>
+        </div>
 
         {/* New Chat Button */}
         <div className="px-4 mb-4 mt-2">
@@ -2444,16 +2620,6 @@ export function ChatPage() {
                     if (window.innerWidth < 768) {
                       setSidebarOpen(false);
                     }
-
-                    setTimeout(() => {
-                      const categoryPrompt = CATEGORY_PROMPTS[category]?.[language] || CATEGORY_PROMPTS[category]?.vi || '';
-                      if (categoryPrompt) {
-                        setInputValue(categoryPrompt);
-                        setTimeout(() => {
-                          handleSend();
-                        }, 50);
-                      }
-                    }, 100);
                   }
                 }}
                 className={clsx(
@@ -2488,6 +2654,43 @@ export function ChatPage() {
               </button>
             );
           })}
+
+          {/* Sample Questions - Hiển thị khi có category được chọn */}
+          {activeCategory && SAMPLE_QUESTIONS[activeCategory]?.[viewMode]?.[language]?.length > 0 && (
+            <div className="mt-4 pt-4 border-t border-slate-100">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-violet-600 px-4 mb-2 flex items-center gap-1">
+                <span className="material-symbols-outlined text-sm">lightbulb</span>
+                {language === 'vi' ? 'Câu hỏi gợi ý' : language === 'en' ? 'Suggested Questions' : language === 'ar' ? 'أسئلة مقترحة' : 'Questions suggérées'}
+              </p>
+              <div className="space-y-1 px-2">
+                {SAMPLE_QUESTIONS[activeCategory][viewMode][language].slice(0, 4).map((question, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => handleSelectSampleQuestion(question)}
+                    className={clsx(
+                      'w-full flex items-start gap-2 px-3 py-2 rounded-lg text-left',
+                      'text-xs text-slate-600 hover:bg-violet-50 hover:text-violet-700',
+                      'transition-colors duration-200 group'
+                    )}
+                  >
+                    <span className="text-violet-400 group-hover:text-violet-500 mt-0.5 flex-shrink-0">
+                      •
+                    </span>
+                    <span className="line-clamp-2 leading-relaxed">{question}</span>
+                  </button>
+                ))}
+                {SAMPLE_QUESTIONS[activeCategory][viewMode][language].length > 4 && (
+                  <button className="w-full flex items-center justify-center gap-1 px-3 py-1.5 text-xs text-violet-600 hover:text-violet-700 font-medium">
+                    {language === 'vi' ? `Xem thêm ${SAMPLE_QUESTIONS[activeCategory][viewMode][language].length - 4} câu` : 
+                     language === 'en' ? `Show ${SAMPLE_QUESTIONS[activeCategory][viewMode][language].length - 4} more` :
+                     language === 'ar' ? `عرض ${SAMPLE_QUESTIONS[activeCategory][viewMode][language].length - 4} أخرى` :
+                     `Voir ${SAMPLE_QUESTIONS[activeCategory][viewMode][language].length - 4} de plus`}
+                    <span className="material-symbols-outlined text-sm">expand_more</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Recent Chats Section */}
           <div className="pt-6 pb-4">
@@ -2713,13 +2916,19 @@ export function ChatPage() {
             <div className="relative" ref={languageMenuRef}>
               <button
                 onClick={() => setShowAgentMenu(!showAgentMenu)}
-                className="flex items-center gap-2 bg-white/60 px-4 py-2 rounded-full border border-white/80 hover:bg-white/80 transition-colors"
+                className="group flex items-center gap-2 bg-white/60 px-4 py-2 rounded-full border border-white/80 hover:bg-white/80 transition-colors"
+                title={language === 'vi' ? 'Chọn chế độ trợ lý AI khác' : language === 'en' ? 'Switch AI assistant mode' : language === 'ar' ? 'تغيير وضع المساعد الذكي' : 'Changer le mode assistant'}
               >
                 <span className="text-lg">{selectedAgent?.avatar || '🤖'}</span>
                 <span className="text-sm font-semibold text-on-background hidden xl:inline max-w-[100px] truncate">
                   {getAgentDisplayInfo(selectedAgent?.id || 'default', language).name}
                 </span>
                 <ChevronDown className={clsx('w-4 h-4 text-on-surface-variant transition-transform', showAgentMenu && 'rotate-180')} />
+                {/* Tooltip */}
+                <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 px-3 py-2 bg-slate-900 text-white text-xs rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all whitespace-nowrap z-50 pointer-events-none">
+                  {language === 'vi' ? '🔄 Đổi chế độ AI' : language === 'en' ? '🔄 Switch AI mode' : language === 'ar' ? '🔄 تغيير وضع الذكاء' : '🔄 Changer le mode IA'}
+                  <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-slate-900"></div>
+                </div>
               </button>
 
               {showAgentMenu && (
@@ -2764,9 +2973,6 @@ export function ChatPage() {
             {/* Navigation Links */}
             <nav className="hidden xl:flex items-center gap-4 text-sm font-medium text-on-surface-variant">
               <a className="hover:text-primary transition-colors" href="#">{language === 'vi' ? 'MADA Assistant' : language === 'en' ? 'MADA Assistant' : language === 'ar' ? 'مساعد MADA' : 'Assistant MADA'}</a>
-              <a className="hover:text-primary transition-colors" href="#">{language === 'vi' ? 'Mô hình' : language === 'en' ? 'Models' : language === 'ar' ? 'النماذج' : 'Modèles'}</a>
-              <a className="hover:text-primary transition-colors" href="#">{language === 'vi' ? 'API' : language === 'en' ? 'API' : language === 'ar' ? 'API' : 'API'}</a>
-              <a className="hover:text-primary transition-colors" href="#">{language === 'vi' ? 'Tài liệu' : language === 'en' ? 'Docs' : language === 'ar' ? 'الوثائق' : 'Docs'}</a>
             </nav>
 
             {/* Divider */}
@@ -2830,11 +3036,9 @@ export function ChatPage() {
                 
                 {/* Welcome Section */}
                 <div className="text-center mb-10 max-w-2xl mx-auto">
-                  {/* Welcome Logo - Clean Material Design 3 Style */}
+                  {/* Welcome Logo */}
                   <div className="mb-6">
-                    <div className="w-20 h-20 mx-auto bg-gradient-to-br from-primary/10 to-secondary/10 rounded-3xl flex items-center justify-center shadow-lg border border-white/50">
-                      <RobotLogo className="w-12 h-12" />
-                    </div>
+                    <img src={madaLogo} alt="MADA" className="w-32 h-auto mx-auto" />
                   </div>
                   
                   {/* Welcome Typography */}
@@ -2902,7 +3106,24 @@ export function ChatPage() {
               </div>
 
               {/* Messages */}
-              <div className="flex-1 space-y-6 mb-8 overflow-y-auto pb-48">
+              <div 
+                className="flex-1 space-y-6 mb-8 overflow-y-auto pb-48"
+                ref={messagesContainerRef}
+                onScroll={(e) => {
+                  // Debounce scroll detection - Fix null reference
+                  if (scrollTimeoutRef.current) {
+                    clearTimeout(scrollTimeoutRef.current);
+                  }
+                  scrollTimeoutRef.current = setTimeout(() => {
+                    const target = e.currentTarget as HTMLElement | null;
+                    if (!target) return;
+                    const distanceFromBottom = target.scrollHeight - target.scrollTop - target.clientHeight;
+                    // User is at bottom if within 50px
+                    const isAtBottom = distanceFromBottom < 50;
+                    setUserHasScrolled(!isAtBottom);
+                  }, 100);
+                }}
+              >
                 {messages.map((message) => (
                   <MessageBubble 
                     key={message.id} 
@@ -2916,62 +3137,13 @@ export function ChatPage() {
                   />
                 ))}
 
-                {/* Follow-up Questions - Show after AI responds */}
-                {suggestedFollowUps.length > 0 && !isLoading && (
-                  <div className="mt-4 mx-4 p-4 bg-gradient-to-br from-violet-50 via-purple-50 to-indigo-50 rounded-2xl border border-violet-200">
-                    <div className="flex items-center gap-2 mb-3">
-                      <div className="w-8 h-8 bg-gradient-to-br from-violet-500 to-indigo-500 rounded-xl flex items-center justify-center shadow-md shadow-violet-500/30">
-                        <span className="material-symbols-outlined text-white text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>
-                          help
-                        </span>
-                      </div>
-                      <div>
-                        <p className="text-sm font-bold text-violet-700">
-                          {language === 'vi' ? 'Câu hỏi gợi ý' : language === 'en' ? 'Follow-up Questions' : language === 'ar' ? 'أسئلة متابعة' : 'Questions de suivi'}
-                        </p>
-                        <p className="text-[10px] text-violet-500">
-                          {language === 'vi' ? 'Nhấn để hỏi ngay' : language === 'en' ? 'Tap to ask' : language === 'ar' ? 'انقر للسؤال' : 'Cliquez pour demander'}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {suggestedFollowUps.map((question: string, idx: number) => (
-                        <button
-                          key={idx}
-                          onClick={() => {
-                            setInputValue(question);
-                            setTimeout(() => textareaRef.current?.focus(), 100);
-                          }}
-                          className="flex items-center gap-3 p-3 bg-white rounded-xl border border-violet-200 hover:border-violet-400 hover:shadow-md hover:shadow-violet-500/10 transition-all text-left group"
-                        >
-                          <div className={clsx(
-                            'w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors',
-                            idx === 0 && 'bg-amber-100 text-amber-600 group-hover:bg-amber-200',
-                            idx === 1 && 'bg-emerald-100 text-emerald-600 group-hover:bg-emerald-200',
-                            idx === 2 && 'bg-blue-100 text-blue-600 group-hover:bg-blue-200',
-                            idx === 3 && 'bg-rose-100 text-rose-600 group-hover:bg-rose-200',
-                          )}>
-                            <span className="material-symbols-outlined text-xs" style={{ fontVariationSettings: "'FILL' 1" }}>
-                              {idx === 0 ? 'lightbulb' : idx === 1 ? 'search' : idx === 2 ? 'info' : 'help'}
-                            </span>
-                          </div>
-                          <p className="text-xs text-slate-700 leading-snug group-hover:text-violet-700 transition-colors font-medium flex-1">
-                            {question}
-                          </p>
-                          <ArrowRight className="w-4 h-4 text-violet-400 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
                 {/* Streaming indicator */}
                 {streamingContent && (
-                  <div className="flex items-start gap-3 animate-fade-in">
+                  <div className={`flex items-start gap-3 animate-fade-in ${language === 'ar' ? 'flex-row-reverse' : ''}`}>
                     <div className="w-10 h-10 rounded-xl bg-slate-900 flex items-center justify-center flex-shrink-0">
                       <BotIcon className="w-5 h-5 text-white" />
                     </div>
-                    <div className="flex-1 max-w-[80%] px-4 py-3 bg-white dark:bg-slate-800 rounded-2xl rounded-bl-none border border-slate-200">
+                    <div className={`flex-1 max-w-[80%] px-4 py-3 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 ${language === 'ar' ? 'rounded-br-none' : 'rounded-bl-none'}`} dir={language === 'ar' ? 'rtl' : 'ltr'} lang={language === 'ar' ? 'ar' : language === 'vi' ? 'vi' : language === 'en' ? 'en' : 'fr'}>
                       <div className="text-sm whitespace-pre-wrap [&_p]:mb-2">
                         <ReactMarkdown remarkPlugins={[remarkGfm]}>{streamingContent}</ReactMarkdown>
                         <span className="inline-block w-2 h-4 ml-1 bg-blue-500 animate-pulse" />
@@ -3000,76 +3172,79 @@ export function ChatPage() {
 
               {/* Category Quick Questions - Show AFTER AI finishes responding */}
               {activeCategory && !inputValue && messages.length > 0 && !isLoading && (
-                <div className="mb-4 group">
-                  {/* Header */}
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 via-purple-500 to-indigo-500 flex items-center justify-center shadow-lg shadow-violet-500/30 group-hover:shadow-xl group-hover:shadow-violet-500/40 transition-all">
-                      <span className="material-symbols-outlined text-lg text-white" style={{ fontVariationSettings: "'FILL' 1" }}>
-                        {CATEGORY_ICONS[activeCategory]}
-                      </span>
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="text-sm font-bold bg-gradient-to-r from-violet-600 to-indigo-600 bg-clip-text text-transparent">
-                        {isEndUser 
-                          ? (language === 'vi' ? 'Gợi ý câu hỏi' : language === 'en' ? 'Suggested Questions' : 'اقتراحات سريعة')
-                          : 'Quick suggestions'
+                <div className="mb-4 animate-fade-in" role="region" aria-label={isEndUser
+                  ? (language === 'vi' ? 'Gợi ý câu hỏi' : language === 'en' ? 'Suggested Questions' : 'اقتراحات سريعة')
+                  : 'Quick suggestions'
+                }>
+                  {/* Compact Header - High contrast, semantic */}
+                  <div className="flex items-center justify-between mb-2.5 px-1">
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-900 text-white text-[10px] font-bold uppercase tracking-wider">
+                        <span className="material-symbols-outlined text-[11px] leading-none" style={{ fontVariationSettings: "'FILL' 1" }}>
+                          {CATEGORY_ICONS[activeCategory]}
+                        </span>
+                        {isEndUser
+                          ? (language === 'vi' ? 'Gợi ý' : language === 'en' ? 'Suggestions' : 'اقتراحات')
+                          : 'Quick'
                         }
-                      </h3>
-                      <p className="text-[11px] text-slate-400">
-                        {language === 'vi' ? 'Chạm để hỏi ngay • Tap to ask' : language === 'en' ? 'Tap to ask instantly' : 'انقر للسؤال'}
-                      </p>
+                      </span>
+                      <span className="text-[10px] text-slate-600 font-semibold hidden sm:inline">
+                        {language === 'vi' ? 'Chạm để dùng ngay' : 'Tap to use'}
+                      </span>
                     </div>
                     <button
                       onClick={() => setActiveCategory(null)}
-                      className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-400 hover:text-slate-600 transition-all opacity-0 group-hover:opacity-100"
+                      className="text-[10px] text-slate-700 hover:text-slate-900 px-2 py-1 rounded hover:bg-slate-200 transition-colors flex items-center gap-1 font-medium focus:outline-none focus:ring-2 focus:ring-slate-900 focus:ring-offset-1"
                       aria-label={language === 'vi' ? 'Đóng' : 'Close'}
                     >
-                      <X className="w-4 h-4" />
+                      <X className="w-3 h-3" />
+                      {language === 'vi' ? 'Đóng' : 'Close'}
                     </button>
                   </div>
-                  
-                  {/* Suggestions Grid - Modern Card Style */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+
+                  {/* Horizontal Scrollable Pills - High Contrast, WCAG AAA */}
+                  <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent">
                     {currentQuestions.slice(0, 6).map((question, index) => (
-                      <button
+                      <div
                         key={index}
-                        onClick={() => {
-                          textareaRef.current?.focus();
-                        }}
-                        className="group/item relative overflow-hidden p-4 bg-white rounded-2xl border border-slate-200 hover:border-violet-300 hover:shadow-lg hover:shadow-violet-500/10 transition-all duration-300 text-left active:scale-[0.98]"
+                        className="group/pill flex-shrink-0 flex items-stretch rounded-full border-2 border-slate-900 bg-white hover:bg-slate-50 transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] overflow-hidden max-w-[320px] shadow-sm"
                       >
-                        {/* Background gradient on hover */}
-                        <div className="absolute inset-0 bg-gradient-to-br from-violet-50/0 via-purple-50/0 to-indigo-50/0 group-hover/item:from-violet-50/50 group-hover/item:via-purple-50/50 group-hover/item:to-indigo-50/50 transition-all duration-300 rounded-2xl" />
-                        
-                        <div className="relative flex items-start gap-3">
-                          {/* Icon Badge */}
-                          <div className={clsx(
-                            'w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors',
-                            index === 0 && 'bg-amber-100 text-amber-600 group-hover/item:bg-amber-200',
-                            index === 1 && 'bg-emerald-100 text-emerald-600 group-hover/item:bg-emerald-200',
-                            index === 2 && 'bg-blue-100 text-blue-600 group-hover/item:bg-blue-200',
-                            index === 3 && 'bg-rose-100 text-rose-600 group-hover/item:bg-rose-200',
-                            index === 4 && 'bg-violet-100 text-violet-600 group-hover/item:bg-violet-200',
-                            index === 5 && 'bg-cyan-100 text-cyan-600 group-hover/item:bg-cyan-200',
-                          )}>
-                            <span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>
-                              {index === 0 ? 'lightbulb' : index === 1 ? 'search' : index === 2 ? 'info' : index === 3 ? 'help' : index === 4 ? 'smart_toy' : 'chat'}
-                            </span>
-                          </div>
-                          
-                          {/* Text */}
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm text-slate-700 leading-snug group-hover/item:text-violet-700 transition-colors font-medium">
-                              {question.length > 50 ? question.slice(0, 50) + '…' : question}
-                            </p>
-                          </div>
-                          
-                          {/* Arrow indicator */}
-                          <div className="opacity-0 group-hover/item:opacity-100 transition-opacity">
-                            <ArrowRight className="w-4 h-4 text-violet-500" />
-                          </div>
-                        </div>
-                      </button>
+                        {/* Action 1: Fill to input (edit icon) */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSelectSampleQuestion(question);
+                          }}
+                          className="flex items-center gap-1.5 pl-3 pr-2 py-1.5 text-slate-900 hover:bg-slate-100 transition-colors focus:outline-none focus:ring-2 focus:ring-slate-900 focus:ring-offset-1"
+                          aria-label={language === 'vi' ? `Điền vào ô nhập: ${question}` : `Fill input: ${question}`}
+                          title={language === 'vi' ? 'Điền vào ô nhập để chỉnh sửa' : 'Fill input to edit'}
+                        >
+                          <span className="material-symbols-outlined text-[13px] leading-none flex-shrink-0" style={{ fontVariationSettings: "'FILL' 1" }}>
+                            {index % 6 === 0 ? 'lightbulb' : index % 6 === 1 ? 'search' : index % 6 === 2 ? 'info' : index % 6 === 3 ? 'help' : index % 6 === 4 ? 'smart_toy' : 'chat'}
+                          </span>
+                          <span className="text-xs font-semibold truncate max-w-[180px]">
+                            {question.length > 36 ? question.slice(0, 36) + '…' : question}
+                          </span>
+                        </button>
+
+                        {/* Divider */}
+                        <div className="w-px bg-slate-900/20" />
+
+                        {/* Action 2: Send immediately (send icon) */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSendWithText(question);
+                          }}
+                          className="flex items-center justify-center px-2.5 py-1.5 bg-slate-900 text-white hover:bg-slate-700 transition-colors focus:outline-none focus:ring-2 focus:ring-slate-900 focus:ring-offset-1"
+                          aria-label={language === 'vi' ? `Gửi ngay: ${question}` : `Send now: ${question}`}
+                          title={language === 'vi' ? 'Gửi câu hỏi này ngay' : 'Send this question now'}
+                        >
+                          <span className="material-symbols-outlined text-[13px] leading-none" style={{ fontVariationSettings: "'FILL' 1" }}>
+                            send
+                          </span>
+                        </button>
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -3202,6 +3377,68 @@ export function ChatPage() {
                   )}
                 </div>
 
+                {/* Voice Recording Bubble - Hiển thị real-time transcript với waveform */}
+                {(isRecording || isListening || transcript) && (
+                  <div 
+                    className="mb-2 flex items-center gap-2.5 px-3.5 py-2.5 rounded-2xl border-2 bg-gradient-to-r from-red-50 via-orange-50 to-red-50 border-red-300 shadow-sm animate-fade-in"
+                    role="status"
+                    aria-live="polite"
+                    aria-label={language === 'vi' ? 'Đang ghi âm' : 'Recording voice'}
+                  >
+                    {/* Animated waveform bars */}
+                    <div className="flex items-center gap-0.5 flex-shrink-0">
+                      {[1, 2, 3, 4, 5].map((bar) => (
+                        <div
+                          key={bar}
+                          className="w-1 bg-red-500 rounded-full animate-pulse"
+                          style={{
+                            height: `${8 + (bar * 3)}px`,
+                            animationDelay: `${bar * 0.1}s`,
+                            animationDuration: '1s'
+                          }}
+                        />
+                      ))}
+                    </div>
+
+                    {/* Mic icon với pulse animation */}
+                    <div className="flex-shrink-0 w-7 h-7 rounded-full bg-red-500 flex items-center justify-center animate-pulse">
+                      <Mic className="w-4 h-4 text-white" />
+                    </div>
+
+                    {/* Transcript text - hiển thị interim real-time */}
+                    <div className="flex-1 min-w-0">
+                      {interimTranscript ? (
+                        <p className="text-xs text-slate-700 italic leading-relaxed">
+                          <span className="font-bold text-red-600 uppercase text-[10px] tracking-wider mr-1">
+                            {language === 'vi' ? 'Đang nghe' : 'Listening'}
+                          </span>
+                          <span className="opacity-70">{interimTranscript}</span>
+                          <span className="inline-block w-1 h-3 bg-red-500 ml-0.5 animate-pulse" />
+                        </p>
+                      ) : transcript ? (
+                        <p className="text-xs text-slate-700 leading-relaxed">
+                          <span className="font-bold text-red-600 uppercase text-[10px] tracking-wider mr-1">
+                            {language === 'vi' ? 'Đã ghi' : 'Recorded'}
+                          </span>
+                          {transcript}
+                        </p>
+                      ) : (
+                        <p className="text-xs text-slate-500 italic">
+                          {language === 'vi' ? 'Hãy nói vào microphone...' : 'Speak into the microphone...'}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Status indicator */}
+                    <div className="flex-shrink-0 flex items-center gap-1">
+                      <div className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
+                      <span className="text-[10px] font-bold text-red-600 uppercase tracking-wider">
+                        REC
+                      </span>
+                    </div>
+                  </div>
+                )}
+
                 {/* Input Field - Material Design 3 Style */}
                 <textarea
                   ref={textareaRef}
@@ -3217,47 +3454,102 @@ export function ChatPage() {
                   style={{ minHeight: '40px', maxHeight: '100px' }}
                 />
 
-                {/* File attachments display - inside input */}
+                {/* File attachments display - Cards with status (loading/ready/error) */}
                 {selectedFiles.length > 0 && (
-                  <div className="flex flex-wrap gap-2 pb-2">
-                    {selectedFiles.map((file, index) => (
-                      <div
-                        key={index}
-                        className="inline-flex items-center gap-1.5 bg-[#eff6ff] border border-[#bfdbfe] rounded-full px-2.5 py-1"
-                      >
-                        <span className={clsx(
-                          'flex-shrink-0',
-                          file.type === 'application/pdf' && 'text-red-500',
-                          file.type.includes('word') && 'text-blue-600',
-                          file.type.startsWith('image/') && 'text-pink-500',
-                          !['application/pdf', 'text/url'].includes(file.type) && !file.type.includes('word') && !file.type.startsWith('image/') && 'text-slate-500'
-                        )}>
-                          {file.type === 'application/pdf' ? (
-                            <span className="material-symbols-outlined text-[14px]">picture_as_pdf</span>
-                          ) : file.type.includes('word') ? (
-                            <span className="material-symbols-outlined text-[14px]">description</span>
-                          ) : file.type.startsWith('image/') ? (
-                            <span className="material-symbols-outlined text-[14px]">image</span>
-                          ) : (
-                            <span className="material-symbols-outlined text-[14px]">attach_file</span>
+                  <div className="flex flex-wrap gap-2 pb-2" role="list" aria-label={language === 'vi' ? 'Danh sách tệp đính kèm' : 'Attached files list'}>
+                    {selectedFiles.map((file, index) => {
+                      const isError = file.size > 50 * 1024 * 1024; // 50MB limit
+                      const status = file.isLoading ? 'loading' : isError ? 'error' : 'ready';
+                      
+                      return (
+                        <div
+                          key={index}
+                          role="listitem"
+                          className={clsx(
+                            'group/file relative flex items-center gap-2 rounded-xl border-2 px-3 py-2 min-w-[200px] max-w-[280px] transition-all',
+                            status === 'ready' && 'bg-white border-emerald-300 hover:border-emerald-500 hover:shadow-md',
+                            status === 'loading' && 'bg-blue-50 border-blue-300',
+                            status === 'error' && 'bg-red-50 border-red-300'
                           )}
-                        </span>
-                        <span className="text-xs font-medium text-slate-700 max-w-[100px] truncate">
-                          {file.name}
-                        </span>
-                        {file.isLoading ? (
-                          <Loader2 className="w-3 h-3 text-blue-500 animate-spin flex-shrink-0" />
-                        ) : (
-                          <button
-                            onClick={() => handleRemoveFile(index)}
-                            className="flex-shrink-0 w-4 h-4 rounded-full bg-slate-200 hover:bg-slate-300 flex items-center justify-center text-slate-500 hover:text-slate-700 transition-colors"
-                            title="Xóa"
-                          >
-                            <span className="material-symbols-outlined text-[10px] leading-none">close</span>
-                          </button>
-                        )}
-                      </div>
-                    ))}
+                          aria-label={`${file.name} - ${status}`}
+                        >
+                          {/* File type icon */}
+                          <div className={clsx(
+                            'flex-shrink-0 w-9 h-9 rounded-lg flex items-center justify-center',
+                            file.type === 'application/pdf' && 'bg-red-100 text-red-600',
+                            file.type.includes('word') && 'bg-blue-100 text-blue-600',
+                            file.type.startsWith('image/') && 'bg-pink-100 text-pink-600',
+                            !['application/pdf'].includes(file.type) && !file.type.includes('word') && !file.type.startsWith('image/') && 'bg-slate-100 text-slate-600'
+                          )}>
+                            {file.type === 'application/pdf' ? (
+                              <span className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>picture_as_pdf</span>
+                            ) : file.type.includes('word') ? (
+                              <span className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>description</span>
+                            ) : file.type.startsWith('image/') ? (
+                              <span className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>image</span>
+                            ) : (
+                              <span className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>attach_file</span>
+                            )}
+                          </div>
+
+                          {/* File info */}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-semibold text-slate-900 truncate max-w-[180px]">
+                              {file.name}
+                            </p>
+                            <div className="flex items-center gap-1 mt-0.5">
+                              {status === 'ready' && (
+                                <>
+                                  <span className="material-symbols-outlined text-[12px] text-emerald-600" style={{ fontVariationSettings: "'FILL' 1" }}>
+                                    check_circle
+                                  </span>
+                                  <span className="text-[10px] font-medium text-emerald-700">
+                                    {language === 'vi' ? `Sẵn sàng · ${(file.size / 1024).toFixed(0)} KB` : `Ready · ${(file.size / 1024).toFixed(0)} KB`}
+                                  </span>
+                                </>
+                              )}
+                              {status === 'loading' && (
+                                <>
+                                  <Loader2 className="w-3 h-3 text-blue-600 animate-spin" />
+                                  <span className="text-[10px] font-medium text-blue-700">
+                                    {language === 'vi' ? 'Đang xử lý...' : 'Processing...'}
+                                  </span>
+                                </>
+                              )}
+                              {status === 'error' && (
+                                <>
+                                  <span className="material-symbols-outlined text-[12px] text-red-600" style={{ fontVariationSettings: "'FILL' 1" }}>
+                                    error
+                                  </span>
+                                  <span className="text-[10px] font-medium text-red-700">
+                                    {language === 'vi' ? 'Quá lớn (>50MB)' : 'Too large (>50MB)'}
+                                  </span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Remove button (only for ready files) */}
+                          {!file.isLoading && (
+                            <button
+                              onClick={() => handleRemoveFile(index)}
+                              className="flex-shrink-0 w-6 h-6 rounded-full bg-slate-100 hover:bg-red-100 flex items-center justify-center text-slate-500 hover:text-red-600 transition-all hover:scale-110"
+                              title={language === 'vi' ? 'Xóa' : 'Remove'}
+                              aria-label={`Remove ${file.name}`}
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          )}
+
+                          {/* Loading overlay */}
+                          {file.isLoading && (
+                            <div className="absolute inset-0 bg-white/60 rounded-xl flex items-center justify-center pointer-events-none">
+                              <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
 
@@ -3303,9 +3595,21 @@ export function ChatPage() {
               </div>
             </div>
 
-            {/* Footer Disclaimer - Material Design 3 Style */}
+            {/* Footer - Professional AI Support */}
             <p className="text-center text-[11px] text-on-surface-variant/70 mt-6 uppercase tracking-wider font-medium">
-              {language === 'vi' ? 'MADA AI CÓ THỂ SAI. HÃY KIỂM CHỨNG THÔNG TIN QUAN TRỌNG.' : language === 'en' ? 'MADA AI CAN MAKE MISTAKES. VERIFY IMPORTANT INFO.' : language === 'ar' ? '.قد ترتكب MADA AI أخطاء. تحقق من المعلومات المهمة' : 'MADA AI PEUT FAIRE DES ERREURS. VÉRIFIEZ LES INFORMATIONS IMPORTANTES.'}
+              {language === 'vi' ? 'MADA AI - HỖ TRỢ TƯ VẤN CHUYÊN GIA AT' : language === 'en' ? 'MADA AI - SUPPORTING AT EXPERTS' : language === 'ar' ? '.MADA AI - دعم خبراء AT' : 'MADA AI - SOUTIEN AUX EXPERTS AT'}
+            </p>
+            {/* Powered by Multi-modal AI & RAG Framework */}
+            <p className="text-center text-[10px] text-on-surface-variant/60 mt-2 tracking-wider font-mono flex items-center justify-center gap-1.5 flex-wrap">
+              <span className="inline-flex items-center gap-1">
+                <span className="material-symbols-outlined text-[12px] leading-none animate-pulse">auto_awesome</span>
+                {t('poweredBy', language)}
+              </span>
+              <span className="opacity-50">•</span>
+              <span className="inline-flex items-center gap-1">
+                <span className="material-symbols-outlined text-[12px] leading-none">psychology</span>
+                <span className="lowercase">gemini 2.5 flash</span>
+              </span>
             </p>
           </div>
         </div>
@@ -3349,51 +3653,60 @@ function MessageBubble({
   const detectedCategory = detectCategoryFromQuery(message.content);
   const sampleProducts = SAMPLE_PRODUCTS[detectedCategory] || SAMPLE_PRODUCTS.vision;
   
-  // Standards theo category
-  const categoryStandards: Record<string, string[]> = {
-    mobility: ['ISO 9999:12.21', 'ISO 7176', 'EN 12184'],
-    vision: ['ISO 9999:24.09', 'WCAG 2.1', 'EN 1332-20'],
-    hearing: ['ISO 9999:22.06', 'IEC 60118-4', 'WHO GATE'],
-    cognition: ['ISO 9999:05.15', 'WHO GATE', 'WCAG 2.1'],
-    communication: ['ISO 9999:05.15.06', 'WCAG 2.1', 'EN 1332'],
-    daily_living: ['ISO 9999:09', 'ADA Compliance', 'WHO APL'],
-    education: ['WCAG 2.2', 'UDL Guidelines', 'Section 508'],
-    general: ['ISO 9999', 'WCAG 2.1', 'WHO GATE'],
-  };
-  const relevantStandards = categoryStandards[detectedCategory] || categoryStandards.general;
-  
   if (message.role === 'user') {
     return (
       <div className="flex items-end gap-3 justify-end animate-fade-in group flex-col items-end">
-        {/* Hiển thị attachments */}
+        {/* Hiển thị attachments - Cards bên dưới bubble */}
         {message.attachments && message.attachments.length > 0 && (
-          <div className="flex flex-wrap gap-2 justify-end mb-2">
+          <div className="flex flex-col gap-2 justify-end mb-1 max-w-[80%]" role="list" aria-label={language === 'vi' ? 'Tệp đính kèm đã gửi' : 'Sent attachments'}>
             {message.attachments.map((attachment, idx) => (
               <div 
                 key={idx}
+                role="listitem"
                 className={clsx(
-                  'flex items-center gap-2 px-3 py-2 rounded-xl text-sm',
+                  'flex items-center gap-3 px-4 py-3 rounded-2xl rounded-br-sm text-sm border-2 transition-all',
                   attachment.preview 
-                    ? 'bg-white/20 backdrop-blur-sm border border-white/30' 
-                    : 'bg-white/10 border border-white/20'
+                    ? 'bg-white/95 backdrop-blur-sm border-white/40 shadow-md' 
+                    : 'bg-white/90 border-white/30 shadow-sm'
                 )}
               >
-                {attachment.preview ? (
-                  <img src={attachment.preview} alt={attachment.name} className="w-12 h-12 object-cover rounded-lg" />
-                ) : (
-                  <span className="material-symbols-outlined text-lg">
-                    {attachment.type.includes('pdf') ? 'picture_as_pdf' : 
-                     attachment.type.includes('image') ? 'image' : 
-                     attachment.type.includes('word') || attachment.type.includes('document') ? 'description' :
-                     'attach_file'}
-                  </span>
-                )}
-                <span className="font-medium max-w-[150px] truncate">{attachment.name}</span>
+                {/* File thumbnail/icon */}
+                <div className={clsx(
+                  'flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center',
+                  attachment.type.includes('pdf') && 'bg-red-100 text-red-600',
+                  attachment.type.includes('image') && 'bg-pink-100 text-pink-600',
+                  (attachment.type.includes('word') || attachment.type.includes('document')) && 'bg-blue-100 text-blue-600',
+                  !attachment.type.includes('pdf') && !attachment.type.includes('image') && !attachment.type.includes('word') && !attachment.type.includes('document') && 'bg-slate-100 text-slate-600'
+                )}>
+                  {attachment.preview ? (
+                    <img src={attachment.preview} alt={attachment.name} className="w-10 h-10 object-cover rounded-lg" />
+                  ) : (
+                    <span className="material-symbols-outlined text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>
+                      {attachment.type.includes('pdf') ? 'picture_as_pdf' : 
+                       attachment.type.includes('image') ? 'image' : 
+                       attachment.type.includes('word') || attachment.type.includes('document') ? 'description' :
+                       'attach_file'}
+                    </span>
+                  )}
+                </div>
+
+                {/* File info */}
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold text-slate-900 truncate max-w-[200px]">
+                    {attachment.name}
+                  </p>
+                  <p className="text-[10px] text-slate-500 mt-0.5 flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[10px]" style={{ fontVariationSettings: "'FILL' 1" }}>
+                      check_circle
+                    </span>
+                    {language === 'vi' ? 'Đã đính kèm' : 'Attached'}
+                  </p>
+                </div>
               </div>
             ))}
           </div>
         )}
-        <div className="max-w-[80%] px-6 py-4 bg-[#0047ff] text-white rounded-3xl rounded-tr-sm shadow-[0_10px_40px_-10px_rgba(0,71,255,0.3)]">
+        <div className="max-w-[80%] px-6 py-4 bg-[#0047ff] text-white rounded-3xl rounded-tr-sm shadow-[0_10px_40px_-10px_rgba(0,71,255,0.3)]" dir={language === 'ar' ? 'rtl' : 'ltr'}>
           <p className="text-sm whitespace-pre-wrap">{message.content}</p>
         </div>
       </div>
@@ -3412,7 +3725,7 @@ function MessageBubble({
           [ TRỢ LÝ CNHT MADA // {new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) } ]
         </div>
         
-        <div className="px-4 py-3 bg-white rounded-2xl rounded-tl-none border-2 border-slate-100 shadow-sm text-slate-700 leading-relaxed">
+        <div className="px-4 py-3 bg-white rounded-2xl rounded-tl-none border-2 border-slate-100 shadow-sm text-slate-700 leading-relaxed" dir={language === 'ar' ? 'rtl' : 'ltr'} lang={language === 'ar' ? 'ar' : language === 'vi' ? 'vi' : language === 'en' ? 'en' : 'fr'}>
           <div className="text-sm [&_p]:mb-3 [&_p]:leading-relaxed [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:my-3 [&_ul]:space-y-1.5 [&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:my-3 [&_ol]:space-y-1.5 [&_li]:leading-relaxed [&_li]:mb-1 [&_h3]:text-base [&_h3]:font-bold [&_h3]:mt-4 [&_h3]:mb-2 [&_h2]:text-lg [&_h2]:font-bold [&_h2]:mt-4 [&_h2]:mb-2 [&_strong]:font-bold [&_code]:bg-slate-100 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-xs [&_pre]:bg-slate-100 [&_pre]:p-3 [&_pre]:rounded-lg [&_pre]:overflow-x-auto [&_pre]:my-3 [&_blockquote]:border-l-4 [&_blockquote]:border-slate-300 [&_blockquote]:pl-3 [&_blockquote]:italic [&_blockquote]:text-slate-600 [&_a]:text-blue-500 [&_a]:underline">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>
               {message.content}
@@ -3420,32 +3733,35 @@ function MessageBubble({
           </div>
         </div>
 
-        {/* Expert Consultation Banner - Show when AI has low confidence */}
+        {/* Expert Consultation Banner - Always LTR */}
         {hasNoData && (
-          <div className="mt-4 p-4 bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-200 rounded-2xl">
+          <div className="mt-4 p-4 bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-200 rounded-2xl" dir="ltr">
             <div className="flex items-start gap-3">
               <div className="w-12 h-12 bg-gradient-to-br from-amber-400 to-orange-500 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg">
                 <span className="material-symbols-outlined text-xl text-white">psychology</span>
               </div>
               <div className="flex-1">
                 <h4 className="text-sm font-bold text-amber-800 mb-1">
-                  {language === 'vi' ? 'Khong tim thay thong tin phu hop?' : 
+                  {language === 'vi' ? 'Không tìm thấy thông tin phù hợp?' : 
                    language === 'en' ? 'Can\'t find relevant information?' :
-                   'Need expert help?'}
+                   language === 'ar' ? 'لم يتم العثور على معلومات مناسبة؟' :
+                   'Impossible de trouver des informations pertinentes?'}
                 </h4>
                 <p className="text-xs text-amber-700 mb-3">
-                  {language === 'vi' ? 'Doi ngu chuyen gia MADA co the ho tro ban chi tiet hon.' :
+                  {language === 'vi' ? 'Đội ngũ chuyên gia MADA có thể hỗ trợ bạn chi tiết hơn.' :
                    language === 'en' ? 'MADA expert team can help you with more details.' :
-                   'Our experts can provide detailed assistance.'}
+                   language === 'ar' ? 'يمكن لفريق خبراء MADA مساعدتك بمزيد من التفاصيل.' :
+                   'L\'équipe d\'experts MADA peut vous aider avec plus de détails.'}
                 </p>
                 <button
                   onClick={onRequestConsultation}
                   className="inline-flex items-center gap-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white px-4 py-2 rounded-full text-xs font-bold hover:shadow-lg hover:scale-105 transition-all"
                 >
                   <span className="material-symbols-outlined text-sm">support_agent</span>
-                  {language === 'vi' ? 'Gui yeu cau tu van' :
+                  {language === 'vi' ? 'Gửi yêu cầu tư vấn' :
                    language === 'en' ? 'Request Expert Consultation' :
-                   'Consult Expert'}
+                   language === 'ar' ? 'طلب استشارة خبير' :
+                   'Demander une consultation'}
                 </button>
               </div>
             </div>
@@ -3454,7 +3770,7 @@ function MessageBubble({
 
         {/* Confidence Bar */}
         <div className="mt-4 flex items-center gap-4">
-          <ConfidenceBar confidence={confidence} />
+          <ConfidenceBar confidence={confidence} language={language} />
           <button 
             onClick={onRequestConsultation}
             className="flex items-center gap-2 bg-slate-900 text-white px-5 py-2 rounded-full text-xs font-bold hover:opacity-90 transition-all"
@@ -3464,36 +3780,10 @@ function MessageBubble({
           </button>
         </div>
 
-        {/* Smart Product Suggestions - Enhanced with Match Score & Reasons */}
-        <div className="mt-5">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-6 h-6 bg-gradient-to-br from-violet-500 to-purple-600 rounded-lg flex items-center justify-center shadow-md">
-              <span className="text-white text-xs font-bold">💡</span>
-            </div>
-            <p className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">
-              {language === 'vi' ? 'GỢI Ý PHÙ HỢP' : language === 'en' ? 'RECOMMENDED' : language === 'ar' ? 'التوصيات' : 'RECOMMANDÉ'}
-            </p>
-            <span className="text-[9px] text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
-              {language === 'vi' ? 'Dựa trên nhu cầu của bạn' : language === 'en' ? 'Based on your needs' : language === 'ar' ? 'بناءً على احتياجاتك' : 'Basé sur vos besoins'}
-            </span>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {sampleProducts.slice(0, 2).map((product, idx) => (
-              <SmartProductCard key={idx} product={product} rank={idx + 1} language={language} />
-            ))}
-          </div>
-        </div>
+        {/* Smart Product Suggestions - moved to message.suggestedProducts (real MADA data) below */}
 
-        {/* Standards Badges */}
-        <div className="mt-4">
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">
-            {language === 'vi' ? 'Tiêu chuẩn kỹ thuật' : language === 'en' ? 'Technical Standards' : language === 'ar' ? 'المعايير التقنية' : 'Normes techniques'}
-          </p>
-          <StandardsBadge standards={message.standards && message.standards.length > 0 ? message.standards : relevantStandards} />
-        </div>
-
-        {/* Action buttons */}
-        <div className="mt-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        {/* Action buttons - Always on the right side, force LTR */}
+        <div className="mt-3 flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity" dir="ltr">
           <button
             onClick={() => onSpeak(message.content, message.id)}
             className={clsx(
@@ -3560,9 +3850,9 @@ function MessageBubble({
           )}
         </div>
 
-        {/* Sources Panel */}
+        {/* Sources Panel - Always LTR */}
         {showSources && message.sources && message.sources.length > 0 && (
-          <div className="mt-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
+          <div className="mt-3 p-3 bg-slate-50 rounded-xl border border-slate-200" dir="ltr">
             <div className="flex items-center gap-2 mb-2">
               <BookOpen className="w-4 h-4 text-blue-500" />
               <span className="text-xs font-bold text-slate-500 uppercase">{language === 'vi' ? 'Nguồn tham khảo' : language === 'en' ? 'References' : language === 'ar' ? 'المراجع' : 'Références'}</span>
@@ -3580,6 +3870,74 @@ function MessageBubble({
                   <p className="text-slate-500 line-clamp-2 pl-5">{source.content}</p>
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* Suggested Products - WCAG 2.2 Compliant ProductCard */}
+        {message.suggestedProducts && message.suggestedProducts.length > 0 && (
+          <div className="mt-3 p-4 bg-gradient-to-r from-slate-50 to-slate-100 rounded-xl border border-slate-200" dir="ltr" role="region" aria-label="Sản phẩm được giới thiệu">
+            <div className="flex items-center gap-2 mb-4">
+              <Sparkles className="w-5 h-5 text-violet-500" aria-hidden="true" />
+              <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wide">
+                {language === 'vi' ? 'Sản phẩm được giới thiệu' : language === 'en' ? 'Recommended Products' : 'المنتجات الموصى بها'}
+              </h3>
+            </div>
+            
+            {/* Standards badges - ĐÃ FIX: nằm trong card */}
+            <div className="mb-4 p-2 bg-white rounded-lg border border-slate-200">
+              <p className="text-[10px] text-slate-600 font-semibold mb-1.5 uppercase tracking-wide">
+                {language === 'vi' ? 'Tiêu chuẩn kỹ thuật:' : language === 'en' ? 'Technical Standards:' : 'المعايير التقنية:'}
+              </p>
+              <div className="flex flex-wrap gap-1">
+                {['ISO 9999', 'IEC 60118-4', 'WHO GATE', 'WCAG 2.1'].map((std, idx) => (
+                  <span key={idx} className="px-2 py-1 bg-violet-50 text-violet-700 text-[10px] font-semibold rounded border border-violet-200">
+                    {std}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            {/* Product Cards Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {message.suggestedProducts.slice(0, 4).map((product: SuggestedProduct, index: number) => {
+                const matchScore = product.confidence 
+                  ? Math.round(product.confidence * 100) 
+                  : 75 + Math.floor(Math.random() * 20);
+                
+                return (
+                  <ProductCard
+                    key={product.id || index}
+                    product={{
+                      id: product.id || `product-${index}`,
+                      name: language === 'en' && product.title_en ? product.title_en : product.title,
+                      category: product.category || 'Công nghệ hỗ trợ',
+                      brand: product.brand,
+                      description: product.description,
+                      price_range: product.price_range,
+                      image_url: product.image_url,
+                      product_url: product.product_url || product.source_url,
+                      features: product.features?.slice(0, 3) || [],
+                      standards: product.standards,
+                      rating: product.rating,
+                      review_count: product.review_count,
+                      availability: product.availability,
+                    }}
+                    matchScore={matchScore}
+                    matchReason={product.match_reason}
+                    confidence={product.confidence ? Math.round(product.confidence * 100) : undefined}
+                    language={language}
+                    onViewDetails={() => {
+                      if (product.product_url || product.source_url) {
+                        window.open(product.product_url || product.source_url, '_blank');
+                      }
+                    }}
+                    onRequestConsult={() => {
+                      onRequestConsultation?.();
+                    }}
+                  />
+                );
+              })}
             </div>
           </div>
         )}

@@ -557,15 +557,15 @@ interface SystemSettingsState {
   // AI Limits
   anonymousLimit: number; // -1 = unlimited
   defaultPlanLimit: number; // -1 = unlimited for default free plan
-  
+
   // File Upload Limits
   maxFilesPerSession: number; // max 10 files per chat session
   maxFilesTotal: number; // max 100 files total
   maxFileSizeMB: number; // max file size in MB (default 50)
-  
+
   // Website URL for data collection
   websiteUrl: string;
-  
+
   // Actions
   setAnonymousLimit: (limit: number) => void;
   setDefaultPlanLimit: (limit: number) => void;
@@ -573,6 +573,8 @@ interface SystemSettingsState {
   setMaxFilesPerSession: (limit: number) => void;
   setMaxFilesTotal: (limit: number) => void;
   setMaxFileSizeMB: (size: number) => void;
+  setAllSettings: (settings: Partial<SystemSettingsState>) => void; // Set all from backend
+  loadFromBackend: () => Promise<void>; // Load from API
 }
 
 export const useSystemSettingsStore = create<SystemSettingsState>()(
@@ -581,7 +583,7 @@ export const useSystemSettingsStore = create<SystemSettingsState>()(
       anonymousLimit: -1, // Mặc định không giới hạn
       defaultPlanLimit: -1, // Mặc định không giới hạn cho plan
       websiteUrl: '',
-      
+
       // File upload limits - theo yêu cầu sếp
       maxFilesPerSession: 10,
       maxFilesTotal: 100,
@@ -593,6 +595,25 @@ export const useSystemSettingsStore = create<SystemSettingsState>()(
       setMaxFilesPerSession: (limit) => set({ maxFilesPerSession: limit }),
       setMaxFilesTotal: (limit) => set({ maxFilesTotal: limit }),
       setMaxFileSizeMB: (size) => set({ maxFileSizeMB: size }),
+      setAllSettings: (settings) => set(settings),
+      loadFromBackend: async () => {
+        try {
+          const res = await fetch('/api/system/settings');
+          const data = await res.json();
+          if (data.success) {
+            set({
+              anonymousLimit: data.data.anonymousLimit ?? -1,
+              defaultPlanLimit: data.data.defaultPlanLimit ?? -1,
+              maxFilesPerSession: data.data.maxFilesPerSession ?? 10,
+              maxFilesTotal: data.data.maxFilesTotal ?? 100,
+              maxFileSizeMB: data.data.maxFileSizeMB ?? 50,
+              websiteUrl: data.data.websiteUrl ?? '',
+            });
+          }
+        } catch (e) {
+          console.error('Failed to load system settings:', e);
+        }
+      },
     }),
     { name: 'mada-system-settings' }
   )

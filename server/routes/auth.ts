@@ -41,10 +41,14 @@ router.post('/register', async (req, res) => {
     const id = `user-${randomUUID()}`;
     const passwordHash = hashPassword(password);
 
+    // Check if admin approval is required (default: true for better security)
+    const ADMIN_APPROVAL_REQUIRED = process.env.ADMIN_APPROVAL_REQUIRED !== 'false';
+    const defaultStatus = ADMIN_APPROVAL_REQUIRED ? 'pending' : 'active';
+
     db.prepare(`
-      INSERT INTO users (id, email, name, password_hash, role, plan, status, provider, quota_used, quota_limit, created_at, updated_at)
-      VALUES (?, ?, ?, ?, 'user', 'free', 'active', 'email', 0, 10, ?, ?)
-    `).run(id, normalizedEmail, name.trim(), passwordHash, now, now);
+  INSERT INTO users (id, email, name, password_hash, role, plan, status, provider, quota_used, quota_limit, created_at, updated_at)
+  VALUES (?, ?, ?, ?, 'user', 'free', ?, 'email', 0, 10, ?, ?)
+`).run(id, normalizedEmail, name.trim(), passwordHash, defaultStatus, now, now);
 
     const user = db.prepare('SELECT * FROM users WHERE id = ?').get(id) as UserRow;
     const accessToken = signAccessToken(user);
@@ -53,6 +57,12 @@ router.post('/register', async (req, res) => {
     auditLog(user.id, 'register', req, { email: user.email });
     logActivity('success', `New user registered: ${user.name}`, 'Auth Service', user.email);
 
+    // Check if pending approval
+    const needsApproval = user.status === 'pending';
+    const approvalMessage = needsApproval
+      ? ' Tài khoản của bạn đang chờ phê duyệt. Vui lòng đợi email xác nhận.'
+      : '';
+
     res.status(201).json({
       success: true,
       data: {
@@ -60,7 +70,9 @@ router.post('/register', async (req, res) => {
         accessToken,
         refreshToken,
         refreshTokenExpiresAt: expiresAt,
+        pendingApproval: needsApproval,
       },
+      message: needsApproval ? `Đăng ký thành công!${approvalMessage}` : undefined,
     });
   } catch (err) {
     console.error('Register error:', err);

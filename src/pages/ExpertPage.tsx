@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Sidebar } from '@/components';
-import { 
-  Inbox, Clock, CheckCircle, User, 
+import {
+  Inbox, Clock, CheckCircle, User,
   Mail, Phone, Send, ChevronRight,
   Loader2
 } from 'lucide-react';
@@ -12,77 +12,106 @@ interface ConsultationRequest {
   name: string;
   email: string;
   phone?: string;
-  content: string;
+  message?: string;
+  content?: string;
   aiResponse?: string;
   expertResponse?: string;
-  status: 'pending' | 'in_progress' | 'resolved' | 'closed';
+  status: 'pending' | 'in_progress' | 'reviewed' | 'contacted' | 'resolved' | 'closed';
+  priority?: string;
   createdAt: string;
 }
 
-const mockRequests: ConsultationRequest[] = [
-  { 
-    id: '1', 
-    name: 'Nguyễn Văn A',
-    email: 'nguyenvana@email.com',
-    phone: '0912 345 678',
-    content: 'Tôi cần tư vấn về bàn phím cho người khiếm thị',
-    aiResponse: 'Đã đề xuất: Bàn phím Braille cảm ứng...',
-    status: 'pending',
-    createdAt: '2024-08-03 10:30'
-  },
-  { 
-    id: '2', 
-    name: 'Trần Thị B',
-    email: 'tranthib@email.com',
-    phone: '0987 654 321',
-    content: 'Cần thiết bị hỗ trợ người điếc sử dụng điện thoại',
-    aiResponse: 'Đã đề xuất: Thiết bị RTT...',
-    status: 'in_progress',
-    createdAt: '2024-08-03 09:15'
-  },
-  { 
-    id: '3', 
-    name: 'Lê Văn C',
-    email: 'levanc@email.com',
-    content: 'Tìm thiết bị hỗ trợ vận động cho người già',
-    aiResponse: 'Đã đề xuất: Ghế xe lăn điện...',
-    status: 'resolved',
-    createdAt: '2024-08-02 14:20'
-  },
-];
-
-const statusConfig = {
+const statusConfig: Record<ConsultationRequest['status'], { label: string; color: string; icon: typeof Clock }> = {
   pending: { label: 'Đang chờ', color: 'bg-yellow-100 text-yellow-800', icon: Clock },
   in_progress: { label: 'Đang xử lý', color: 'bg-blue-100 text-blue-800', icon: Loader2 },
+  reviewed: { label: 'Đã xem', color: 'bg-blue-100 text-blue-800', icon: Loader2 },
+  contacted: { label: 'Đã liên hệ', color: 'bg-green-100 text-green-800', icon: CheckCircle },
   resolved: { label: 'Đã giải quyết', color: 'bg-green-100 text-green-800', icon: CheckCircle },
   closed: { label: 'Đã đóng', color: 'bg-gray-100 text-gray-800', icon: CheckCircle },
 };
 
+function normalizeStatus(s: string): ConsultationRequest['status'] {
+  if (s === 'reviewed' || s === 'contacted' || s === 'closed' || s === 'resolved' || s === 'pending' || s === 'in_progress') return s;
+  return 'pending';
+}
+
+function normalizeRequest(raw: any): ConsultationRequest {
+  return {
+    id: raw.id,
+    name: raw.name,
+    email: raw.email,
+    phone: raw.phone,
+    message: raw.message,
+    content: raw.message ?? raw.content,
+    aiResponse: raw.aiResponse,
+    expertResponse: raw.expertResponse,
+    status: normalizeStatus(raw.status),
+    priority: raw.priority,
+    createdAt: raw.createdAt ?? raw.timestamp ?? new Date().toISOString(),
+  };
+}
+
 export function ExpertPage() {
-  const [requests, setRequests] = useState(mockRequests);
-  const [selectedRequest, setSelectedRequest] = useState<typeof mockRequests[0] | null>(null);
+  const [requests, setRequests] = useState<ConsultationRequest[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedRequest, setSelectedRequest] = useState<ConsultationRequest | null>(null);
   const [replyContent, setReplyContent] = useState('');
   const [filter, setFilter] = useState('all');
 
-  const filteredRequests = filter === 'all' 
-    ? requests 
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const res = await fetch('/api/consultations?limit=100');
+        const json = await res.json();
+        if (cancelled) return;
+        if (json.success && Array.isArray(json.data)) {
+          setRequests(json.data.map(normalizeRequest));
+          setError(null);
+        } else {
+          setError('Không thể tải danh sách yêu cầu');
+        }
+      } catch (err) {
+        if (!cancelled) setError('Lỗi kết nối đến máy chủ');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    void load();
+    return () => { cancelled = true; };
+  }, []);
+
+  const filteredRequests = filter === 'all'
+    ? requests
     : requests.filter(r => r.status === filter);
 
   const stats = {
     pending: requests.filter(r => r.status === 'pending').length,
-    inProgress: requests.filter(r => r.status === 'in_progress').length,
-    resolved: requests.filter(r => r.status === 'resolved').length,
+    inProgress: requests.filter(r => r.status === 'in_progress' || r.status === 'reviewed').length,
+    resolved: requests.filter(r => r.status === 'resolved' || r.status === 'contacted').length,
   };
 
-  const handleReply = () => {
-    if (selectedRequest && replyContent) {
-      setRequests(prev => prev.map(r => 
-        r.id === selectedRequest.id 
-          ? { ...r, status: 'resolved', expertResponse: replyContent }
-          : r
-      ));
-      setReplyContent('');
-      setSelectedRequest(null);
+  const handleReply = async () => {
+    if (!selectedRequest || !replyContent) return;
+    try {
+      const res = await fetch(`/api/consultation/${selectedRequest.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'resolved' }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        setRequests(prev => prev.map(r =>
+          r.id === selectedRequest.id
+            ? { ...r, status: 'resolved', expertResponse: replyContent }
+            : r
+        ));
+        setReplyContent('');
+        setSelectedRequest(null);
+      }
+    } catch (err) {
+      console.error('Failed to update consultation', err);
     }
   };
 
@@ -134,6 +163,24 @@ export function ExpertPage() {
 
           {/* Request List */}
           <div className="flex-1 overflow-y-auto">
+            {loading && (
+              <div className="flex items-center justify-center p-8 text-on-surface-variant">
+                <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                <span>Đang tải...</span>
+              </div>
+            )}
+            {!loading && error && (
+              <div className="p-6 text-center text-red-600">
+                <Inbox className="w-10 h-10 mx-auto mb-2 opacity-50" />
+                <p>{error}</p>
+              </div>
+            )}
+            {!loading && !error && filteredRequests.length === 0 && (
+              <div className="p-6 text-center text-on-surface-variant">
+                <Inbox className="w-10 h-10 mx-auto mb-2 opacity-50" />
+                <p>Chưa có yêu cầu nào</p>
+              </div>
+            )}
             {filteredRequests.map((request) => {
               const status = statusConfig[request.status as keyof typeof statusConfig];
               return (

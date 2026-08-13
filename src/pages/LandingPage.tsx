@@ -1,6 +1,4 @@
 import { Header, Footer } from '@/components';
-import { AuthModal } from '@/components/auth/AuthModal';
-import { PaywallModal } from '@/components/auth/PaywallModal';
 
 export function LandingPage() {
   return (
@@ -167,9 +165,6 @@ export function LandingPage() {
       </section>
 
       <Footer />
-
-      <AuthModal />
-      <PaywallModal />
     </div>
   );
 }

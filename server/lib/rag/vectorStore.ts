@@ -1,26 +1,20 @@
 /**
  * VectorStore - Multi-Provider Vector Database
- * 
- * Hỗ trợ 3 Vector Database providers:
- * 1. Mock (fallback): TF-IDF mock cho development khi không có DB
- * 2. Pinecone (cloud): Semantic search với AI embeddings - cloud hosted
- * 3. Milvus (local/cloud): High-performance vector DB - cần Docker
- * 
- * Priority: Mock → Milvus → Pinecone
- * (Dùng provider nào available đầu tiên)
- * 
+ *
+ * Hỗ trợ 2 Vector Database providers:
+ * 1. Pinecone (cloud): Semantic search với AI embeddings - cloud hosted
+ * 2. Milvus (local/cloud): High-performance vector DB - cần Docker
+ *
+ * Auto-detect: Milvus → Pinecone
+ *
  * Để chọn provider cụ thể, set trong .env:
  *   VECTOR_DB_PROVIDER=milvus    (local, cần Docker)
  *   VECTOR_DB_PROVIDER=pinecone  (cloud, cần API key)
- *   VECTOR_DB_PROVIDER=mock      (demo, không cần gì)
- * 
- * Hoặc để trống để dùng auto-detect (Milvus → Pinecone → Mock)
  */
 
 // @ts-nocheck
 import path from 'path';
 import fs from 'fs';
-import crypto from 'crypto';
 import { Pinecone } from '@pinecone-database/pinecone';
 import { pineconeConfig } from './pinecone';
 import { milvusClient, milvusConfig, isMilvusConfigured } from './milvus';
@@ -37,59 +31,33 @@ interface EmbeddingProvider {
 
 let activeProvider: EmbeddingProvider | null = null;
 
-class MockEmbeddingProvider implements EmbeddingProvider {
-  name = 'mock-tfidf';
-  dimension = 384;
-
-  isReady(): boolean { return true; }
-
-  async embed(text: string): Promise<number[]> {
-    return createSimpleEmbedding(text);
-  }
-
-  async embedBatch(texts: string[]): Promise<number[][]> {
-    return texts.map(text => createSimpleEmbedding(text));
-  }
-}
-
 class GeminiEmbeddingProvider implements EmbeddingProvider {
-  name = 'gemini-text-embedding-004';
+  name = 'gemini-embedding-001';
   dimension = 768;
-  private genAI: any = null;
+  private apiKey: string;
 
   constructor(apiKey: string) {
-    try {
-      import('@google/generative-ai').then((mod) => {
-        this.genAI = new mod.GoogleGenerativeAI(apiKey);
-      }).catch((err) => {
-        console.warn('Failed to init Gemini embeddings:', err);
-      });
-    } catch (err) {
-      console.warn('Failed to init Gemini embeddings:', err);
-    }
+    this.apiKey = apiKey;
   }
 
-  isReady(): boolean { return this.genAI !== null; }
+  isReady(): boolean { return !!this.apiKey; }
 
   async embed(text: string): Promise<number[]> {
-    if (!this.genAI) {
-      throw new Error('Gemini client not initialized');
-    }
-
     const truncated = text.length > 8000 ? text.slice(0, 8000) : text;
 
-    try {
-      const model = this.genAI.getGenerativeModel({ model: 'text-embedding-004' });
-      const result = await model.embedContent(truncated);
-      const values = result.embedding?.values;
-      if (!values || !Array.isArray(values)) {
-        throw new Error('Invalid embedding response');
-      }
-      return values;
-    } catch (err: any) {
-      console.error('Gemini embedContent failed:', err.message);
-      return createSimpleEmbedding(text);
+    const { GoogleGenerativeAI } = await import('@google/generative-ai');
+    const genAI = new GoogleGenerativeAI(this.apiKey);
+    const model = genAI.getGenerativeModel({ model: 'gemini-embedding-001' });
+    // gemini-embedding-001 defaults to 3072 dims. Pin to 768 to match existing Pinecone schema.
+    const result = await model.embedContent({
+      content: { role: 'user', parts: [{ text: truncated }] },
+      outputDimensionality: 768,
+    });
+    const values = result.embedding?.values;
+    if (!values || !Array.isArray(values)) {
+      throw new Error('Invalid embedding response');
     }
+    return values;
   }
 
   async embedBatch(texts: string[]): Promise<number[][]> {
@@ -101,17 +69,22 @@ export function getEmbeddingProvider(): EmbeddingProvider {
   if (activeProvider) return activeProvider;
 
   const apiKey = process.env.GEMINI_API_KEY;
-  if (apiKey && apiKey !== 'your_gemini_api_key_here') {
-    const provider = new GeminiEmbeddingProvider(apiKey);
-    if (provider.isReady()) {
-      console.log('✅ Using Gemini embeddings');
-      activeProvider = provider;
-      return provider;
+  // Accept both old (AIza...) and new (AQ...) Google AI Studio API keys.
+  // Old format: starts with "AIza" (39 chars total).
+  // New format: starts with "AQ." (~59 chars) — issued by newer AI Studio flows.
+  // We just check that the key exists and has a sane minimum length to catch empty/placeholder values.
+  const isValidGeminiKey = !!apiKey && apiKey.length >= 30 && apiKey !== 'YOUR_KEY_HERE';
+  if (!isValidGeminiKey) {
+    if (apiKey) {
+      console.error('❌ GEMINI_API_KEY có vẻ không hợp lệ (length=' + apiKey.length + ')');
+    } else {
+      console.error('❌ GEMINI_API_KEY chưa được set trong .env');
     }
+    console.error('   Lấy key mới tại: https://aistudio.google.com/apikey');
+    throw new Error('GEMINI_API_KEY is missing or invalid. Set it in .env to enable embeddings.');
   }
-
-  console.log('⚠️  Using mock embeddings (set GEMINI_API_KEY để bật Gemini)');
-  activeProvider = new MockEmbeddingProvider();
+  console.log('✅ Using Gemini embeddings: ' + apiKey.substring(0, 10) + '...');
+  activeProvider = new GeminiEmbeddingProvider(apiKey!);
   return activeProvider;
 }
 
@@ -127,8 +100,31 @@ export interface Document {
     createdAt: string;
     itemId?: string;
     category?: string;
+    /** ⭐ MADA category slug (e.g. 'sensory-hearing') để filter RAG theo domain */
+    madaCategory?: string;
+    /** ⭐ Bot ID (e.g. 'bot-hearing') để filter RAG theo agent */
+    botId?: string;
     tags?: string[];
+    // MADA-specific
+    thumbnailUrl?: string;
+    galleryImages?: string[];
+    postId?: string;
+    slug?: string;
+    product_url?: string;
+    brand?: string;
   };
+}
+
+export interface SearchFilter {
+  /** Filter theo botId, e.g. 'bot-hearing' */
+  botId?: string;
+  /** Filter theo madaCategory slug, e.g. 'sensory-hearing' */
+  madaCategory?: string;
+}
+
+export interface SearchOptions {
+  topK?: number;
+  filter?: SearchFilter;
 }
 
 interface SearchResult {
@@ -138,32 +134,7 @@ interface SearchResult {
   score?: number;
 }
 
-// ============== MOCK VECTOR FUNCTIONS ==============
-
-function createSimpleEmbedding(text: string): number[] {
-  const words = text.toLowerCase().split(/\s+/);
-  const wordCount: Record<string, number> = {};
-  
-  words.forEach(word => {
-    if (word.length > 2) {
-      wordCount[word] = (wordCount[word] || 0) + 1;
-    }
-  });
-  
-  const dimension = 384;
-  const vector = new Array(dimension).fill(0);
-  
-  Object.keys(wordCount).slice(0, 50).forEach((word, i) => {
-    const hash = crypto.createHash('md5').update(word).digest();
-    for (let j = 0; j < Math.min(16, dimension); j++) {
-      const idx = (hash[j % hash.length] + i * 7 + j * 13) % dimension;
-      vector[idx] += (wordCount[word] / words.length) * (hash[j] / 255);
-    }
-  });
-  
-  const magnitude = Math.sqrt(vector.reduce((sum, val) => sum + val * val, 0));
-  return magnitude > 0 ? vector.map(v => v / magnitude) : vector;
-}
+// ============== SIMILARITY ==============
 
 function cosineSimilarity(a: number[], b: number[]): number {
   if (a.length !== b.length) return 0;
@@ -184,18 +155,18 @@ function cosineSimilarity(a: number[], b: number[]): number {
 
 // ============== VECTOR STORE MAIN CLASS ==============
 
-export type VectorDBProvider = 'mock' | 'pinecone' | 'milvus' | 'auto';
+export type VectorDBProvider = 'pinecone' | 'milvus' | 'auto';
 
 class VectorStore {
   // Provider instances
   private pinecone: any = null;
   private pineconeIndex: any = null;
-  
+
   // State
   private isInitialized = false;
-  private activeDbProvider: VectorDBProvider = 'mock';
+  private activeDbProvider: VectorDBProvider = 'pinecone';
   private dataDir: string = '';
-  
+
   // In-memory store (backup khi không có vector DB)
   private inMemoryStore: Map<string, any> = new Map();
 
@@ -211,7 +182,7 @@ class VectorStore {
 
       // Detect và initialize provider
       const preferredProvider = (process.env.VECTOR_DB_PROVIDER || 'auto') as VectorDBProvider;
-      
+
       if (preferredProvider === 'auto') {
         await this.initializeAutoProvider();
       } else {
@@ -220,17 +191,16 @@ class VectorStore {
 
       this.isInitialized = true;
       console.log(`✅ Vector store initialized (${this.activeDbProvider})`);
-      
+
     } catch (error) {
       console.error('Failed to initialize vector store:', error);
-      this.activeDbProvider = 'mock';
-      this.isInitialized = true;
+      throw error;
     }
   }
 
   private async initializeAutoProvider(): Promise<void> {
     console.log('🔍 Auto-detecting Vector DB provider...');
-    
+
     // Thử Milvus trước (local, fast)
     try {
       await this.initializeProvider('milvus');
@@ -244,11 +214,9 @@ class VectorStore {
       await this.initializeProvider('pinecone');
       return;
     } catch (e) {
-      console.log('⚠️  Pinecone not available, using Mock...');
+      console.error('❌ No vector DB provider available. Set PINECONE_API_KEY or start Milvus.');
+      throw e;
     }
-
-    this.activeDbProvider = 'mock';
-    console.log('⚠️  Using in-memory mock vector store');
   }
 
   private async initializeProvider(provider: VectorDBProvider): Promise<void> {
@@ -260,7 +228,7 @@ class VectorStore {
         await this.initializePinecone();
         break;
       default:
-        this.activeDbProvider = 'mock';
+        throw new Error(`Unknown vector DB provider: ${provider}`);
     }
   }
 
@@ -306,12 +274,18 @@ class VectorStore {
     if (fs.existsSync(docsPath)) {
       try {
         const data = JSON.parse(fs.readFileSync(docsPath, 'utf-8'));
-        data.forEach((doc: any) => {
-          this.inMemoryStore.set(doc.id, {
-            ...doc,
-            embedding: createSimpleEmbedding(doc.content),
-          });
-        });
+        const provider = getEmbeddingProvider();
+        for (const doc of data) {
+          if (!doc.embedding) {
+            try {
+              doc.embedding = await provider.embed(doc.content);
+            } catch (e) {
+              console.warn(`⚠️ Skipped doc ${doc.id} — failed to compute embedding`);
+              continue;
+            }
+          }
+          this.inMemoryStore.set(doc.id, doc);
+        }
         console.log(`📚 Loaded ${this.inMemoryStore.size} documents from disk`);
       } catch (e) {
         console.log('📚 Starting with empty knowledge base');
@@ -348,6 +322,9 @@ class VectorStore {
           type: doc.metadata.type,
           title: doc.metadata.title || '',
           category: doc.metadata.category || '',
+          // ⭐ MỚI: lưu MADA filter fields
+          madaCategory: doc.metadata.madaCategory || '',
+          botId: doc.metadata.botId || '',
         }));
         await milvusClient.insert(vectors);
       } catch (err) {
@@ -368,9 +345,12 @@ class VectorStore {
             type: doc.metadata.type,
             title: doc.metadata.title || '',
             category: doc.metadata.category || '',
+            // ⭐ MỚI: lưu MADA filter fields
+            madaCategory: doc.metadata.madaCategory || '',
+            botId: doc.metadata.botId || '',
           },
         }));
-        await this.pineconeIndex.upsert(vectors);
+        await this.pineconeIndex.upsert({ records: vectors });
       } catch (err) {
         console.error('Failed to add to Pinecone:', err);
       }
@@ -380,14 +360,21 @@ class VectorStore {
     console.log(`✅ Added ${documents.length} documents (total: ${this.inMemoryStore.size})`);
   }
 
-  async search(query: string, topK = 5): Promise<SearchResult[]> {
+  async search(query: string, topKOrOptions: number | SearchOptions = 5): Promise<SearchResult[]> {
+    // Backward compat: cho phép search(query, topK) hoặc search(query, {topK, filter})
+    const opts: SearchOptions = typeof topKOrOptions === 'number'
+      ? { topK: topKOrOptions }
+      : topKOrOptions;
+    const topK = opts.topK || 5;
+    const filter = opts.filter;
+
     const provider = getEmbeddingProvider();
     const queryEmbedding = await provider.embed(query);
 
     // Search Milvus if using
     if (this.activeDbProvider === 'milvus' && milvusClient.isReady()) {
       try {
-        const results = await milvusClient.search(queryEmbedding, topK);
+        const results = await milvusClient.search(queryEmbedding, topK, filter);
         return results.map((r: any) => ({
           content: r.content,
           metadata: {
@@ -395,6 +382,8 @@ class VectorStore {
             type: r.type,
             title: r.title,
             category: r.category,
+            madaCategory: r.madaCategory,
+            botId: r.botId,
             createdAt: new Date().toISOString(),
           },
           distance: r.distance,
@@ -408,10 +397,12 @@ class VectorStore {
     // Search Pinecone if using
     if (this.activeDbProvider === 'pinecone' && this.pineconeIndex) {
       try {
+        const pineconeFilter = filter ? this.buildPineconeFilter(filter) : undefined;
         const results = await this.pineconeIndex.query({
           vector: queryEmbedding,
           topK,
           includeMetadata: true,
+          filter: pineconeFilter,
         });
         return (results.matches || []).map((match: any) => ({
           content: match.metadata?.content || '',
@@ -420,6 +411,8 @@ class VectorStore {
             type: match.metadata?.type || 'text',
             title: match.metadata?.title || '',
             category: match.metadata?.category || '',
+            madaCategory: match.metadata?.madaCategory || '',
+            botId: match.metadata?.botId || '',
             createdAt: new Date().toISOString(),
           },
           distance: match.distance,
@@ -430,14 +423,30 @@ class VectorStore {
       }
     }
 
-    // Default: In-memory search
-    return this.searchInMemory(queryEmbedding, topK);
+    // Default: In-memory search (with filter)
+    return this.searchInMemory(queryEmbedding, topK, filter);
   }
 
-  private searchInMemory(queryEmbedding: number[], topK: number): SearchResult[] {
+  /**
+   * Build Pinecone metadata filter từ SearchFilter
+   */
+  private buildPineconeFilter(filter: SearchFilter): any {
+    const conditions: any[] = [];
+    if (filter.botId) conditions.push({ botId: { '$eq': filter.botId } });
+    if (filter.madaCategory) conditions.push({ madaCategory: { '$eq': filter.madaCategory } });
+    if (conditions.length === 0) return undefined;
+    if (conditions.length === 1) return conditions[0];
+    return { '$and': conditions };
+  }
+
+  private searchInMemory(queryEmbedding: number[], topK: number, filter?: SearchFilter): SearchResult[] {
     const results: Array<{ doc: any; score: number }> = [];
 
     this.inMemoryStore.forEach(doc => {
+      // ⭐ MỚI: Apply filter nếu có
+      if (filter?.botId && doc.metadata?.botId !== filter.botId) return;
+      if (filter?.madaCategory && doc.metadata?.madaCategory !== filter.madaCategory) return;
+
       const similarity = cosineSimilarity(queryEmbedding, doc.embedding);
       results.push({ doc, score: similarity });
     });

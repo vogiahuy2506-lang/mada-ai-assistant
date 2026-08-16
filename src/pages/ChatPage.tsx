@@ -9,9 +9,9 @@ import {
   Trash2, Volume2, ChevronDown, Check, Copy, ThumbsUp, ThumbsDown,
   Speaker, BookOpen, Bot as BotIcon, HelpCircle, ChevronRight,
   FileText, Video, Mic2, ImageIcon, File, X,
-  Star, MessageCircle,
+  MessageCircle,
   LogOut, Sparkles,
-  Search, Pin, MessageSquare, PinOff, Loader2, ArrowRight,
+  Search, Pin, MessageSquare, PinOff, Loader2,
   Settings, Smartphone, Brain, Eye, Accessibility,
   Users, MoreHorizontal, Gift, Wallet, CreditCard,
   PiggyBank, Handshake, ZoomIn, PlusCircle, Monitor,
@@ -22,6 +22,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { CATEGORY_INFO, SAMPLE_QUESTIONS, type ATCategory, type Language, type SuggestedProduct } from '@/types';
 import { t } from '@/lib/translations';
+import { userHistoryApi } from '@/lib/api';
 
 // Attachment options - use getAttachmentOptions(language) inside component
 function getAttachmentOptions(lang: Language) {
@@ -309,165 +310,6 @@ function getAgentDisplayInfo(agentId: string, lang: Language): { name: string; d
   return AGENT_TRANSLATIONS[agentId]?.['en'] || { name: 'Agent', description: '' };
 }
 
-// Sample Products Data - theo từng category (anh thuc cua san pham)
-const SAMPLE_PRODUCTS: Record<string, any[]> = {
-  vision: [
-    { 
-      name: 'OrCam MyEye Pro', 
-      nameVi: 'OrCam MyEye Pro', 
-      brand: 'OrCam Technologies',
-      price: '~$6,500 USD', 
-      image: 'https://at.mada.org.qa/wp-content/uploads/2020/03/Interpretype.png',
-      features: ['Nhận diện khuôn mặt', 'Đọc văn bản 100+ ngôn ngữ', 'Nhận diện tiền giấy', 'Pin 6 giờ', 'Gắn kính được'],
-      reasons: ['Hỗ trợ tiếng Việt native', 'Di động, gắn kính', 'Pin sạc 6h sử dụng liên tục', 'Không cần smartphone'],
-      standards: ['ISO 9999:22.06', 'IEC 60118-4', 'WHO GATE']
-    },
-    { 
-      name: 'JAWS Screen Reader', 
-      nameVi: 'JAWS Screen Reader', 
-      brand: 'Freedom Scientific', 
-      price: '~$1,000 USD/năm', 
-      image: 'https://at.mada.org.qa/wp-content/uploads/2020/03/Interpretype.png',
-      features: ['Đọc màn hình Windows', 'Hỗ trợ 40+ ngôn ngữ', 'Tương thích Braille', 'Script tùy chỉnh'],
-      reasons: ['Rẻ hơn 85% so OrCam', 'Chuẩn quốc tế, dùng phổ biến', 'Hỗ trợ phần mềm văn phòng', 'Cộng đồng người dùng lớn'],
-      standards: ['WCAG 2.1', 'ISO 9999:22.06', 'EN 1332']
-    },
-    { name: 'NVDA Screen Reader', nameVi: 'NVDA Screen Reader', brand: 'NV Access', price: 'Miễn phí (donation)', image: 'https://at.mada.org.qa/wp-content/uploads/2020/03/Interpretype.png', features: ['Đọc màn hình mã nguồn mở', 'Hỗ trợ 50+ ngôn ngữ', 'Chạy trên Windows'], reasons: ['100% miễn phí', 'Mã nguồn mở, bảo mật', 'Cộng đồng phát triển tích cực', 'Nhẹ, chạy trên USB'], standards: ['WCAG 2.1', 'ISO 9999:22.06'] },
-  ],
-  hearing: [
-    { 
-      name: 'Phonak Paradise P90', 
-      nameVi: 'Phonak Paradise P90', 
-      brand: 'Phonak', 
-      price: '~$3,500 USD/đôi', 
-      image: 'https://at.mada.org.qa/wp-content/uploads/2022/12/Oticon-EduMic.png',
-      features: ['Kết nối Bluetooth', 'Chống ồn AI', 'Pin sạc lithium', 'Waterproof IP68'],
-      reasons: ['Chống ồn AI thông minh nhất', 'Kết nối TV, điện thoại', 'Pin 16h, sạc nhanh 30p', 'Chống nước, bụi'],
-      standards: ['ISO 9999:22.06', 'IEC 60118-4', 'WHO GATE']
-    },
-    { 
-      name: 'Roger Pen Microphone', 
-      nameVi: 'Roger Pen Microphone', 
-      brand: 'Phonak', 
-      price: '~$1,200 USD', 
-      image: 'https://at.mada.org.qa/wp-content/uploads/2021/10/StreamLine-Mic.jpg',
-      features: ['Hệ thống FM', 'Microphone định hướng', 'Kết nối đa thiết bị', 'Pin 10 giờ'],
-      reasons: ['Tăng nghe rõ ràng 61%', 'Học tập, họp hành hiệu quả', 'Gắn bluetooth nhiều máy', 'Nhẹ, dễ mang theo'],
-      standards: ['IEC 60118-4', 'ISO 9999:22.06']
-    },
-    { name: 'Oticon More Hearing Aid', nameVi: 'Oticon More Hearing Aid', brand: 'Oticon', price: '~$4,200 USD/đôi', image: 'https://at.mada.org.qa/wp-content/uploads/2021/10/Oticon-Amigo-T31T30.jpg', features: ['Deep Neural Network', 'Chống ồn thông minh', 'Kết nối iPhone/Android'], reasons: ['AI deep learning', 'Tự động điều chỉnh theo môi trường', 'Kết nối iPhone & Android', 'App điều khiển trên điện thoại'], standards: ['IEC 60118-4', 'WHO GATE'] },
-  ],
-  mobility: [
-    { 
-      name: 'Permobil F5 Wheelchair', 
-      nameVi: 'Permobil F5 Xe lăn điện', 
-      brand: 'Permobil', 
-      price: '~$25,000 USD', 
-      image: 'https://at.mada.org.qa/wp-content/uploads/2021/10/StreamLine-Mic.jpg',
-      features: ['Đứng thẳng tự động', 'Leo dốc 12°', 'Điều khiển smartphone', 'Seat Elevator 30cm'],
-      reasons: ['Tự động đứng thẳng', 'Leo dốc, bậc thềm', 'Điều khiển bằng app', 'Nâng ghế lên 30cm'],
-      standards: ['ISO 9999:12.21', 'ISO 7176', 'EN 12184']
-    },
-    { 
-      name: 'Scalamobil S95', 
-      nameVi: 'Scalamobil S95 Leo cầu thang', 
-      brand: 'Scala', 
-      price: '~$4,500 USD', 
-      image: 'https://at.mada.org.qa/wp-content/uploads/2021/10/StreamLine-Mic.jpg',
-      features: ['Leo cầu thang an toàn', 'Pin sạc', 'Gắn được nhiều xe lăn', 'Tháo lắp 2 phút'],
-      reasons: ['Leo cầu thang an toàn', 'Gắn hầu hết xe lăn', 'Tháo lắp nhanh 2 phút', 'Rẻ hơn xe lăn điện 80%'],
-      standards: ['ISO 9999:12.21', 'EN 12184']
-    },
-    { name: 'Quickie Q700-UP M', nameVi: 'Quickie Q700-UP M Xe lăn', brand: 'Sunrise Medical', price: '~$18,500 USD', image: 'https://at.mada.org.qa/wp-content/uploads/2021/10/StreamLine-Mic.jpg', features: ['Hệ thống đứng', 'C-Leg technology', 'Cấu hình tùy chỉnh'], reasons: ['Công nghệ C-Leg tiên tiến', 'Đứng thẳng bằng điều khiển', 'Cấu hình theo nhu cầu', 'Bảo hành 5 năm'], standards: ['ISO 7176', 'ISO 9999:12.21'] },
-  ],
-  cognition: [
-    { 
-      name: 'Tobii Dynavox TD I-13', 
-      nameVi: 'Tobii Dynavox TD I-13 Eye Tracker', 
-      brand: 'Tobii Dynavox', 
-      price: '~$8,500 USD', 
-      image: 'https://at.mada.org.qa/wp-content/uploads/2020/03/iCommunicator-.png',
-      features: ['Eye-tracking chính xác', 'Màn hình 13.3 inch', 'AAC software', 'Không cần tay điều khiển'],
-      reasons: ['Theo dõi mắt chính xác cao', 'Không cần dùng tay', 'Phần mềm AAC tích hợp', 'Giao tiếp bằng mắt'],
-      standards: ['ISO 9999:05.15.06', 'WCAG 2.1', 'WHO GATE']
-    },
-    { 
-      name: 'Proloquo2Go App', 
-      nameVi: 'Proloquo2Go AAC App', 
-      brand: 'AssistiveWare', 
-      price: '~$250 USD/lifetime', 
-      image: 'https://at.mada.org.qa/wp-content/uploads/2020/03/iCommunicator-.png',
-      features: ['iOS app', 'Symbol-based AAC', 'Giọng Việt/Eng', 'Hình ảnh 25,000+'],
-      reasons: ['Rẻ hơn 97% thiết bị AAC', 'Dùng iPhone/iPad có sẵn', 'Hỗ trợ tiếng Việt', 'Cài đặt, sử dụng dễ'],
-      standards: ['ISO 9999:05.15.06', 'WCAG 2.1']
-    },
-    { name: 'Memo Smart Calendar', nameVi: 'Memo Smart Calendar', brand: 'Memo', price: '~$300 USD', image: 'https://at.mada.org.qa/wp-content/uploads/2020/03/iCommunicator-.png', features: ['Đồng hồ nhắc nhở', 'Màn hình LCD', 'Chống nhầm lẫn thuốc'], reasons: ['Nhắc uống thuốc đúng giờ', 'Chống nhầm lẫn thuốc', 'Giao diện đơn giản', 'Người lớn tuổi dùng được'], standards: ['ISO 9999:09', 'WHO GATE'] },
-  ],
-  communication: [
-    { 
-      name: 'LightWriter SL40 AAC', 
-      nameVi: 'LightWriter SL40 Thiết bị AAC', 
-      brand: 'Tobii Dynavox', 
-      price: '~$4,200 USD', 
-      image: 'https://at.mada.org.qa/wp-content/uploads/2020/03/Lightwriter-US.webp',
-      features: ['Bàn phím vật lý', 'Màn hình chia đôi', 'Tổng hợp giọng nói', 'Bluetooth'],
-      reasons: ['Bàn phím + màn hình', 'Giao tiếp 2 chiều', 'Pin 10 giờ liên tục', 'Kết nối điện thoại'],
-      standards: ['ISO 9999:05.15.06', 'WCAG 2.1']
-    },
-    { 
-      name: 'TouchChat HD AAC', 
-      nameVi: 'TouchChat HD AAC App', 
-      brand: 'Prentke Romich', 
-      price: '~$300 USD', 
-      image: 'https://at.mada.org.qa/wp-content/uploads/2020/03/iCommunicator-.png',
-      features: ['iPad app', 'Vocabulary pages', 'Customizable', 'Hình ảnh SymbolShare'],
-      reasons: ['Dùng iPad có sẵn', 'Tùy chỉnh theo nhu cầu', '25,000+ hình ảnh Symbol', 'Giá hợp lý'],
-      standards: ['ISO 9999:05.15.06', 'WCAG 2.1', 'EN 1332']
-    },
-    { name: 'Big Mack Communicator', nameVi: 'Big Mack Communicator', brand: 'AbleNet', price: '~$160 USD', image: 'https://at.mada.org.qa/wp-content/uploads/2020/03/iCommunicator-.png', features: ['1 nút bấm lớn', 'Ghi âm 75 giây', 'Dùng cho trẻ em'], reasons: ['Đơn giản nhất', 'Giá rẻ nhất', 'Dùng cho trẻ nhỏ', 'Bền, chịu va đập'], standards: ['ISO 9999:05.15.06'] },
-  ],
-  daily_living: [
-    { 
-      name: 'Easy Grip Eating Aids', 
-      nameVi: 'Dụng cụ ăn uống Easy Grip', 
-      brand: 'Performance Health', 
-      price: '~$30-50 USD', 
-      features: ['Tay cầm dày', 'Chống trượt', 'Bộ 4 món', 'Rửa máy được'],
-      reasons: ['Giá rẻ, dễ mua', 'Giúp cầm nắm dễ hơn', 'Chống trượt hiệu quả', 'Phù hợp người viêm khớp'],
-      standards: ['ISO 9999:09', 'ADA Compliance']
-    },
-    { 
-      name: 'Mediplanner Timer', 
-      nameVi: 'Hộp thuốc Mediplanner', 
-      brand: 'TabTimer', 
-      price: '~$120 USD', 
-      features: ['8 ngăn thuốc', 'Báo động', 'Nhắc nhở tự động', 'LCD hiển thị'],
-      reasons: ['Nhắc uống thuốc đúng giờ', 'Chống nhầm lẫn thuốc', 'Gia đình yên tâm', 'Pin 1 năm'],
-      standards: ['ISO 9999:09', 'WHO GATE']
-    },
-    { name: 'Grab Bar Bathroom', nameVi: 'Thanh vịn nhà tắm', brand: 'Moen', price: '~$80-200 USD', features: ['Thép không gỉ', 'Chịu lực 250kg', 'Lắp đặt dễ dàng'], reasons: ['Chống trượt an toàn', 'Lắp tường/van', 'Chịu lực 250kg', 'Bảo hành 10 năm'], standards: ['ISO 9999:09', 'ADA Compliance'] },
-  ],
-  education: [
-    { 
-      name: 'Kurzweil 3000', 
-      nameVi: 'Kurzweil 3000 Phần mềm học tập', 
-      brand: 'Cambium Learning', 
-      price: '~$1,500 USD/năm', 
-      features: ['Đọc văn bản', 'Hỗ trợ dyslexia', 'Scan tài liệu', 'Ghi chú tích hợp'],
-      reasons: ['Chuẩn cho học sinh khó đọc', 'Scan & đọc sách giáo khoa', 'Hỗ trợ 40+ ngôn ngữ', 'Dùng ở trường & nhà'],
-      standards: ['WCAG 2.2', 'UDL Guidelines', 'Section 508']
-    },
-    { 
-      name: 'Dragon NaturallySpeaking', 
-      nameVi: 'Dragon Speech Recognition', 
-      brand: 'Nuance', 
-      price: '~$500 USD', 
-      features: ['Speech-to-text', '99% accuracy', 'Vocabulary tùy chỉnh', 'Điều khiển máy tính bằng giọng'],
-      reasons: ['Đánh văn bản nhanh 3x', 'Chính xác 99%', 'Tạo từ vựng riêng', 'Điều khiển máy tính bằng giọng']
-    },
-    { name: 'C-Pen Reader', nameVi: 'C-Pen Reader Scanner', brand: 'C-Pen', price: '~$300 USD', features: ['Scan văn bản', 'Đọc to', 'Từ điển tích hợp'], reasons: ['Nhỏ gọn bỏ túi', 'Scan & đọc tức thì', 'Từ điển Oxford tích hợp', 'Học ngoại ngữ hiệu quả'] },
-  ],
-};
 
 
 
@@ -965,303 +807,6 @@ function ConsultationModal({
 }
 
 // Product Card Component
-// Smart Product Card with Match Score, Reasons & Real Images
-function SmartProductCard({ product, rank, language = 'vi' as Language, onConsult }: { product: any; rank: number; language?: Language; onConsult?: (product: any) => void }) {
-  const [expanded, setExpanded] = useState(false);
-  const [imageError, setImageError] = useState(false);
-  
-  // Translate reasons based on language
-  const getTranslatedReasons = (reasons: string[] | undefined) => {
-    if (!reasons) return [];
-    
-    // Vietnamese translations for common product reasons
-    const reasonTranslations: Record<string, Record<string, string>> = {
-      'Hỗ trợ tiếng Việt native': { vi: 'Hỗ trợ tiếng Việt native', en: 'Native Vietnamese support', ar: 'دعم اللغة الفيتنامية الأصلي', fr: 'Support vietnamien natif' },
-      'Di động, gắn kính': { vi: 'Di động, gắn kính', en: 'Portable, glasses mountable', ar: 'محمول، يمكن تركيبه على النظارات', fr: 'Portable, montable sur lunettes' },
-      'Pin sạc 6h sử dụng liên tục': { vi: 'Pin sạc 6h sử dụng liên tục', en: '6h rechargeable battery', ar: 'بطارية قابلة للشحن 6 ساعات', fr: 'Batterie rechargeable 6h' },
-      'Không cần smartphone': { vi: 'Không cần smartphone', en: 'No smartphone needed', ar: 'لا يحتاج هاتف ذكي', fr: 'Pas besoin de smartphone' },
-      'Rẻ hơn 85% so OrCam': { vi: 'Rẻ hơn 85% so OrCam', en: '85% cheaper than OrCam', ar: 'أرخص 85% من OrCam', fr: '85% moins cher que OrCam' },
-      'Chuẩn quốc tế, dùng phổ biến': { vi: 'Chuẩn quốc tế, dùng phổ biến', en: 'International standard, widely used', ar: 'معيار دولي، مستخدم على نطاق واسع', fr: 'Standard international, largement utilisé' },
-      'Hỗ trợ phần mềm văn phòng': { vi: 'Hỗ trợ phần mềm văn phòng', en: 'Office software support', ar: 'دعم برامج المكاتب', fr: 'Support logiciel de bureau' },
-      'Cộng đồng người dùng lớn': { vi: 'Cộng đồng người dùng lớn', en: 'Large user community', ar: 'مجتمع مستخدمين كبير', fr: 'Grande communauté d\'utilisateurs' },
-      'Chống ồn AI thông minh nhất': { vi: 'Chống ồn AI thông minh nhất', en: 'Smartest AI noise cancellation', ar: 'إلغاء الضوضاء الذكي بالذكاء الاصطناعي', fr: 'Annulation du bruit IA la plus intelligente' },
-      'Kết nối TV, điện thoại': { vi: 'Kết nối TV, điện thoại', en: 'Connects to TV, phone', ar: 'يتصل بالتلفزيون والهاتف', fr: 'Connexion TV, téléphone' },
-      'Pin 16h, sạc nhanh 30p': { vi: 'Pin 16h, sạc nhanh 30p', en: '16h battery, 30min fast charge', ar: 'بطارية 16 ساعة، شحن سريع 30 دقيقة', fr: 'Batterie 16h, charge rapide 30min' },
-      'Chống nước, bụi': { vi: 'Chống nước, bụi', en: 'Water & dust resistant', ar: 'مقاوم للماء والغبار', fr: 'Résistant à l\'eau et à la poussière' },
-      'Tăng nghe rõ ràng 61%': { vi: 'Tăng nghe rõ ràng 61%', en: '61% clearer hearing', ar: 'وضوح سمعي 61%', fr: '61% plus claire audition' },
-      'Học tập, học hành hiệu quả': { vi: 'Học tập, học hành hiệu quả', en: 'Effective for learning', ar: 'فعّال للتعلم', fr: 'Efficace pour l\'apprentissage' },
-      'Gắn bluetooth nhiều máy': { vi: 'Gắn bluetooth nhiều máy', en: 'Bluetooth multi-device', ar: 'بلوتوث متعدد الأجهزة', fr: 'Bluetooth multi-appareils' },
-      'Nhẹ, dễ mang theo': { vi: 'Nhẹ, dễ mang theo', en: 'Lightweight, portable', ar: 'خفيف الوزن، محمول', fr: 'Léger, portable' },
-      'Tự động đứng thẳng': { vi: 'Tự động đứng thẳng', en: 'Auto standing feature', ar: 'ميزة الوقوف التلقائي', fr: 'Fonction debout automatique' },
-      'Leo dốc, bậc thềm': { vi: 'Leo dốc, bậc thềm', en: 'Climbs slopes, steps', ar: 'يتسلق المنحدرات والدرج', fr: 'Monte pentes, marches' },
-      'Điều khiển bằng app': { vi: 'Điều khiển bằng app', en: 'App control', ar: 'التحكم بالتطبيق', fr: 'Contrôle par application' },
-      'Nâng ghế lên 30cm': { vi: 'Nâng ghế lên 30cm', en: 'Seat raises 30cm', ar: 'رفع المقعد 30 سم', fr: 'Siège lève 30cm' },
-      'Leo cầu thang an toàn': { vi: 'Leo cầu thang an toàn', en: 'Safe stair climbing', ar: 'تسلق الدرج بأمان', fr: 'Escalier en toute sécurité' },
-      'Gắn hầu hết xe lăn': { vi: 'Gắn hầu hết xe lăn', en: 'Fits most wheelchairs', ar: 'يناسب معظم الكراسي المتحركة', fr: 'S\'adapte à la plupart des fauteuils' },
-      'Tháo lắp nhanh 2 phút': { vi: 'Tháo lắp nhanh 2 phút', en: '2-min quick setup', ar: 'تركيب سريع دقيقتين', fr: 'Installation rapide 2 min' },
-      'Rẻ hơn xe lăn điện 80%': { vi: 'Rẻ hơn xe lăn điện 80%', en: '80% cheaper than power wheelchair', ar: 'أرخص 80% من الكرسي الكهربائي', fr: '80% moins cher qu\'un fauteuil électrique' },
-    };
-    
-    return reasons.map(reason => {
-      if (reasonTranslations[reason]) {
-        return reasonTranslations[reason][language] || reason;
-      }
-      return reason;
-    });
-  };
-  
-  // Translate features based on language
-  const getTranslatedFeatures = (features: string[] | undefined) => {
-    if (!features) return [];
-    
-    const featureTranslations: Record<string, Record<string, string>> = {
-      'Nhận diện khuôn mặt': { vi: 'Nhận diện khuôn mặt', en: 'Face recognition', ar: 'التعرف على الوجوه', fr: 'Reconnaissance faciale' },
-      'Đọc văn bản 100+ ngôn ngữ': { vi: 'Đọc văn bản 100+ ngôn ngữ', en: 'Reads 100+ languages', ar: 'يقرأ أكثر من 100 لغة', fr: 'Lit plus de 100 langues' },
-      'Nhận diện tiền giấy': { vi: 'Nhận diện tiền giấy', en: 'Currency recognition', ar: 'التعرف على العملات', fr: 'Reconnaissance des devises' },
-      'Pin 6 giờ': { vi: 'Pin 6 giờ', en: '6 hour battery', ar: 'بطارية 6 ساعات', fr: 'Batterie 6 heures' },
-      'Gắn kính được': { vi: 'Gắn kính được', en: 'Glasses mountable', ar: 'يمكن تركيبه على النظارات', fr: 'Montable sur lunettes' },
-      'Đọc màn hình Windows': { vi: 'Đọc màn hình Windows', en: 'Windows screen reader', ar: 'قارئ شاشة ويندوز', fr: 'Lecteur d\'écran Windows' },
-      'Hỗ trợ 40+ ngôn ngữ': { vi: 'Hỗ trợ 40+ ngôn ngữ', en: 'Supports 40+ languages', ar: 'يدعم أكثر من 40 لغة', fr: 'Supporte 40+ langues' },
-      'Tương thích Braille': { vi: 'Tương thích Braille', en: 'Braille compatible', ar: 'متوافق مع برايل', fr: 'Compatible braille' },
-      'Kết nối Bluetooth': { vi: 'Kết nối Bluetooth', en: 'Bluetooth connectivity', ar: 'اتصال بلوتوث', fr: 'Connectivité Bluetooth' },
-      'Chống ồn AI': { vi: 'Chống ồn AI', en: 'AI noise cancellation', ar: 'إلغاء الضوضاء بالذكاء الاصطناعي', fr: 'Annulation du bruit IA' },
-      'Pin sạc lithium': { vi: 'Pin sạc lithium', en: 'Lithium rechargeable', ar: 'بطارية ليثيوم قابلة للشحن', fr: 'Lithium rechargeable' },
-      'Waterproof IP68': { vi: 'Waterproof IP68', en: 'Waterproof IP68', ar: 'مقاوم للماء IP68', fr: 'Imperméable IP68' },
-    };
-    
-    return features.map(feature => {
-      if (featureTranslations[feature]) {
-        return featureTranslations[feature][language] || feature;
-      }
-      return feature;
-    });
-  };
-  
-  const translatedReasons = getTranslatedReasons(product.reasons);
-  const translatedFeatures = getTranslatedFeatures(product.features);
-  
-  // Calculate match score based on product properties
-  const matchScore = product.matchScore || (rank === 1 ? 94 : 87);
-  const matchLabel = rank === 1 
-    ? (language === 'vi' ? 'Phù hợp nhất' : language === 'en' ? 'Best Match' : language === 'ar' ? 'الأفضل' : 'Meilleur choix')
-    : rank === 2 
-    ? (language === 'vi' ? 'Giá trị tốt' : language === 'en' ? 'Best Value' : language === 'ar' ? 'أفضل قيمة' : 'Meilleur rapport')
-    : (language === 'vi' ? 'Đề xuất' : language === 'en' ? 'Recommended' : language === 'ar' ? 'موصى به' : 'Recommandé');
-  
-  // Get category info with image
-  const getCategoryInfo = (name: string) => {
-    const n = name.toLowerCase();
-    if (n.includes('orcam')) {
-      return { gradient: 'from-violet-600 to-purple-800', icon: '👁️', label: language === 'vi' ? 'Hỗ trợ thị giác' : language === 'en' ? 'Vision Support' : language === 'ar' ? 'دعم البصر' : 'Support visuel', color: 'violet', img: 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=400&h=300&fit=crop' };
-    }
-    if (n.includes('jaws') || n.includes('nvda') || n.includes('screen reader')) {
-      return { gradient: 'from-slate-600 to-slate-800', icon: '🖥️', label: language === 'vi' ? 'Trình đọc màn hình' : language === 'en' ? 'Screen Reader' : language === 'ar' ? 'قارئ الشاشة' : 'Lecteur d\'écran', color: 'slate', img: 'https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=400&h=300&fit=crop' };
-    }
-    if (n.includes('phonak') || n.includes('oticon') || n.includes('hearing')) {
-      return { gradient: 'from-blue-500 to-cyan-600', icon: '👂', label: language === 'vi' ? 'Hỗ trợ thính giác' : language === 'en' ? 'Hearing Support' : language === 'ar' ? 'دعم السمع' : 'Support auditif', color: 'blue', img: 'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=400&h=300&fit=crop' };
-    }
-    if (n.includes('roger')) {
-      return { gradient: 'from-blue-400 to-cyan-500', icon: '🎤', label: language === 'vi' ? 'Microphone' : language === 'en' ? 'Microphone' : language === 'ar' ? 'الميكروفون' : 'Microphone', color: 'blue', img: 'https://images.unsplash.com/photo-1590602847861-f357a9332bbc?w=400&h=300&fit=crop' };
-    }
-    if (n.includes('wheelchair') || n.includes('xe lăn') || n.includes('permobil')) {
-      return { gradient: 'from-emerald-500 to-teal-600', icon: '🦽', label: language === 'vi' ? 'Hỗ trợ vận động' : language === 'en' ? 'Mobility Support' : language === 'ar' ? 'دعم الحركة' : 'Support mobilité', color: 'emerald', img: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&h=300&fit=crop' };
-    }
-    if (n.includes('scalamobil') || n.includes('leo cầu')) {
-      return { gradient: 'from-teal-500 to-cyan-600', icon: '🪜', label: language === 'vi' ? 'Leo cầu thang' : language === 'en' ? 'Stair Climbing' : language === 'ar' ? 'تسلق الدرج' : 'Montée d\'escalier', color: 'teal', img: 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&h=300&fit=crop' };
-    }
-    if (n.includes('tobii') || n.includes('eye')) {
-      return { gradient: 'from-purple-500 to-pink-600', icon: '👁️', label: language === 'vi' ? 'Theo dõi mắt' : language === 'en' ? 'Eye Tracker' : language === 'ar' ? 'تتبع العين' : 'Eye Tracker', color: 'purple', img: 'https://images.unsplash.com/photo-1531746790731-6c087fecd65a?w=400&h=300&fit=crop' };
-    }
-    if (n.includes('proloquo') || n.includes('touchchat')) {
-      return { gradient: 'from-orange-500 to-red-500', icon: '📱', label: language === 'vi' ? 'Ứng dụng AAC' : language === 'en' ? 'AAC App' : language === 'ar' ? 'تطبيق التواصل' : 'App AAC', color: 'orange', img: 'https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?w=400&h=300&fit=crop' };
-    }
-    if (n.includes('memo') || n.includes('calendar')) {
-      return { gradient: 'from-indigo-500 to-blue-600', icon: '📅', label: language === 'vi' ? 'Nhắc nhở' : language === 'en' ? 'Reminder' : language === 'ar' ? 'التذكير' : 'Rappel', color: 'indigo', img: 'https://images.unsplash.com/photo-1434494878577-86c23bcb06b9?w=400&h=300&fit=crop' };
-    }
-    if (n.includes('lightwriter')) {
-      return { gradient: 'from-orange-400 to-red-500', icon: '💬', label: language === 'vi' ? 'Thiết bị giao tiếp' : language === 'en' ? 'AAC Device' : language === 'ar' ? 'جهاز التواصل' : 'Appareil AAC', color: 'orange', img: 'https://images.unsplash.com/photo-1590650213165-c1fef80648c4?w=400&h=300&fit=crop' };
-    }
-    if (n.includes('mack')) {
-      return { gradient: 'from-pink-400 to-rose-500', icon: '🔊', label: language === 'vi' ? 'Bộ giao tiếp' : language === 'en' ? 'Communicator' : language === 'ar' ? 'مواصل' : 'Communicateur', color: 'pink', img: 'https://images.unsplash.com/photo-1563770660941-20978e870e26?w=400&h=300&fit=crop' };
-    }
-    if (n.includes('easy grip') || n.includes('eating')) {
-      return { gradient: 'from-amber-400 to-orange-500', icon: '🍴', label: language === 'vi' ? 'Dụng cụ ăn uống' : language === 'en' ? 'Eating Aids' : language === 'ar' ? 'أدوات الأكل' : 'Ustensiles de repas', color: 'amber', img: 'https://images.unsplash.com/photo-1584346133934-a3afd2a33c4c?w=400&h=300&fit=crop' };
-    }
-    if (n.includes('mediplanner') || n.includes('thuốc')) {
-      return { gradient: 'from-green-500 to-emerald-600', icon: '💊', label: language === 'vi' ? 'Hộp thuốc' : language === 'en' ? 'Pill Organizer' : language === 'ar' ? 'منظم الأدوية' : 'Porte-médicaments', color: 'green', img: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=400&h=300&fit=crop' };
-    }
-    if (n.includes('grab') || n.includes('bathroom')) {
-      return { gradient: 'from-slate-400 to-gray-600', icon: '🚿', label: language === 'vi' ? 'Hỗ trợ nhà tắm' : language === 'en' ? 'Bathroom Support' : language === 'ar' ? 'دعم الحمام' : 'Support salle de bain', color: 'slate', img: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=300&fit=crop' };
-    }
-    if (n.includes('kurzweil')) {
-      return { gradient: 'from-amber-500 to-orange-600', icon: '📚', label: language === 'vi' ? 'Hỗ trợ học tập' : language === 'en' ? 'Education Support' : language === 'ar' ? 'دعم التعليم' : 'Support éducatif', color: 'amber', img: 'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=400&h=300&fit=crop' };
-    }
-    if (n.includes('dragon')) {
-      return { gradient: 'from-cyan-500 to-blue-600', icon: '🎯', label: language === 'vi' ? 'Nhận dạng giọng nói' : language === 'en' ? 'Speech Recognition' : language === 'ar' ? 'التعرف على الكلام' : 'Reconnaissance vocale', color: 'cyan', img: 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=400&h=300&fit=crop' };
-    }
-    if (n.includes('c-pen')) {
-      return { gradient: 'from-yellow-500 to-orange-600', icon: '✏️', label: language === 'vi' ? 'Bút quét' : language === 'en' ? 'Scanner Pen' : language === 'ar' ? 'قلم الماسح' : 'Stylo scan', color: 'yellow', img: 'https://images.unsplash.com/photo-1553729784-e91953dec042?w=400&h=300&fit=crop' };
-    }
-    return { gradient: 'from-slate-600 to-slate-800', icon: '🔧', label: language === 'vi' ? 'Thiết bị AT' : language === 'en' ? 'AT Device' : language === 'ar' ? 'جهاز AT' : 'Appareil AT', color: 'slate', img: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=400&h=300&fit=crop' };
-  };
-  
-  const categoryInfo = getCategoryInfo(product.name);
-  
-  // Rating & reviews (simulated based on rank)
-  const rating = rank === 1 ? 4.8 : 4.5;
-  const reviews = rank === 1 ? 234 : 189;
-  
-  // Availability badge
-  const availability = rank === 1 
-    ? { text: language === 'vi' ? 'Có sẵn tại VN' : language === 'en' ? 'Available in VN' : language === 'ar' ? 'متاح في فيتنام' : 'Disponible au VN', icon: '📦', color: 'bg-emerald-100 text-emerald-700' } 
-    : { text: language === 'vi' ? 'Tải digital' : language === 'en' ? 'Digital download' : language === 'ar' ? 'تحميل رقمي' : 'Téléchargement', icon: '📥', color: 'bg-blue-100 text-blue-700' };
-
-  return (
-    <div className={`bg-white border-2 rounded-2xl overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 ${
-      rank === 1 ? 'border-amber-300 shadow-amber-100' : 'border-slate-200'
-    }`}>
-      {/* Product Image */}
-      <div className="relative h-36 overflow-hidden">
-        {!imageError ? (
-          <img 
-            src={categoryInfo.img} 
-            alt={product.name}
-            className="w-full h-full object-cover"
-            onError={() => setImageError(true)}
-          />
-        ) : (
-          <div className={`w-full h-full bg-gradient-to-br ${categoryInfo.gradient} flex items-center justify-center`}>
-            <span className="text-5xl">{categoryInfo.icon}</span>
-          </div>
-        )}
-        
-        {/* Gradient Overlay */}
-        <div className={`absolute inset-0 bg-gradient-to-t ${categoryInfo.gradient} opacity-60`} />
-        
-        {/* Rank Badge */}
-        <div className={`absolute top-3 left-3 flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold shadow-lg ${
-          rank === 1 ? 'bg-amber-400 text-amber-900' : 'bg-white/90 backdrop-blur text-slate-700'
-        }`}>
-          {rank === 1 && '🏆'}
-          {matchLabel}
-        </div>
-        
-        {/* Match Score */}
-        <div className="absolute top-3 right-3 w-12 h-12 bg-white rounded-full shadow-lg flex items-center justify-center">
-          <div className="text-center">
-            <span className="text-sm font-bold text-slate-800">{matchScore}%</span>
-          </div>
-        </div>
-        
-        {/* Product Name Overlay */}
-        <div className="absolute bottom-3 left-3 right-3">
-          <h4 className="font-bold text-white text-sm leading-tight drop-shadow-lg line-clamp-1">{product.name}</h4>
-          <span className="text-xs text-white/80">{categoryInfo.label}</span>
-        </div>
-      </div>
-      
-      {/* Content */}
-      <div className="p-4">
-        {/* Rating & Availability */}
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-1.5">
-            <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
-            <span className="font-semibold text-sm">{rating}</span>
-            <span className="text-xs text-slate-500">({reviews} {language === 'vi' ? 'đánh giá' : language === 'en' ? 'reviews' : language === 'ar' ? 'تقييم' : 'avis'})</span>
-          </div>
-          <span className={`flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-medium ${availability.color}`}>
-            {availability.icon} {availability.text}
-          </span>
-        </div>
-        
-        {/* Why This Product Section */}
-        <div className="mb-4">
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-2 flex items-center gap-1">
-            <span className="material-symbols-outlined text-sm">lightbulb</span>
-            {language === 'vi' ? 'Phù hợp vì:' : language === 'en' ? 'Why this fits:' : language === 'ar' ? 'لماذا يناسب:' : 'Pourquoi ça convient:'}
-          </p>
-          <div className="space-y-1.5">
-            {translatedReasons?.slice(0, 3).map((reason: string, idx: number) => (
-              <div key={idx} className="flex items-start gap-2 text-xs text-slate-600 bg-slate-50 p-2 rounded-lg">
-                <Check className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" />
-                <span>{reason}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-        
-        {/* Price & Features Preview */}
-        <div className="flex items-center justify-between text-sm mb-4 pb-4 border-b border-slate-100">
-          <div>
-            <span className="text-xs text-slate-500 block">{language === 'vi' ? 'Giá tham khảo' : language === 'en' ? 'Reference price' : language === 'ar' ? 'السعر المرجعي' : 'Prix de référence'}</span>
-            <span className="font-bold text-lg text-slate-800">{product.price || (language === 'vi' ? 'Liên hệ' : language === 'en' ? 'Contact' : language === 'ar' ? 'اتصل' : 'Contact')}</span>
-          </div>
-          <div className="text-right">
-            <span className="text-xs text-slate-500 block">{language === 'vi' ? 'Đánh giá' : language === 'en' ? 'Rating' : language === 'ar' ? 'التقييم' : 'Note'}</span>
-            <div className="flex gap-0.5">
-              {[1,2,3,4,5].map((star) => (
-                <Star key={star} className={`w-3 h-3 ${star <= Math.round(rating) ? 'text-amber-400 fill-amber-400' : 'text-slate-200'}`} />
-              ))}
-            </div>
-          </div>
-        </div>
-        
-        {/* Expandable Features */}
-        {expanded && (
-          <div className="mb-4 p-3 bg-slate-50 rounded-xl">
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-2">
-              {language === 'vi' ? 'Tính năng nổi bật' : language === 'en' ? 'Key Features' : language === 'ar' ? 'الميزات الرئيسية' : 'Caractéristiques principales'}
-            </p>
-            <div className="grid grid-cols-2 gap-1">
-              {translatedFeatures?.slice(0, 6).map((feature: string, idx: number) => (
-                <div key={idx} className="flex items-center gap-1 text-xs text-slate-600">
-                  <span className="w-1 h-1 bg-blue-500 rounded-full" />
-                  {feature}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-        
-        {/* Action Buttons - ĐÃ FIX: phân biệt rõ ràng */}
-        <div className="flex gap-2">
-          <button 
-            onClick={() => setExpanded(!expanded)}
-            className="flex-1 py-2 px-3 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors"
-            aria-label={expanded ? (language === 'vi' ? 'Thu gọn' : 'Show less') : (language === 'vi' ? 'Xem chi tiết' : 'View details')}
-          >
-            {expanded ? (language === 'vi' ? 'Thu gọn' : language === 'en' ? 'Show less' : language === 'ar' ? 'عرض أقل' : 'Réduire') : (language === 'vi' ? 'Chi tiết' : language === 'en' ? 'Details' : language === 'ar' ? 'التفاصيل' : 'Détails')}
-          </button>
-          <button
-            onClick={() => onConsult?.(product)}
-            className="flex-1 py-2 px-3 bg-[#0047ff] text-white text-xs font-bold rounded-xl hover:bg-[#0037cc] transition-all shadow-sm hover:shadow flex items-center justify-center gap-1"
-            aria-label={language === 'vi' ? 'Tư vấn về sản phẩm' : 'Get consultation'}
-          >
-            {language === 'vi' ? 'Tư vấn ngay' : language === 'en' ? 'Get Consult' : language === 'ar' ? 'استشارة' : 'Consultation'}
-            <ArrowRight className="w-3 h-3" aria-hidden="true" />
-          </button>
-        </div>
-        
-        {/* Standards Badges - ĐÃ FIX: nằm trong card */}
-        {product.standards && product.standards.length > 0 && (
-          <div className="mt-4 pt-3 border-t border-slate-100">
-            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-2">
-              {language === 'vi' ? 'Tiêu chuẩn kỹ thuật:' : language === 'en' ? 'Technical Standards:' : language === 'ar' ? 'المعايير التقنية:' : 'Normes techniques:'}
-            </p>
-            <div className="flex flex-wrap gap-1">
-              {product.standards.map((standard: string, idx: number) => (
-                <span key={idx} className="px-2 py-1 bg-violet-50 text-violet-700 text-[10px] font-semibold rounded border border-violet-200">
-                  {standard}
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
 // Confidence Rating Bar Component
 function ConfidenceBar({ confidence, language = 'vi' as Language }: { confidence: number; language?: Language }) {
   const getColor = (value: number) => {
@@ -1750,8 +1295,30 @@ export function ChatPage() {
         updatedAt: Date.now(),
       });
       setActiveConversationId(currentConvId);
+
+      // 💾 Save conversation mới + first user message vào backend (DB persistence)
+      // Chỉ save khi user đã đăng nhập
+      if (currentUser) {
+        userHistoryApi.create({
+          conversationId: currentConvId,
+          title: userMessage.slice(0, 40) + (userMessage.length > 40 ? '...' : ''),
+          agentId: selectedAgentId || undefined,
+          language,
+          firstMessage: userMessage,
+        }).catch((err) => console.warn('[ChatPage] Failed to save conversation:', err?.message));
+      }
     } else {
       touchConversation(currentConvId, userMessage);
+
+      // 💾 Thêm user message vào conversation hiện tại
+      if (currentUser) {
+        userHistoryApi.addMessage(currentConvId, {
+          role: 'user',
+          content: userMessage,
+          agentId: selectedAgentId || undefined,
+          language,
+        }).catch((err) => console.warn('[ChatPage] Failed to save user message:', err?.message));
+      }
     }
 
     // Xây dựng message với nội dung file
@@ -1916,6 +1483,18 @@ export function ChatPage() {
             suggestedProducts: suggestedProducts, // ✅ Now captured from stream event
           });
 
+          // 💾 Save assistant message vào backend (DB persistence)
+          if (currentUser && currentConvId) {
+            userHistoryApi.addMessage(currentConvId, {
+              role: 'assistant',
+              content: fullContent,
+              agentId: selectedAgentId || undefined,
+              sources,
+              confidence,
+              language,
+            }).catch((err) => console.warn('[ChatPage] Failed to save assistant message:', err?.message));
+          }
+
           // Generate follow-up questions
           const followUps = generateFollowUpQuestions(userMessage, fullContent, language);
           setSuggestedFollowUps(followUps);
@@ -1972,7 +1551,19 @@ export function ChatPage() {
           contextUsed: data.data.contextUsed,
           suggestedProducts: data.data.suggestedProducts,
         });
-        
+
+        // 💾 Save assistant message vào backend (non-streaming)
+        if (currentUser && currentConvId) {
+          userHistoryApi.addMessage(currentConvId, {
+            role: 'assistant',
+            content: fullContent,
+            agentId: selectedAgentId || undefined,
+            sources: data.data.sources || [],
+            confidence: data.data.confidence,
+            language,
+          }).catch((err) => console.warn('[ChatPage] Failed to save assistant (non-stream):', err?.message));
+        }
+
         // Generate follow-up questions based on user question and AI response
         const followUps = generateFollowUpQuestions(userMessage, fullContent, language);
         setSuggestedFollowUps(followUps);
@@ -3101,7 +2692,7 @@ export function ChatPage() {
                   </h2>
                 </div>
                 <div className="text-[10px] font-mono text-slate-400 tracking-widest hidden md:block">
-                  {language === 'vi' ? 'AGENT_ID: MADA_USER' : language === 'en' ? 'AGENT_ID: MADA_USER' : language === 'ar' ? 'AGENT_ID: MADA_USER' : 'AGENT_ID: MADA_USER'}
+                  AGENT_ID: {selectedAgentId || 'none'}
                 </div>
               </div>
 
@@ -3649,10 +3240,10 @@ function MessageBubble({
   const hasNoData = confidence < 50 || 
     noDataIndicators.some(indicator => message.content.toLowerCase().includes(indicator.toLowerCase()));
   
-  // Detect category từ nội dung message và chọn sản phẩm phù hợp
+  // Detect category từ nội dung message (có thể dùng cho analytics sau)
   const detectedCategory = detectCategoryFromQuery(message.content);
-  const sampleProducts = SAMPLE_PRODUCTS[detectedCategory] || SAMPLE_PRODUCTS.vision;
-  
+  void detectedCategory;
+
   if (message.role === 'user') {
     return (
       <div className="flex items-end gap-3 justify-end animate-fade-in group flex-col items-end">

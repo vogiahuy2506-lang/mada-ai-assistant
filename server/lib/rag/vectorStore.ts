@@ -170,6 +170,32 @@ class VectorStore {
   // In-memory store (backup khi không có vector DB)
   private inMemoryStore: Map<string, any> = new Map();
 
+  // LRU cache query embeddings (tiết kiệm 300-800ms / hit)
+  private embeddingCache: Map<string, { vec: number[]; ts: number }> = new Map();
+  private static readonly CACHE_MAX = 200;
+  private static readonly CACHE_TTL_MS = 30 * 60 * 1000; // 30 phút
+
+  private getCachedEmbedding(query: string): number[] | null {
+    const key = query.trim().toLowerCase().slice(0, 200);
+    const cached = this.embeddingCache.get(key);
+    if (!cached) return null;
+    if (Date.now() - cached.ts > VectorStore.CACHE_TTL_MS) {
+      this.embeddingCache.delete(key);
+      return null;
+    }
+    return cached.vec;
+  }
+
+  private setCachedEmbedding(query: string, vec: number[]): void {
+    const key = query.trim().toLowerCase().slice(0, 200);
+    if (this.embeddingCache.size >= VectorStore.CACHE_MAX) {
+      // Xóa entry cũ nhất
+      const firstKey = this.embeddingCache.keys().next().value;
+      if (firstKey) this.embeddingCache.delete(firstKey);
+    }
+    this.embeddingCache.set(key, { vec, ts: Date.now() });
+  }
+
   async initialize(): Promise<void> {
     if (this.isInitialized) return;
 
@@ -369,7 +395,9 @@ class VectorStore {
     const filter = opts.filter;
 
     const provider = getEmbeddingProvider();
-    const queryEmbedding = await provider.embed(query);
+    const cachedVec = this.getCachedEmbedding(query);
+    const queryEmbedding = cachedVec || await provider.embed(query);
+    if (!cachedVec) this.setCachedEmbedding(query, queryEmbedding);
 
     // Search Milvus if using
     if (this.activeDbProvider === 'milvus' && milvusClient.isReady()) {

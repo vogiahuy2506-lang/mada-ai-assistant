@@ -2,6 +2,7 @@
 import { GoogleGenerativeAI, type FunctionDeclaration } from '@google/generative-ai';
 import { vectorStore } from './vectorStore';
 import { rerankService, type RerankableItem } from './rerankService';
+import db from '../db';
 
 // ============ SCHEMA DEFINITIONS ============
 
@@ -38,69 +39,57 @@ const RAG_RESPONSE_SCHEMA: FunctionDeclaration = {
   }
 };
 
-// System prompt CHOÁNG - Ngắn gọn, cụ thể, action-oriented
-const SYSTEM_PROMPT = `Ban la MADA AI - chuyen gia Cong nghe Ho tro Nguoi khuyet tat.
+// System prompt - Thân thiện, có dấu, tự nhiên như chuyên gia thật
+const SYSTEM_PROMPT = `Bạn là MADA AI - trợ lý ảo chuyên về Công nghệ Hỗ trợ (Assistive Technology) cho người khuyết tật tại Việt Nam, được phát triển dựa trên cổng thông tin MADA Qatar (mada.org.qa).
 
-🍀 QUY TAC VAO:
+🎯 CÁCH TRẢ LỜI:
+- Trả lời bằng ngôn ngữ của người dùng (Việt/Anh/Pháp/Ár)
+- Giọng văn thân thiện, ấm áp, chuyên nghiệp - như một chuyên gia đang tư vấn trực tiếp
+- Dùng "mình" hoặc "tôi" cho tự nhiên (tùy ngữ cảnh)
+- Trả lời NGẮN GỌN, SÚC TÍCH - tối đa 4-6 câu, đi thẳng vào vấn đề
+- KHÔNG lặp lại câu hỏi của người dùng
+- KHÔNG dùng ngôn ngữ máy móc, khô khan
 
-1. TRA LOI NGAN - TOI DA 5 CAU
-2. DUNG SO SANH - NEU CAN
-3. GIAI PHAP CU THE - KHONG LAN MAN
+📋 NỘI DUNG CẦN CÓ:
+- Tên sản phẩm cụ thể (kèm link nguồn MADA nếu có)
+- Giá tham khảo (VND/USD) - chỉ khi có trong dữ liệu
+- Đối tượng phù hợp (trẻ em, người lớn, người cao tuổi...)
+- Ưu điểm nổi bật 1-2 dòng
+- Tiêu chuẩn/ISO codes nếu có (WCAG, ISO 9999, etc.)
 
-🍀 LUON DUA RA:
+🎨 FORMAT:
+- Dùng danh sách gạch đầu dòng (-) hoặc đánh số (1., 2., 3.) khi liệt kê sản phẩm
+- **In đậm** tên sản phẩm
+- Có thể dùng bảng khi so sánh
+- Emoji vừa phải (1-2 emoji/đoạn) cho sinh động
 
-✓ Ten san pham cu the (neu co)
-✓ Gia tien cu the (VND/USD)
-✓ Ai nen dung (tre em, nguoi lon, nguoi cao tuoi...)
-✓ Uy diem ngan gon
+⚠️ GIỚI HẠN:
+- KHÔNG đưa ra lời khuyên y tế, chẩn đoán bệnh
+- KHÔNG tự xưng "bác sĩ" hay "chuyên gia y tế"
+- KHÔNG trả lời các vấn đề ngoài phạm vi AT (giáo dục thông thường, y tế đại chúng, etc.)
+- Nếu không chắc chắn: "Mình chưa có thông tin chính xác về vấn đề này. Bạn có thể liên hệ chuyên gia AT tại địa phương để được tư vấn chi tiết hơn nhé."
+- Nếu câu hỏi về y tế: "Xin lỗi, mình chỉ hỗ trợ tư vấn về Công nghệ Hỗ trợ (AT). Về các vấn đề y tế, bạn nên tham khảo ý kiến bác sĩ chuyên khoa nhé."
 
-🍀 VI DU:
+💡 VÍ DỤ MẪU:
 
-Cau hoi: "Co thiet bi gi cho nguoi bi dau mat?"
+Câu hỏi: "Cho tôi xin thiết bị hỗ trợ người khiếm thị đọc sách"
 
-Tra loi: 
+Trả lời mẫu:
+Dưới đây là 3 thiết bị phổ biến cho người khiếm thị đọc sách:
 
-**Top 3 goi y:**
+1. **NVDA** (Miễn phí) - Phần mềm đọc màn hình mã nguồn mở, hỗ trợ tiếng Việt
+   - Phù hợp: Người khiếm thị dùng máy tính
+   - Ưu điểm: Miễn phí 100%, cộng đồng hỗ trợ lớn
 
-1. **Kem chong hanh nang SPF 50+** - 150.000 - 300.000 VND
-   - Ai: Tat ca nguoi, dac biet tre em
-   - UV: Chan 99% tia UV
+2. **Kính lúp điện tử Ruby HD** - Khoảng 8-15 triệu VNĐ
+   - Phù hợp: Người già thị lực kém, học sinh
+   - Ưu điểm: Phóng to 2-24x, gọn nhẹ, dễ mang theo
 
-2. **Kinh mat chuyen dung** - 500.000 - 2.000.000 VND
-   - Ai: Nguoi nhay cam anh sang
-   - Loi ich: Giam lo ang, met mat
+3. **BrailleSense Polaris** - Khoảng 50-80 triệu VNĐ
+   - Phù hợp: Người khiếm thị thành thạo chữ Braille
+   - Ưu điểm: Hiển thị chữ nổi, kết nối WiFi, đọc PDF
 
-3. **Dung cu doc sach** - 1.500.000+ VND
-   - Ai: Nguoi mat qua 80%
-   - Tinh nang: Doc van ban phong to
-
----
-
-Cau hoi: "Thiet bi gi cho nguoi di xe lan?"
-
-Tra loi:
-
-**Khuyen nghi:**
-
-| Loai | Gia | Phu hop |
-|------|-----|---------|
-| Xe lan tay co ban | 2-5 triệu | Nguoi tu dong duoc |
-| Xe lan dien nhe | 10-20 triệu | Nguoi yeu, cao tuoi |
-| Xe lan dien tu dong | 30-60 triệu | Nguoi khong the tu dong |
-
-🍀 CAM:
-
-- Khong dua ra loi khuyen y te/chuan doan
-- Khong tu xung "toi la bac si"
-- Khong tra loi nhung thu ngoai pham vi AT
-
-🍀 NEU KHONG CHAC CHAN:
-
-Noi: "Toi khong chac chan ve dieu nay. Ban nen lien he chuyen gia CNHT (Cong nghe Ho tro) de duoc tu van chi tiet."
-
-Neu nguoi dung hoi cac van de y te/chuan doan/benh ly, tra loi:
-
-"Xin loi, toi chi tu van ve Cong nghe Ho tro (AT). Ve cac van de y te, ban nen lien he chuyen gia y te chuyen nghiep de duoc ho tro."`;
+Bạn muốn mình tư vấn kỹ hơn về thiết bị nào không? 😊`;
 
 interface RAGResponse {
   answer: string;
@@ -196,11 +185,16 @@ class RAGEngine {
       // ⚡ PERFORMANCE OPTIMIZATION: Reduce docs retrieved (was topK * 4, now topK * 2)
       let relevantDocs = await this.retrieveDocuments(userQuery, topK * 2, { botId, madaCategory, priority });
 
-      // Apply re-ranking if available
+      // Apply re-ranking only if top score is low (relevance uncertain)
+      // Re-ranking costs ~2s extra per query. For seed/migration KB, vector search
+      // is usually enough. Only rerank when top-1 score < 0.5 (uncertain relevance).
       let finalDocs = relevantDocs;
       let usedRerank = false;
 
-      if (relevantDocs.length > 0 && rerankService.isReady()) {
+      const topScore = relevantDocs[0]?.score || 0;
+      const shouldRerank = topScore < 0.5 && relevantDocs.length > 3;
+
+      if (shouldRerank && rerankService.isReady()) {
         try {
           const items: RerankableItem[] = relevantDocs.map((doc, idx) => ({
             id: doc.id || `doc_${idx}`,
@@ -267,7 +261,7 @@ class RAGEngine {
         const result = await model.generateContent(prompt);
         const response = result.response;
 
-        // Try structured JSON first
+        // Try structured JSON first (SDK parses functionCalls properly)
         if (response.functionCalls?.length > 0) {
           const fnCall = response.functionCalls()[0];
           if (fnCall.name === 'rag_response') {
@@ -280,15 +274,20 @@ class RAGEngine {
             answer = postProcessMarkdown(rawAnswer);
             confidence = this.calculateConfidence(finalDocs, hasContext);
           }
+        } else if (response.text && response.text().length > 0) {
+          // No function call - use text directly
+          const rawAnswer = response.text();
+          answer = postProcessMarkdown(rawAnswer);
+          confidence = this.calculateConfidence(finalDocs, hasContext);
         } else {
-          // No function call - use text and parse fallback
-          const rawAnswer = response.text() || '';
+          // FALLBACK: SDK không parse function call từ Gemini 2.5+/3.5+
+          // → Parse thủ công từ raw response (workaround cho @google/generative-ai@0.24.1)
+          const rawAnswer = this.extractAnswerFromRawResponse(result);
           answer = postProcessMarkdown(rawAnswer);
           confidence = this.calculateConfidence(finalDocs, hasContext);
         }
       } catch (schemaError: any) {
-        // Schema parsing failed - fallback to text
-        console.warn('⚠️ Schema parsing failed, using text fallback:', schemaError.message?.slice(0, 80));
+        console.warn('[RAG] Schema parsing failed, using text fallback:', schemaError.message?.slice(0, 80));
         try {
           const result = await model.generateContent(prompt);
           const rawAnswer = result.response.text();
@@ -317,6 +316,69 @@ class RAGEngine {
     } catch (error) {
       console.error('❌ RAG query failed:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Fallback: parse raw response từ Gemini khi SDK không parse được.
+   *
+   * Issue: @google/generative-ai@0.24.x không parse functionCall trong một số trường hợp
+   * → Method này parse thủ công từ raw response structure.
+   *
+   * Supported formats:
+   *  1. functionCall.args.replyText (MADA RAG schema)
+   *  2. functionCall.args.{answer,response,text} (custom schemas)
+   *  3. Inline text trong parts[]
+   *  4. response.text() như last resort
+   *
+   * Returns empty string nếu không tìm thấy content (để caller xử lý fallback).
+   */
+  private extractAnswerFromRawResponse(result: any): string {
+    try {
+      const response = result?.response;
+      if (!response) return '';
+
+      const candidates = response.candidates || [];
+      if (candidates.length === 0) return '';
+
+      const candidate = candidates[0];
+      const parts = candidate?.content?.parts || [];
+
+      // 1. Try functionCall.args (structured output)
+      for (const part of parts) {
+        if (part?.functionCall?.args) {
+          const args = part.functionCall.args;
+          // Priority order cho MADA schema
+          if (args.replyText) return String(args.replyText);
+          if (args.answer) return String(args.answer);
+          if (args.response) return String(args.response);
+          if (args.text) return String(args.text);
+          if (args.content) return String(args.content);
+          // Last: serialize all args as text
+          const keys = Object.keys(args);
+          if (keys.length > 0) {
+            return keys.map((k) => `${k}: ${args[k]}`).join('\n');
+          }
+        }
+      }
+
+      // 2. Try inline text trong parts
+      for (const part of parts) {
+        if (part?.text) return String(part.text);
+      }
+
+      // 3. Try response.text() như last resort
+      try {
+        const text = response.text?.();
+        if (text) return text;
+      } catch {
+        // Ignore
+      }
+
+      return '';
+    } catch (err) {
+      console.error('[RAG] Manual parse failed:', err instanceof Error ? err.message : err);
+      return '';
     }
   }
 
@@ -555,10 +617,132 @@ ${historyStr}
 
     // Nếu không có filter hoặc không priority → trả về primary hoặc search toàn bộ
     if (!filter) {
-      return await vectorStore.search(userQuery, topK);
+      const noFilterResults = await vectorStore.search(userQuery, topK);
+      if (noFilterResults.length > 0) return noFilterResults;
+      return await this.sqliteFallback(userQuery, topK);
+    }
+
+    // Nếu filter search rỗng mà priority=false → fallback SQLite
+    if (primary.length === 0) {
+      return await this.sqliteFallback(userQuery, topK, { botId, madaCategory });
     }
 
     return primary;
+  }
+
+  /**
+   * Fallback: SELECT trực tiếp từ SQLite knowledge_items bằng LIKE keyword
+   * Dùng khi vector store rỗng hoặc không match được.
+   * Score đơn giản: count keyword matches trong title + content.
+   */
+  private async sqliteFallback(
+    userQuery: string,
+    topK: number,
+    filter?: { botId?: string; madaCategory?: string }
+  ): Promise<any[]> {
+    try {
+      const query = userQuery.trim();
+      if (!query || query.length < 2) return [];
+
+      // Tách keywords (loại bỏ stop words)
+      const stopWords = new Set(['là', 'gì', 'có', 'cho', 'tôi', 'bạn', 'của', 'và', 'thì', 'mà', 'được', 'không', 'này', 'kia', 'với', 'từ', 'trong', 'một', 'những', 'các']);
+      const keywords = query.toLowerCase()
+        .split(/\s+/)
+        .filter(w => w.length > 2 && !stopWords.has(w))
+        .slice(0, 8);
+
+      if (keywords.length === 0) return [];
+
+      // Build SQL: mỗi keyword là 1 điều kiện LIKE, score = số match
+      const likeConditions = keywords.map(() => '(LOWER(title) LIKE ? OR LOWER(content) LIKE ?)').join(' OR ');
+      const likeParams = keywords.flatMap(k => [`%${k}%`, `%${k}%`]);
+
+      // Map botId/category từ filter (nếu có)
+      let categoryFilter = '';
+      const catFilterParams: string[] = [];
+      if (filter?.madaCategory) {
+        // Cho phép partial match vì DB có cả 'sensory-vision' và 'vision'
+        const aliases = this.expandCategoryAliases(filter.madaCategory);
+        if (aliases.length > 0) {
+          categoryFilter = ` AND (${aliases.map(() => 'category = ?').join(' OR ')})`;
+          catFilterParams.push(...aliases);
+        }
+      }
+
+      const sql = `
+        SELECT id, title, content, source, category, metadata,
+          (${keywords.map(() => 'CASE WHEN LOWER(title) LIKE ? THEN 2 ELSE 0 END + CASE WHEN LOWER(content) LIKE ? THEN 1 ELSE 0 END').join(' + ')}) as score
+        FROM knowledge_items
+        WHERE source_type = 'web'
+          AND (${likeConditions})
+          ${categoryFilter}
+        ORDER BY score DESC, length(content) DESC
+        LIMIT ?
+      `;
+
+      // Params: score weight params + like params + category params + limit
+      const scoreParams = keywords.flatMap(() => ['%' + keywords.join('%') + '%', '%' + keywords.join('%') + '%']);
+      // Loại bỏ score params vì SQL trên dùng placeholder lặp, đơn giản hóa:
+      const simpleSql = `
+        SELECT id, title, content, source, category, metadata,
+          (${keywords.map(() => '(CASE WHEN LOWER(title) LIKE ? THEN 2 ELSE 0 END + CASE WHEN LOWER(content) LIKE ? THEN 1 ELSE 0 END)').join(' + ')}) as match_score
+        FROM knowledge_items
+        WHERE source_type = 'web'
+          AND (${likeConditions})
+          ${categoryFilter}
+        ORDER BY match_score DESC
+        LIMIT ?
+      `;
+      const allParams: any[] = [];
+      keywords.forEach(k => {
+        allParams.push(`%${k}%`, `%${k}%`);
+      });
+      allParams.push(...likeParams);
+      allParams.push(...catFilterParams);
+      allParams.push(topK);
+
+      const rows = db.prepare(simpleSql).all(...allParams) as any[];
+
+      console.log(`🗄️ [SQLite fallback] ${rows.length} docs for: "${query.slice(0, 50)}..."`);
+
+      return rows.map((row, i) => {
+        let meta: any = {};
+        try {
+          meta = typeof row.metadata === 'string' ? JSON.parse(row.metadata || '{}') : (row.metadata || {});
+        } catch { meta = {}; }
+
+        return {
+          id: row.id,
+          content: row.content?.slice(0, 4000) || row.title,
+          score: 0.3 + (i === 0 ? 0.2 : 0), // baseline score 0.3-0.5
+          metadata: {
+            source: row.source || '',
+            type: 'web',
+            title: row.title || '',
+            category: row.category || 'general',
+            ...meta,
+          },
+        };
+      });
+    } catch (err) {
+      console.warn('⚠️ [SQLite fallback] failed:', (err as Error).message);
+      return [];
+    }
+  }
+
+  /** Map filter category sang nhiều alias có thể có trong DB */
+  private expandCategoryAliases(cat: string): string[] {
+    const map: Record<string, string[]> = {
+      'vision': ['vision', 'sensory-vision'],
+      'hearing': ['hearing', 'sensory-hearing'],
+      'mobility': ['mobility', 'mobility-transportation', 'neuromusculoskeletal-movement'],
+      'communication': ['communication', 'voice-and-speech'],
+      'cognition': ['cognition', 'mental-cognitive'],
+      'daily_living': ['general', 'daily_living'],
+      'education': ['education', 'general'],
+      'general': ['general'],
+    };
+    return map[cat] || [cat];
   }
 }
 

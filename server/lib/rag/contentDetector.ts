@@ -163,8 +163,7 @@ class ContentDetector {
         },
         suggestedCategory: parsed.whoGateCategory,
         rawAnalysis: JSON.stringify(parsed),
-        };
-      }
+      };
     } catch (error) {
       console.error('Content detection error:', error);
     }

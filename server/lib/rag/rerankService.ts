@@ -121,25 +121,50 @@ export class RerankService {
         const result = await model.generateContent(prompt);
         const response = result.response;
 
-        // Try structured JSON first
-        if (response.functionCalls?.length > 0) {
-          const fnCall = response.functionCalls()[0];
-          if (fnCall.name === 'rerank_response') {
-            scores = fnCall.args.scores || [];
+        // Try structured JSON first (functionCall)
+        try {
+          if (response.functionCalls && typeof response.functionCalls === 'function') {
+            const fnCalls = response.functionCalls();
+            if (Array.isArray(fnCalls) && fnCalls.length > 0) {
+              const fnCall = fnCalls[0];
+              if (fnCall.name === 'rerank_response' && fnCall.args?.scores) {
+                scores = fnCall.args.scores;
+              }
+            }
           }
+        } catch {
+          // ignore - manual parse fallback
         }
 
         // Fallback: if no structured response, parse text
         if (scores.length === 0) {
-          const text = response.text().trim();
-          scores = this.parseScores(text, items.length);
+          try {
+            const text = response.text().trim();
+            if (text) {
+              scores = this.parseScores(text, items.length);
+            }
+          } catch {
+            // response.text() may throw - ignore
+          }
         }
       } catch (schemaError: any) {
         // Schema failed - fallback to text parsing
         console.warn('⚠️ Rerank schema parsing failed, using text fallback:', schemaError.message?.slice(0, 80));
-        const result = await model.generateContent(prompt);
-        const text = result.response.text().trim();
-        scores = this.parseScores(text, items.length);
+        try {
+          const result = await model.generateContent(prompt);
+          const text = result.response.text().trim();
+          if (text) {
+            scores = this.parseScores(text, items.length);
+          }
+        } catch {
+          // ignore - use fallback below
+        }
+      }
+
+      // Nếu vẫn không có scores, dùng fallback ranking
+      if (scores.length === 0) {
+        console.warn('⚠️ RerankService: No scores extracted, falling back to original scores');
+        return this.fallbackRank(items, cfg);
       }
 
       // Map scores vào items, sort theo rerank score
@@ -274,5 +299,35 @@ QUAN TRỌNG: Chỉ trả về JSON object, không thêm markdown code block hay
   }
 }
 
-// Singleton instance
-export const rerankService = new RerankService();
+// Lazy singleton - chỉ initialize khi GEMINI_API_KEY đã load (sau dotenv.config())
+// Fix cho bug: imports chạy trước dotenv → process.env.GEMINI_API_KEY rỗng khi constructor chạy
+let _rerankServiceInstance: RerankService | null = null;
+
+export const rerankService = {
+  rerank<T extends RerankableItem>(items: T[], query: string, config?: Partial<RerankConfig>): Promise<RerankResult<T>[]> {
+    if (!_rerankServiceInstance) {
+      _rerankServiceInstance = new RerankService();
+    }
+    return _rerankServiceInstance.rerank(items, query, config);
+  },
+  /**
+   * Check ready. Trả về true nếu instance đã init + có Gemini client
+   */
+  isReady(): boolean {
+    if (!_rerankServiceInstance) {
+      // Lazy init: tạo instance để xem API key có không
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (apiKey && apiKey !== 'your_gemini_api_key_here') {
+        _rerankServiceInstance = new RerankService();
+        return _rerankServiceInstance.isReady();
+      }
+      return false;
+    }
+    return _rerankServiceInstance.isReady();
+  },
+  initialize(config?: Partial<RerankConfig>): void {
+    if (!_rerankServiceInstance) {
+      _rerankServiceInstance = new RerankService(config);
+    }
+  },
+};

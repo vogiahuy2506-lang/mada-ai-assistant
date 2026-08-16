@@ -2,6 +2,8 @@
 @tailwind components;
 @tailwind utilities;
 
+@import './styles/accessibility.css';
+
 @layer base {
   html {
     font-family: 'Inter', sans-serif;

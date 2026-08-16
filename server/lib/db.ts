@@ -404,6 +404,59 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_chat_metrics_date ON chat_metrics(date);
 `);
 
+// ============== USER CHAT HISTORY & FAVORITES SCHEMA ==============
+
+db.exec(`
+  -- Bảng conversations: Mỗi cuộc hội thoại (group nhiều messages)
+  CREATE TABLE IF NOT EXISTS chat_conversations (
+    id TEXT PRIMARY KEY,
+    user_id TEXT,                  -- NULL nếu anonymous
+    title TEXT NOT NULL,
+    agent_id TEXT,
+    language TEXT NOT NULL DEFAULT 'vi',
+    message_count INTEGER NOT NULL DEFAULT 0,
+    last_message_preview TEXT,
+    is_pinned INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+
+  -- Bảng chat_messages: Từng message trong conversation
+  CREATE TABLE IF NOT EXISTS chat_messages (
+    id TEXT PRIMARY KEY,
+    conversation_id TEXT NOT NULL,
+    role TEXT NOT NULL CHECK (role IN ('user', 'assistant', 'system')),
+    content TEXT NOT NULL,
+    agent_id TEXT,
+    sources TEXT,                  -- JSON string mảng sources
+    confidence REAL,
+    language TEXT,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (conversation_id) REFERENCES chat_conversations(id) ON DELETE CASCADE
+  );
+
+  -- Bảng user_favorites: Sản phẩm / KB items user bookmark
+  CREATE TABLE IF NOT EXISTS user_favorites (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    item_type TEXT NOT NULL CHECK (item_type IN ('product', 'kb_item', 'standard')),
+    item_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    metadata TEXT,                 -- JSON string
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    UNIQUE(user_id, item_type, item_id)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_conv_user ON chat_conversations(user_id);
+  CREATE INDEX IF NOT EXISTS idx_conv_updated ON chat_conversations(updated_at);
+  CREATE INDEX IF NOT EXISTS idx_conv_pinned ON chat_conversations(is_pinned);
+  CREATE INDEX IF NOT EXISTS idx_messages_conv ON chat_messages(conversation_id);
+  CREATE INDEX IF NOT EXISTS idx_messages_created ON chat_messages(created_at);
+  CREATE INDEX IF NOT EXISTS idx_favorites_user ON user_favorites(user_id);
+`);
+
 console.log('✅ Schema created');
 
 // ============== SEED ADMIN ==============

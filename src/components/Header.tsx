@@ -26,10 +26,9 @@ export function Header() {
 
   // Navigation links với translation
   const navLinks = [
-    { href: '#features', label: t('nav.model', language) },
-    { href: '#how-it-works', label: t('nav.intelligence', language) },
-    { href: '#standards', label: t('nav.standards', language) },
-    { href: '#ecosystem', label: t('nav.connect', language) },
+    { href: '/products', label: 'Sản phẩm' },
+    { href: '/search', label: 'Tìm kiếm' },
+    { href: '/compare', label: 'So sánh' },
     { href: '/pricing', label: t('nav.pricing', language) },
   ];
 

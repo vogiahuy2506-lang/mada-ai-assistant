@@ -1,5 +1,6 @@
 import express from 'express';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -7,32 +8,40 @@ const __dirname = path.dirname(__filename);
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { v4 as uuidv4 } from 'uuid';
-import path from 'path';
-import fs from 'fs';
 import session from 'express-session';
 
 // ============== HELPERS ==============
-// Fallback images for products without MADA thumbnails
-const FALLBACK_IMAGES: Record<string, string> = {
-  'victor-reader-stratus4-m-daisy-and-mp3-player': 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/6c/Media-player.svg/200px-Media-player.svg.png',
-};
 
-// Convert MADA image URL to proxy URL to avoid hotlink protection
-// If no MADA image, try to get fallback image
-function toProxyImageUrl(madaUrl: string, slug?: string): string {
-  if (madaUrl && madaUrl.includes('mada.org.qa')) {
+/**
+ * Convert MADA image URL to proxy URL to avoid hotlink protection.
+ * Returns EMPTY string if no MADA image available - frontend will show
+ * a clean placeholder icon instead of fake/random images.
+ *
+ * RATIONALE: We do NOT use generic fallback images (Unsplash, etc.) because:
+ *  - Users see random unrelated photos → confusing, breaks trust
+ *  - It hides real data quality issues
+ *  - MADA Qatar has its own product images we must scrape properly
+ *
+ * @param madaUrl - The original image URL from MADA (can be empty)
+ * @returns Proxy URL string, or '' if no image (frontend handles placeholder)
+ */
+function toProxyImageUrl(madaUrl: string): string {
+  // Only accept valid MADA URLs
+  if (madaUrl && typeof madaUrl === 'string' && madaUrl.startsWith('http')) {
+    if (madaUrl.includes('mada.org.qa') || madaUrl.includes('cdn.at.mada.org.qa')) {
+      return `/api/mada-image?url=${encodeURIComponent(madaUrl)}`;
+    }
+    // Other trusted URLs (cdn uploads) → use proxy too
     return `/api/mada-image?url=${encodeURIComponent(madaUrl)}`;
   }
-  // Try fallback image
-  if (slug && FALLBACK_IMAGES[slug]) {
-    return FALLBACK_IMAGES[slug];
-  }
+  // No image → return empty string, frontend shows placeholder
   return '';
 }
 
 // RAG imports
 import { vectorStore } from './lib/rag/vectorStore';
 import { ragEngine } from './lib/rag/ragEngine';
+import { ragService } from './lib/rag/rag.service'; // ⭐ Seed data service
 import { dataIngestion } from './lib/rag/dataIngestion';
 import type { DataSource } from './lib/rag/dataIngestion';
 import { guardrails } from './lib/guardrails';
@@ -45,6 +54,7 @@ import './lib/db'; // Initialize DB
 import db from './lib/db';
 import authRoutes from './routes/auth';
 import userRoutes from './routes/users';
+import userHistoryRoutes from './routes/userHistory';
 import kbRoutes from './routes/knowledgeBase';
 import scraperRoutes from './routes/scraper';
 import madaScraperRoutes from './routes/mada-scraper';
@@ -54,6 +64,8 @@ import paymentRoutes from './routes/payments';
 import productsRoutes from './routes/products';
 import consultationRoutes from './routes/consultation';
 import adminRoutes from './routes/admin';
+import urlImportRoutes from './routes/urlImport';
+import publicRoutes from './routes/public';
 
 // Load .env from project root (mada-ai-assistant/.env), not just cwd
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
@@ -303,6 +315,7 @@ app.use(cors({
 // ============== AUTH ROUTES ==============
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/user', userHistoryRoutes);
 app.use('/api/kb', kbRoutes);
 app.use('/api/scraper', scraperRoutes);
 app.use('/api/payments', paymentRoutes);
@@ -312,40 +325,67 @@ app.use('/api/admin/products', productsRoutes);
 // Proxy requests to MADA images to avoid hotlink protection
 app.get('/api/mada-image', async (req, res) => {
   const { url } = req.query;
-  
+
   if (!url || typeof url !== 'string') {
     return res.status(400).json({ error: 'Missing url parameter' });
   }
-  
-  // Validate URL is from MADA
-  if (!url.includes('mada.org.qa')) {
-    return res.status(400).json({ error: 'Only MADA images are allowed' });
+
+  // Validate URL is allowed
+  // Chấp nhận: mada.org.qa (MADA gốc), cdn.at.mada.org.qa, cdn.mada.org.qa, plus các shop VN hợp lệ
+  const allowedHosts = [
+    'mada.org.qa',
+    'cdn.at.mada.org.qa',
+    'cdn.mada.org.qa',
+    'at.mada.org.qa',
+    // Shop VN phổ biến - nhiều SP AT nhập từ shop VN
+    'cdn.tgdd.vn',
+    'cdn.cellphones.com.vn',
+    'cdn.fptshop.com.vn',
+    'images.fpt.shop',
+    'cdn.dienmayxanh.com',
+    'img.dienmayxanh.com',
+    'product.hstatic.net',
+    'cdn.viettelstore.vn',
+  ];
+  const isAllowed = allowedHosts.some((host) => url.includes(host));
+  if (!isAllowed) {
+    return res.status(400).json({
+      error: 'URL không được phép',
+      detail: `Chỉ chấp nhận: ${allowedHosts.join(', ')}`,
+    });
   }
-  
+
   try {
     const response = await fetch(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
         'Referer': 'https://at.mada.org.qa/',
-      }
+      },
+      // ⭐ Timeout để tránh stuck
+      signal: AbortSignal.timeout(10000), // 10s
     });
-    
+
     if (!response.ok) {
-      return res.status(404).json({ error: 'Image not found' });
+      console.warn(`[mada-image] upstream ${response.status}: ${url}`);
+      return res.status(404).json({ error: 'Image not found at upstream', upstream: response.status });
     }
-    
+
     const buffer = await response.arrayBuffer();
     const contentType = response.headers.get('content-type') || 'image/jpeg';
-    
+
     res.setHeader('Content-Type', contentType);
     res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache for 1 day
     res.setHeader('Access-Control-Allow-Origin', '*');
-    
+    res.setHeader('X-MADA-Proxy', 'true');
+    res.setHeader('X-Cache-Buster', Date.now().toString());
     res.send(Buffer.from(buffer));
   } catch (err: any) {
-    console.error('MADA image proxy error:', err);
-    res.status(500).json({ error: 'Failed to fetch image' });
+    console.error(`[mada-image] proxy error: ${url}`, err.message);
+    if (err.name === 'TimeoutError') {
+      return res.status(504).json({ error: 'Upstream timeout' });
+    }
+    return res.status(502).json({ error: 'Proxy failed', detail: err.message });
   }
 });
 
@@ -389,10 +429,13 @@ logActivity('info', 'CORS policy: any localhost port allowed (dev)', 'Security')
 // ============== ADMIN ROUTES ==============
 app.use('/api/scraper', scraperRoutes);
 app.use('/api/scraper', scraperScheduleRoutes);
+app.use('/api/scraper', urlImportRoutes);
 app.use('/api/mada-scraper', madaScraperRoutes);
 app.use('/api/admin', approvalRoutes);
 app.use('/api/consultation', consultationRoutes);
 app.use('/api/admin', adminRoutes);
+// Public routes (no auth required)
+app.use('/api/public', publicRoutes);
 app.get('/api/admin/logs', async (req, res) => {
   try {
     const { level, source, limit = '100' } = req.query;
@@ -572,6 +615,78 @@ app.use((err: any, _req: any, res: any, _next: any) => {
 // Initialize RAG on startup
 let ragInitialized = false;
 
+/**
+ * Sync all knowledge_items từ SQLite → vector store khi khởi động.
+ * Fix bug "không tìm thấy trong CSDL" vì 358 items không được auto-sync.
+ * Lý do: trước đó chỉ sync items có status='published', nhưng data scrape hiện tại
+ * toàn 'draft' → vector store rỗng.
+ */
+async function syncKnowledgeBaseToVectorStore(): Promise<void> {
+  try {
+    const db = (await import('./lib/db')).default;
+
+    // Lấy TẤT CẢ items có content (bất kể status - vì draft vẫn cần search được)
+    const items = db.prepare(`
+      SELECT id, title, content, source, source_type, category, metadata, language
+      FROM knowledge_items
+      WHERE content IS NOT NULL AND length(content) > 20
+      LIMIT 500
+    `).all() as any[];
+
+    if (items.length === 0) {
+      console.log('📚 [Sync KB] No items to sync');
+      return;
+    }
+
+    console.log(`📚 [Sync KB] Syncing ${items.length} items to vector store...`);
+
+    const documents = items.map((item) => {
+      let meta: any = {};
+      try {
+        meta = typeof item.metadata === 'string' ? JSON.parse(item.metadata || '{}') : (item.metadata || {});
+      } catch { meta = {}; }
+
+      return {
+        id: item.id,
+        content: `${item.title}\n\n${item.content}`.slice(0, 4000),
+        metadata: {
+          source: item.source || '',
+          type: item.source_type || 'web',
+          title: item.title || '',
+          category: item.category || 'general',
+          ...meta,
+        },
+      };
+    });
+
+    // Bulk add - tự chunk để tránh rate limit
+    const CHUNK_SIZE = 20;
+    let synced = 0;
+    for (let i = 0; i < documents.length; i += CHUNK_SIZE) {
+      const chunk = documents.slice(i, i + CHUNK_SIZE);
+      try {
+        await vectorStore.addDocuments(chunk);
+        synced += chunk.length;
+        if (i % 100 === 0) {
+          console.log(`   ${synced}/${documents.length}...`);
+        }
+      } catch (err) {
+        console.warn(`   ⚠️ Chunk ${i}-${i + CHUNK_SIZE} failed:`, (err as Error).message);
+      }
+    }
+
+    // Đánh dấu indexed=1
+    const stmt = db.prepare('UPDATE knowledge_items SET indexed = 1, indexed_at = ? WHERE id = ?');
+    for (const item of items) {
+      stmt.run(new Date().toISOString(), item.id);
+    }
+
+    console.log(`✅ [Sync KB] Done! ${synced}/${documents.length} items indexed in vector store`);
+  } catch (err) {
+    console.error('❌ [Sync KB] Failed:', (err as Error).message);
+  }
+}
+
 async function initializeServices() {
   try {
     await vectorStore.initialize();
@@ -580,7 +695,10 @@ async function initializeServices() {
     ragInitialized = true;
     console.log('🚀 RAG system ready');
     console.log('🛡️ Guardrails system ready');
-    
+
+    // ⭐ Auto-sync SQLite → vector store để search hoạt động
+    await syncKnowledgeBaseToVectorStore();
+
     // Start scraping scheduler
     startScheduler();
   } catch (error) {
@@ -1898,6 +2016,132 @@ function detectMessageLanguage(message: string): 'vi' | 'en' | 'ar' | 'fr' {
   return 'en';
 }
 
+/**
+ * Detect language của AI response (verify AI có tuân thủ system instruction không)
+ * Returns language code nếu detect được, hoặc 'unknown' nếu không rõ ràng.
+ */
+function detectAnswerLanguage(answer: string): 'vi' | 'en' | 'ar' | 'fr' | 'unknown' {
+  const text = (answer || '').trim();
+  if (!text || text.length < 10) return 'unknown';
+
+  // Arabic: Arabic chars > 30% → Arabic
+  const arabicChars = (text.match(/[\u0600-\u06FF]/g) || []).length;
+  const totalChars = text.length;
+  if (arabicChars / totalChars > 0.3) return 'ar';
+
+  // Vietnamese: có Vietnamese diacritics (ư, ơ, đ, etc)
+  const viDiacritics = /[ăâđêôơưĂÂĐÊÔƠƯàáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹ]/;
+  if (viDiacritics.test(text)) return 'vi';
+
+  // French: French common words (≥2 match)
+  const frCommon = /\b(le|la|les|un|une|des|du|de|et|ou|est|sont|avec|pour|sans|dans|sur|sous|tres|aussi|etre|avoir|faire|aller|venir|voir|savoir|prendre|parler)\b/i;
+  const frMatches = (text.match(frCommon) || []).length;
+  if (frMatches >= 2) return 'fr';
+
+  // English: default nếu có Latin chars
+  if (/[a-zA-Z]/.test(text)) return 'en';
+
+  return 'unknown';
+}
+
+/**
+ * Verify AI response có đúng ngôn ngữ UI không.
+ * Returns true nếu response đúng ngôn ngữ mong đợi, false nếu sai.
+ */
+function isAnswerInExpectedLanguage(answer: string, expectedLang: 'vi' | 'en' | 'ar' | 'fr'): boolean {
+  const detected = detectAnswerLanguage(answer);
+  if (detected === 'unknown') return true; // Không chắc chắn → assume OK
+  return detected === expectedLang;
+}
+
+/**
+ * ⭐ SYSTEM PROMPT ĐẦY ĐỦ CHO TẤT CẢ 4 NGÔN NGỮ (VI/EN/AR/FR)
+ * Dùng chung cho /api/chat, /api/chat-with-file, /api/chat/stream
+ * Có structured rules + emergency injection nếu AI trả sai ngôn ngữ
+ */
+const FULL_LANGUAGE_INSTRUCTIONS: Record<string, string> = {
+  vi: `🚨 QUY TẮC NGÔN NGỮ BẮT BUỘC - BẠN PHẢI TUÂN THỦ 🚨
+Bạn là trợ lý ảo MADA - chuyên gia về Công nghệ Hỗ trợ (AT).
+Người dùng đã chọn giao diện TIẾNG VIỆT.
+→ BẠN PHẢI trả lời 100% bằng TIẾNG VIỆT cho câu trả lời này.
+→ KHÔNG ĐƯỢC trả lời bằng bất kỳ ngôn ngữ nào khác (Arabic, English, French, v.v.).
+→ Kể cả khi câu hỏi của người dùng bằng ngôn ngữ khác, bạn VẪN phải trả lời bằng TIẾNG VIỆT.
+→ Nếu thông tin trong cơ sở tri thức bằng ngôn ngữ khác, hãy DỊCH sang TIẾNG VIỆT.
+→ Bạn PHẢI có dấu tiếng Việt đầy đủ (Bạn, được, không, các, v.v.) - KHÔNG được viết không dấu.
+Vi phạm = lỗi nghiêm trọng.`,
+
+  en: `🚨 MANDATORY LANGUAGE RULE - YOU MUST COMPLY 🚨
+You are MADA AI assistant - an Assistive Technology (AT) specialist.
+The user has selected the ENGLISH interface.
+→ You MUST respond 100% in ENGLISH for this answer.
+→ DO NOT respond in any other language (Vietnamese, Arabic, French, etc.).
+→ Even if the user's question is in another language, you STILL respond in ENGLISH.
+→ If knowledge base info is in another language, TRANSLATE it to ENGLISH.
+Violation = critical error.`,
+
+  ar: `🚨 قاعدة اللغة الإلزامية - يجب الامتثال 🚨
+أنت مساعد MADA الذكي - متخصص في التكنولوجيا المساعدة (AT).
+المستخدم قد اختار واجهة اللغة العربية.
+→ يجب أن ترد 100% بالعربية في هذا الرد.
+→ لا ترد بأي لغة أخرى (الفيتنامية، الإنجليزية، الفرنسية، إلخ).
+→ حتى لو كان سؤال المستخدم بلغة أخرى، يجب أن ترد بالعربية.
+→ إذا كانت المعلومات في قاعدة المعرفة بلغة أخرى، ترجمها إلى العربية.
+المخالفة = خطأ جسيم.`,
+
+  fr: `🚨 RÈGLE LINGUISTIQUE OBLIGATOIRE - VOUS DEVEZ RESPECTER 🚨
+Vous êtes l'assistant MADA - un spécialiste en Technologie d'Assistance (TA).
+L'utilisateur a sélectionné l'interface FRANÇAISE.
+→ Vous DEVEZ répondre 100% en FRANÇAIS pour cette réponse.
+→ NE répondez PAS dans une autre langue (vietnamien, anglais, arabe, etc.).
+→ Même si la question est dans une autre langue, vous répondez quand même en FRANÇAIS.
+→ Si les infos de la base sont dans une autre langue, TRADUISEZ-les en FRANÇAIS.
+Violation = erreur critique.`,
+};
+
+/**
+ * Lấy system instruction chuẩn cho ngôn ngữ (fallback về 'vi' nếu unknown).
+ * Có thể append agentPrompt sau (optional).
+ */
+function getSystemInstruction(lang: string, agentPrompt?: string): string {
+  const langCode = (['vi', 'en', 'ar', 'fr'].includes(lang) ? lang : 'vi') as 'vi' | 'en' | 'ar' | 'fr';
+  const base = FULL_LANGUAGE_INSTRUCTIONS[langCode];
+  return agentPrompt ? `${base}\n\n${agentPrompt}` : base;
+}
+
+/**
+ * ⭐ Multi-language UI strings cho suggestedProducts match_reason
+ * Giúp user ở ngôn ngữ nào cũng hiểu được lý do sản phẩm được gợi ý
+ */
+const MATCH_REASON_I18N: Record<string, { found: string; category: (cat: string) => string; matched: (n: number) => string }> = {
+  vi: {
+    found: 'Tìm thấy trong MADA Knowledge Base',
+    category: (cat) => `Phù hợp category: ${cat}`,
+    matched: (n) => `${n} sản phẩm phù hợp`,
+  },
+  en: {
+    found: 'Found in MADA Knowledge Base',
+    category: (cat) => `Matched category: ${cat}`,
+    matched: (n) => `${n} matching products`,
+  },
+  ar: {
+    found: 'تم العثور عليها في قاعدة معرفة MADA',
+    category: (cat) => `فئة متطابقة: ${cat}`,
+    matched: (n) => `${n} منتجات مطابقة`,
+  },
+  fr: {
+    found: 'Trouvé dans la base de connaissances MADA',
+    category: (cat) => `Catégorie correspondante: ${cat}`,
+    matched: (n) => `${n} produits correspondants`,
+  },
+};
+
+function getMatchReason(lang: string, kind: 'found' | 'category', context?: string): string {
+  const langCode = (['vi', 'en', 'ar', 'fr'].includes(lang) ? lang : 'vi') as 'vi' | 'en' | 'ar' | 'fr';
+  const dict = MATCH_REASON_I18N[langCode];
+  if (kind === 'found') return dict.found;
+  return dict.category(context || '');
+}
+
 // ============== CHAT ENDPOINTS ==============
 
 app.post('/api/chat', async (req, res) => {
@@ -1955,16 +2199,8 @@ app.post('/api/chat', async (req, res) => {
     }
     chatHistory.get(convId)!.push({ role: 'user', content: message });
 
-    // Build system instruction based on DETECTED LANGUAGE (not UI language!)
-    const languageInstructions: Record<string, string> = {
-      vi: 'Bạn là trợ lý ảo MADA - chuyên gia về Công nghệ Hỗ trợ (AT). Hãy trả lời BẰNG TIẾNG VIỆT cho tất cả câu trả lời. Không trả lời bằng ngôn ngữ khác.',
-      en: 'You are MADA AI assistant - an Assistive Technology (AT) specialist. Respond in ENGLISH only. Never respond in any other language.',
-      ar: 'أنت مساعد MADA الذكي - متخصص في التكنولوجيا المساعدة (AT). أجب بالعربية فقط. لا تجب بلغة أخرى.',
-      fr: 'Vous êtes l\'assistant MADA - un spécialiste en Technologie d\'Assistance (TA). Répondez en FRANÇAIS uniquement. Ne répondez jamais dans une autre langue.',
-    };
-    
-    const baseInstruction = languageInstructions[effectiveLanguage] || languageInstructions.vi;
-    const agentInstruction = agentPrompt ? `${baseInstruction} ${agentPrompt}` : baseInstruction;
+    // ⭐ Dùng full language instruction chung (DRY)
+    const agentInstruction = getSystemInstruction(effectiveLanguage, agentPrompt);
 
     // ⭐ MỚI: Lấy botId/madaCategory từ agentId
     const madaMapping = agentId ? AGENT_TO_MADA[agentId] : null;
@@ -1978,6 +2214,36 @@ app.post('/api/chat', async (req, res) => {
 
     // Query RAG engine with agent context
     const ragResponse = await ragEngine.query(message, chatHistory.get(convId) || [], ragConfig);
+
+    // 🚨 POST-VALIDATION: Verify AI response đúng ngôn ngữ UI không
+    // Nếu sai → retry với stronger instruction
+    let finalAnswer = ragResponse.answer;
+    let retryCount = 0;
+    const maxRetries = 2;
+
+    while (
+      retryCount < maxRetries &&
+      finalAnswer &&
+      !isAnswerInExpectedLanguage(finalAnswer, effectiveLanguage as 'vi' | 'en' | 'ar' | 'fr')
+    ) {
+      retryCount++;
+      console.warn(
+        `[Chat] ⚠️ Response not in expected language (${effectiveLanguage}), retry #${retryCount} with stronger prompt...`
+      );
+
+      // Tạo stronger prompt với explicit warning
+      const strongerInstruction = `${agentInstruction}\n\n⚠️ CRITICAL REMINDER: The UI language is ${effectiveLanguage.toUpperCase()}. Your previous response was in WRONG language. Respond ONLY in ${effectiveLanguage.toUpperCase()} NOW.`;
+
+      const retryConfig = { ...ragConfig, systemInstruction: strongerInstruction };
+      const retryResponse = await ragEngine.query(message, chatHistory.get(convId) || [], retryConfig);
+      finalAnswer = retryResponse.answer;
+
+      // Update sources/confidence từ retry attempt cuối
+      ragResponse.sources = retryResponse.sources;
+      ragResponse.confidence = retryResponse.confidence;
+    }
+
+    ragResponse.answer = finalAnswer;
 
     // Validate response with guardrails
     if (!guardrails.validateResponse(ragResponse.answer)) {
@@ -2016,23 +2282,25 @@ app.post('/api/chat', async (req, res) => {
         suggestedProducts = ragSources.slice(0, 4).map((src: any, idx: number) => {
           const meta = src.metadata || {};
           const sourceUrl = meta.source || meta.url || src.source || '';
-          // Lấy thumbnail từ map, fallback vào empty string
-          const thumbnail = thumbnailMap[sourceUrl] || '';
-          
+          // Ưu tiên thumbnailUrl trong metadata (vector store copy từ DB)
+          // Sau đó mới đến DB lookup theo sourceUrl
+          let thumbnail = meta.thumbnailUrl || thumbnailMap[sourceUrl] || '';
+          const category = meta.category || 'general';
+
           return {
             id: src.id || `src-${idx}`,
             title: meta.title || 'Assistive Technology',
             title_en: meta.title,
             description: (src.content || '').slice(0, 200),
             description_en: (src.content || '').slice(0, 200),
-            category: meta.category || 'hearing',
+            category,
             brand: meta.brand || 'MADA Qatar AT Portal',
             price_range: 'Contact MADA Center',
             product_url: sourceUrl,
             source_url: sourceUrl,
             image_url: toProxyImageUrl(thumbnail),
             confidence: src.score,
-            match_reason: 'Tìm thấy trong MADA Knowledge Base',
+            match_reason: getMatchReason(effectiveLanguage, 'found'),
           };
         });
         console.log('🔵 /api/chat Suggested from RAG sources:', suggestedProducts.length, 'with thumbnails:', suggestedProducts.filter((p: any) => p.image_url).length);
@@ -2093,6 +2361,15 @@ app.post('/api/chat', async (req, res) => {
                 match_reason: `Phù hợp category: ${detectedCat}`,
               };
             });
+            
+            // ⭐ DEDUPLICATE: Chỉ giữ lại sản phẩm duy nhất theo product_url
+            const seenUrls = new Set<string>();
+            suggestedProducts = suggestedProducts.filter((p: any) => {
+              if (seenUrls.has(p.product_url)) return false;
+              seenUrls.add(p.product_url);
+              return true;
+            });
+            
             console.log('🔵 /api/chat Suggested from MADA KB items:', suggestedProducts.length);
           } catch (dbErr) {
             console.log('⚠️ DB query for MADA items failed:', dbErr);
@@ -2130,7 +2407,7 @@ app.post('/api/chat', async (req, res) => {
               source_url: url,
               image_url: toProxyImageUrl(thumbnail),
               confidence: 0.6,
-              match_reason: 'Sản phẩm từ MADA Knowledge Base',
+              match_reason: getMatchReason(effectiveLanguage, 'found'),
             };
           });
           console.log('🔵 /api/chat Suggested from random MADA:', suggestedProducts.length);
@@ -2397,12 +2674,13 @@ ${promptTemplate.respondNow}`;
 
     // Query RAG - Dùng system prompt khác khi có file đính kèm
     const languageInstructions: Record<string, string> = {
-      vi: 'Ban la tro ly AI MADA ho tro phan tich tai lieu. Hay tra loi CHI TIET va DAY DU tieng Viet.',
+      // ⭐ Fix: Tiếng Việt CÓ DẤU đầy đủ (trước đây viết không dấu)
+      vi: 'Bạn là trợ lý AI MADA hỗ trợ phân tích tài liệu. Hãy trả lời CHI TIẾT và ĐẦY ĐỦ bằng tiếng Việt, có dấu đầy đủ.',
       en: 'You are MADA AI assistant for document analysis. Respond in English. Answer DETAILED and COMPLETE.',
       ar: 'أنت مساعد MADA الذكي لتحليل المستندات. أجب دائمًا باللغة العربية وبالتفصيل.',
       fr: 'Vous êtes l\'assistant MADA pour l\'analyse de documents. Répondez en français et en détail.',
     };
-    
+
     const langInstruction = languageInstructions[effectiveLanguage] || languageInstructions.vi;
     
     const ragConfig: any = {};
@@ -2447,22 +2725,33 @@ ${promptTemplate.respondNow}`;
         suggestedProducts = ragSources.slice(0, 4).map((src: any, idx: number) => {
           const meta = src.metadata || {};
           const sourceUrl = meta.source || meta.url || src.source || '';
+          const category = meta.category || 'general';
+          const thumbnail = meta.thumbnailUrl || thumbnailMap[sourceUrl] || '';
           return {
             id: src.id || `src-${idx}`,
             title: meta.title || 'Assistive Technology',
             title_en: meta.title,
             description: (src.content || '').slice(0, 200),
             description_en: (src.content || '').slice(0, 200),
-            category: meta.category || 'hearing',
+            category,
             brand: meta.brand || 'MADA Qatar AT Portal',
             price_range: 'Contact MADA Center',
             product_url: sourceUrl,
             source_url: sourceUrl,
-            image_url: toProxyImageUrl(thumbnailMap[sourceUrl] || ''),
+            image_url: toProxyImageUrl(thumbnail),
             confidence: src.score,
-            match_reason: 'Tìm thấy trong MADA Knowledge Base',
+            match_reason: getMatchReason(effectiveLanguage, 'found'),
           };
         });
+
+        // ⭐ DEDUPLICATE: Chỉ giữ lại sản phẩm duy nhất theo product_url
+        const seenUrls = new Set<string>();
+        suggestedProducts = suggestedProducts.filter((p) => {
+          if (seenUrls.has(p.product_url)) return false;
+          seenUrls.add(p.product_url);
+          return true;
+        });
+        
         console.log('🔵 Suggested from RAG sources:', suggestedProducts.length);
       }
 
@@ -2513,6 +2802,15 @@ ${promptTemplate.respondNow}`;
               match_reason: `Phù hợp category: ${detectedCat}`,
             };
           });
+          
+          // ⭐ DEDUPLICATE: Chỉ giữ lại sản phẩm duy nhất theo product_url
+          const seenUrls = new Set<string>();
+          suggestedProducts = suggestedProducts.filter((p) => {
+            if (seenUrls.has(p.product_url)) return false;
+            seenUrls.add(p.product_url);
+            return true;
+          });
+          
           console.log('🔵 Suggested from MADA KB items:', suggestedProducts.length);
         }
       }
@@ -2606,19 +2904,13 @@ app.post('/api/chat/stream', async (req: Request, res: Response) => {
     chatHistory.get(convId)!.push({ role: 'user', content: message });
 
     // Build prompt
-    const languageInstructions: Record<string, string> = {
-      vi: 'Ban la tro ly AI MADA ho tro cong nghe ho tro nguoi khuyet tat. Tra loi chi tiet tieng Viet.',
-      en: 'You are MADA AI assistant for assistive technology. Respond in English.',
-      ar: 'أنت مساعد MADA الذكي. أجب دائمًا باللغة العربية.',
-      fr: 'Vous êtes l\'assistant MADA. Répondez en français.',
-    };
-
+    // ⭐ Dùng full language instruction chung (không hard-code riêng)
     let ragConfig: any = {
-      systemInstruction: languageInstructions[effectiveLanguage] || languageInstructions.vi,
+      systemInstruction: getSystemInstruction(effectiveLanguage, agentPrompt),
     };
 
     if (agentPrompt) {
-      ragConfig.systemInstruction += ` ${agentPrompt}`;
+      // (đã merge trong getSystemInstruction ở trên)
     }
 
     // ⭐ MỚI: Lấy botId/madaCategory từ agentId cho RAG filter
@@ -2631,9 +2923,16 @@ app.post('/api/chat/stream', async (req: Request, res: Response) => {
 
     // Check if Gemini is configured
     if (!ragEngine.isConfigured) {
+      // ⭐ Multi-language error
+      const geminiErrors: Record<string, string> = {
+        vi: '❌ Gemini API chưa được cấu hình. Vui lòng liên hệ admin để thiết lập GEMINI_API_KEY trong .env.',
+        en: '❌ Gemini API is not configured. Please contact admin to set GEMINI_API_KEY in .env.',
+        ar: '❌ Gemini API غير مهيأ. يُرجى التواصل مع المسؤول لإعداد GEMINI_API_KEY في .env.',
+        fr: '❌ Gemini API n\'est pas configuré. Veuillez contacter l\'admin pour configurer GEMINI_API_KEY dans .env.',
+      };
       sendEvent({
         type: 'done',
-        answer: '❌ Gemini API chưa được cấu hình. Vui lòng liên hệ admin để thiết lập GEMINI_API_KEY trong .env.',
+        answer: geminiErrors[effectiveLanguage] || geminiErrors.vi,
         sources: [],
         error: 'gemini_not_configured',
       });
@@ -2671,22 +2970,25 @@ app.post('/api/chat/stream', async (req: Request, res: Response) => {
             } catch (e) { /* ignore */ }
           }
           
-          suggestedProducts = ragSources.slice(0, 4).map((src: any, idx: number) => {
+suggestedProducts = ragSources.slice(0, 4).map((src: any, idx: number) => {
             const meta = src.metadata || {};
             const sourceUrl = meta.source || meta.url || src.source || '';
+            const category = meta.category || 'general';
+            const thumbnail = meta.thumbnailUrl || thumbnailMap[sourceUrl] || '';
             return {
               id: src.id || `src-${idx}`,
               title: meta.title || 'Assistive Technology',
               title_en: meta.title || 'Assistive Technology',
               description: '',
-              category: meta.category || 'general',
+              category,
               brand: meta.brand || 'MADA Qatar AT Portal',
               price_range: 'Contact MADA Center',
               product_url: sourceUrl,
               source_url: sourceUrl,
-              image_url: toProxyImageUrl(thumbnailMap[sourceUrl] || ''),
+              image_url: toProxyImageUrl(thumbnail),
               confidence: src.score || 0.7,
-              match_reason: 'Tìm thấy trong MADA Knowledge Base',
+              // ⭐ Multi-language match_reason
+              match_reason: getMatchReason(effectiveLanguage, 'found'),
             };
           });
         }
@@ -2732,8 +3034,17 @@ app.post('/api/chat/stream', async (req: Request, res: Response) => {
                 category: item.category, brand: 'MADA Qatar AT Portal',
                 price_range: 'Contact MADA Center', product_url: url, source_url: url,
                 image_url: toProxyImageUrl(thumbnail), confidence: 0.7,
-                match_reason: `Phù hợp category: ${detectedCat}`,
+                // ⭐ Multi-language match_reason
+                match_reason: getMatchReason(effectiveLanguage, 'category', detectedCat),
               };
+            });
+            
+            // ⭐ DEDUPLICATE: Chỉ giữ lại sản phẩm duy nhất theo product_url
+            const seenUrls = new Set<string>();
+            suggestedProducts = suggestedProducts.filter((p: any) => {
+              if (seenUrls.has(p.product_url)) return false;
+              seenUrls.add(p.product_url);
+              return true;
             });
           }
         }
@@ -2760,7 +3071,7 @@ app.post('/api/chat/stream', async (req: Request, res: Response) => {
               category: item.category, brand: 'MADA Qatar AT Portal',
               price_range: 'Contact MADA Center', product_url: url, source_url: url,
               image_url: toProxyImageUrl(thumbnail), confidence: 0.6,
-              match_reason: 'Sản phẩm từ MADA Knowledge Base',
+              match_reason: getMatchReason(effectiveLanguage, 'found'),
             };
           });
         }
@@ -2798,13 +3109,32 @@ app.post('/api/chat/stream', async (req: Request, res: Response) => {
 
     } catch (streamError) {
       console.error('❌ Stream error:', streamError);
-      sendEvent({ type: 'error', error: streamError instanceof Error ? streamError.message : 'Stream failed' });
+      // ⭐ FIX: Chỉ gửi event nếu response chưa end
+      if (!res.writableEnded) {
+        sendEvent({ type: 'error', error: streamError instanceof Error ? streamError.message : 'Stream failed' });
+      }
     }
 
-    return res.end();
+    // ⭐ FIX: Chỉ end nếu response chưa được end (tránh throw "write after end")
+    if (!res.writableEnded) {
+      try {
+        return res.end();
+      } catch (e) {
+        console.warn('⚠️ res.end() error (already closed?):', (e as Error).message);
+        return;
+      }
+    }
+    return;
   } catch (error) {
     console.error('❌ Chat stream error:', error);
-    res.status(500).json({ success: false, error: `Error: ${error instanceof Error ? error.message : 'Unknown'}` });
+    // ⭐ FIX: Tránh crash nếu res đã end
+    if (!res.writableEnded && !res.headersSent) {
+      try {
+        res.status(500).json({ success: false, error: `Error: ${error instanceof Error ? error.message : 'Unknown'}` });
+      } catch (e) {
+        console.warn('⚠️ Cannot send 500 (stream already closed):', (e as Error).message);
+      }
+    }
   }
 });
 
@@ -3341,6 +3671,161 @@ app.get('/api/stats', async (_req, res) => {
   } catch (error) {
     console.error('[GET /api/stats] failed:', error);
     res.status(500).json({ success: false, error: 'Internal server error', message: (error as Error).message });
+  }
+});
+
+// ============== SEED DATA API ENDPOINTS ==============
+// ⭐ Đảm bảo AI luôn có data để trả lời
+
+// GET /api/seed/search - Tìm kiếm sản phẩm từ seed data
+app.get('/api/seed/search', async (req, res) => {
+  try {
+    const { q, category, lang = 'vi', limit = 5 } = req.query;
+
+    if (!q || typeof q !== 'string') {
+      return res.status(400).json({
+        success: false,
+        error: 'Query parameter "q" is required'
+      });
+    }
+
+    const categories = category
+      ? [category as string] as any[]
+      : undefined;
+
+    const results = await ragService.search({
+      query: q,
+      categories,
+      maxResults: parseInt(limit as string),
+    });
+
+    res.json({
+      success: true,
+      data: {
+        query: q,
+        results: results.results.map(r => ({
+          id: r.item.id,
+          madaId: r.item.madaId,
+          name: r.item.name,
+          description: r.item.description,
+          category: r.item.category,
+          subcategory: r.item.subcategory,
+          manufacturer: r.item.manufacturer,
+          sourceUrl: r.item.sourceUrl,
+          thumbnailUrl: r.item.thumbnailUrl,
+          isoCodes: r.item.isoCodes,
+          features: r.item.features,
+          useCases: r.item.useCases,
+          targetSymptoms: r.item.targetSymptoms,
+          score: r.score,
+          relevanceReason: r.relevanceReason,
+          confidence: r.confidence,
+          source: r.source,
+        })),
+        totalInDatabase: results.totalInDatabase,
+        processingTime: results.processingTime,
+      },
+    });
+  } catch (error) {
+    console.error('[GET /api/seed/search] failed:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error',
+      message: (error as Error).message
+    });
+  }
+});
+
+// GET /api/seed/products - Lấy danh sách tất cả sản phẩm
+app.get('/api/seed/products', async (req, res) => {
+  try {
+    const { category, limit = 50, offset = 0 } = req.query;
+
+    let products = await ragService.getAllProducts();
+
+    if (category) {
+      products = products.filter(p => p.category === category);
+    }
+
+    const total = products.length;
+    const paginated = products.slice(
+      parseInt(offset as string),
+      parseInt(offset as string) + parseInt(limit as string)
+    );
+
+    res.json({
+      success: true,
+      data: {
+        products: paginated,
+        total,
+        limit: parseInt(limit as string),
+        offset: parseInt(offset as string),
+      },
+    });
+  } catch (error) {
+    console.error('[GET /api/seed/products] failed:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error',
+      message: (error as Error).message
+    });
+  }
+});
+
+// GET /api/seed/product/:id - Lấy chi tiết sản phẩm
+app.get('/api/seed/product/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const product = await ragService.getProductById(id);
+
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        error: 'Product not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: product,
+    });
+  } catch (error) {
+    console.error('[GET /api/seed/product/:id] failed:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error',
+      message: (error as Error).message
+    });
+  }
+});
+
+// GET /api/seed/stats - Thống kê seed data
+app.get('/api/seed/stats', async (_req, res) => {
+  try {
+    const stats = await ragService.getStats();
+
+    res.json({
+      success: true,
+      data: {
+        ...stats,
+        categories: {
+          'sensory-hearing': 'Cảm giác – Thính giác',
+          'sensory-vision': 'Cảm giác – Thị giác',
+          'voice-and-speech': 'Giọng nói và Lời nói',
+          'mental-cognitive': 'Tâm thần – Nhận thức',
+          'neuromusculoskeletal': 'Vận động thần kinh – cơ xương',
+          'mobility-transportation': 'Di chuyển và Giao thông',
+          'regulatory-standards': 'Thông tin bổ trợ',
+        },
+      },
+    });
+  } catch (error) {
+    console.error('[GET /api/seed/stats] failed:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error',
+      message: (error as Error).message
+    });
   }
 });
 

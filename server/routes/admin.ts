@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import db from '../lib/db';
+import { syncProductToKnowledge, syncAllPublishedProducts } from '../lib/syncKbProducts';
 
 const router = Router();
 
@@ -307,16 +308,30 @@ router.delete('/products/:id', requireAdmin, (req, res) => {
 router.post('/products/:id/publish', requireAdmin, (req, res) => {
   try {
     const { status } = req.body;
-    
+
     if (!['draft', 'published', 'archived'].includes(status)) {
       return res.status(400).json({ success: false, error: 'Invalid status' });
     }
-    
+
     db.prepare('UPDATE kb_products SET status = ?, updated_at = ? WHERE id = ?')
       .run(status, new Date().toISOString(), req.params.id);
-    
-    const product = db.prepare('SELECT * FROM kb_products WHERE id = ?').get(req.params.id);
-    res.json({ success: true, data: product });
+
+    const product = db.prepare('SELECT * FROM kb_products WHERE id = ?').get(req.params.id) as any;
+
+    // ⭐ Auto-sync sang knowledge_items để AI/RAG có thể tìm thấy
+    let syncResult: any = null;
+    try {
+      syncResult = syncProductToKnowledge(product);
+      console.log(`📦 [publish] Synced product ${product.id} (${product.title}) → ${syncResult.action} (knowledge_item: ${syncResult.knowledge_item_id})`);
+    } catch (syncErr: any) {
+      console.error(`⚠️ [publish] Failed to sync ${product.id} to knowledge_items:`, syncErr.message);
+    }
+
+    res.json({
+      success: true,
+      data: product,
+      sync: syncResult, // trả về cho client biết
+    });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -693,6 +708,32 @@ router.patch('/settings', requireAdmin, (req, res) => {
     }
     
     res.json({ success: true, message: 'Settings updated successfully' });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// POST /api/admin/products/sync-all
+// Bulk sync tất cả kb_products → knowledge_items để AI/RAG biết đến
+router.post('/products/sync-all', requireAdmin, (req, res) => {
+  try {
+    const result = syncAllPublishedProducts();
+    console.log(
+      `📦 [admin/sync-all] kb_products → knowledge_items: ` +
+      `inserted=${result.inserted}, updated=${result.updated}, archived=${result.archived}, errors=${result.errors.length}`
+    );
+    res.json({
+      success: true,
+      data: {
+        inserted: result.inserted,
+        updated: result.updated,
+        archived: result.archived,
+        errors: result.errors,
+      },
+      message:
+        `Synced ${result.inserted} new + ${result.updated} updated + ${result.archived} archived. ` +
+        `Run "Sync to Vector Store" (npx tsx server/scripts/sync-kb-to-vectors.ts) to make them searchable by AI.`,
+    });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
   }

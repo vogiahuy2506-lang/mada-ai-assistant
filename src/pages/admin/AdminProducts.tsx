@@ -1,6 +1,9 @@
 import { useEffect, useState, useCallback } from 'react';
 import { AdminLayout } from './AdminLayout';
 import { adminApi, Product, Category } from './adminApi';
+import { AIImportCard } from './AIImportCard';
+import { formatPrice } from '../../lib/formatPrice';
+import { getImageUrl } from '../../lib/imageProxy';
 import {
   Plus, RefreshCw, X, Save, Loader2, AlertCircle,
   Edit2, Trash2, Eye, EyeOff, Star, StarOff,
@@ -475,57 +478,115 @@ function ProductCard({ product, categoryName, onEdit, onDelete, onTogglePublish 
     web_accessibility: { icon: 'language', bg: 'bg-teal-100', text: 'text-teal-600' },
     general: { icon: 'inventory_2', bg: 'bg-slate-100', text: 'text-slate-600' },
   };
-  
+
   const style = categoryStyles[product.category] || categoryStyles.general;
+  const isPublished = product.status === 'published';
 
   return (
-    <div className="bg-white rounded-2xl border border-outline-variant/20 overflow-hidden hover:shadow-lg hover:shadow-slate-200/50 hover:-translate-y-0.5 transition-all duration-200 group">
-      {product.image_url && (
-        <div className="h-28 bg-gradient-to-br from-surface-container-low to-surface-container-high overflow-hidden">
-          <img src={product.image_url} alt={product.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" onError={(e) => (e.target as HTMLImageElement).style.display = 'none'} />
+    <div className="bg-white rounded-lg border border-outline-variant/30 overflow-hidden hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 group">
+      {/* Ảnh sản phẩm - lớn, chiếm phần lớn card */}
+      <div className="relative aspect-square bg-white overflow-hidden">
+        {product.image_url ? (
+          <img
+            src={getImageUrl(product.image_url)}
+            alt={product.title}
+            className="w-full h-full object-contain p-2 group-hover:scale-105 transition-transform duration-300"
+            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden'); }}
+          />
+        ) : null}
+        <div className={clsx('w-full h-full flex items-center justify-center text-slate-300', product.image_url ? 'hidden' : '')}>
+          <span className="material-symbols-outlined text-5xl">image_not_supported</span>
         </div>
-      )}
-      <div className="p-4">
-        <div className="flex flex-wrap gap-1.5 mb-2">
-          <span className={clsx('px-2.5 py-1 rounded-lg text-[10px] font-bold', STATUS_STYLES[product.status])}>
-            {product.status === 'published' ? 'Pub' : product.status === 'archived' ? 'Lưu trữ' : 'Nháp'}
-          </span>
-          {product.featured && <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-secondary/10 text-secondary">Nổi bật</span>}
+
+        {/* Badge góc trên trái - status */}
+        <div className="absolute top-2 left-2 flex flex-col gap-1">
+          {product.featured && (
+            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500 text-white shadow-sm">
+              HOT
+            </span>
+          )}
+          {!isPublished && (
+            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-700 text-white shadow-sm">
+              Nháp
+            </span>
+          )}
         </div>
-        <h3 className="font-bold text-on-surface text-sm mb-1 line-clamp-1">{product.title}</h3>
-        {product.title_en && <p className="text-xs text-on-surface-variant mb-2 line-clamp-1">{product.title_en}</p>}
-        
-        <div className="flex items-center gap-2 mb-2">
-          <span className={clsx('px-2.5 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1.5', style.bg, style.text)}>
-            <span className="material-symbols-outlined text-xs">{style.icon}</span>
+
+        {/* Action buttons - góc trên phải (hover only) */}
+        <div className="absolute top-2 right-2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button
+            onClick={(e) => { e.stopPropagation(); onEdit(product); }}
+            className="w-7 h-7 rounded-full bg-white/95 shadow-sm flex items-center justify-center text-slate-700 hover:bg-blue-500 hover:text-white transition-colors"
+            title="Sửa"
+          >
+            <span className="material-symbols-outlined text-sm">edit</span>
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); onDelete(product); }}
+            className="w-7 h-7 rounded-full bg-white/95 shadow-sm flex items-center justify-center text-slate-700 hover:bg-red-500 hover:text-white transition-colors"
+            title="Xóa"
+          >
+            <span className="material-symbols-outlined text-sm">delete</span>
+          </button>
+        </div>
+
+        {/* Quick publish toggle - góc dưới phải */}
+        <button
+          onClick={(e) => { e.stopPropagation(); onTogglePublish(product); }}
+          className={clsx(
+            'absolute bottom-2 right-2 px-2 py-1 rounded-full text-[10px] font-bold shadow-sm flex items-center gap-1 transition-colors',
+            isPublished
+              ? 'bg-emerald-500 text-white hover:bg-emerald-600'
+              : 'bg-white/95 text-slate-700 hover:bg-blue-500 hover:text-white'
+          )}
+          title={isPublished ? 'Hạ xuống' : 'Xuất bản'}
+        >
+          <span className="material-symbols-outlined text-xs">{isPublished ? 'check_circle' : 'publish'}</span>
+          {isPublished ? 'Live' : 'Đăng'}
+        </button>
+      </div>
+
+      {/* Nội dung - gọn gàng */}
+      <div className="p-2.5 space-y-1.5">
+        {/* Tên sản phẩm */}
+        <h3 className="text-[13px] font-medium text-slate-800 line-clamp-2 leading-snug min-h-[34px]">
+          {product.title}
+        </h3>
+
+        {/* Giá - prominent */}
+        {product.price_range && (
+          <div className="flex items-baseline gap-1">
+            <span className="text-red-600 font-bold text-[15px] leading-tight">
+              {formatPrice(product.price_range)}
+            </span>
+          </div>
+        )}
+
+        {/* Meta: brand + category */}
+        <div className="flex items-center gap-1 text-[11px]">
+          {product.brand && (
+            <span className="font-bold text-slate-700 truncate">{product.brand}</span>
+          )}
+          <span className={clsx('px-1.5 py-0.5 rounded text-[10px] font-medium', style.bg, style.text)}>
             {categoryName}
           </span>
-          {product.brand && <span className="px-2.5 py-1 rounded-lg bg-surface-container-low text-on-surface-variant text-[10px] font-bold">{product.brand}</span>}
         </div>
 
-        {product.description && <p className="text-xs text-on-surface-variant line-clamp-2 mb-3">{product.description}</p>}
-
-        <div className="flex items-center gap-1.5 mb-3">
-          {product.price_range && <span className="px-2.5 py-1 rounded-lg bg-tertiary/10 text-tertiary text-[10px] font-bold">Giá: {product.price_range}</span>}
-          {Array.isArray(product.iso_codes) && product.iso_codes.length > 0 && <span className="px-2.5 py-1 rounded-lg bg-surface-container-low text-on-surface-variant text-[10px] font-mono">ISO</span>}
-          {product.wcag_level && <span className="px-2.5 py-1 rounded-lg bg-surface-container-low text-on-surface-variant text-[10px]">WCAG</span>}
-        </div>
-
-        <div className="flex items-center gap-2 pt-3 border-t border-outline-variant/20">
-          <button onClick={() => onTogglePublish(product)} 
-            className={clsx('flex-1 py-2 rounded-xl text-xs font-bold transition-all', 
-              product.status === 'published' ? 'bg-secondary/10 text-secondary hover:bg-secondary/20' : 'bg-primary/10 text-primary hover:bg-primary/20')}>
-            {product.status === 'published' ? 'Hạ xuống' : 'Xuất bản'}
-          </button>
-          <button onClick={() => onEdit(product)} 
-            className="flex-1 py-2 rounded-xl bg-primary/10 text-primary hover:bg-primary/20 transition-all text-xs font-bold">
-            Sửa
-          </button>
-          <button onClick={() => onDelete(product)} 
-            className="p-2 rounded-xl hover:bg-error/10 text-on-surface-variant hover:text-error transition-all">
-            <Trash2 className="w-4 h-4" />
-          </button>
-        </div>
+        {/* Options/variants - TGDD style */}
+        {(product.wcag_level || (Array.isArray(product.iso_codes) && product.iso_codes.length > 0)) && (
+          <div className="flex flex-wrap gap-1 pt-0.5">
+            {product.wcag_level && (
+              <span className="px-1.5 py-0.5 rounded border border-slate-200 text-[10px] text-slate-600 bg-slate-50">
+                WCAG {product.wcag_level}
+              </span>
+            )}
+            {Array.isArray(product.iso_codes) && product.iso_codes.slice(0, 2).map((iso, idx) => (
+              <span key={idx} className="px-1.5 py-0.5 rounded border border-slate-200 text-[10px] text-slate-600 bg-slate-50 font-mono">
+                {iso}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -766,6 +827,11 @@ export function AdminProducts() {
         <MetricCard icon="workspace_premium" label="Nội dung cao cấp" value="95%" color="amber" />
       </section>
 
+      {/* AI Import Card */}
+      {viewMode === 'products' && (
+        <AIImportCard categories={categories} onImportSuccess={loadProducts} />
+      )}
+
       {/* PRODUCTS VIEW */}
       {viewMode === 'products' && (
         <>
@@ -842,9 +908,9 @@ export function AdminProducts() {
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
                 {products.map((prod) => (
-                  <ProductCard key={prod.id} product={prod} categoryName={getCategoryName(prod.category)} 
+                  <ProductCard key={prod.id} product={prod} categoryName={getCategoryName(prod.category)}
                     onEdit={(p) => { setEditingProduct(p); setShowProductModal(true); }} onDelete={handleDeleteProduct} onTogglePublish={handleTogglePublish} />
                 ))}
               </div>

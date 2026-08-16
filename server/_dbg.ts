@@ -1,3 +1,4 @@
+// @ts-nocheck
 require('dotenv').config({ path: '../.env' });
 const module1 = require('./lib/rag/vectorStore');
 

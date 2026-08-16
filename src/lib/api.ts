@@ -190,3 +190,74 @@ export const systemApi = {
     });
   },
 };
+
+// ============== USER HISTORY (Chat) ==============
+export interface ChatConversation {
+  id: string;
+  title: string;
+  agent_id: string | null;
+  language: string;
+  message_count: number;
+  last_message_preview: string | null;
+  is_pinned: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  agent_id: string | null;
+  sources: any[] | null;
+  confidence: number | null;
+  language: string | null;
+  created_at: string;
+}
+
+export const userHistoryApi = {
+  async list(params?: { search?: string; limit?: number }) {
+    const query = new URLSearchParams(params as any).toString();
+    return request<{ conversations: ChatConversation[] }>(`/user/history${query ? `?${query}` : ''}`);
+  },
+  async get(id: string) {
+    return request<{ conversation: ChatConversation; messages: ChatMessage[] }>(`/user/history/${id}`);
+  },
+  async create(data: { conversationId?: string; title: string; agentId?: string; language: string; firstMessage?: string }) {
+    return request<{ id: string }>('/user/history', { method: 'POST', body: JSON.stringify(data) });
+  },
+  async addMessage(conversationId: string, data: { role: string; content: string; agentId?: string; sources?: any; confidence?: number; language?: string }) {
+    return request<{ messageId: string }>(`/user/history/${conversationId}/messages`, { method: 'POST', body: JSON.stringify(data) });
+  },
+  async update(id: string, updates: { title?: string; is_pinned?: boolean }) {
+    return request<{ success: boolean }>(`/user/history/${id}`, { method: 'PATCH', body: JSON.stringify(updates) });
+  },
+  async delete(id: string) {
+    return request<{ success: boolean }>(`/user/history/${id}`, { method: 'DELETE' });
+  },
+};
+
+// ============== USER FAVORITES ==============
+export interface UserFavorite {
+  id: string;
+  item_type: 'product' | 'kb_item' | 'standard';
+  item_id: string;
+  title: string;
+  metadata: any | null;
+  created_at: string;
+}
+
+export const userFavoritesApi = {
+  async list() {
+    return request<{ favorites: UserFavorite[] }>('/user/favorites');
+  },
+  async add(data: { item_type: string; item_id: string; title: string; metadata?: any }) {
+    return request<{ id: string }>('/user/favorites', { method: 'POST', body: JSON.stringify(data) });
+  },
+  async delete(id: string) {
+    return request<{ success: boolean }>(`/user/favorites/${id}`, { method: 'DELETE' });
+  },
+  async removeByItem(item_type: string, item_id: string) {
+    return request<{ success: boolean }>(`/user/favorites/by-item?item_type=${encodeURIComponent(item_type)}&item_id=${encodeURIComponent(item_id)}`, { method: 'DELETE' });
+  },
+};

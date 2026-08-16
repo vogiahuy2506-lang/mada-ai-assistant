@@ -57,8 +57,12 @@ export const SEED_PRODUCTS: Product[] = [];
 /**
  * Stub search function - không tìm trong empty list.
  * rag.service.ts import với alias `seedSearchProducts` nhưng không gọi trong logic.
+ *
+ * @param _query Chuỗi truy vấn (hiện không dùng vì SEED_PRODUCTS rỗng)
+ * @param _opts Tùy chọn (hiện không dùng)
+ * @returns Luôn trả về mảng rỗng - fallback sang vector store
  */
-export function searchProducts(query: string, opts?: any): Product[] {
+export function searchProducts(_query: string, _opts?: unknown): Product[] {
   return [];
 }
 

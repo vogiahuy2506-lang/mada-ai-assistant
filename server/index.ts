@@ -2264,14 +2264,15 @@ app.post('/api/chat', async (req, res) => {
           try {
             const placeholders = sourceUrls.map(() => '?').join(',');
             const thumbnailRows = db.prepare(`
-              SELECT url, json_extract(metadata, '$.thumbnailUrl') as thumbnail 
-              FROM knowledge_items 
+              SELECT url, source, json_extract(metadata, '$.thumbnailUrl') as thumbnail
+              FROM knowledge_items
               WHERE url IN (${placeholders}) OR source IN (${placeholders})
             `).all(...sourceUrls, ...sourceUrls) as any[];
-            
+
             for (const row of thumbnailRows) {
               if (row.thumbnail) {
                 thumbnailMap[row.url] = row.thumbnail;
+                if (row.source) thumbnailMap[row.source] = row.thumbnail;
               }
             }
           } catch (e) {
@@ -2712,12 +2713,15 @@ ${promptTemplate.respondNow}`;
           try {
             const placeholders = sourceUrls.map(() => '?').join(',');
             const thumbnailRows = db.prepare(`
-              SELECT url, json_extract(metadata, '$.thumbnailUrl') as thumbnail 
-              FROM knowledge_items 
-              WHERE url IN (${placeholders}) OR source IN (${placeholders})
-            `).all(...sourceUrls, ...sourceUrls) as any[];
+SELECT url, source, json_extract(metadata, '$.thumbnailUrl') as thumbnail
+            FROM knowledge_items
+            WHERE url IN (${placeholders}) OR source IN (${placeholders})
+          `).all(...sourceUrls, ...sourceUrls) as any[];
             for (const row of thumbnailRows) {
-              if (row.thumbnail) thumbnailMap[row.url] = row.thumbnail;
+              if (row.thumbnail) {
+                if (row.url) thumbnailMap[row.url] = row.thumbnail;
+                if (row.source) thumbnailMap[row.source] = row.thumbnail;
+              }
             }
           } catch (e) { /* ignore */ }
         }
@@ -2959,13 +2963,18 @@ app.post('/api/chat/stream', async (req: Request, res: Response) => {
           if (sourceUrls.length > 0) {
             try {
               const placeholders = sourceUrls.map(() => '?').join(',');
+              // ⭐ FIX: Select both url AND source as map keys (DB có url empty, source mới là URL thật)
               const thumbnailRows = db.prepare(`
-                SELECT url, json_extract(metadata, '$.thumbnailUrl') as thumbnail 
-                FROM knowledge_items 
+                SELECT url, source, json_extract(metadata, '$.thumbnailUrl') as thumbnail
+                FROM knowledge_items
                 WHERE url IN (${placeholders}) OR source IN (${placeholders})
               `).all(...sourceUrls, ...sourceUrls) as any[];
               for (const row of thumbnailRows) {
-                if (row.thumbnail) thumbnailMap[row.url] = row.thumbnail;
+                if (row.thumbnail) {
+                  // Map by both url and source since DB design uses source as URL
+                  if (row.url) thumbnailMap[row.url] = row.thumbnail;
+                  if (row.source) thumbnailMap[row.source] = row.thumbnail;
+                }
               }
             } catch (e) { /* ignore */ }
           }

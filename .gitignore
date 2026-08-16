@@ -55,6 +55,7 @@ data/
 # BUT allow backend source data (seed data, fixtures, configs)
 !backend/src/data/
 !backend/data/
+!server/lib/data/
 
 # Ignore runtime data in backend/data/ but keep the folder structure
 backend/data/products/

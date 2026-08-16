@@ -10,7 +10,7 @@
  */
 
 import React from 'react';
-import { ExternalLink, Check, Star, MapPin, Package } from 'lucide-react';
+import { ExternalLink, Check, Star, MapPin } from 'lucide-react';
 
 interface Product {
   id: string;
@@ -53,6 +53,48 @@ export function ProductCard({
     if (score >= 85) return 'bg-emerald-500';
     if (score >= 70) return 'bg-blue-500';
     return 'bg-amber-500';
+  };
+
+  /**
+   * Map category → gradient colors cho fallback image.
+   * Giúp user phân biệt nhanh loại sản phẩm qua màu nền.
+   */
+  const getCategoryGradient = (cat: string): string => {
+    const c = (cat || '').toLowerCase();
+    if (c.includes('hearing') || c.includes('điếc') || c.includes('thính')) {
+      return '#06b6d4, #3b82f6'; // cyan → blue (thính giác - tai)
+    }
+    if (c.includes('vision') || c.includes('mắt') || c.includes('thị giác') || c.includes('blind')) {
+      return '#8b5cf6, #ec4899'; // violet → pink (thị giác)
+    }
+    if (c.includes('mobility') || c.includes('vận động') || c.includes('wheelchair')) {
+      return '#10b981, #06b6d4'; // emerald → cyan (di chuyển)
+    }
+    if (c.includes('communication') || c.includes('giao tiếp') || c.includes('speech') || c.includes('aac')) {
+      return '#f59e0b, #ef4444'; // amber → red (giao tiếp)
+    }
+    if (c.includes('cognition') || c.includes('nhận thức') || c.includes('learn')) {
+      return '#3b82f6, #8b5cf6'; // blue → violet (nhận thức)
+    }
+    if (c.includes('daily') || c.includes('sinh hoạt')) {
+      return '#84cc16, #10b981'; // lime → emerald
+    }
+    return '#6366f1, #8b5cf6'; // default indigo → violet
+  };
+
+  /**
+   * Map category → emoji icon (universal symbols cho WCAG accessibility).
+   * Unicode emoji sẽ hiển thị consistent trên mọi platform.
+   */
+  const getCategoryEmoji = (cat: string): string => {
+    const c = (cat || '').toLowerCase();
+    if (c.includes('hearing') || c.includes('điếc') || c.includes('thính')) return '👂';
+    if (c.includes('vision') || c.includes('mắt') || c.includes('thị giác') || c.includes('blind')) return '👁️';
+    if (c.includes('mobility') || c.includes('vận động') || c.includes('wheelchair')) return '🦽';
+    if (c.includes('communication') || c.includes('giao tiếp') || c.includes('speech') || c.includes('aac')) return '💬';
+    if (c.includes('cognition') || c.includes('nhận thức') || c.includes('learn')) return '🧠';
+    if (c.includes('daily') || c.includes('sinh hoạt')) return '🍽️';
+    return '🛠️'; // mặc định "công nghệ hỗ trợ"
   };
 
   const translations = {
@@ -119,8 +161,8 @@ export function ProductCard({
       <div className="relative p-4 bg-gradient-to-br from-slate-50 to-slate-100 border-b border-slate-200">
         {/* Image */}
         <div className="flex gap-4">
-          <div className="w-24 h-24 rounded-xl overflow-hidden bg-white flex-shrink-0 border border-slate-200">
-            {product.image_url ? (
+          <div className="w-24 h-24 rounded-xl overflow-hidden bg-white flex-shrink-0 border border-slate-200 relative">
+            {product.image_url && product.image_url !== '' ? (
               <img
                 src={product.image_url}
                 alt={`${product.name} - ${product.category}`}
@@ -129,23 +171,22 @@ export function ProductCard({
                 referrerPolicy="no-referrer"
                 crossOrigin="anonymous"
                 onError={(e) => {
-                  // Hide img and show fallback
+                  // Hide broken img → reveal CSS fallback underneath
                   const target = e.currentTarget as HTMLImageElement;
                   target.style.display = 'none';
-                  const parent = target.parentElement;
-                  if (parent && !parent.querySelector('.fallback-icon')) {
-                    const fallback = document.createElement('div');
-                    fallback.className = 'fallback-icon w-full h-full bg-gradient-to-br from-violet-100 to-indigo-100 flex items-center justify-center';
-                    fallback.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-8 h-8 text-violet-400" aria-hidden="true"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>';
-                    parent.appendChild(fallback);
-                  }
                 }}
               />
-            ) : (
-              <div className="w-full h-full bg-gradient-to-br from-violet-100 to-indigo-100 flex items-center justify-center">
-                <Package className="w-8 h-8 text-violet-400" aria-hidden="true" />
-              </div>
-            )}
+            ) : null}
+            {/* ⭐ Category-based fallback (always present, shown when image missing or broken) */}
+            <div
+              className="fallback-icon absolute inset-0 w-full h-full flex items-center justify-center text-white font-bold text-2xl select-none"
+              style={{
+                background: `linear-gradient(135deg, ${getCategoryGradient(product.category)})`,
+              }}
+              aria-hidden="true"
+            >
+              {getCategoryEmoji(product.category)}
+            </div>
           </div>
 
           {/* Product Info */}

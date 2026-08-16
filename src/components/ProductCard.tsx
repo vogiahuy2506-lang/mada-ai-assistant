@@ -11,6 +11,7 @@
 
 import React from 'react';
 import { ExternalLink, Check, Star, MapPin } from 'lucide-react';
+import { getImageUrl } from '@/lib/imageProxy';
 
 interface Product {
   id: string;
@@ -162,22 +163,26 @@ export function ProductCard({
         {/* Image */}
         <div className="flex gap-4">
           <div className="w-24 h-24 rounded-xl overflow-hidden bg-white flex-shrink-0 border border-slate-200 relative">
-            {product.image_url && product.image_url !== '' ? (
-              <img
-                src={product.image_url}
-                alt={`${product.name} - ${product.category}`}
-                className="w-full h-full object-cover"
-                loading="eager"
-                referrerPolicy="no-referrer"
-                crossOrigin="anonymous"
-                onError={(e) => {
-                  // Hide broken img → reveal CSS fallback underneath
-                  const target = e.currentTarget as HTMLImageElement;
-                  target.style.display = 'none';
-                }}
-              />
-            ) : null}
-            {/* ⭐ Category-based fallback (always present, shown when image missing or broken) */}
+            {(() => {
+              // ⭐ Route qua imageProxy để xử lý mada.org.qa hotlink protection
+              const safeUrl = getImageUrl(product.image_url);
+              return safeUrl ? (
+                <img
+                  src={safeUrl}
+                  alt={`${product.name} - ${product.category}`}
+                  className="w-full h-full object-cover relative z-10"
+                  loading="eager"
+                  referrerPolicy="no-referrer"
+                  crossOrigin="anonymous"
+                  onError={(e) => {
+                    // Ản img bị lỗi → fallback gradient + emoji tự động hiện ra
+                    const target = e.currentTarget as HTMLImageElement;
+                    target.style.display = 'none';
+                  }}
+                />
+              ) : null;
+            })()}
+            {/* Category-based fallback - gradient + emoji. Layer dưới img với z-index thấp hơn (z-10 của img), nên khi img load thành công sẽ che fallback. Khi img lỗi/rỗng → fallback hiện ra. */}
             <div
               className="fallback-icon absolute inset-0 w-full h-full flex items-center justify-center text-white font-bold text-2xl select-none"
               style={{

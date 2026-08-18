@@ -65,14 +65,14 @@
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                       DATA LAYER                                 │
-│  ┌──────────┐  ┌──────────┐  ┌──────────────────┐              │
-│  │  Mock    │  │ Milvus   │  │  Knowledge Base │              │
-│  │ (Dev)    │  │(Docker)  │  │  (SQLite + FS) │              │
-│  └──────────┘  └──────────┘  └──────────────────┘              │
-│  ┌──────────┐                                                      │
-│  │ Pinecone │                                                      │
-│  │ (Cloud) │                                                      │
-│  └──────────┘                                                      │
+│  ┌──────────────────┐  ┌──────────────────�              │
+│  │   Pinecone       │  │  Knowledge Base │              │
+│  │   (Cloud)        │  │  (SQLite + FS) │              │
+│  └──────────────────┘  └──────────────────┘              │
+│  ┌──────────────────┐                                          │
+│  │  In-Memory       │                                          │
+│  │  Fallback (Dev) │                                          │
+│  └──────────────────┘                                          │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -126,7 +126,7 @@ interface AppState {
 - **Node.js 20** - Runtime
 - **Express.js** - API Framework
 - **Gemini SDK** - AI Integration
-- **Multi Vector DB** - Mock/Milvus/Pinecone (configurable)
+- **Multi Vector DB** - Pinecone (cloud) + In-Memory fallback
 - **TypeScript** - Type Safety
 
 ### Directory Structure
@@ -155,7 +155,6 @@ server/
 │   ├── scraper.ts          # Scraper API
 │   └── payments.ts         # Payment API
 └── scripts/
-    ├── migrate-to-milvus.ts   # Milvus migration
     └── migrate-to-pinecone.ts # Pinecone migration
 ```
 
@@ -167,24 +166,19 @@ server/
 
 | Provider | Type | Use Case | Setup Required |
 |----------|------|----------|---------------|
-| **Mock** | In-memory | Development | None |
+| **In-Memory** | In-memory | Development / fallback | None |
 | **Pinecone** | Cloud | Production (cloud) | API Key |
-| **Milvus** | Self-hosted | Production (local) | Docker |
 
 ### Configuration
 
 ```bash
 # Choose provider
-VECTOR_DB_PROVIDER=mock      # Default, no setup needed
 VECTOR_DB_PROVIDER=pinecone   # Cloud, needs API key
-VECTOR_DB_PROVIDER=milvus     # Docker, needs Docker
+# Empty/invalid PINECONE_API_KEY → auto fallback sang in-memory cosine search
 
 # For Pinecone
 PINECONE_API_KEY=your_key_here
-
-# For Milvus (Docker)
-MILVUS_ADDRESS=localhost:19530
-MILVUS_COLLECTION_NAME=mada_kb
+PINECONE_INDEX_NAME=mada-knowledge-base
 ```
 
 ### Architecture
@@ -192,14 +186,11 @@ MILVUS_COLLECTION_NAME=mada_kb
 ```
 VectorStore (abstraction layer)
     │
-    ├── Mock Provider (TF-IDF in-memory)
-    │       └── Fast for development
-    │
     ├── Pinecone Provider (cloud)
     │       └── Scalable, no infrastructure
     │
-    └── Milvus Provider (Docker)
-            └── High performance, self-hosted
+    └── In-Memory Fallback (cosine similarity)
+            └── Fast for dev/test, persistent trong data/chroma/documents.json
 ```
 
 ---
@@ -484,9 +475,8 @@ GET /api/payments/usage/:userId
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `GEMINI_API_KEY` | Yes | Google Gemini API key |
-| `VECTOR_DB_PROVIDER` | No | mock/pinecone/milvus |
+| `VECTOR_DB_PROVIDER` | No | pinecone |
 | `PINECONE_API_KEY` | For Pinecone | Pinecone API key |
-| `MILVUS_ADDRESS` | For Milvus | Milvus server address |
 | `STRIPE_SECRET_KEY` | For payments | Stripe API key |
 | `PORT` | No | Server port (default: 3001) |
 
@@ -519,25 +509,10 @@ docker run -d \
   mada-ai:latest
 ```
 
-### Milvus Setup
-
-```bash
-# Start Milvus (requires Docker)
-./scripts/setup-milvus.sh start
-
-# Check status
-./scripts/setup-milvus.sh status
-
-# Stop
-./scripts/setup-milvus.sh stop
-```
 
 ### Migration
 
 ```bash
-# Migrate to Milvus
-npm run milvus:migrate
-
 # Migrate to Pinecone
 npm run pinecone:migrate
 ```
@@ -552,8 +527,6 @@ npm run pinecone:migrate
 | `npm run server` | Start backend (Express) |
 | `npm run dev:all` | Start both |
 | `npm run build` | Production build |
-| `npm run milvus:start` | Start Milvus Docker |
-| `npm run milvus:migrate` | Migrate to Milvus |
 | `npm run scraper:start` | Start scraper scheduler |
 | `npm run scraper:run` | Run scraper once |
 

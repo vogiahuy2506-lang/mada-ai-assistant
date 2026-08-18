@@ -1,0 +1,68 @@
+name: Deploy to Cloud Run
+
+on:
+  push:
+    branches:
+      - main
+      - feat/code-review-and-cleanup
+  workflow_dispatch:
+
+env:
+  PROJECT_ID: gen-lang-client-0003620608
+  SERVICE: mada-ai
+  REGION: asia-southeast1
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for GCR
+        run: gcloud auth configure-docker gcr.io --quiet
+
+      - name: Build & Push image
+        run: |
+          docker buildx build --platform linux/amd64 \
+            -t gcr.io/${{ env.PROJECT_ID }}/${{ env.SERVICE }}:${{ github.sha }} \
+            -t gcr.io/${{ env.PROJECT_ID }}/${{ env.SERVICE }}:latest \
+            --push \
+            .
+
+      - name: Deploy to Cloud Run
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: ${{ env.SERVICE }}
+          region: ${{ env.REGION }}
+          image: gcr.io/${{ env.PROJECT_ID }}/${{ env.SERVICE }}:${{ github.sha }}
+          flags: |
+            --allow-unauthenticated
+            --memory=1Gi
+            --cpu=1
+            --timeout=300
+            --concurrency=80
+            --max-instances=10
+
+      - name: Deploy Summary
+        if: success()
+        run: |
+          echo "✅ Deploy thành công!"
+          echo "🌐 URL: https://${{ env.SERVICE }}-${{ env.PROJECT_ID }}.${{ env.REGION }}.run.app"
+          echo "📝 Commit: ${{ github.sha }}"
+          echo "👤 Author: ${{ github.actor }}"

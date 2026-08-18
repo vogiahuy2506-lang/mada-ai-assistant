@@ -115,7 +115,7 @@ và hướng dẫn sử dụng công nghệ hỗ trợ."
 📌 NGUYÊN TẮC SỬ DỤNG DỮ LIỆU:
 
 1. BẮT BUỘC dùng dữ liệu từ NGUỒN SAU (theo thứ tự ưu tiên):
-   a) RAG Database (Vector DB - Milvus/Pinecone) ← ƯU TIÊN CAO NHẤT
+   a) RAG Database (Vector DB - Pinecone, fallback in-memory) ← ƯU TIÊN CAO NHẤT
    b) Seed Products Data (server/lib/data/seed-products.ts)
    c) Kiến thức chung về AT (như fallback cuối cùng)
 

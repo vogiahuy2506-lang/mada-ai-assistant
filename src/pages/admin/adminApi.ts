@@ -140,8 +140,14 @@ export const adminApi = {
   },
 
   // ============== KNOWLEDGE ==============
-  async getKnowledgeStats() {
-    return request<KnowledgeStats>('/admin/knowledge-stats');
+  async getKnowledgeStats(params?: { botId?: string; category?: string }) {
+    const p = new URLSearchParams();
+    if (params?.botId) p.set('botId', params.botId);
+    if (params?.category) p.set('category', params.category);
+    const qs = p.toString();
+    return request<KnowledgeStats & { perBot: { botId: string; count: number }[] }>(
+      `/admin/knowledge-stats${qs ? `?${qs}` : ''}`
+    );
   },
   async searchKnowledge(q: string, limit = 10) {
     return request<{ results: any[]; total: number }>(`/knowledge/search?q=${encodeURIComponent(q)}&limit=${limit}`);
@@ -218,7 +224,11 @@ export const adminApi = {
 
   // ============== SETTINGS ==============
   async getSettings() {
-    return request<Record<string, any>>('/admin/settings');
+    return request<{
+      data: Record<string, any>;
+      grouped: Record<string, Array<{ key: string; value: any; type: string; description: string; updated_at: string }>>;
+      categories: Record<string, { label: string; icon: string }>;
+    }>('/admin/settings');
   },
   async updateSettings(settings: Record<string, any>) {
     return request<{ success: boolean }>('/admin/settings', { method: 'PATCH', body: JSON.stringify(settings) });
@@ -244,5 +254,78 @@ export const adminApi = {
   },
   async getConsultationStats() {
     return request<any>('/consultation/stats/summary');
+  },
+
+  // ============== SCRAPER (admin) ==============
+  async getMadaCategories() {
+    return request<any[]>('/admin/scraper/mada-categories');
+  },
+  async startCrawlMada(category: string) {
+    return request<{ jobId: string; status: string }>('/admin/scraper/crawl-mada', {
+      method: 'POST',
+      body: JSON.stringify({ category }),
+    });
+  },
+  async getCrawlJob(jobId: string) {
+    return request<any>(`/admin/scraper/crawl-mada/${jobId}`);
+  },
+  async listCrawlJobs() {
+    return request<any[]>('/admin/scraper/crawl-mada-jobs');
+  },
+  async getRagChunksStats() {
+    return request<{ files: any; chunkCount: number; productCount: number }>('/admin/scraper/rag-chunks-stats');
+  },
+  async ingestRagChunks(payload?: { chunks?: any[]; dryRun?: boolean }) {
+    return request<any>('/admin/scraper/ingest-rag-chunks', {
+      method: 'POST',
+      body: JSON.stringify(payload || {}),
+    });
+  },
+  async getSources() {
+    return request<any[]>('/admin/scraper/sources');
+  },
+  async addSource(payload: any) {
+    return request<any>('/admin/scraper/sources', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+  async deleteSource(id: string) {
+    return request<{ success: boolean }>(`/admin/scraper/sources/${id}`, { method: 'DELETE' });
+  },
+  async toggleSource(id: string, enabled: boolean) {
+    return request<{ success: boolean }>(`/admin/scraper/sources/${id}/toggle`, {
+      method: 'POST',
+      body: JSON.stringify({ enabled }),
+    });
+  },
+
+  // ============== AUDIT LOGS ==============
+  async getAuditLogs(params?: { action?: string; user_id?: string; limit?: number; offset?: number }) {
+    const p = new URLSearchParams();
+    if (params?.action) p.set('action', params.action);
+    if (params?.user_id) p.set('user_id', params.user_id);
+    if (params?.limit) p.set('limit', String(params.limit));
+    if (params?.offset) p.set('offset', String(params.offset));
+    const qs = p.toString();
+    // Trả về nested total
+    return request<{ data?: any[]; total?: number }>(`/admin/audit${qs ? `?${qs}` : ''}`);
+  },
+
+  // ============== CHAT METRICS ==============
+  async postChatMetric(payload: { conversationId?: string; latencyMs: number; confidence: number; botId?: string; language?: string; userMode?: 'endUser' | 'specialist' }) {
+    return request<{ success: boolean }>('/admin/chat-metrics', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+  async testAgent(payload: { agentId: string; message: string }) {
+    return request<{ response: string; latencyMs: number; confidence: number; agentName: string }>(
+      '/admin/agents/test',
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }
+    );
   },
 };

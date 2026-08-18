@@ -356,12 +356,118 @@ CORS_ORIGINS=https://yourdomain.com
 
 ## 🧪 Testing
 
-```bash
-# Chạy QA tests
-npx tsx server/tests/run-tests.ts
+### Unit Tests
 
-# Custom API
-API_URL=https://your-api.com npx tsx server/tests/run-tests.ts
+```bash
+# Run unit tests for RAG engine
+npm run test:unit
+
+# Run with coverage
+npm run test:coverage
+```
+
+### E2E Tests
+
+```bash
+# Install Playwright browsers
+npx playwright install --with-deps chromium
+
+# Run E2E tests
+npm run test:e2e
+
+# Run specific test file
+npx playwright test e2e/consultation.spec.ts
+```
+
+### Test Coverage
+
+- **RAG Engine**: Query processing, language support, search results, error handling
+- **Consultation Flow**: Modal, form validation, submission, close
+- **Accessibility**: Keyboard navigation, ARIA labels, skip links
+- **Image Proxy**: URL validation, thumbnail handling
+
+---
+
+## 🔄 CI/CD Pipeline
+
+### GitHub Actions
+
+Pipeline tự động chạy:
+
+1. **Lint & Type Check** - ESLint, TypeScript compiler
+2. **Unit Tests** - Vitest unit tests
+3. **E2E Tests** - Playwright E2E tests
+4. **Build** - Vite build, TypeScript compile
+5. **Docker** - Build & push images
+6. **Deploy** - Staging/Production
+
+### Setup Secrets
+
+Thêm trong GitHub Settings → Secrets:
+
+```
+GEMINI_API_KEY
+PINECONE_API_KEY
+DOCKER_USERNAME
+DOCKER_PASSWORD
+STAGING_HOST
+STAGING_USER
+STAGING_SSH_KEY
+PRODUCTION_HOST
+PRODUCTION_USER
+PRODUCTION_SSH_KEY
+```
+
+---
+
+## 🐳 Docker Deployment
+
+### Quick Start
+
+```bash
+# Build images
+docker-compose build
+
+# Start all services
+docker-compose up -d
+
+# Start with Milvus (optional)
+docker-compose --profile with-milvus up -d
+
+# Start with monitoring (optional)
+docker-compose --profile monitoring up -d
+```
+
+### Services
+
+| Service | Port | Description |
+|---------|------|-------------|
+| frontend | 5173 | React Vite app |
+| backend | 3000 | Express API server |
+| milvus | 19530 | Vector database (optional) |
+| prometheus | 9090 | Metrics (optional) |
+| grafana | 3001 | Dashboards (optional) |
+
+### Environment Variables
+
+```env
+# Server
+PORT=3000
+NODE_ENV=production
+
+# Gemini
+GEMINI_API_KEY=xxx
+
+# Vector DB
+VECTOR_DB_PROVIDER=pinecone
+PINECONE_API_KEY=xxx
+
+# Stripe
+STRIPE_SECRET_KEY=xxx
+STRIPE_WEBHOOK_SECRET=xxx
+
+# CORS
+CORS_ORIGINS=https://yourdomain.com
 ```
 
 ---

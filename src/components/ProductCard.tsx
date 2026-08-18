@@ -49,6 +49,20 @@ export function ProductCard({
   onViewDetails,
   onRequestConsult,
 }: ProductCardProps) {
+  // Helper: kiểm tra URL có hợp lệ (http/https) không
+  const isValidUrl = (url?: string): boolean => {
+    if (!url || typeof url !== 'string') return false;
+    return /^https?:\/\//i.test(url.trim());
+  };
+  const hasValidUrl = isValidUrl(product.product_url) || isValidUrl(product.source_url);
+  const handleViewDetails = () => {
+    if (!hasValidUrl) {
+      // URL không hợp lệ → fallback mở consultation thay vì báo lỗi
+      onRequestConsult?.();
+      return;
+    }
+    onViewDetails?.();
+  };
   // Đảm bảo contrast ratio ≥ 4.5:1 (WCAG 1.4.3)
   const getScoreColor = (score: number) => {
     if (score >= 85) return 'bg-emerald-500';
@@ -84,18 +98,17 @@ export function ProductCard({
   };
 
   /**
-   * Map category → emoji icon (universal symbols cho WCAG accessibility).
-   * Unicode emoji sẽ hiển thị consistent trên mọi platform.
+   * Map category → icon name for Material Symbols.
    */
-  const getCategoryEmoji = (cat: string): string => {
+  const getCategoryIcon = (cat: string): string => {
     const c = (cat || '').toLowerCase();
-    if (c.includes('hearing') || c.includes('điếc') || c.includes('thính')) return '👂';
-    if (c.includes('vision') || c.includes('mắt') || c.includes('thị giác') || c.includes('blind')) return '👁️';
-    if (c.includes('mobility') || c.includes('vận động') || c.includes('wheelchair')) return '🦽';
-    if (c.includes('communication') || c.includes('giao tiếp') || c.includes('speech') || c.includes('aac')) return '💬';
-    if (c.includes('cognition') || c.includes('nhận thức') || c.includes('learn')) return '🧠';
-    if (c.includes('daily') || c.includes('sinh hoạt')) return '🍽️';
-    return '🛠️'; // mặc định "công nghệ hỗ trợ"
+    if (c.includes('hearing') || c.includes('điếc') || c.includes('thính')) return 'headphones';
+    if (c.includes('vision') || c.includes('mắt') || c.includes('thị giác') || c.includes('blind')) return 'visibility';
+    if (c.includes('mobility') || c.includes('vận động') || c.includes('wheelchair')) return 'accessible_forward';
+    if (c.includes('communication') || c.includes('giao tiếp') || c.includes('speech') || c.includes('aac')) return 'record_voice_over';
+    if (c.includes('cognition') || c.includes('nhận thức') || c.includes('learn')) return 'psychology';
+    if (c.includes('daily') || c.includes('sinh hoạt')) return 'commute';
+    return 'accessibility'; // default assistive technology
   };
 
   const translations = {
@@ -164,14 +177,14 @@ export function ProductCard({
         <div className="flex gap-4">
           <div className="w-24 h-24 rounded-xl overflow-hidden bg-white flex-shrink-0 border border-slate-200 relative">
             {(() => {
-              // ⭐ Route qua imageProxy để xử lý mada.org.qa hotlink protection
               const safeUrl = getImageUrl(product.image_url);
               return safeUrl ? (
                 <img
                   src={safeUrl}
                   alt={`${product.name} - ${product.category}`}
                   className="w-full h-full object-cover relative z-10"
-                  loading="eager"
+                  loading="lazy"
+                  decoding="async"
                   referrerPolicy="no-referrer"
                   crossOrigin="anonymous"
                   onError={(e) => {
@@ -182,15 +195,17 @@ export function ProductCard({
                 />
               ) : null;
             })()}
-            {/* Category-based fallback - gradient + emoji. Layer dưới img với z-index thấp hơn (z-10 của img), nên khi img load thành công sẽ che fallback. Khi img lỗi/rỗng → fallback hiện ra. */}
+            {/* Category-based fallback - gradient + icon. Layer dưới img với z-index thấp hơn (z-10 của img), nên khi img load thành công sẽ che fallback. Khi img lỗi/rỗng → fallback hiện ra. */}
             <div
-              className="fallback-icon absolute inset-0 w-full h-full flex items-center justify-center text-white font-bold text-2xl select-none"
+              className="fallback-icon absolute inset-0 w-full h-full flex items-center justify-center text-white font-bold"
               style={{
                 background: `linear-gradient(135deg, ${getCategoryGradient(product.category)})`,
               }}
               aria-hidden="true"
             >
-              {getCategoryEmoji(product.category)}
+              <span className="material-symbols-outlined text-3xl" style={{ fontVariationSettings: "'FILL' 1" }}>
+                {getCategoryIcon(product.category)}
+              </span>
             </div>
           </div>
 
@@ -308,10 +323,16 @@ export function ProductCard({
 
       {/* Footer - Actions */}
       <div className="px-4 pb-4 flex gap-2">
-        {/* Nút Chi tiết - Secondary (xám) */}
+        {/* Nút Chi tiết - Secondary (xám). Disable nếu URL không hợp lệ (vd: manual:<ts>). */}
         <button
-          onClick={onViewDetails}
-          className="flex-1 px-4 py-2.5 bg-slate-100 text-slate-700 text-xs font-bold rounded-xl hover:bg-slate-200 hover:text-slate-900 transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-400"
+          onClick={handleViewDetails}
+          disabled={!hasValidUrl}
+          title={hasValidUrl ? t.details : 'Liên hệ tư vấn để biết thêm chi tiết'}
+          className={`flex-1 px-4 py-2.5 bg-slate-100 text-slate-700 text-xs font-bold rounded-xl transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-400 ${
+            hasValidUrl
+              ? 'hover:bg-slate-200 hover:text-slate-900 cursor-pointer'
+              : 'opacity-50 cursor-not-allowed'
+          }`}
           aria-label={`${t.details}: ${product.name}`}
         >
           {t.details}

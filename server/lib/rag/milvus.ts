@@ -301,7 +301,7 @@ export class MilvusVectorClient {
         collection_name: this.collectionName,
         vector: queryEmbedding,
         limit: topK,
-        output_fields: ['id', 'content', 'source', 'type', 'title', 'category', 'madaCategory', 'botId'],
+        output_fields: ['id', 'content', 'source', 'type', 'title', 'category', 'madaCategory', 'botId', 'thumbnailUrl', 'galleryImages'],
         params: milvusConfig.searchParams,
         ...(expr ? { expr } : {}),
       });
@@ -319,6 +319,8 @@ export class MilvusVectorClient {
         category: match.entity?.category || match.category || 'general',
         madaCategory: match.entity?.madaCategory || match.madaCategory || '',
         botId: match.entity?.botId || match.botId || '',
+        thumbnailUrl: match.entity?.thumbnailUrl || match.thumbnailUrl || '',
+        galleryImages: match.entity?.galleryImages || match.galleryImages || '',
         distance: match.distance || 0,
       }));
     } catch (error: any) {

@@ -12,6 +12,14 @@
 
 import * as cheerio from 'cheerio';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import {
+  MADA_CATEGORIES,
+  extractCategoryFromUrl,
+  scrapeCategoryListing,
+  scrapeProductDetail,
+  type ProductDetail,
+  type ProductListItem,
+} from '../../scripts/mada-scraper';
 
 export interface ExtractedProduct {
   id: string;
@@ -29,7 +37,22 @@ export interface ExtractedProduct {
   url: string;
   rating?: number;
   reviewsCount?: number;
-  extractionMethod: 'json-ld' | 'html-selectors' | 'gemini-ai';
+  extractionMethod: 'json-ld' | 'html-selectors' | 'gemini-ai' | 'mada-scraper';
+  /** Optional rich payload chỉ dành cho MADA (ISO codes, attachments, gallery...) */
+  madaMetadata?: {
+    postId?: string;
+    slug?: string;
+    isoCodes?: string[];
+    tags?: string[];
+    attachments?: { type: string; url: string; label: string }[];
+    galleryImages?: string[];
+    videoLinks?: string[];
+    content?: string;
+    categories?: string[];
+    madaCategory?: string | null;
+    botId?: string | null;
+    language?: 'en' | 'ar';
+  };
 }
 
 export interface ExtractionResult {
@@ -37,7 +60,7 @@ export interface ExtractionResult {
   url: string;
   totalFound: number;
   products: ExtractedProduct[];
-  method: 'json-ld' | 'html-selectors' | 'gemini-ai' | 'mixed';
+  method: 'json-ld' | 'html-selectors' | 'gemini-ai' | 'mixed' | 'mada-scraper';
   fetchMethod: 'fetch' | 'puppeteer'; // Cách lấy HTML
   durationMs: number;
   proxy?: string;
@@ -49,6 +72,47 @@ interface ExtractorLogger {
   info?: (...args: any[]) => void;
   warn?: (...args: any[]) => void;
   error?: (...args: any[]) => void;
+}
+
+export interface ExtractOptions {
+  /**
+   * - 'preview': MADA chỉ scrape 1 page, tối đa 20 SP để admin xem nhanh.
+   * - 'save':    MADA scrape tối đa 3 page, 100 SP để lưu DB.
+   */
+  mode?: 'preview' | 'save';
+  /**
+   * Ngôn ngữ ưu tiên khi scrape MADA. Mặc định: 'en'.
+   */
+  language?: 'en' | 'ar';
+}
+
+const MADA_DOMAINS = new Set(['at.mada.org.qa', 'www.mada.org.qa', 'mada.org.qa']);
+
+export function isMadaUrl(url: string): boolean {
+  try {
+    const host = new URL(url).host.toLowerCase();
+    return MADA_DOMAINS.has(host);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Nhận diện URL là single product page (technology/<slug>) hay category listing.
+ */
+export function classifyMadaUrl(url: string): 'product' | 'category' | 'unknown' {
+  try {
+    const path = new URL(url).pathname;
+    // /technology/<slug>/ là chi tiết 1 sản phẩm
+    if (/\/technology\/[^/]+\/?$/i.test(path)) return 'product';
+    // /technology-category/.../ là listing
+    if (/\/technology-category\//i.test(path)) return 'category';
+    // /assistive-technology-portal/ là listing đặc biệt
+    if (/\/assistive-technology-portal\/?$/i.test(path)) return 'category';
+    return 'unknown';
+  } catch {
+    return 'unknown';
+  }
 }
 
 class ProductExtractorService {
@@ -72,14 +136,28 @@ class ProductExtractorService {
 
   /**
    * Main entry: trích xuất products từ URL
+   *
+   * Auto-routing:
+   *  - URL thuộc MADA (at.mada.org.qa) → dùng mada-scraper chuyên dụng
+   *  - URL khác → 3-layer e-commerce extractor (JSON-LD, HTML, Gemini AI)
    */
-  async extractFromUrl(url: string, logger?: ExtractorLogger): Promise<ExtractionResult> {
+  async extractFromUrl(
+    url: string,
+    logger?: ExtractorLogger,
+    options: ExtractOptions = {}
+  ): Promise<ExtractionResult> {
     const start = Date.now();
     const log = {
       info: logger?.info || console.log,
       warn: logger?.warn || console.warn,
       error: logger?.error || console.error,
     };
+
+    // ===== MADA fast path =====
+    if (isMadaUrl(url)) {
+      log.info?.(`[ProductExtractor] Detected MADA URL → routing to mada-scraper`);
+      return this.extractFromMada(url, log, options, start);
+    }
 
     let fetchMethod: 'fetch' | 'puppeteer' = 'fetch';
     let proxyUsed: string | undefined;
@@ -653,6 +731,201 @@ QUAN TRỌNG: Chỉ trả về JSON hợp lệ. Không có text giải thích.`;
     } catch (err: any) {
       log.error?.('[ProductExtractor] Gemini extraction failed:', err.message);
       return [];
+    }
+  }
+
+  // ============================================================
+  // MADA PORTAL ROUTE (at.mada.org.qa)
+  // ============================================================
+
+  /**
+   * Map 1 ProductDetail (MADA) → ExtractedProduct để tận dụng flow lưu DB / sync RAG.
+   * MADA không có giá → price = 0, currency = 'N/A' (filter chỉ-lưu-SP-có-giá sẽ tự skip nếu cần).
+   */
+  private madaDetailToExtractedProduct(detail: ProductDetail): ExtractedProduct {
+    const madaCategory = extractCategoryFromUrl(detail.source);
+    let catConfig = madaCategory ? MADA_CATEGORIES.find((c) => c.slug === madaCategory) : undefined;
+
+    // Fallback: detect category từ detail.categories (WordPress taxonomy slugs)
+    // Nếu admin paste URL sản phẩm (không chứa category slug), ta vẫn có thể
+    // gán đúng category từ breadcrumb HTML.
+    if (!catConfig && detail.categories?.length) {
+      // detail.categories chứa WordPress taxonomy slugs như 'sensory-hearing'
+      const matched = detail.categories.find((c) =>
+        MADA_CATEGORIES.some((m) => m.slug === c)
+      );
+      if (matched) {
+        catConfig = MADA_CATEGORIES.find((c) => c.slug === matched);
+      }
+    }
+
+    const category = catConfig?.slug || madaCategory || 'general';
+    const brand = catConfig?.botId || undefined;
+
+    // Specifications từ standards + attachments
+    const specs: Record<string, string> = {};
+    detail.isoCodes.forEach((code, i) => {
+      specs[`standard_${i + 1}`] = code;
+    });
+    if (detail.attachments.length) {
+      specs.documents = detail.attachments.map((a) => a.label).join(', ');
+    }
+
+    return {
+      id: detail.slug || `mada-${detail.postId}`,
+      name: detail.title,
+      description: (detail.description || '').slice(0, 1000),
+      price: 0,
+      currency: 'N/A',
+      imageUrl: detail.thumbnailUrl,
+      images: detail.galleryImages?.length ? detail.galleryImages : (detail.thumbnailUrl ? [detail.thumbnailUrl] : []),
+      category,
+      brand,
+      specifications: specs,
+      inStock: true,
+      url: detail.source,
+      extractionMethod: 'mada-scraper',
+      madaMetadata: {
+        postId: detail.postId,
+        slug: detail.slug,
+        isoCodes: detail.isoCodes,
+        tags: detail.tags,
+        attachments: detail.attachments,
+        galleryImages: detail.galleryImages,
+        videoLinks: detail.videoLinks,
+        content: detail.content,
+        categories: detail.categories,
+        madaCategory: catConfig?.slug || madaCategory,
+        botId: catConfig?.botId || null,
+        language: detail.language,
+      },
+    };
+  }
+
+  /**
+   * MADA-specific extractor:
+   *  - Single product URL  → scrape detail page đó
+   *  - Category URL        → list page → scrape N details
+   *  - Root / misc URL     → fallback: list 1 page đầu của sensory-hearing
+   */
+  private async extractFromMada(
+    url: string,
+    log: ExtractorLogger,
+    options: ExtractOptions,
+    startTime: number
+  ): Promise<ExtractionResult> {
+    const mode = options.mode || 'preview';
+    const language = options.language || 'en';
+    const classify = classifyMadaUrl(url);
+
+    try {
+      let products: ExtractedProduct[] = [];
+
+      if (classify === 'product') {
+        // ===== Single product URL → fetch detail trực tiếp =====
+        log.info?.(`[ProductExtractor/MADA] Scraping single product: ${url}`);
+        const slug = url.split('/').filter(Boolean).pop() || 'unknown';
+        const postIdMatch = url.match(/post[-_]?(\d+)/i);
+        const item: ProductListItem = {
+          postId: postIdMatch?.[1] || `unknown-${slug}`,
+          slug,
+          title: slug.replace(/-/g, ' '),
+          detailUrl: url,
+          thumbnailUrl: '',
+          categories: extractCategoryFromUrl(url) ? [extractCategoryFromUrl(url)!] : [],
+          language,
+        };
+        const detail = await scrapeProductDetail(item);
+        products = [this.madaDetailToExtractedProduct(detail)];
+      } else if (classify === 'category') {
+        // ===== Category URL → list + scrape N details =====
+        // Ưu tiên lấy category slug từ URL (EN hoặc AR)
+        let slug = extractCategoryFromUrl(url);
+        let catConfig = slug ? MADA_CATEGORIES.find((c) => c.slug === slug) : undefined;
+
+        // Nếu URL là /ar/... thì tự detect ngôn ngữ
+        let detectedLang: 'en' | 'ar' = language;
+        try {
+          const path = new URL(url).pathname;
+          if (path.startsWith('/ar/')) detectedLang = 'ar';
+        } catch { /* ignore */ }
+
+        if (!catConfig) {
+          // Trường hợp portal root: dùng sensory-hearing mặc định
+          slug = 'sensory-hearing';
+          catConfig = MADA_CATEGORIES.find((c) => c.slug === slug);
+          log.warn?.(`[ProductExtractor/MADA] Cannot match category from URL, falling back to ${slug}`);
+        }
+
+        const maxPages = mode === 'save' ? 3 : 1;
+        const listLimit = mode === 'save' ? 100 : 20;
+
+        if (!slug) {
+          log.warn?.('[ProductExtractor/MADA] No valid category slug, returning empty result');
+          return {
+            success: true,
+            url,
+            totalFound: 0,
+            products: [],
+            method: 'mada-scraper',
+            fetchMethod: 'fetch',
+            durationMs: Date.now() - startTime,
+          };
+        }
+
+        log.info?.(`[ProductExtractor/MADA] Scraping category "${slug}" (lang=${detectedLang}, mode=${mode}, maxPages=${maxPages})`);
+        const list = await scrapeCategoryListing(slug, maxPages, detectedLang);
+
+        for (let i = 0; i < list.length && products.length < listLimit; i++) {
+          const item = list[i];
+          try {
+            log.info?.(`[ProductExtractor/MADA] [${i + 1}/${list.length}] ${item.title}`);
+            const detail = await scrapeProductDetail(item);
+            products.push(this.madaDetailToExtractedProduct(detail));
+            // polite delay
+            await new Promise((r) => setTimeout(r, 500));
+          } catch (err: any) {
+            log.warn?.(`[ProductExtractor/MADA] Skip "${item.title}": ${err.message}`);
+          }
+        }
+      } else {
+        // Unknown URL type → fallback sensory-hearing 1 page
+        log.warn?.(`[ProductExtractor/MADA] Unknown URL type, falling back to sensory-hearing listing`);
+        const list = await scrapeCategoryListing('sensory-hearing', 1, language);
+        for (let i = 0; i < Math.min(list.length, mode === 'save' ? 20 : 5); i++) {
+          try {
+            const detail = await scrapeProductDetail(list[i]);
+            products.push(this.madaDetailToExtractedProduct(detail));
+            await new Promise((r) => setTimeout(r, 500));
+          } catch (err: any) {
+            log.warn?.(`[ProductExtractor/MADA] Skip: ${err.message}`);
+          }
+        }
+      }
+
+      log.info?.(`[ProductExtractor/MADA] ✅ Got ${products.length} products from ${url}`);
+
+      return {
+        success: true,
+        url,
+        totalFound: products.length,
+        products,
+        method: 'mada-scraper',
+        fetchMethod: 'fetch',
+        durationMs: Date.now() - startTime,
+      };
+    } catch (err: any) {
+      log.error?.('[ProductExtractor/MADA] Error:', err);
+      return {
+        success: false,
+        url,
+        totalFound: 0,
+        products: [],
+        method: 'mada-scraper',
+        fetchMethod: 'fetch',
+        durationMs: Date.now() - startTime,
+        error: err.message || String(err),
+      };
     }
   }
 

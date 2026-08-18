@@ -67,6 +67,11 @@ const SYSTEM_PROMPT = `Bạn là MADA AI - trợ lý ảo chuyên về Công ngh
 - KHÔNG đưa ra lời khuyên y tế, chẩn đoán bệnh
 - KHÔNG tự xưng "bác sĩ" hay "chuyên gia y tế"
 - KHÔNG trả lời các vấn đề ngoài phạm vi AT (giáo dục thông thường, y tế đại chúng, etc.)
+- 🚨 QUAN TRỌNG VỀ CÁCH TRẢ LỜI KHI KHÔNG CÓ DỮ LIỆU:
+  • Nếu [Context] ở dưới KHÔNG chứa thông tin liên quan trực tiếp đến câu hỏi của người dùng (kể cả khi có từ khóa trùng), bạn PHẢI nói thẳng rằng mình không tìm thấy thông tin, ví dụ:
+    "Xin lỗi, mình không tìm thấy thông tin về [chủ đề] trong cơ sở dữ liệu MADA. Bạn có thể thử hỏi về [chủ đề liên quan] hoặc liên hệ chuyên gia AT nhé."
+  • TUYỆT ĐỐI KHÔNG bịa thiết bị, KHÔNG gán thông tin từ doc không liên quan vào câu trả lời.
+  • TUYỆT ĐỐI KHÔNG lặp lại tên sản phẩm chỉ vì nó xuất hiện trong context mà không đúng với câu hỏi.
 - Nếu không chắc chắn: "Mình chưa có thông tin chính xác về vấn đề này. Bạn có thể liên hệ chuyên gia AT tại địa phương để được tư vấn chi tiết hơn nhé."
 - Nếu câu hỏi về y tế: "Xin lỗi, mình chỉ hỗ trợ tư vấn về Công nghệ Hỗ trợ (AT). Về các vấn đề y tế, bạn nên tham khảo ý kiến bác sĩ chuyên khoa nhé."
 
@@ -91,6 +96,88 @@ Dưới đây là 3 thiết bị phổ biến cho người khiếm thị đọc 
 
 Bạn muốn mình tư vấn kỹ hơn về thiết bị nào không? 😊`;
 
+/**
+ * ⭐ i18n hóa phần "tail prompt" (CHỈ DẪN TRẢ LỜI) của buildPrompt.
+ * Trước đây cứng tiếng Việt không dấu, nay đa ngôn ngữ.
+ */
+interface RagTailPrompt {
+  userLabel: string;
+  aiLabel: string;
+  guidanceTitle: string;
+  guidanceRules: string[];
+  contextHeader: string;
+  historyHeader: string;
+  questionHeader: string;
+  answerPrompt: string;
+}
+
+const RAG_TAIL_PROMPTS: Record<'vi' | 'en' | 'ar' | 'fr', RagTailPrompt> = {
+  vi: {
+    userLabel: 'Người dùng',
+    aiLabel: 'MADA AI',
+    guidanceTitle: 'CHỈ DẪN TRẢ LỜI',
+    guidanceRules: [
+      'Trả lời NGẮN GỌN, ĐÚNG TRỌNG TÂM câu hỏi',
+      'Chỉ dùng thông tin TỪ NGUỒN, không lan man',
+      'Dừng ngay sau khi đã trả lời đủ',
+      'Nếu CÓ thông tin trong [THÔNG TIN TỪ CƠ SỞ TRI THỨC] thì TRẢ LỜI ngay, TUYỆT ĐỐI KHÔNG nói "không tìm thấy"',
+      'Nếu KHÔNG có thông tin: "Tôi không tìm thấy thông tin về [chủ đề] trong cơ sở dữ liệu."'
+    ],
+    contextHeader: '📚 THÔNG TIN TỪ CƠ SỞ TRI THỨC',
+    historyHeader: '📝 LỊCH SỬ',
+    questionHeader: '❓ Câu hỏi',
+    answerPrompt: '🤖 Trả lời ngắn gọn, đúng trọng tâm:'
+  },
+  en: {
+    userLabel: 'User',
+    aiLabel: 'MADA AI',
+    guidanceTitle: 'ANSWER GUIDELINES',
+    guidanceRules: [
+      'Answer CONCISELY, FOCUSED on the question',
+      'Only use information FROM THE SOURCE, no rambling',
+      'Stop immediately after answering sufficiently',
+      'If information IS in [KNOWLEDGE BASE CONTEXT] then ANSWER right away, NEVER say "not found"',
+      'If NO information: "I could not find information about [topic] in the database."'
+    ],
+    contextHeader: '📚 KNOWLEDGE BASE CONTEXT',
+    historyHeader: '📝 HISTORY',
+    questionHeader: '❓ Question',
+    answerPrompt: '🤖 Answer concisely and focused:'
+  },
+  ar: {
+    userLabel: 'المستخدم',
+    aiLabel: 'MADA AI',
+    guidanceTitle: 'إرشادات الإجابة',
+    guidanceRules: [
+      'أجب بإيجاز، مع التركيز على السؤال',
+      'استخدم فقط المعلومات من المصدر، بدون تشتت',
+      'توقف فورًا بعد الإجابة الكافية',
+      'إذا كانت المعلومات موجودة في [سياق قاعدة المعرفة]، فأجب فورًا، ولا تقل أبدًا "غير موجود"',
+      'إذا لم تكن هناك معلومات: "لم أجد معلومات حول [الموضوع] في قاعدة البيانات."'
+    ],
+    contextHeader: '📚 سياق قاعدة المعرفة',
+    historyHeader: '📝 السجل',
+    questionHeader: '❓ سؤال',
+    answerPrompt: '🤖 أجب بإيجاز وبشكل مركّز:'
+  },
+  fr: {
+    userLabel: 'Utilisateur',
+    aiLabel: 'MADA AI',
+    guidanceTitle: 'CONSIGNES DE RÉPONSE',
+    guidanceRules: [
+      'Répondez CONCISÉMENT, en vous concentrant sur la question',
+      'Utilisez uniquement les informations DE LA SOURCE, sans digression',
+      'Arrêtez-vous dès que la réponse est suffisante',
+      'Si l\'information EST dans [CONTEXTE BASE DE CONNAISSANCES], RÉPONDEZ immédiatement, NE dites JAMAIS "non trouvé"',
+      'Si AUCUNE information : "Je n\'ai pas trouvé d\'information sur [sujet] dans la base de données."'
+    ],
+    contextHeader: '📚 CONTEXTE BASE DE CONNAISSANCES',
+    historyHeader: '📝 HISTORIQUE',
+    questionHeader: '❓ Question',
+    answerPrompt: '🤖 Réponses concise et ciblée :'
+  }
+};
+
 interface RAGResponse {
   answer: string;
   confidence: number;
@@ -110,6 +197,8 @@ interface RAGConfig {
   topK?: number;
   maxOutputTokens?: number;
   systemInstruction?: string;
+  /** ⭐ Ngôn ngữ UI để i18n hóa tail prompt (mặc định 'vi') */
+  language?: 'vi' | 'en' | 'ar' | 'fr';
   /** ⭐ MỚI: Filter RAG theo bot ID (e.g. 'bot-hearing') */
   botId?: string;
   /** ⭐ MỚI: Filter RAG theo MADA category slug (e.g. 'sensory-hearing') */
@@ -232,7 +321,7 @@ class RAGEngine {
 
       // Build prompt
       const hasContext = context.length > 0;
-      const prompt = this.buildPrompt(userQuery, context, conversationHistory, hasContext, systemInstruction);
+      const prompt = this.buildPrompt(userQuery, context, conversationHistory, hasContext, systemInstruction, config.language);
 
       // Generate response
       if (!this._isConfigured || !this.genAI) {
@@ -403,7 +492,52 @@ class RAGEngine {
     const { botId, madaCategory, priority = false } = config;
 
     // Retrieve relevant documents (với filter MADA nếu có)
-    const relevantDocs = await this.retrieveDocuments(userQuery, topK * 4, { botId, madaCategory, priority });
+    const rawDocs = await this.retrieveDocuments(userQuery, topK * 4, { botId, madaCategory, priority });
+
+    // ⭐ FIX: Pinecone trả score=1.0 cho mọi doc (do metric config), không dùng được.
+    // → BẮT BUỘC gọi rerankService (LLM-based) để có relevance score thật.
+    // Nếu rerank fail → fallback dùng rawDocs nhưng đánh confidence thấp.
+    let relevantDocs: any[] = rawDocs;
+    let usedRerank = false;
+    if (rerankService.isReady() && rawDocs.length > 0) {
+      try {
+        const items: RerankableItem[] = rawDocs.map((doc, idx) => ({
+          id: doc.id || `doc_${idx}`,
+          content: doc.content,
+          score: doc.score || 0.5,
+          metadata: doc.metadata,
+        }));
+        const reranked = await rerankService.rerank(userQuery, items, { topN: topK });
+        if (reranked.length > 0) {
+          relevantDocs = reranked.map((r) => ({
+            ...r.item,
+            score: r.rerankScore,
+            metadata: {
+              ...r.item.metadata,
+              rerankScore: r.rerankScore,
+              rerankReason: r.reason,
+            },
+          }));
+          usedRerank = true;
+          console.log(`🔄 [RAG Stream] Reranked: top rerank score = ${relevantDocs[0].score.toFixed(3)}`);
+        }
+      } catch (err) {
+        console.warn('⚠️ [RAG Stream] Rerank failed, using raw docs:', (err as Error).message);
+      }
+    }
+
+    // ⭐ FIX: Lọc docs có relevance score quá thấp (sau rerank) để tránh
+    // Gemini bị ép trả lời khi context không thực sự match câu hỏi.
+    // Rerank score 0..1. Threshold 0.5: docs < 0.5 rõ ràng không liên quan.
+    // Threshold cao hơn (0.7) sẽ cắt nhầm paraphrase tốt.
+    const RERANK_THRESHOLD = 0.5;
+    const beforeFilter = relevantDocs.length;
+    if (usedRerank) {
+      relevantDocs = relevantDocs.filter((d: any) => (d.score ?? 0) >= RERANK_THRESHOLD);
+      console.log(`🔍 [RAG Stream] After threshold: ${relevantDocs.length}/${beforeFilter} (best: ${(relevantDocs[0]?.score ?? 0).toFixed(3)})`);
+    } else if (relevantDocs.length > 0) {
+      console.log(`⚠️ [RAG Stream] No rerank; using all ${relevantDocs.length} raw docs (may be irrelevant)`);
+    }
 
     // Build context
     let context = '';
@@ -415,7 +549,7 @@ class RAGEngine {
 
     // Build prompt
     const hasContext = context.length > 0;
-    const prompt = this.buildPrompt(userQuery, context, conversationHistory, hasContext, config.systemInstruction);
+    const prompt = this.buildPrompt(userQuery, context, conversationHistory, hasContext, config.systemInstruction, config.language);
 
     // Format sources
     const sources = relevantDocs.map((doc) => ({
@@ -477,11 +611,18 @@ class RAGEngine {
     context: string,
     conversationHistory: Array<{ role: string; content: string }>,
     hasContext: boolean,
-    systemInstruction?: string
+    systemInstruction?: string,
+    language: 'vi' | 'en' | 'ar' | 'fr' = 'vi'
   ): string {
+    const langCode: 'vi' | 'en' | 'ar' | 'fr' = (['vi', 'en', 'ar', 'fr'].includes(language) ? language : 'vi');
+    const tail = RAG_TAIL_PROMPTS[langCode];
+
     const historyStr = conversationHistory.length > 0
       ? conversationHistory
-          .map((msg) => `${msg.role === 'user' ? 'Nguoi dung' : 'MADA AI'}: ${msg.content}`)
+          .map((msg) => {
+            const roleLabel = msg.role === 'user' ? tail.userLabel : tail.aiLabel;
+            return `${roleLabel}: ${msg.content}`;
+          })
           .join('\n')
       : '';
 
@@ -489,34 +630,48 @@ class RAGEngine {
 
     return `${basePrompt}
 
-CHI DAN TRA LOI:
-- Tra loi NGAN GON, DUNG TRONG TAM cau hoi
-- Chi dung thong tin TU NGUON, khong lan man
-- Dung dong ngay sau khi da tra loi du
-- Neu khong co thong tin: "Toi khong tim thay thong tin ve [chu de] trong co so du lieu."
+${tail.guidanceTitle}:
+${tail.guidanceRules.map(r => `- ${r}`).join('\n')}
 
-${hasContext ? `📚 THONG TIN TU CO SO TRI THUC:
+${hasContext ? `${tail.contextHeader}:
 ${context}
 
 ---` : ''}
-${historyStr ? `📝 LICH SU:
+${historyStr ? `${tail.historyHeader}:
 ${historyStr}
 
 ---` : ''}
-❓ Cau hoi: ${userQuery}
+${tail.questionHeader}: ${userQuery}
 
-🤖 Tra loi ngan gon, dung trong tam:`;
+${tail.answerPrompt}`;
   }
 
   private calculateConfidence(relevantDocs: any[], hasContext: boolean): number {
-    if (!hasContext) return 50;
+    if (!hasContext || relevantDocs.length === 0) return 30;
 
-    const docCount = relevantDocs.length;
-    if (docCount >= 3) return 95;
-    if (docCount >= 2) return 85;
-    if (docCount >= 1) return 75;
+    // ⭐ FIX: Confidence dựa trên rerank score (range 0..1, từ rerankService).
+    // Top rerank score càng cao → confidence càng cao.
+    const scores = relevantDocs
+      .map((d: any) => (typeof d.score === 'number' ? d.score : 0.5))
+      .slice(0, 5);
+    const top1 = scores[0] || 0;
+    const avgTop3 = scores.slice(0, 3).reduce((a, b) => a + b, 0) / Math.min(3, scores.length);
 
-    return 65;
+    // ⭐ Rerank score 0.5-0.7 thường là "liên quan một phần" (trùng keyword nhưng
+    // không match intent). Cần penalty mạnh.
+    // Rerank score 0.7+ mới thực sự trả lời được câu hỏi.
+    const toConfidence = (s: number) => {
+      if (s >= 0.85) return 95;
+      if (s >= 0.75) return 85;
+      if (s >= 0.65) return 70;
+      if (s >= 0.55) return 55;
+      return 40; // < 0.55 thì coi như không match
+    };
+    const topConf = toConfidence(top1);
+    const avgConf = toConfidence(avgTop3);
+
+    // Weighted: 70% top1 + 30% avg top3
+    return Math.round(topConf * 0.7 + avgConf * 0.3);
   }
 
   private detectCategory(query: string): string {

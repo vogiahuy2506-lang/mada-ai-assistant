@@ -638,16 +638,39 @@ router.get('/user-stats', (req, res) => {
 // GET /api/admin/knowledge-stats
 router.get('/knowledge-stats', (req, res) => {
   try {
-    const stats = {
-      totalDocuments: db.prepare('SELECT COUNT(*) as count FROM kb_products').get() as { count: number },
-      totalCategories: db.prepare('SELECT COUNT(*) as count FROM kb_categories').get() as { count: number },
-    };
-    
+    const { botId, category } = req.query;
+
+    // Build WHERE cho knowledge_items (dùng JSON extract)
+    let kiWhere = "WHERE 1=1";
+    const kiParams: any[] = [];
+    if (botId) { kiWhere += " AND json_extract(metadata, '$.botId') = ?"; kiParams.push(botId); }
+    if (category) { kiWhere += " AND json_extract(metadata, '$.madaCategory') = ?"; kiParams.push(category); }
+
+    let kpWhere = "WHERE 1=1";
+    const kpParams: any[] = [];
+    if (category) { kpWhere += " AND category = ?"; kpParams.push(category); }
+
+    // Per-bot breakdown
+    const perBotRows = db.prepare(
+      `SELECT json_extract(metadata, '$.botId') as botId, COUNT(*) as count
+       FROM knowledge_items
+       WHERE json_extract(metadata, '$.botId') IS NOT NULL
+       GROUP BY json_extract(metadata, '$.botId')
+       ORDER BY count DESC`
+    ).all() as { botId: string; count: number }[];
+
+    const totalDocs = (db.prepare(`SELECT COUNT(*) as count FROM knowledge_items ${kiWhere}`).get(...kiParams) as { count: number }).count;
+    const totalKb = (db.prepare('SELECT COUNT(*) as count FROM kb_products').get() as { count: number }).count;
+    const totalCats = (db.prepare('SELECT COUNT(*) as count FROM kb_categories').get() as { count: number }).count;
+
     res.json({
       success: true,
       data: {
-        totalDocuments: stats.totalDocuments.count,
-        totalCategories: stats.totalCategories.count,
+        totalDocuments: totalDocs,
+        totalKbProducts: totalKb,
+        totalCategories: totalCats,
+        perBot: perBotRows,
+        filter: { botId: botId || null, category: category || null },
       },
     });
   } catch (error: any) {
@@ -661,17 +684,45 @@ router.get('/knowledge-stats', (req, res) => {
 router.get('/settings', requireAdmin, (req, res) => {
   try {
     const settings = db.prepare('SELECT * FROM system_settings').all() as any[];
-    
+
     const settingsMap: Record<string, any> = {};
+    const grouped: Record<string, any[]> = {};
+    const categories: Record<string, { label: string; icon: string }> = {
+      ai: { label: 'AI & Model', icon: 'psychology' },
+      auth: { label: 'Authentication & Security', icon: 'lock' },
+      file_upload: { label: 'File Upload', icon: 'upload_file' },
+      rate_limit: { label: 'Rate Limits', icon: 'speed' },
+      plan: { label: 'Plans & Quotas', icon: 'workspace_premium' },
+      system: { label: 'System', icon: 'settings' },
+    };
+
     for (const s of settings) {
-      let value = s.value;
+      let value: any = s.value;
       if (s.type === 'number') value = Number(value);
       if (s.type === 'boolean') value = value === 'true';
       if (s.type === 'json') value = JSON.parse(value);
+
       settingsMap[s.key] = value;
+
+      // ⭐ Auto-group theo prefix key
+      const prefix = s.key.split('_')[0];
+      const catKey = categories[prefix] ? prefix : 'system';
+      if (!grouped[catKey]) grouped[catKey] = [];
+      grouped[catKey].push({
+        key: s.key,
+        value,
+        type: s.type,
+        description: s.description || '',
+        updated_at: s.updated_at,
+      });
     }
-    
-    res.json({ success: true, data: settingsMap });
+
+    res.json({
+      success: true,
+      data: settingsMap,
+      grouped,
+      categories,
+    });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -733,6 +784,142 @@ router.post('/products/sync-all', requireAdmin, (req, res) => {
       message:
         `Synced ${result.inserted} new + ${result.updated} updated + ${result.archived} archived. ` +
         `Run "Sync to Vector Store" (npx tsx server/scripts/sync-kb-to-vectors.ts) to make them searchable by AI.`,
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ============== AUDIT LOGS ==============
+
+router.get('/audit', requireAdmin, (req, res) => {
+  try {
+    const { action, user_id, limit = 100, offset = 0 } = req.query;
+    let sql = 'SELECT * FROM audit_logs WHERE 1=1';
+    const params: any[] = [];
+
+    if (action) { sql += ' AND action LIKE ?'; params.push(`%${action}%`); }
+    if (user_id) { sql += ' AND user_id = ?'; params.push(user_id); }
+
+    // Count
+    let countSql = `SELECT COUNT(*) as total FROM audit_logs WHERE 1=1${action ? ' AND action LIKE ?' : ''}${user_id ? ' AND user_id = ?' : ''}`;
+    const countParams = params.slice();
+    const { total } = db.prepare(countSql).get(...countParams) as { total: number };
+
+    sql += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
+    params.push(Number(limit), Number(offset));
+
+    const logs = db.prepare(sql).all(...params);
+    res.json({ success: true, data: logs, total });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+router.get('/audit/actions', requireAdmin, (_req, res) => {
+  try {
+    const rows = db.prepare(
+      'SELECT DISTINCT action FROM audit_logs ORDER BY action ASC'
+    ).all();
+    res.json({ success: true, data: rows.map((r: any) => r.action) });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ============== POST /api/admin/chat-metrics ==============
+
+router.post('/chat-metrics', requireAdmin, (req, res) => {
+  try {
+    const { latencyMs, confidence } = req.body || {};
+    if (typeof latencyMs !== 'number' || typeof confidence !== 'number') {
+      return res.status(400).json({ success: false, error: 'latencyMs, confidence phải là number' });
+    }
+
+    const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+
+    // Upsert vào summary row cho today (running aggregates)
+    const existing = db.prepare('SELECT * FROM chat_metrics WHERE date = ?').get(today) as any;
+
+    if (existing) {
+      const newTotalQueries = (existing.total_queries || 0) + 1;
+      const newAvgLatency = Math.round(
+        ((existing.avg_response_time_ms || 0) * (existing.total_queries || 0) + latencyMs) / newTotalQueries
+      );
+      const newAvgConfidence =
+        ((existing.avg_confidence || 0) * (existing.total_queries || 0) + confidence) / newTotalQueries;
+
+      db.prepare(
+        `UPDATE chat_metrics SET
+           total_queries = ?,
+           avg_response_time_ms = ?,
+           avg_confidence = ?,
+           updated_at = ?
+         WHERE date = ?`
+      ).run(newTotalQueries, newAvgLatency, newAvgConfidence, new Date().toISOString(), today);
+    } else {
+      db.prepare(
+        `INSERT INTO chat_metrics (id, total_chats, total_queries, avg_response_time_ms, avg_confidence, date, created_at, updated_at)
+         VALUES (?, 0, 1, ?, ?, ?, ?, ?)`
+      ).run(
+        `metric-${Date.now()}`,
+        latencyMs,
+        confidence,
+        today,
+        new Date().toISOString(),
+        new Date().toISOString()
+      );
+    }
+
+    res.json({ success: true, data: { date: today, updated: !existing } });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ============== POST /api/admin/agents/test ==============
+
+router.post('/agents/test', requireAdmin, async (req, res) => {
+  try {
+    const { agentId, message } = req.body || {};
+    if (!agentId || !message) {
+      return res.status(400).json({ success: false, error: 'agentId, message là bắt buộc' });
+    }
+
+    const agent = db.prepare('SELECT * FROM admin_agents WHERE id = ?').get(agentId) as any;
+    if (!agent) {
+      return res.status(404).json({ success: false, error: 'Agent không tồn tại' });
+    }
+
+    const start = Date.now();
+    // Proxy tới /api/chat nội bộ
+    const chatRes = await fetch(`http://127.0.0.1:${process.env.PORT || 5001}/api/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message,
+        agentId,
+        language: 'vi',
+        userMode: 'endUser',
+        // stream: false để lấy nguyên văn
+      }),
+    });
+
+    const latencyMs = Date.now() - start;
+    if (!chatRes.ok) {
+      const err = await chatRes.text();
+      return res.status(500).json({ success: false, error: `Chat API failed: ${err}`, latencyMs });
+    }
+
+    const json: any = await chatRes.json();
+    res.json({
+      success: true,
+      data: {
+        response: json.data?.response || json.response || json.message || '',
+        latencyMs,
+        confidence: json.data?.confidence ?? json.confidence ?? 0.8,
+        agentName: agent.name,
+      },
     });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });

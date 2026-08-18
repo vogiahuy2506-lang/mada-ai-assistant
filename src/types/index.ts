@@ -611,6 +611,10 @@ export const CATEGORY_INFO: Record<ATCategory, {
   color: string;
   bgColor: string;
   borderColor: string;
+  greeting: string;
+  greetingEn: string;
+  greetingAr: string;
+  greetingFr: string;
 }> = {
   vision: { 
     name: 'Thiết bị nhìn', 
@@ -622,6 +626,10 @@ export const CATEGORY_INFO: Record<ATCategory, {
     color: 'text-violet-600',
     bgColor: 'bg-violet-50 dark:bg-violet-900/30',
     borderColor: 'border-violet-500',
+    greeting: 'Xin chào! Tôi là **Trợ lý AI** chuyên khoa **Thị giác**. Tôi có thể hỗ trợ bạn về các thiết bị hỗ trợ nhìn như **phần mềm đọc màn hình**, **kính lúp điện tử**, **chữ nổi Braille** và các **giải pháp công nghệ hỗ trợ thị lực**.',
+    greetingEn: 'Hello! I am your **AI Assistant** specializing in **Vision**. I can help you with **screen readers**, **electronic magnifiers**, **Braille displays**, and **visual assistive technology** solutions.',
+    greetingAr: 'مرحباً! أنا مساعدك **الذكي** المتخصص في **الرؤية**. يمكنني مساعدتك في **قارئات الشاشة**، **المكبرات الإلكترونية**، **شاشات بريل**، و**حلول التكنولوجيا المساعدة للبصر**.',
+    greetingFr: 'Bonjour! Je suis votre assistant **IA** spécialisé dans la **Vision**. Je peux vous aider avec les **lecteurs d\'écran**, les **lupa électroniques**, les **plages Braille** et les **solutions technologiques d\'assistance visuelle**.',
   },
   hearing: { 
     name: 'Thiết bị nghe', 
@@ -633,6 +641,10 @@ export const CATEGORY_INFO: Record<ATCategory, {
     color: 'text-blue-600',
     bgColor: 'bg-blue-50 dark:bg-blue-900/30',
     borderColor: 'border-blue-500',
+    greeting: 'Xin chào! Tôi là **Trợ lý AI** chuyên khoa **Thính giác**. Tôi có thể hỗ trợ bạn về **máy trợ thính**, **thiết bị phản hồi âm thanh**, **thiết bị khuếch đại cá nhân** và các **giải pháp công nghệ hỗ trợ thính lực**.',
+    greetingEn: 'Hello! I am your **AI Assistant** specializing in **Hearing**. I can help you with **hearing aids**, **alerting devices**, **personal amplifiers**, and **hearing assistive technology** solutions.',
+    greetingAr: 'مرحباً! أنا مساعدك **الذكي** المتخصص في **السمع**. يمكنني مساعدتك في **سماعات الأذن**، **أجهزة التنبيه**، **المضخات الصوتية الشخصية**، و**حلول التكنولوجيا المساعدة للسمع**.',
+    greetingFr: 'Bonjour! Je suis votre assistant **IA** spécialisé dans l\'**Audition**. Je peux vous aider avec les **appareils auditifs**, les **dispositifs d\'alerte**, les **amplificateurs personnels**, et les **solutions technologiques d\'assistance auditive**.',
   },
   mobility: { 
     name: 'Thiết bị vận động', 
@@ -644,6 +656,10 @@ export const CATEGORY_INFO: Record<ATCategory, {
     color: 'text-green-600',
     bgColor: 'bg-green-50 dark:bg-green-900/30',
     borderColor: 'border-green-500',
+    greeting: 'Xin chào! Tôi là **Trợ lý AI** chuyên khoa **Vận động**. Tôi có thể hỗ trợ bạn về **xe lăn**, **xe scooter**, **nạng**, **walker**, **prosthetics** và các **giải pháp công nghệ hỗ trợ di chuyển**.',
+    greetingEn: 'Hello! I am your **AI Assistant** specializing in **Mobility**. I can help you with **wheelchairs**, **scooters**, **crutches**, **walkers**, **prosthetics**, and **mobility assistive technology** solutions.',
+    greetingAr: 'مرحباً! أنا مساعدك **الذكي** المتخصص في **الحركة**. يمكنني مساعدتك في **الكراسي المتحركة**، **السكوترات**، **العكازات**، **المشايات**، **الأطراف الصناعية**، و**حلول التكنولوجيا المساعدة للحركة**.',
+    greetingFr: 'Bonjour! Je suis votre assistant **IA** spécialisé dans la **Mobilité**. Je peux vous aider avec les **fauteuils roulants**, les **scooters**, les **béquilles**, les **déambulateurs**, les **prothèses**, et les **solutions technologiques d\'assistance à la mobilité**.',
   },
   cognition: { 
     name: 'Thiết bị nhận thức', 
@@ -655,6 +671,10 @@ export const CATEGORY_INFO: Record<ATCategory, {
     color: 'text-amber-600',
     bgColor: 'bg-amber-50 dark:bg-amber-900/30',
     borderColor: 'border-amber-500',
+    greeting: 'Xin chào! Tôi là **Trợ lý AI** chuyên khoa **Nhận thức**. Tôi có thể hỗ trợ bạn về thiết bị hỗ trợ **trí nhớ**, **lập kế hoạch**, **tổ chức công việc**, **hỗ trợ học tập nhận thức** và các **công nghệ hỗ trợ nhận thức**.',
+    greetingEn: 'Hello! I am your **AI Assistant** specializing in **Cognition**. I can help you with **memory aids**, **planning tools**, **task organization**, **cognitive learning support**, and **cognitive assistive technology** solutions.',
+    greetingAr: 'مرحباً! أنا مساعدك **الذكي** المتخصص في **الإدراك**. يمكنني مساعدتك في **أدوات الذاكرة**، **أدوات التخطيط**، **تنظيم المهام**، **الدعم المعرفي للتعلم**، و**حلول التكنولوجيا المساعدة للإدراك**.',
+    greetingFr: 'Bonjour! Je suis votre assistant **IA** spécialisé dans la **Cognition**. Je peux vous aider avec les **aides à la mémoire**, les **outils de planification**, l\'**organisation des tâches**, le **soutien à l\'apprentissage cognitif**, et les **solutions technologiques d\'assistance cognitive**.',
   },
   communication: { 
     name: 'Thiết bị giao tiếp', 
@@ -666,6 +686,10 @@ export const CATEGORY_INFO: Record<ATCategory, {
     color: 'text-rose-600',
     bgColor: 'bg-rose-50 dark:bg-rose-900/30',
     borderColor: 'border-rose-500',
+    greeting: 'Xin chào! Tôi là **Trợ lý AI** chuyên khoa **Giao tiếp**. Tôi có thể hỗ trợ bạn về thiết bị giao tiếp **tăng thay thế (AAC)**, **ứng dụng hỗ trợ ngôn ngữ**, **thiết bị hỗ trợ nói** và các **công nghệ hỗ trợ giao tiếp**.',
+    greetingEn: 'Hello! I am your **AI Assistant** specializing in **Communication**. I can help you with **augmentative and alternative communication (AAC)** devices, **language support apps**, **speech aids**, and **communication assistive technology** solutions.',
+    greetingAr: 'مرحباً! أنا مساعدك **الذكي** المتخصص في **التواصل**. يمكنني مساعدتك في أجهزة **الاتصال التوسعي والبديل (AAC)**، **تطبيقات الدعم اللغوي**، **أدوات المساعدة في الكلام**، و**حلول التكنولوجيا المساعدة للتواصل**.',
+    greetingFr: 'Bonjour! Je suis votre assistant **IA** spécialisé dans la **Communication**. Je peux vous aider avec les dispositifs de **communication augmentative et alternative (CAA)**, les **applications de soutien linguistique**, les **aides à la parole**, et les **solutions technologiques d\'assistance à la communication**.',
   },
   daily_living: { 
     name: 'Hỗ trợ sinh hoạt', 
@@ -677,6 +701,10 @@ export const CATEGORY_INFO: Record<ATCategory, {
     color: 'text-teal-600',
     bgColor: 'bg-teal-50 dark:bg-teal-900/30',
     borderColor: 'border-teal-500',
+    greeting: 'Xin chào! Tôi là **Trợ lý AI** chuyên khoa **Sinh hoạt hàng ngày**. Tôi có thể hỗ trợ bạn về thiết bị **ăn uống**, **vệ sinh cá nhân**, **hỗ trợ ngủ nghỉ**, **điều khiển nhà thông minh** và các **giải pháp công nghệ hỗ trợ sinh hoạt**.',
+    greetingEn: 'Hello! I am your **AI Assistant** specializing in **Daily Living**. I can help you with **eating aids**, **personal hygiene devices**, **sleep support**, **smart home controls**, and **daily living assistive technology** solutions.',
+    greetingAr: 'مرحباً! أنا مساعدك **الذكي** المتخصص في **المعيشة اليومية**. يمكنني مساعدتك في **أدوات الأكل**، **أجهزة النظافة الشخصية**، **دعم النوم**، **التحكم في المنزل الذكي**، و**حلول التكنولوجيا المساعدة للمعيشة اليومية**.',
+    greetingFr: 'Bonjour! Je suis votre assistant **IA** spécialisé dans la **Vie Quotidienne**. Je peux vous aider avec les **aides à l\'alimentation**, les **appareils d\'hygiène personnelle**, le **soutien au sommeil**, les **contrôles domotiques**, et les **solutions technologiques d\'assistance à la vie quotidienne**.',
   },
   education: { 
     name: 'Giáo dục', 
@@ -688,5 +716,9 @@ export const CATEGORY_INFO: Record<ATCategory, {
     color: 'text-indigo-600',
     bgColor: 'bg-indigo-50 dark:bg-indigo-900/30',
     borderColor: 'border-indigo-500',
+    greeting: 'Xin chào! Tôi là **Trợ lý AI** chuyên khoa **Giáo dục**. Tôi có thể hỗ trợ bạn về thiết bị hỗ trợ **học tập**, **phần mềm giáo dục đặc biệt**, **tài liệu hướng dẫn sư phạm** và các **công nghệ hỗ trợ giáo dục** cho người khuyết tật.',
+    greetingEn: 'Hello! I am your **AI Assistant** specializing in **Education**. I can help you with **learning assistive devices**, **special education software**, **pedagogical guides**, and **educational assistive technology** solutions for people with disabilities.',
+    greetingAr: 'مرحباً! أنا مساعدك **الذكي** المتخصص في **التعليم**. يمكنني مساعدتك في **أجهزة المساعدة التعليمية**، **برامج التعليم الخاص**، **الأدلة التربوية**، و**حلول التكنولوجيا المساعدة التعليمية** للأشخاص ذوي الإعاقة.',
+    greetingFr: 'Bonjour! Je suis votre assistant **IA** spécialisé dans l\'**Éducation**. Je peux vous aider avec les **appareils d\'assistance à l\'apprentissage**, les **logiciels d\'éducation spéciale**, les **guides pédagogiques**, et les **solutions technologiques d\'assistance éducative** pour les personnes en situation de handicap.',
   },
 };

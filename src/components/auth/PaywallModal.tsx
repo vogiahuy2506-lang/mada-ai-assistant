@@ -157,11 +157,15 @@ export function PaywallModal() {
             <h2 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight mb-2">
               {reason === 'anonymous_exhausted'
                 ? 'Bạn đã dùng hết lượt miễn phí'
+                : reason === 'file_upload_exhausted'
+                ? 'Đã hết lượt tải file trong tháng'
                 : 'Đã hết lượt trong gói Free'}
             </h2>
             <p className="text-slate-500 max-w-xl mx-auto">
               {reason === 'anonymous_exhausted'
                 ? 'Đăng ký miễn phí để tiếp tục trò chuyện với MADA AI — nhận ngay 10 lượt trải nghiệm.'
+                : reason === 'file_upload_exhausted'
+                ? 'Bạn đã sử dụng hết 10 lượt tải file trong tháng này. Nâng cấp Pro để tải không giới hạn và mở khóa thêm tính năng nâng cao.'
                 : 'Nâng cấp lên Pro để mở khóa cuộc trò chuyện không giới hạn và các tính năng chuyên gia.'}
             </p>
 

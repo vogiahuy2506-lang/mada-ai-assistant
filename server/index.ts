@@ -14,7 +14,7 @@ import session from 'express-session';
 
 /**
  * Convert MADA image URL to proxy URL to avoid hotlink protection.
- * Returns EMPTY string if no MADA image available - frontend will show
+ * Returns EMPTY string if no valid image available - frontend will show
  * a clean placeholder icon instead of fake/random images.
  *
  * RATIONALE: We do NOT use generic fallback images (Unsplash, etc.) because:
@@ -26,16 +26,29 @@ import session from 'express-session';
  * @returns Proxy URL string, or '' if no image (frontend handles placeholder)
  */
 function toProxyImageUrl(madaUrl: string): string {
-  // Only accept valid MADA URLs
-  if (madaUrl && typeof madaUrl === 'string' && madaUrl.startsWith('http')) {
-    if (madaUrl.includes('mada.org.qa') || madaUrl.includes('cdn.at.mada.org.qa')) {
-      return `/api/mada-image?url=${encodeURIComponent(madaUrl)}`;
-    }
-    // Other trusted URLs (cdn uploads) → use proxy too
+  // Chỉ accept valid URLs
+  if (!madaUrl || typeof madaUrl !== 'string' || !madaUrl.startsWith('http')) {
+    return '';
+  }
+
+  // Proxy tất cả MADA domains
+  if (madaUrl.includes('mada.org.qa') || madaUrl.includes('cdn.at.mada.org.qa')) {
     return `/api/mada-image?url=${encodeURIComponent(madaUrl)}`;
   }
-  // No image → return empty string, frontend shows placeholder
-  return '';
+
+  // Proxy các shop VN phổ biến
+  const shopDomains = ['tgdd.vn', 'cellphones.com.vn', 'fptshop.com.vn', 'dienmayxanh.com', 'hstatic.net', 'viettelstore.vn'];
+  if (shopDomains.some(d => madaUrl.includes(d))) {
+    return madaUrl; // Load trực tiếp không cần proxy
+  }
+
+  // Proxy Wikimedia (Wikipedia images)
+  if (madaUrl.includes('upload.wikimedia.org')) {
+    return madaUrl; // Load trực tiếp
+  }
+
+  // Unknown domain → cố load trực tiếp (browser sẽ fail nếu có hotlink protection)
+  return madaUrl;
 }
 
 // RAG imports
@@ -51,7 +64,7 @@ import { startScheduler } from './lib/scraping-scheduler';
 
 // Auth imports
 import './lib/db'; // Initialize DB
-import db from './lib/db';
+import db, { getFileUploadQuota, trackFileUpload } from './lib/db';
 import authRoutes from './routes/auth';
 import userRoutes from './routes/users';
 import userHistoryRoutes from './routes/userHistory';
@@ -64,6 +77,7 @@ import paymentRoutes from './routes/payments';
 import productsRoutes from './routes/products';
 import consultationRoutes from './routes/consultation';
 import adminRoutes from './routes/admin';
+import adminScraperRoutes from './routes/admin-scraper';
 import urlImportRoutes from './routes/urlImport';
 import publicRoutes from './routes/public';
 
@@ -83,9 +97,12 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 import { createRateLimiter } from './lib/middleware/rate-limiter';
 const apiRateLimiter = createRateLimiter({
   windowMs: 60 * 1000, // 1 phút
-  max: 100, // Tối đa 100 requests / phút / IP
+  max: 300, // Tăng từ 100 → 300 để không vướng khi admin polling /admin/scraper + chat cùng lúc
 });
 app.use('/api/', apiRateLimiter);
+
+// Skip rate limit cho admin scraper routes (ch� admin mới vào được - đã có requireRole)
+app.use('/api/admin/scraper', (req, _res, next) => next());
 
 // Rate limit chặt hơn cho các endpoint đắt tài nguyên (chat, recommend, rag)
 const heavyApiRateLimiter = createRateLimiter({
@@ -319,6 +336,8 @@ app.use('/api/user', userHistoryRoutes);
 app.use('/api/kb', kbRoutes);
 app.use('/api/scraper', scraperRoutes);
 app.use('/api/payments', paymentRoutes);
+// ⭐ Mount productsRoutes ở 2 prefix: /items (file gốc) và /products (frontend gọi)
+app.use('/api/admin/items', productsRoutes);
 app.use('/api/admin/products', productsRoutes);
 
 // ============== MADA IMAGE PROXY ==============
@@ -434,6 +453,7 @@ app.use('/api/mada-scraper', madaScraperRoutes);
 app.use('/api/admin', approvalRoutes);
 app.use('/api/consultation', consultationRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/admin/scraper', adminScraperRoutes);
 // Public routes (no auth required)
 app.use('/api/public', publicRoutes);
 app.get('/api/admin/logs', async (req, res) => {
@@ -468,6 +488,46 @@ app.delete('/api/admin/logs', async (_req, res) => {
   activityLogs.length = 0;
   logActivity('info', 'Activity logs cleared by admin', 'Admin');
   res.json({ success: true, message: 'Logs cleared' });
+});
+
+// ============== FILE UPLOAD QUOTA ENDPOINTS ==============
+// Authenticated: trả quota của user hiện tại
+app.get('/api/user/file-quota', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith('Bearer ')) {
+      return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+    const token = authHeader.slice('Bearer '.length);
+    const { verifyAccessToken } = await import('./lib/auth');
+    const payload = verifyAccessToken(token);
+    if (!payload?.userId) return res.status(401).json({ success: false, error: 'Invalid token' });
+
+    const user = db.prepare('SELECT id, plan FROM users WHERE id = ?').get(payload.userId) as { id: string; plan: 'free' | 'pro' | 'enterprise' } | undefined;
+    if (!user) return res.status(404).json({ success: false, error: 'User not found' });
+
+    const quota = getFileUploadQuota(user.id, user.plan);
+    res.json({ success: true, data: quota });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+});
+
+// Admin/system: trả plan limits để FE hiển thị pricing card
+app.get('/api/user/file-quota/plan-limits', async (_req, res) => {
+  try {
+    const { getFileUploadLimitForPlan } = await import('./lib/db');
+    res.json({
+      success: true,
+      data: {
+        free: getFileUploadLimitForPlan('free'),
+        pro: getFileUploadLimitForPlan('pro'),
+        enterprise: getFileUploadLimitForPlan('enterprise'),
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
 });
 
 // Admin analytics summary
@@ -702,11 +762,28 @@ async function initializeServices() {
     // Start scraping scheduler
     startScheduler();
   } catch (error) {
-    console.error('Failed to initialize services:', error);
+    console.error('❌ Failed to initialize services:', error);
+    if (error instanceof Error && error.stack) {
+      console.error('Stack:', error.stack);
+    }
   }
 }
 
 initializeServices();
+
+/**
+ * ⭐ FIX: Wait cho RAG engine sẵn sàng (tối đa timeoutMs)
+ * Dùng để tránh 500 errors khi user request đến trước khi initializeServices() xong.
+ * Trả về true nếu ready, false nếu timeout.
+ */
+async function waitForRagReady(timeoutMs = 15000): Promise<boolean> {
+  if (ragEngine.isConfigured) return true;
+  const start = Date.now();
+  while (!ragEngine.isConfigured && Date.now() - start < timeoutMs) {
+    await new Promise((r) => setTimeout(r, 250));
+  }
+  return ragEngine.isConfigured;
+}
 
 // In-memory storage
 const consultations: any[] = [];
@@ -2099,13 +2176,89 @@ Violation = erreur critique.`,
 };
 
 /**
+ * ⭐ Persona overlay cho 2 chế độ người dùng: End-User vs AT Specialist
+ * Được inject vào system prompt để AI điều chỉnh giọng điệu và mức độ kỹ thuật.
+ * Không lâm sàng/y tế — tập trung vào Công nghệ Hỗ trợ (AT).
+ */
+const MODE_PERSONA_INSTRUCTIONS: Record<string, Record<'endUser' | 'specialist', string>> = {
+  vi: {
+    endUser: `🎭 CHẾ ĐỘ NGƯỜI DÙNG (End-User Mode):
+- Bạn nói chuyện THÂN THIỆN, đơn giản, dễ hiểu như đang tư vấn trực tiếp cho người dùng phổ thông.
+- Tránh dùng thuật ngữ kỹ thuật phức tạp. Nếu cần dùng, hãy giải thích kèm ví dụ đời thường.
+- Cấu trúc câu trả lời: mở đầu thân thiện → giới thiệu 1-3 thiết bị phù hợp → hướng dẫn cơ bản cách dùng → gợi ý liên hệ Mada expert nếu cần.
+- Bạn KHÔNG phải chuyên gia y tế/lâm sàng. Bạn tư vấn về Công nghệ Hỗ trợ.
+- Luôn ghi nhớ: ưu tiên nhu cầu thực tế của người dùng cuối.`,
+    specialist: `🎭 CHẾ ĐỘ CHUYÊN GIA CNHT (AT Specialist Mode):
+- Bạn nói chuyện với THUẬT NGỮ KỸ THUẬT CHÍNH XÁC, cấu trúc chặt chẽ, dẫn chứng tiêu chuẩn quốc tế.
+- Luôn cite mã ISO 9999:2022, WCAG 2.2, EU MDR, FDA 21 CFR, IEC, WHO GATE khi liên quan.
+- Trình bày dạng: Phạm vi chuyên môn → Tiêu chuẩn áp dụng → Thiết bị đề xuất (kèm mã) → Use case thực tế → Ràng buộc kỹ thuật.
+- Có thể so sánh các giải pháp kỹ thuật (BTE vs CIC vs IIC, manual vs powered, etc.).
+- Bạn KHÔNG phải chuyên gia y tế/lâm sàng. Bạn tư vấn về Công nghệ Hỗ trợ ở góc độ kỹ thuật/tiêu chuẩn.`
+  },
+  en: {
+    endUser: `🎭 END-USER MODE:
+- Speak in a FRIENDLY, simple, easy-to-understand way, as if counseling an everyday user directly.
+- Avoid complex technical jargon. If needed, explain with everyday examples.
+- Answer structure: warm opening → introduce 1-3 suitable devices → basic usage guidance → suggest contacting Mada expert if needed.
+- You are NOT a medical/clinical professional. You advise on Assistive Technology.
+- Always prioritize actual end-user needs.`,
+    specialist: `🎭 AT SPECIALIST MODE:
+- Speak with precise technical terminology, structured rigorously, citing international standards.
+- Always cite ISO 9999:2022, WCAG 2.2, EU MDR, FDA 21 CFR, IEC, WHO GATE codes when relevant.
+- Structure: Scope of expertise → Applicable standards → Recommended devices (with codes) → Real use cases → Technical constraints.
+- Compare technical solutions (BTE vs CIC vs IIC, manual vs powered, etc.).
+- You are NOT a medical/clinical professional. You advise on Assistive Technology from a technical/standards perspective.`
+  },
+  ar: {
+    endUser: `🎭 وضع المستخدم النهائي:
+- تحدث بطريقة ودودة وبسيطة وسهلة الفهم، كما لو كنت تقدم المشورة لمستخدم عادي مباشرة.
+- تجنب المصطلحات التقنية المعقدة. إذا لزم الأمر، اشرح بأمثلة يومية.
+- هيكل الإجابة: افتتاحية ودودة → تقديم 1-3 أجهزة مناسبة → إرشادات الاستخدام الأساسية → اقتراح التواصل مع خبير مادا إذا لزم الأمر.
+- لست متخصصًا طبيًا/سريريًا. أنت تقدم المشورة بشأن التكنولوجيا المساعدة.
+- أعط الأولوية دائمًا لاحتياجات المستخدم النهائي الفعلية.`,
+    specialist: `🎭 وضع خبير التكنولوجيا المساعدة:
+- تحدث بمصطلحات تقنية دقيقة، منظمة بشكل صارم، مع الاستشهاد بالمعايير الدولية.
+- استشهد دائمًا بـ ISO 9999:2022 و WCAG 2.2 و EU MDR و FDA 21 CFR و IEC و WHO GATE عند الاقتضاء.
+- الهيكل: مجال الخبرة → المعايير المعمول بها → الأجهزة الموصى بها (مع الرموز) → حالات الاستخدام الحقيقي → القيود التقنية.
+- قارن بين الحلول التقنية (BTE vs CIC vs IIC، يدوي vs كهربائي، إلخ).
+- لست متخصصًا طبيًا/سريريًا. أنت تقدم المشورة بشأن التكنولوجيا المساعدة من منظور تقني/المعايير.`
+  },
+  fr: {
+    endUser: `🎭 MODE UTILISATEUR FINAL:
+- Parlez de manière AMICALE, simple et facile à comprendre, comme si vous conseilliez directement un utilisateur quotidien.
+- Évitez le jargon technique complexe. Si nécessaire, expliquez avec des exemples quotidiens.
+- Structure de la réponse: ouverture chaleureuse → présenter 1-3 appareils adaptés → conseils d'utilisation de base → suggérer de contacter l'expert Mada si nécessaire.
+- Vous n'êtes PAS un professionnel médical/clinique. Vous conseillez sur la Technologie d'Assistance.
+- Priorisez toujours les besoins réels de l'utilisateur final.`,
+    specialist: `🎭 MODE SPÉCIALISTE TA:
+- Parlez avec une terminologie technique précise, structurée rigoureusement, en citant les normes internationales.
+- Citez toujours ISO 9999:2022, WCAG 2.2, EU MDR, FDA 21 CFR, IEC, WHO GATE quand c'est pertinent.
+- Structure: périmètre d'expertise → normes applicables → appareils recommandés (avec codes) → cas d'usage réels → contraintes techniques.
+- Comparez les solutions techniques (BTE vs CIC vs IIC, manuel vs électrique, etc.).
+- Vous n'êtes PAS un professionnel médical/clinique. Vous conseillez sur la Technologie d'Assistance d'un point de vue technique/normes.`
+  }
+};
+
+/**
  * Lấy system instruction chuẩn cho ngôn ngữ (fallback về 'vi' nếu unknown).
  * Có thể append agentPrompt sau (optional).
+ *
+ * Hỗ trợ 2 persona:
+ *   - 'endUser' (mặc định): giọng đời thường, thân thiện
+ *   - 'specialist': thuật ngữ kỹ thuật, dẫn chứng tiêu chuẩn
  */
-function getSystemInstruction(lang: string, agentPrompt?: string): string {
+function getSystemInstruction(
+  lang: string,
+  agentPrompt?: string,
+  userMode: 'endUser' | 'specialist' = 'endUser'
+): string {
   const langCode = (['vi', 'en', 'ar', 'fr'].includes(lang) ? lang : 'vi') as 'vi' | 'en' | 'ar' | 'fr';
   const base = FULL_LANGUAGE_INSTRUCTIONS[langCode];
-  return agentPrompt ? `${base}\n\n${agentPrompt}` : base;
+
+  // Thêm persona overlay theo chế độ người dùng
+  const personaOverlay = MODE_PERSONA_INSTRUCTIONS[langCode]?.[userMode] || MODE_PERSONA_INSTRUCTIONS.vi.endUser;
+
+  return agentPrompt ? `${base}\n\n${personaOverlay}\n\n${agentPrompt}` : `${base}\n\n${personaOverlay}`;
 }
 
 /**
@@ -2146,24 +2299,40 @@ function getMatchReason(lang: string, kind: 'found' | 'category', context?: stri
 
 app.post('/api/chat', async (req, res) => {
   try {
-    const { message, conversationId, language: uiLanguage = 'vi', agentId, agentPrompt } = req.body;
+    const { message, conversationId, language: uiLanguage = 'vi', agentId, agentPrompt, userMode } = req.body;
+
+    // ⭐ FIX: Wait cho RAG engine sẵn sàng (tránh 500 khi server vừa start)
+    const ready = await waitForRagReady(15000);
+    if (!ready) {
+      const lang = (req.body.language || uiLanguage || 'vi').slice(0, 2);
+      const errMsgs: Record<string, string> = {
+        vi: 'Hệ thống đang khởi tạo, vui lòng thử lại sau vài giây.',
+        en: 'System is initializing, please retry in a few seconds.',
+        ar: 'النظام قيد التهيئة، يرجى إعادة المحاولة.',
+        fr: "Le système s'initialise, veuillez réessayer.",
+      };
+      return res.status(503).json({
+        success: false,
+        error: errMsgs[lang] || errMsgs.vi,
+        retryable: true,
+      });
+    }
 
     // 🎯 USE UI LANGUAGE AS PRIMARY - Falls back to detected only if UI lang is not set
-    const rawLanguage = req.body.language || uiLanguage;
+    // ⭐ FIX: LUÔN ƯU TIÊN UI LANGUAGE — không cho phép request body ghi đè UI language.
     const detectedLanguage = detectMessageLanguage(message);
-    
+
     // If UI language is set, use it. Otherwise use detected language
     // This ensures user setting takes priority over auto-detection
-    const effectiveLanguage = (rawLanguage && ['vi', 'en', 'ar', 'fr'].includes(rawLanguage)) 
-      ? rawLanguage 
+    const effectiveLanguage = (uiLanguage && ['vi', 'en', 'ar', 'fr'].includes(uiLanguage))
+      ? uiLanguage
       : detectedLanguage;
-    
-    console.log('🌍 Language settings:', { 
-      uiLanguage, 
-      rawLanguage,
-      detectedLanguage, 
+
+    console.log('🌍 Language settings:', {
+      uiLanguage,
+      detectedLanguage,
       effectiveLanguage,
-      messagePreview: message?.slice(0, 30) 
+      messagePreview: message?.slice(0, 30)
     });
 
     if (!message) {
@@ -2199,13 +2368,14 @@ app.post('/api/chat', async (req, res) => {
     }
     chatHistory.get(convId)!.push({ role: 'user', content: message });
 
-    // ⭐ Dùng full language instruction chung (DRY)
-    const agentInstruction = getSystemInstruction(effectiveLanguage, agentPrompt);
+    // ⭐ Dùng full language instruction chung (DRY) + persona theo userMode
+    const validUserMode: 'endUser' | 'specialist' = userMode === 'specialist' ? 'specialist' : 'endUser';
+    const agentInstruction = getSystemInstruction(effectiveLanguage, agentPrompt, validUserMode);
 
     // ⭐ MỚI: Lấy botId/madaCategory từ agentId
     const madaMapping = agentId ? AGENT_TO_MADA[agentId] : null;
 
-    const ragConfig: any = { systemInstruction: agentInstruction };
+    const ragConfig: any = { systemInstruction: agentInstruction, language: effectiveLanguage };
     if (madaMapping) {
       ragConfig.botId = madaMapping.botId;
       ragConfig.madaCategory = madaMapping.madaCategory;
@@ -2454,20 +2624,36 @@ app.post('/api/chat', async (req, res) => {
 app.post('/api/chat-with-file', async (req, res) => {
   try {
     const { message, conversationId, language: uiLanguage = 'vi', agentId, agentPrompt, attachments } = req.body;
-    
+
+    // ⭐ FIX: Wait cho RAG engine sẵn sàng (tránh 500 khi server vừa start)
+    const ready = await waitForRagReady(15000);
+    if (!ready) {
+      const lang = (req.body.language || uiLanguage || 'vi').slice(0, 2);
+      const errMsgs: Record<string, string> = {
+        vi: 'Hệ thống đang khởi tạo, vui lòng thử lại sau vài giây.',
+        en: 'System is initializing, please retry in a few seconds.',
+        ar: 'النظام قيد التهيئة، يرجى إعادة المحاولة.',
+        fr: "Le système s'initialise, veuillez réessayer.",
+      };
+      return res.status(503).json({
+        success: false,
+        error: errMsgs[lang] || errMsgs.vi,
+        retryable: true,
+      });
+    }
+
     // 🎯 USE UI LANGUAGE AS PRIMARY - Falls back to detected only if UI lang is not set
-    const rawLanguage = req.body.language;
+    // ⭐ FIX: LUÔN ƯU TIÊN UI LANGUAGE.
     const detectedLanguage = detectMessageLanguage(message);
-    const effectiveLanguage = (rawLanguage && ['vi', 'en', 'ar', 'fr'].includes(rawLanguage)) 
-      ? rawLanguage 
-      : (uiLanguage && ['vi', 'en', 'ar', 'fr'].includes(uiLanguage) ? uiLanguage : detectedLanguage);
-    
-    console.log('🌍 Language settings (with file):', { 
-      uiLanguage, 
-      rawLanguage,
-      detectedLanguage, 
-      effectiveLanguage, 
-      messagePreview: message?.slice(0, 30) 
+    const effectiveLanguage = (uiLanguage && ['vi', 'en', 'ar', 'fr'].includes(uiLanguage))
+      ? uiLanguage
+      : detectedLanguage;
+
+    console.log('🌍 Language settings (with file):', {
+      uiLanguage,
+      detectedLanguage,
+      effectiveLanguage,
+      messagePreview: message?.slice(0, 30)
     });
     
     // Write to log file
@@ -2487,6 +2673,46 @@ app.post('/api/chat-with-file', async (req, res) => {
 
     if (!message) {
       return res.status(400).json({ success: false, error: 'Message is required' });
+    }
+
+    // ⭐ FILE UPLOAD QUOTA — pre-check trước khi xử lý file (early reject)
+    // Resolve user từ Bearer token (optional — endpoint vẫn cho anonymous dùng quota zero logic)
+    let _fileUserId: string | null = null;
+    let _fileUserPlan: 'free' | 'pro' | 'enterprise' | null = null;
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.slice('Bearer '.length);
+      try {
+        const { verifyAccessToken } = await import('./lib/auth');
+        const payload = verifyAccessToken(token);
+        if (payload?.userId) {
+          const u = db.prepare('SELECT id, plan FROM users WHERE id = ?').get(payload.userId) as { id: string; plan: 'free' | 'pro' | 'enterprise' } | undefined;
+          if (u) {
+            _fileUserId = u.id;
+            _fileUserPlan = u.plan;
+          }
+        }
+      } catch {
+        // Invalid token → treat as anonymous (no file upload quota enforced)
+      }
+    }
+    if (attachments && Array.isArray(attachments) && attachments.length > 0 && _fileUserId && _fileUserPlan) {
+      const preQuota = getFileUploadQuota(_fileUserId, _fileUserPlan);
+      if (preQuota.limit !== -1 && preQuota.remaining < attachments.length) {
+        const lang = (req.body.language || uiLanguage || 'vi').slice(0, 2);
+        const errMsgs: Record<string, string> = {
+          vi: `Bạn chỉ còn ${preQuota.remaining}/${preQuota.limit} lượt tải file tháng này, không đủ cho ${attachments.length} file. Vui lòng nâng cấp gói để tiếp tục.`,
+          en: `You only have ${preQuota.remaining}/${preQuota.limit} file uploads left this month, not enough for ${attachments.length} files. Please upgrade your plan to continue.`,
+          ar: `لديك ${preQuota.remaining}/${preQuota.limit} عمليات تحميل متبقية هذا الشهر، لا تكفي لـ ${attachments.length} ملفات. يرجى ترقية خطتك.`,
+          fr: `Il ne vous reste que ${preQuota.remaining}/${preQuota.limit} téléchargements ce mois-ci, insuffisant pour ${attachments.length} fichiers. Veuillez mettre à niveau votre forfait.`,
+        };
+        return res.status(402).json({
+          success: false,
+          error: errMsgs[lang] || errMsgs.vi,
+          code: 'FILE_UPLOAD_QUOTA_EXCEEDED',
+          quota: preQuota,
+        });
+      }
     }
 
     // Parse attachments if provided
@@ -2684,8 +2910,8 @@ ${promptTemplate.respondNow}`;
 
     const langInstruction = languageInstructions[effectiveLanguage] || languageInstructions.vi;
     
-    const ragConfig: any = {};
-    
+    const ragConfig: any = { language: effectiveLanguage };
+
     if (fileContext) {
       // Khi có file - dùng system prompt không giới hạn
       ragConfig.systemInstruction = langInstruction;
@@ -2825,6 +3051,30 @@ SELECT url, source, json_extract(metadata, '$.thumbnailUrl') as thumbnail
     // Store response
     chatHistory.get(convId)!.push({ role: 'assistant', content: ragResponse.answer });
     
+    // ⭐ FILE UPLOAD QUOTA — Track sau khi AI response thành công (only-on-success)
+    // Mỗi attachment đính kèm = 1 lượt quota (3 file = 3 lượt).
+    let _fileQuota: ReturnType<typeof getFileUploadQuota> | null = null;
+    if (_fileUserId && _fileUserPlan && attachments && Array.isArray(attachments) && attachments.length > 0 && ragResponse?.answer) {
+      let lastQuota: ReturnType<typeof getFileUploadQuota> | null = null;
+      let stoppedByQuota = false;
+      for (const att of attachments) {
+        const size = att.base64 ? Math.floor((att.base64.length * 3) / 4) : (att.content?.length || 0);
+        const result = trackFileUpload({
+          userId: _fileUserId,
+          filename: att.name || 'upload',
+          fileSizeBytes: size,
+          fileType: att.type,
+        });
+        lastQuota = result.quota;
+        if (!result.ok) {
+          stoppedByQuota = true;
+          break;
+        }
+      }
+      _fileQuota = lastQuota;
+      console.log('📎 File quota tracked:', { count: attachments.length, stoppedByQuota, quota: _fileQuota });
+    }
+
     res.json({
       success: true,
       data: {
@@ -2834,6 +3084,7 @@ SELECT url, source, json_extract(metadata, '$.thumbnailUrl') as thumbnail
         fileContextIncluded: !!fileContext,
         conversationId: convId,
         suggestedProducts, // NEW: Auto-suggested products based on content
+        fileQuota: _fileQuota, // NEW: trả về quota hiện tại để FE cập nhật
       },
     });
   } catch (error) {
@@ -2845,8 +3096,10 @@ SELECT url, source, json_extract(metadata, '$.thumbnailUrl') as thumbnail
 // ============== REAL-TIME STREAMING CHAT ENDPOINT ==============
 // Server-Sent Events (SSE) endpoint for real-time AI responses
 app.post('/api/chat/stream', async (req: Request, res: Response) => {
+  // ⭐ FIX: declare startTime ngay từ đầu để tránh ReferenceError nếu path chậm
+  const startTime = Date.now();
   try {
-    const { message, conversationId, language: uiLanguage = 'vi', agentId, agentPrompt } = req.body;
+    const { message, conversationId, language: uiLanguage = 'vi', agentId, agentPrompt, userMode } = req.body;
 
     // Set headers for SSE
     res.setHeader('Content-Type', 'text/event-stream');
@@ -2886,11 +3139,12 @@ app.post('/api/chat/stream', async (req: Request, res: Response) => {
     }
     // ===== END QUOTA CHECK =====
 
-    // Detect language
-    const rawLanguage = req.body.language || uiLanguage;
+    // Detect language — ⭐ FIX: LUÔN ƯU TIÊN UI LANGUAGE
+    // UI language là lựa chọn CHỦ ĐỘNG của user (dropdown). Không cho phép
+    // detectMessageLanguage ghi đè UI language vì nó detect sai khi query ngắn ("Oticon").
     const detectedLanguage = detectMessageLanguage(message);
-    const effectiveLanguage = (rawLanguage && ['vi', 'en', 'ar', 'fr'].includes(rawLanguage))
-      ? rawLanguage
+    const effectiveLanguage = (uiLanguage && ['vi', 'en', 'ar', 'fr'].includes(uiLanguage))
+      ? uiLanguage
       : detectedLanguage;
 
     // Guardrails check (non-streaming)
@@ -2908,9 +3162,11 @@ app.post('/api/chat/stream', async (req: Request, res: Response) => {
     chatHistory.get(convId)!.push({ role: 'user', content: message });
 
     // Build prompt
-    // ⭐ Dùng full language instruction chung (không hard-code riêng)
+    // ⭐ Dùng full language instruction chung (không hard-code riêng) + persona theo userMode
+    const validUserMode: 'endUser' | 'specialist' = userMode === 'specialist' ? 'specialist' : 'endUser';
     let ragConfig: any = {
-      systemInstruction: getSystemInstruction(effectiveLanguage, agentPrompt),
+      systemInstruction: getSystemInstruction(effectiveLanguage, agentPrompt, validUserMode),
+      language: effectiveLanguage,
     };
 
     if (agentPrompt) {
@@ -2925,22 +3181,26 @@ app.post('/api/chat/stream', async (req: Request, res: Response) => {
       ragConfig.priority = true;  // Ưu tiên KB của bot, fallback toàn bộ
     }
 
-    // Check if Gemini is configured
+    // Check if Gemini is configured (wait for init if server just started)
     if (!ragEngine.isConfigured) {
-      // ⭐ Multi-language error
-      const geminiErrors: Record<string, string> = {
-        vi: '❌ Gemini API chưa được cấu hình. Vui lòng liên hệ admin để thiết lập GEMINI_API_KEY trong .env.',
-        en: '❌ Gemini API is not configured. Please contact admin to set GEMINI_API_KEY in .env.',
-        ar: '❌ Gemini API غير مهيأ. يُرجى التواصل مع المسؤول لإعداد GEMINI_API_KEY في .env.',
-        fr: '❌ Gemini API n\'est pas configuré. Veuillez contacter l\'admin pour configurer GEMINI_API_KEY dans .env.',
-      };
-      sendEvent({
-        type: 'done',
-        answer: geminiErrors[effectiveLanguage] || geminiErrors.vi,
-        sources: [],
-        error: 'gemini_not_configured',
-      });
-      return res.end();
+      const ready = await waitForRagReady(15000);
+      if (!ready) {
+        // Still not ready, return graceful error event (NOT 500)
+        console.warn('[chat/stream] RAG engine not configured after 15s wait');
+        const geminiErrors: Record<string, string> = {
+          vi: '⚠️ Hệ thống đang khởi tạo, vui lòng thử lại sau vài giây. Nếu lỗi tiếp tục, liên hệ admin.',
+          en: '⚠️ System is initializing, please retry in a few seconds. If the issue persists, contact admin.',
+          ar: '⚠️ النظام قيد التهيئة، يرجى إعادة المحاولة بعد بضع ثوانٍ.',
+          fr: "⚠️ Le système s'initialise, veuillez réessayer dans quelques secondes.",
+        };
+        sendEvent({
+          type: 'error',
+          error: geminiErrors[effectiveLanguage] || geminiErrors.vi,
+          retryable: true,
+        });
+        return res.end();
+      }
+      console.info(`[chat/stream] RAG engine ready after ${Date.now() - startTime}ms wait`);
     }
 
     // Stream from RAG engine
@@ -3136,14 +3396,224 @@ suggestedProducts = ragSources.slice(0, 4).map((src: any, idx: number) => {
     return;
   } catch (error) {
     console.error('❌ Chat stream error:', error);
-    // ⭐ FIX: Tránh crash nếu res đã end
-    if (!res.writableEnded && !res.headersSent) {
+    // ⭐ FIX: TRÁNH 500 — nếu SSE headers đã gửi (đã vào stream mode),
+    // phải gửi error event thay vì 500 status (Express 500 sẽ đóng stream).
+    const errMsg = error instanceof Error ? error.message : 'Unknown error';
+    if (!res.writableEnded) {
       try {
-        res.status(500).json({ success: false, error: `Error: ${error instanceof Error ? error.message : 'Unknown'}` });
+        if (res.headersSent) {
+          // SSE mode: gửi error event để client xử lý
+          res.write(`data: ${JSON.stringify({
+            type: 'error',
+            error: `Lỗi server: ${errMsg}. Vui lòng thử lại.`,
+            retryable: true,
+          })}\n\n`);
+          res.end();
+        } else {
+          // Chưa vào SSE: mới chỉ là JSON error
+          res.status(503).json({ success: false, error: `Error: ${errMsg}`, retryable: true });
+        }
       } catch (e) {
-        console.warn('⚠️ Cannot send 500 (stream already closed):', (e as Error).message);
+        console.warn('⚠️ Cannot send error response (stream already closed):', (e as Error).message);
       }
     }
+  }
+});
+
+// ============== AI FOLLOW-UP QUESTIONS ENDPOINT ==============
+/**
+ * Generate AI-powered follow-up questions based on conversation context
+ * Uses Gemini to create contextually relevant questions
+ */
+app.post('/api/chat/follow-up', async (req, res) => {
+  try {
+    const { userMessage, aiResponse, conversationHistory, language = 'vi', userMode = 'endUser' } = req.body;
+
+    if (!userMessage) {
+      return res.status(400).json({ success: false, error: 'userMessage is required' });
+    }
+
+    console.log('💡 Generating follow-up questions for:', userMessage.slice(0, 50));
+
+    // Build context from conversation history (last 5 messages)
+    const historyContext = conversationHistory
+      ?.slice(-10)
+      ?.map((m: { role: string; content: string }) => `${m.role}: ${m.content}`)
+      ?.join('\n') || '';
+
+    // Prompt templates by language
+    const prompts: Record<string, string> = {
+      vi: `Bạn là trợ lý MADA AI chuyên về Công nghệ Hỗ trợ (AT).
+Dựa vào cuộc trò chuyện sau:
+---
+Người dùng: ${userMessage}
+MADA AI: ${aiResponse || '(chưa có phản hồi)'}
+${historyContext ? `Lịch sử:\n${historyContext}` : ''}
+---
+Hãy đề xuất 3 câu hỏi TIẾP THEO mà người dùng có thể hỏi, liên quan trực tiếp đến câu hỏi ban đầu và câu trả lời.
+QUY TẮC:
+1. Câu hỏi phải CỤ THỂ, liên quan đến nội dung đang thảo luận
+2. Đa dạng: có thể hỏi về giá, cách dùng, so sánh, mua ở đâu, tiêu chuẩn...
+3. Ngắn gọn 10-20 từ
+4. Trả lời JSON theo format: {"questions": ["câu 1", "câu 2", "câu 3"]}
+5. Không hỏi lại những gì đã được trả lời
+6. Ưu tiên câu hỏi thực tế người dùng hay quan tâm
+7. CHỈ trả về JSON, không giải thích gì thêm`,
+      en: `You are MADA AI assistant specializing in Assistive Technology (AT).
+Based on this conversation:
+---
+User: ${userMessage}
+MADA AI: ${aiResponse || '(no response yet)'}
+${historyContext ? `History:\n${historyContext}` : ''}
+---
+Suggest 3 NEXT questions the user might ask, directly related to the initial question and answer.
+RULES:
+1. Questions must be SPECIFIC and relevant to the discussed topic
+2. Diverse: pricing, usage, comparison, where to buy, standards...
+3. Concise 10-20 words
+4. Respond ONLY in JSON format: {"questions": ["question 1", "question 2", "question 3"]}
+5. Don't repeat questions already answered
+6. Prioritize practical questions users care about
+7. ONLY return JSON, no explanation`,
+      ar: `أنت مساعد MADA AI المتخصص في التكنولوجيا المساعدة (AT).
+بناءً على هذه المحادثة:
+---
+المستخدم: ${userMessage}
+MADA AI: ${aiResponse || '(لا توجد إجابة بعد)'}
+${historyContext ? `السجل:\n${historyContext}` : ''}
+---
+اقترح 3-4 أسئلة NEXT التي قد يسألها المستخدم، مرتبطة مباشرة بالسؤال الأول والإجابة.
+القواعد:
+1. يجب أن تكون الأسئلة محددة وذات صلة بالموضوع المطروح
+2. متنوعة: الأسعار، الاستخدام، المقارنة، من أين أشتري، المعايير...
+3. موجزة وسهلة الفهم
+4. أجب بتنسيق JSON: {"questions": ["سؤال 1", "سؤال 2", "سؤال 3"]}
+5. لا تكرر الأسئلة التي تمت الإجابة عليها بالفعل
+6. أعط الأولوية للأسئلة العملية`,
+      fr: `Vous êtes l'assistant MADA AI spécialisé dans la Technologie d'Assistance (TA).
+Basé sur cette conversation:
+---
+Utilisateur: ${userMessage}
+MADA AI: ${aiResponse || '(pas encore de réponse)'}
+${historyContext ? `Historique:\n${historyContext}` : ''}
+---
+Suggérez 3-4 questions SUIVANTES que l'utilisateur pourrait poser, directement liées à la question initiale et à la réponse.
+RÈGLES:
+1. Les questions doivent être SPÉCIFIQUES et pertinentes au sujet discuté
+2. Diversifiées: prix, utilisation, comparaison, où acheter, normes...
+3. Concises et faciles à comprendre
+4. Répondez en format JSON: {"questions": ["question 1", "question 2", "question 3"]}
+5. Ne répétez pas les questions déjà répondues
+6. Priorisez les questions pratiques qui intéressent les utilisateurs`
+    };
+
+    const prompt = prompts[language] || prompts.vi;
+
+    // Check if Gemini is configured
+    if (!process.env.GEMINI_API_KEY && !process.env.GOOGLE_GEMINI_API_KEY) {
+      // Fallback to basic keyword matching if no API key
+      return res.json({
+        success: true,
+        data: {
+          questions: [],
+          source: 'fallback'
+        }
+      });
+    }
+
+    // Call Gemini
+    const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_GEMINI_API_KEY;
+    const model = process.env.GEMINI_MODEL || 'gemini-3.6-flash';
+
+    console.log('🔵 [follow-up] Calling Gemini with model:', model, 'key prefix:', apiKey?.slice(0, 10));
+
+    const geminiResponse = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 2048,
+          }
+        })
+      }
+    );
+
+    if (!geminiResponse.ok) {
+      console.error('❌ Gemini API error:', await geminiResponse.text());
+      return res.json({
+        success: true,
+        data: { questions: [], source: 'api_error' }
+      });
+    }
+
+    const geminiData = await geminiResponse.json();
+    let responseText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    
+    // Remove markdown code blocks if present
+    responseText = responseText.replace(/```json\s*/i, '').replace(/```\s*/g, '').trim();
+    console.log('🔵 [follow-up] Gemini response length:', responseText.length, 'preview:', responseText.slice(0, 200));
+
+    // Parse JSON from response
+    try {
+      // Try to extract JSON first
+      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+      
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        const questions = Array.isArray(parsed.questions) ? parsed.questions : [];
+        console.log(`✅ Generated ${questions.length} follow-up questions from JSON`);
+        return res.json({
+          success: true,
+          data: {
+            questions: questions.slice(0, 4),
+            source: 'gemini'
+          }
+        });
+      }
+      
+      // Fallback: parse markdown list format "Q1: ...", "* ...", "- ..."
+      const lines = responseText.split('\n').map(l => l.trim()).filter(Boolean);
+      const questions: string[] = [];
+      
+      for (const line of lines) {
+        // Match patterns like "Q1:", "Q2:", "1.", "2.", "* ", "- ", "• "
+        const match = line.match(/^[*\-\•]?\s*(?:Q?\d+[:\.)]\s*)?(.+)/i);
+        if (match && match[1] && match[1].length > 10) {
+          const q = match[1].replace(/^[a-z]\)\s*/i, '').trim();
+          if (q.length > 10 && !q.startsWith('#')) {
+            questions.push(q);
+          }
+        }
+      }
+      
+      if (questions.length > 0) {
+        console.log(`✅ Generated ${questions.length} follow-up questions from text`);
+        return res.json({
+          success: true,
+          data: {
+            questions: questions.slice(0, 4),
+            source: 'gemini_text'
+          }
+        });
+      }
+    } catch (parseErr) {
+      console.warn('⚠️ Could not parse follow-up response:', parseErr);
+    }
+
+    // Fallback
+    console.log('⚠️ Could not parse any questions, returning empty');
+    return res.json({
+      success: true,
+      data: { questions: [], source: 'parse_error' }
+    });
+
+  } catch (error) {
+    console.error('❌ Follow-up generation error:', error);
+    res.status(500).json({ success: false, error: 'Failed to generate follow-up questions' });
   }
 });
 

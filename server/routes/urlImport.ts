@@ -39,7 +39,52 @@ function mapProductToRow(p: ExtractedProduct, defaultCategory: string) {
     ? `${p.price.toLocaleString('en-US')} ${p.currency}`
     : '';
 
-  // ===== Auto-detect brand & category =====
+  // ===== MADA branch =====
+  // MADA SP không có brand/giá, dùng category từ botId + giữ ISO codes + attachments metadata
+  if (p.extractionMethod === 'mada-scraper' && p.madaMetadata) {
+    const meta = p.madaMetadata;
+    const detectedBrand = meta.botId || '';
+    const detectedCategory = meta.madaCategory || defaultCategory || 'general';
+
+    const contentParts = [
+      `Tên: ${p.name}`,
+      detectedBrand ? `MADA Bot: ${detectedBrand}` : '',
+      meta.madaCategory ? `Danh mục MADA: ${meta.madaCategory}` : '',
+      meta.isoCodes?.length ? `Tiêu chuẩn: ${meta.isoCodes.join(', ')}` : '',
+      meta.tags?.length ? `Tags: ${meta.tags.join(', ')}` : '',
+      meta.attachments?.length
+        ? `Tài liệu đính kèm: ${meta.attachments.map((a) => `[${a.label}](${a.url})`).join(', ')}`
+        : '',
+      meta.videoLinks?.length ? `Video: ${meta.videoLinks.join(', ')}` : '',
+      p.description ? `Mô tả: ${p.description}` : '',
+      meta.content ? `Nội dung chi tiết:\n${meta.content}` : '',
+    ].filter(Boolean);
+
+    return {
+      id: `prod_${uuidv4().slice(0, 12)}`,
+      title,
+      title_en: titleEn,
+      description,
+      description_en: descriptionEn,
+      content: contentParts.join('\n'),
+      category: detectedCategory,
+      brand: detectedBrand,
+      model: '',
+      price_range: '',
+      source_url: p.url,
+      product_url: p.url,
+      image_url: p.imageUrl,
+      iso_codes: meta.isoCodes || [],
+      wcag_level: '',
+      who_gate_area: '',
+      status: 'draft' as const,
+      featured: 0,
+      sort_order: 0,
+      language: meta.language || lang,
+    };
+  }
+
+  // ===== E-commerce branch (generic) =====
   const detectedBrand = detectBrand(p.name, p.brand);
   const detectedCategory = detectCategoryFromBrand(detectedBrand) || defaultCategory || p.category || 'general';
 
@@ -51,7 +96,7 @@ function mapProductToRow(p: ExtractedProduct, defaultCategory: string) {
     p.inStock ? 'Còn hàng' : 'Hết hàng',
     p.description ? `Mô tả: ${p.description}` : '',
     Object.keys(p.specifications).length
-      ? `Thông số k� thuật: ${JSON.stringify(p.specifications)}`
+      ? `Thông số kỹ thuật: ${JSON.stringify(p.specifications)}`
       : '',
   ]
     .filter(Boolean)
@@ -215,7 +260,7 @@ function detectCategoryFromBrand(brand: string): string {
 
 router.post('/import-url', async (req, res) => {
   try {
-    const { url, defaultCategory = 'general' } = req.body;
+    const { url, defaultCategory = 'general', madaLanguage = 'en' } = req.body;
 
     if (!url) {
       return res
@@ -238,7 +283,12 @@ router.post('/import-url', async (req, res) => {
     }
 
     console.log(`\n🕷️ [import-url] Scraping: ${url}`);
-    const result: ExtractionResult = await productExtractor.extractFromUrl(url);
+
+    // MADA → preview mode (1 page, 20 SP) cho admin xem nhanh
+    const result: ExtractionResult = await productExtractor.extractFromUrl(url, undefined, {
+      mode: 'preview',
+      language: madaLanguage === 'ar' ? 'ar' : 'en',
+    });
 
     if (!result.success) {
       return res.status(500).json({
@@ -258,8 +308,10 @@ router.post('/import-url', async (req, res) => {
       mapProductToRow(p, defaultCategory)
     );
 
-    // Get proxy stats
-    const { proxyService } = await import('../lib/scraping/proxyService');
+    // Get proxy stats (chỉ cần cho e-commerce path)
+    const proxyStats = result.method === 'mada-scraper'
+      ? null
+      : (await import('../lib/scraping/proxyService')).proxyService.getStats();
 
     res.json({
       success: true,
@@ -279,7 +331,7 @@ router.post('/import-url', async (req, res) => {
           inStock: result.products.filter((p) => p.inStock).length,
           withBrand: result.products.filter((p) => !!p.brand).length,
         },
-        proxyStats: proxyService.getStats(),
+        proxyStats,
       },
     });
   } catch (err: any) {
@@ -292,7 +344,13 @@ router.post('/import-url', async (req, res) => {
 
 router.post('/import-url/save', async (req, res) => {
   try {
-    const { url, defaultCategory = 'general', onlyValid = true, forceReimport = false } = req.body;
+    const {
+      url,
+      defaultCategory = 'general',
+      onlyValid = true,
+      forceReimport = false,
+      madaLanguage = 'en',
+    } = req.body;
 
     if (!url) {
       return res
@@ -300,21 +358,32 @@ router.post('/import-url/save', async (req, res) => {
         .json({ success: false, error: 'URL là bắt buộc' });
     }
 
-    const result = await productExtractor.extractFromUrl(url);
+    // MADA → save mode (3 page, 100 SP) để lưu nhiều SP
+    const result = await productExtractor.extractFromUrl(url, undefined, {
+      mode: 'save',
+      language: madaLanguage === 'ar' ? 'ar' : 'en',
+    });
+
     if (!result.success) {
       return res
         .status(500)
         .json({ success: false, error: result.error || 'Scrape thất bại' });
     }
 
-    const productsToSave = onlyValid
+    const isMada = result.method === 'mada-scraper';
+
+    // MADA SP không có giá → bỏ filter "onlyValid" khi user chọn lưu từ MADA
+    // (admin paste URL MADA thường muốn lưu tất cả assistive tech SP)
+    const productsToSave = onlyValid && !isMada
       ? result.products.filter((p) => p.name && p.price > 0)
-      : result.products;
+      : result.products.filter((p) => p.name);
 
     if (productsToSave.length === 0) {
       return res.status(400).json({
         success: false,
-        error: 'Không có sản phẩm hợp lệ để lưu. Hãy thử bỏ tick "Chỉ lưu SP có giá" hoặc dùng URL khác.',
+        error: isMada
+          ? 'MADA URL không trả về sản phẩm nào. Kiểm tra URL hoặc category.'
+          : 'Không có sản phẩm hợp lệ để lưu. Hãy thử bỏ tick "Chỉ lưu SP có giá" hoặc dùng URL khác.',
       });
     }
 

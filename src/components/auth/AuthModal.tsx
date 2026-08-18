@@ -2,14 +2,15 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Mail, Lock, User as UserIcon, X, Eye, EyeOff, Loader2 } from 'lucide-react';
 import madaLogo from '@/assets/mada-logo.png';
-import { useAuthModalStore, useAuthStore, useAnonQuotaStore, PLAN_LIMITS } from '@/stores';
-import type { User, UserPlan } from '@/types';
+import { useAuthModalStore, useAuthStore, useAnonQuotaStore } from '@/stores';
 
 interface FormState {
   email: string;
   password: string;
   name: string;
 }
+
+type AuthTab = 'login' | 'register';
 
 export function AuthModal() {
   const { isOpen, mode, close } = useAuthModalStore();
@@ -18,7 +19,7 @@ export function AuthModal() {
   const navigate = useNavigate();
   const resetAnon = useAnonQuotaStore((s) => s.reset);
 
-  const [tab, setTab] = useState<Tab>(mode);
+  const [tab, setTab] = useState<AuthTab>(mode);
   const [form, setForm] = useState<FormState>({ email: '', password: '', name: '' });
   const [showPwd, setShowPwd] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -49,7 +50,7 @@ export function AuthModal() {
 
   if (!isOpen) return null;
 
-  const handleTabChange = (next: Tab) => {
+  const handleTabChange = (next: AuthTab) => {
     setTab(next);
     setError(null);
   };

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { AdminLayout } from './AdminLayout';
 import { adminApi, UserStats, KnowledgeStats } from './adminApi';
+import { getAccessToken } from '@/lib/api';
 import clsx from 'clsx';
 
 type TimeRange = '24h' | '7d' | '30d' | '90d';
@@ -100,6 +101,11 @@ export function AdminAnalytics() {
   // Load analytics data
   useEffect(() => {
     const load = async () => {
+      // Skip when not authenticated to avoid 401 spam in console
+      if (!getAccessToken()) {
+        setLoading(false);
+        return;
+      }
       const [us, an, cm] = await Promise.all([
         adminApi.getUserStats(),
         adminApi.getAnalytics(),
@@ -172,28 +178,28 @@ export function AdminAnalytics() {
         {/* Total Chats */}
         <div className="bg-gradient-to-br from-violet-50 to-violet-100 rounded-2xl p-3 border-2 border-violet-200">
           <p className="text-[10px] font-bold text-violet-600 uppercase">Tổng chat</p>
-          <p className="text-xl font-black text-violet-700">{chatMetrics?.totalChats.toLocaleString() || '—'}</p>
+          <p className="text-xl font-black text-violet-700">{chatMetrics?.totalChats?.toLocaleString() || '—'}</p>
           <p className="text-[10px] text-violet-500">Hội thoại</p>
         </div>
 
         {/* Avg Response Time */}
         <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl p-3 border-2 border-blue-200">
           <p className="text-[10px] font-bold text-blue-600 uppercase">Phản hồi TB</p>
-          <p className="text-xl font-black text-blue-700">{chatMetrics ? Math.round(chatMetrics.avgResponseTime / 100) / 10 + 's' : '—'}</p>
+          <p className="text-xl font-black text-blue-700">{chatMetrics?.avgResponseTime != null ? (Math.round(chatMetrics.avgResponseTime / 100) / 10) + 's' : '—'}</p>
           <p className="text-[10px] text-blue-500">Mili giây</p>
         </div>
 
         {/* Avg Confidence */}
         <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-2xl p-3 border-2 border-green-200">
           <p className="text-[10px] font-bold text-green-600 uppercase">Độ tin cậy TB</p>
-          <p className="text-xl font-black text-green-700">{chatMetrics ? chatMetrics.avgConfidence.toFixed(0) + '%' : '—'}</p>
+          <p className="text-xl font-black text-green-700">{chatMetrics?.avgConfidence != null ? chatMetrics.avgConfidence.toFixed(0) + '%' : '—'}</p>
           <p className="text-[10px] text-green-500">Confidence</p>
         </div>
 
         {/* Error Rate */}
         <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-2xl p-3 border-2 border-red-200">
           <p className="text-[10px] font-bold text-red-600 uppercase">Tỷ lệ lỗi</p>
-          <p className="text-xl font-black text-red-700">{chatMetrics ? chatMetrics.errorRate.toFixed(1) + '%' : '—'}</p>
+          <p className="text-xl font-black text-red-700">{chatMetrics?.errorRate != null ? chatMetrics.errorRate.toFixed(1) + '%' : '—'}</p>
           <p className="text-[10px] text-red-500">Thất bại</p>
         </div>
 
@@ -218,11 +224,11 @@ export function AdminAnalytics() {
         <div className="bg-white rounded-2xl border-2 border-black p-6 shadow-[4px_4px_0px_0px_#000]">
           <h3 className="text-lg font-bold mb-4">Hoạt động theo giờ</h3>
           <BarChart
-            data={chatMetrics?.chatsByHour.map(h => ({
+            data={(chatMetrics?.chatsByHour ?? []).map(h => ({
               label: h.hour.toString().padStart(2, '0') + 'h',
               value: h.count,
-            })) || []}
-            maxValue={Math.max(...(chatMetrics?.chatsByHour.map(h => h.count) || [1]))}
+            }))}
+            maxValue={Math.max(...((chatMetrics?.chatsByHour ?? []).map(h => h.count).length ? chatMetrics!.chatsByHour.map(h => h.count) : [1]))}
           />
         </div>
 
@@ -230,11 +236,11 @@ export function AdminAnalytics() {
         <div className="bg-white rounded-2xl border-2 border-black p-6 shadow-[4px_4px_0px_0px_#000]">
           <h3 className="text-lg font-bold mb-4">Phân bố danh mục AT</h3>
           <PieChart
-            data={chatMetrics?.categoryUsage.map((c, i) => ({
+            data={(chatMetrics?.categoryUsage ?? []).map((c, i) => ({
               label: c.category,
               value: c.count,
               color: ['#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#6366f1'][i % 7],
-            })) || []}
+            }))}
           />
         </div>
       </div>
@@ -245,7 +251,7 @@ export function AdminAnalytics() {
         <div className="lg:col-span-2 bg-white rounded-2xl border-2 border-black p-6 shadow-[4px_4px_0px_0px_#000]">
           <h3 className="text-lg font-bold mb-4">Câu hỏi phổ biến nhất</h3>
           <div className="space-y-2">
-            {chatMetrics?.topQueries.map((q, i) => (
+            {(chatMetrics?.topQueries ?? []).map((q, i) => (
               <div key={i} className="flex items-center gap-3 p-2 bg-gray-50 rounded-lg">
                 <span className={clsx(
                   'w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold',
@@ -264,7 +270,7 @@ export function AdminAnalytics() {
         <div className="bg-white rounded-2xl border-2 border-black p-6 shadow-[4px_4px_0px_0px_#000]">
           <h3 className="text-lg font-bold mb-4">Ngôn ngữ sử dụng</h3>
           <div className="space-y-3">
-            {chatMetrics?.languageDistribution.map((l, i) => (
+            {(chatMetrics?.languageDistribution ?? []).map((l, i) => (
               <div key={i}>
                 <div className="flex justify-between mb-1">
                   <span className="text-sm font-medium">{l.language}</span>

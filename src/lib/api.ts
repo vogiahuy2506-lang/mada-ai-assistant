@@ -191,6 +191,45 @@ export const systemApi = {
   },
 };
 
+// ============== FILE UPLOAD QUOTA ==============
+
+export interface FileUploadQuota {
+  used: number;
+  limit: number; // -1 = unlimited
+  remaining: number; // -1 = unlimited
+  plan: 'free' | 'pro' | 'enterprise';
+  monthKey: string;
+}
+
+export const fileQuotaApi = {
+  /** Lấy quota file upload của user hiện tại (cần auth). */
+  async getMyQuota() {
+    const token = getAccessToken();
+    const res = await fetch('/api/user/file-quota', {
+      method: 'GET',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    const json = await res.json();
+    if (!res.ok || !json.success) {
+      return { success: false as const, error: json.error || 'Failed' };
+    }
+    return { success: true as const, data: json.data as FileUploadQuota };
+  },
+
+  /** Lấy plan limits cho tất cả gói (public). */
+  async getPlanLimits() {
+    try {
+      const res = await fetch('/api/user/file-quota/plan-limits');
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error('Failed');
+      return json.data as { free: number; pro: number; enterprise: number };
+    } catch {
+      // Fallback defaults
+      return { free: 10, pro: -1, enterprise: -1 };
+    }
+  },
+};
+
 // ============== USER HISTORY (Chat) ==============
 export interface ChatConversation {
   id: string;

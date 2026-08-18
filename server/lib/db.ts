@@ -342,6 +342,25 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_system_logs_timestamp ON admin_system_logs(timestamp);
 `);
 
+// ============== FILE UPLOAD QUOTA SCHEMA ==============
+// Track successful file uploads per user per month.
+// Used to enforce plan-based upload limits (e.g. Free = 10/month, Pro = unlimited).
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS file_uploads (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    filename TEXT NOT NULL,
+    file_size_bytes INTEGER NOT NULL DEFAULT 0,
+    file_type TEXT,
+    month_key TEXT NOT NULL,
+    uploaded_at TEXT NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_file_uploads_user_month ON file_uploads(user_id, month_key);
+`);
+
 // ============== SYSTEM SETTINGS SCHEMA ==============
 
 db.exec(`
@@ -359,6 +378,9 @@ function seedSystemSettings() {
   const defaults = [
     { key: 'anonymous_limit', value: '10', type: 'number', description: 'Message quota for anonymous users' },
     { key: 'default_plan_limit', value: '50', type: 'number', description: 'Default quota limit for free plan' },
+    { key: 'file_upload_limit_free', value: '10', type: 'number', description: 'File upload quota per month for Free plan' },
+    { key: 'file_upload_limit_pro', value: '0', type: 'number', description: 'File upload quota per month for Pro plan (0 = unlimited)' },
+    { key: 'file_upload_limit_enterprise', value: '0', type: 'number', description: 'File upload quota per month for Enterprise plan (0 = unlimited)' },
     { key: 'max_files_per_session', value: '10', type: 'number', description: 'Maximum files per chat session' },
     { key: 'max_files_total', value: '100', type: 'number', description: 'Maximum total files' },
     { key: 'max_file_size_mb', value: '50', type: 'number', description: 'Maximum file size in MB' },
@@ -560,4 +582,110 @@ export function toPublicUser(row: UserRow): PublicUser {
     lastLogin: row.last_login_at,
     createdAt: row.created_at,
   };
+}
+
+// ============== FILE UPLOAD QUOTA HELPERS ==============
+
+export interface FileUploadQuota {
+  used: number;
+  limit: number; // -1 = unlimited
+  remaining: number; // -1 = unlimited
+  plan: 'free' | 'pro' | 'enterprise';
+  monthKey: string;
+}
+
+function currentMonthKey(): string {
+  const d = new Date();
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+
+export function getFileUploadLimitForPlan(plan: 'free' | 'pro' | 'enterprise'): number {
+  const key = `file_upload_limit_${plan}`;
+  const row = db.prepare('SELECT value FROM system_settings WHERE key = ?').get(key) as { value: string } | undefined;
+  if (!row) return plan === 'free' ? 10 : -1;
+  const n = parseInt(row.value, 10);
+  return Number.isFinite(n) && n >= 0 ? n : (plan === 'free' ? 10 : -1);
+}
+
+export function getFileUploadQuota(userId: string, plan: 'free' | 'pro' | 'enterprise'): FileUploadQuota {
+  const limit = getFileUploadLimitForPlan(plan);
+  const monthKey = currentMonthKey();
+
+  if (limit === -1) {
+    return { used: 0, limit: -1, remaining: -1, plan, monthKey };
+  }
+
+  const row = db.prepare(
+    'SELECT COUNT(*) AS c FROM file_uploads WHERE user_id = ? AND month_key = ?'
+  ).get(userId, monthKey) as { c: number };
+
+  const used = row.c;
+  const remaining = Math.max(0, limit - used);
+  return { used, limit, remaining, plan, monthKey };
+}
+
+export interface TrackFileUploadInput {
+  userId: string;
+  filename: string;
+  fileSizeBytes: number;
+  fileType?: string;
+}
+
+export interface TrackFileUploadResult {
+  ok: boolean;
+  reason?: 'plan_limit_exceeded' | 'invalid_plan';
+  quota: FileUploadQuota;
+}
+
+export function trackFileUpload(input: TrackFileUploadInput): TrackFileUploadResult {
+  // Resolve plan from users table
+  const userRow = db.prepare('SELECT plan FROM users WHERE id = ?').get(input.userId) as { plan: 'free' | 'pro' | 'enterprise' } | undefined;
+  if (!userRow) {
+    return {
+      ok: false,
+      reason: 'invalid_plan',
+      quota: { used: 0, limit: 0, remaining: 0, plan: 'free', monthKey: currentMonthKey() },
+    };
+  }
+
+  const plan = userRow.plan;
+  const quota = getFileUploadQuota(input.userId, plan);
+
+  // Unlimited plans always allow
+  if (quota.limit === -1) {
+    db.prepare(`
+      INSERT INTO file_uploads (id, user_id, filename, file_size_bytes, file_type, month_key, uploaded_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      `fu-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      input.userId,
+      input.filename,
+      input.fileSizeBytes,
+      input.fileType ?? null,
+      quota.monthKey,
+      new Date().toISOString()
+    );
+
+    return { ok: true, quota: { ...quota, used: quota.used + 1 } };
+  }
+
+  // Limited plans: enforce
+  if (quota.remaining <= 0) {
+    return { ok: false, reason: 'plan_limit_exceeded', quota };
+  }
+
+  db.prepare(`
+    INSERT INTO file_uploads (id, user_id, filename, file_size_bytes, file_type, month_key, uploaded_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    `fu-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    input.userId,
+    input.filename,
+    input.fileSizeBytes,
+    input.fileType ?? null,
+    quota.monthKey,
+    new Date().toISOString()
+  );
+
+  return { ok: true, quota: { ...quota, used: quota.used + 1, remaining: quota.remaining - 1 } };
 }

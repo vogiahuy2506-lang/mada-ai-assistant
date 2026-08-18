@@ -30,6 +30,12 @@ export function AdminAgents() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<string | null>(null);
 
+  // ⭐ Test Agent state
+  const [testAgentId, setTestAgentId] = useState<string | null>(null);
+  const [testInput, setTestInput] = useState('');
+  const [testMessages, setTestMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string; latency?: number; confidence?: number }>>([]);
+  const [testing, setTesting] = useState(false);
+
   // Form state
   const [formData, setFormData] = useState({
     name: '',
@@ -143,6 +149,38 @@ export function AdminAgents() {
       }
     } catch (err: any) {
       alert(err.message);
+    }
+  };
+
+  const handleTestAgent = async () => {
+    if (!testAgentId || !testInput.trim()) return;
+    const userMsg = { role: 'user' as const, content: testInput };
+    setTestMessages(prev => [...prev, userMsg]);
+    setTesting(true);
+    const inputSnapshot = testInput;
+    setTestInput('');
+    try {
+      const res = await adminApi.testAgent({ agentId: testAgentId, message: inputSnapshot });
+      if (res.success && res.data && res.data.response) {
+        setTestMessages(prev => [...prev, {
+          role: 'assistant',
+          content: res.data!.response || '(empty response)',
+          latency: res.data!.latencyMs,
+          confidence: res.data!.confidence,
+        }]);
+      } else {
+        setTestMessages(prev => [...prev, {
+          role: 'assistant',
+          content: `❌ Lỗi: ${res.error || 'unknown'}`,
+        }]);
+      }
+    } catch (e: any) {
+      setTestMessages(prev => [...prev, {
+        role: 'assistant',
+        content: `❌ Exception: ${e.message}`,
+      }]);
+    } finally {
+      setTesting(false);
     }
   };
 
@@ -528,6 +566,16 @@ export function AdminAgents() {
                     Sửa
                   </button>
                   <button
+                    onClick={() => {
+                      setTestAgentId(agent.id);
+                      setTestMessages([]);
+                    }}
+                    title="Test agent này"
+                    className="w-8 h-8 rounded-lg bg-cyan-100 text-cyan-700 flex items-center justify-center border border-black shadow-[2px_2px_0px_0px_#000] hover:shadow-[3px_3px_0px_0px_#000]"
+                  >
+                    <span className="material-symbols-outlined text-xs">play_arrow</span>
+                  </button>
+                  <button
                     onClick={() => handleDelete(agent.id)}
                     className="w-8 h-8 rounded-lg bg-red-100 text-red-600 flex items-center justify-center border border-black shadow-[2px_2px_0px_0px_#000] hover:shadow-[3px_3px_0px_0px_#000]"
                   >
@@ -539,6 +587,74 @@ export function AdminAgents() {
           </div>
         )}
       </div>
+
+      {/* ⭐ Test Agent Modal */}
+      {testAgentId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+          <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[80vh] flex flex-col shadow-2xl">
+            <div className="px-5 py-3 border-b border-outline-variant flex items-center justify-between bg-gradient-to-r from-cyan-50 to-blue-50">
+              <div>
+                <h2 className="text-lg font-bold">Test Agent</h2>
+                <p className="text-xs text-on-surface-variant mt-0.5">
+                  Agent: <span className="font-mono font-bold">{testAgentId}</span>
+                </p>
+              </div>
+              <button
+                onClick={() => { setTestAgentId(null); setTestMessages([]); }}
+                className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center"
+              >
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-5 space-y-3 min-h-[300px]">
+              {testMessages.length === 0 ? (
+                <div className="text-center text-sm text-on-surface-variant py-12">
+                  <span className="material-symbols-outlined text-4xl mb-2">chat</span>
+                  <p>Nhập câu hỏi bên dưới để test agent.</p>
+                  <p className="text-xs mt-1">Kết quả sẽ hiển thị confidence + latency.</p>
+                </div>
+              ) : (
+                testMessages.map((m, i) => (
+                  <div key={i} className={clsx('p-3 rounded-lg text-sm', m.role === 'user' ? 'bg-primary/10 ml-8' : 'bg-slate-50 mr-8')}>
+                    <div className="text-[10px] font-bold uppercase text-on-surface-variant mb-1">
+                      {m.role === 'user' ? 'Bạn' : 'Agent'}
+                      {m.latency !== undefined && <span className="ml-2 text-emerald-600">{m.latency}ms</span>}
+                      {m.confidence !== undefined && <span className="ml-2 text-blue-600">
+                        {m.confidence <= 1 ? Math.round(m.confidence * 100) : Math.round(m.confidence)}% conf
+                      </span>}
+                    </div>
+                    <div className="whitespace-pre-wrap">{m.content}</div>
+                  </div>
+                ))
+              )}
+              {testing && (
+                <div className="p-3 rounded-lg bg-slate-50 mr-8 text-sm text-on-surface-variant">
+                  <span className="animate-pulse">⏳ Agent đang suy nghĩ...</span>
+                </div>
+              )}
+            </div>
+
+            <div className="border-t border-outline-variant p-3 flex gap-2">
+              <input
+                value={testInput}
+                onChange={(e) => setTestInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleTestAgent(); } }}
+                placeholder="Nhập câu hỏi test..."
+                className="flex-1 h-10 px-3 rounded-lg border border-outline text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+                disabled={testing}
+              />
+              <button
+                onClick={handleTestAgent}
+                disabled={testing || !testInput.trim()}
+                className="px-4 h-10 rounded-lg bg-primary text-on-primary text-sm font-bold disabled:opacity-50"
+              >
+                {testing ? '...' : 'Gửi'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* FAB */}
       <div className="fixed bottom-6 right-6 z-50">

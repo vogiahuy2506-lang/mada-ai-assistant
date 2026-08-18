@@ -319,7 +319,9 @@ export async function scrapeCategoryListing(
       // Title + URL
       const $link = $el.find('h2.entry-title a');
       // Get the link text but exclude the .screen-reader-text span content
-      const title = $link.clone().children('.screen-reader-text').remove().end().text().replace(/\s+/g, ' ').trim();
+      let title = $link.clone().children('.screen-reader-text').remove().end().text().replace(/\s+/g, ' ').trim();
+      // ⭐ FIX: Remove trailing "Date: <Month> <day>, <year>" that MADA theme injects into h2
+      title = title.replace(/\s*Date:\s*[A-Z][a-z]+\s+\d{1,2},\s*\d{4}.*$/i, '').trim();
       const href = $link.attr('href') || '';
       const detailUrl = absoluteUrl(href, BASE_URL);
 
@@ -383,16 +385,19 @@ export async function scrapeProductDetail(item: ProductListItem): Promise<Produc
   const $ = cheerio.load(html);
 
   // ===== Title =====
-  const title =
+  let title =
     $('meta[property="og:title"]').attr('content') ||
     $('h1.entry-title').first().text().trim() ||
     item.title;
+  // ⭐ FIX: strip trailing date from title (MADA theme leaks it in some templates)
+  title = title.replace(/\s*Date:\s*[A-Z][a-z]+\s+\d{1,2},\s*\d{4}.*$/i, '').trim();
 
   // ===== Description =====
-  const description =
+  let description =
     $('meta[property="og:description"]').attr('content') ||
     $('meta[name="description"]').attr('content') ||
     '';
+  description = description.replace(/\s*Date:\s*[A-Z][a-z]+\s+\d{1,2},\s*\d{4}.*$/i, '').trim();
 
   // ===== Main content (gutenberg blocks) =====
   const contentParts: string[] = [];

@@ -22,7 +22,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { CATEGORY_INFO, SAMPLE_QUESTIONS, type ATCategory, type Language, type SuggestedProduct } from '@/types';
 import { t } from '@/lib/translations';
-import { userHistoryApi } from '@/lib/api';
+import { userHistoryApi, fileQuotaApi, type FileUploadQuota } from '@/lib/api';
 
 // Attachment options - use getAttachmentOptions(language) inside component
 function getAttachmentOptions(lang: Language) {
@@ -59,7 +59,7 @@ const categories = Object.keys(CATEGORY_INFO) as ATCategory[];
 
 // Category Icons
 const CATEGORY_ICONS: Record<ATCategory, string> = {
-  hearing: 'hearing',
+  hearing: 'headphones',
   vision: 'visibility',
   communication: 'record_voice_over',
   cognition: 'psychology',
@@ -855,10 +855,63 @@ export function ChatPage() {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [_cancellingFiles, setCancellingFiles] = useState<Set<string>>(new Set());
   const [isGeneratingResponse, setIsGeneratingResponse] = useState(false);
+
+  // ⭐ File upload quota state (theo plan + tháng)
+  const [fileQuota, setFileQuota] = useState<FileUploadQuota | null>(null);
+  const fetchFileQuota = useCallback(async () => {
+    if (!user) {
+      setFileQuota(null);
+      return;
+    }
+    const res = await fileQuotaApi.getMyQuota();
+    if (res.success) setFileQuota(res.data);
+  }, [user]);
+  // Fetch quota khi user thay đổi (login/logout)
+  useEffect(() => {
+    fetchFileQuota();
+  }, [fetchFileQuota]);
+
+  const fileQuotaExhausted = !!fileQuota && fileQuota.limit !== -1 && fileQuota.remaining <= 0;
   const [activeCategory, setActiveCategory] = useState<ATCategory | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [_suggestedFollowUps, setSuggestedFollowUps] = useState<string[]>([]);
   const [isDragging, setIsDragging] = useState(false);
+
+  // ⭐ AI-powered follow-up questions generator
+  const generateFollowUpWithAI = useCallback(async (
+    userMessage: string,
+    aiResponse: string,
+    conversationHistory: { role: string; content: string }[],
+    lang: Language,
+    mode: string
+  ): Promise<string[]> => {
+    try {
+      const res = await fetch('/api/chat/follow-up', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userMessage,
+          aiResponse,
+          conversationHistory: conversationHistory.slice(-10),
+          language: lang,
+          userMode: mode,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.data?.questions?.length > 0) {
+          console.log('💡 AI follow-up questions:', data.data.questions);
+          return data.data.questions;
+        }
+      }
+    } catch (err) {
+      console.warn('[ChatPage] AI follow-up failed:', err);
+    }
+
+    // Fallback to keyword-based questions
+    return generateFollowUpQuestions(userMessage, aiResponse, lang);
+  }, []);
 
   // View Mode Store
   const { viewMode, toggleViewMode } = useViewModeStore();
@@ -1053,8 +1106,8 @@ export function ChatPage() {
   // Auto-scroll to bottom - but respect user's manual scroll
   useEffect(() => {
     // Only auto-scroll if user hasn't manually scrolled up
-    if (!userHasScrolled) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (!userHasScrolled && messages.length > 0) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'instant', block: 'end' });
     }
   }, [messages, isLoading, streamingContent]);
 
@@ -1400,17 +1453,23 @@ export function ChatPage() {
       // Gửi chat với file đính kèm - sử dụng streaming endpoint
       const useStream = attachmentsForApi.length === 0; // Chỉ stream khi không có file
       const chatEndpoint = useStream ? '/api/chat/stream' : (attachmentsForApi.length > 0 ? '/api/chat-with-file' : '/api/chat');
-      const chatBody: any = { 
-        message: fullMessage, 
+      // Map viewMode ('end_user' | 'at_specialist') → userMode ('endUser' | 'specialist')
+      const userMode: 'endUser' | 'specialist' = viewMode === 'at_specialist' ? 'specialist' : 'endUser';
+      const chatBody: any = {
+        message: fullMessage,
         language,
         agentId: selectedAgentId,
         agentPrompt: selectedAgent?.systemPrompt,
+        userMode,
       };
       
       // Thêm attachments nếu có
       if (attachmentsForApi.length > 0) {
         chatBody.attachments = attachmentsForApi;
       }
+
+      // ===== Bắt đầu đo latency cho analytics =====
+      const chatStartTime = Date.now();
 
       // ===== STREAMING MODE =====
       if (useStream) {
@@ -1495,9 +1554,30 @@ export function ChatPage() {
             }).catch((err) => console.warn('[ChatPage] Failed to save assistant message:', err?.message));
           }
 
-          // Generate follow-up questions
-          const followUps = generateFollowUpQuestions(userMessage, fullContent, language);
-          setSuggestedFollowUps(followUps);
+          // ⭐ Generate AI-powered follow-up questions
+          generateFollowUpWithAI(userMessage, fullContent, messages, language, viewMode)
+            .then(followUps => setSuggestedFollowUps(followUps))
+            .catch(() => setSuggestedFollowUps(generateFollowUpQuestions(userMessage, fullContent, language)));
+
+          // ⭐ Post chat metric (stream mode)
+          try {
+            const latencyMs = Date.now() - chatStartTime;
+            const confidencePct = typeof confidence === 'number'
+              ? (confidence <= 1 ? confidence * 100 : confidence)
+              : 0.8 * 100;
+            fetch('/api/admin/chat-metrics', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                conversationId: currentConvId || undefined,
+                latencyMs,
+                confidence: confidencePct,
+                botId: selectedAgentId || undefined,
+                language,
+                userMode: viewMode === 'at_specialist' ? 'specialist' : 'endUser',
+              }),
+            }).catch(() => { /* silent */ });
+          } catch { /* ignore */ }
         }
         return; // Done with streaming
       }
@@ -1512,6 +1592,17 @@ export function ChatPage() {
 
       // Check if response is OK
       if (!response.ok) {
+        // ⭐ Handle 402 — File upload quota exceeded
+        if (response.status === 402) {
+          try {
+            const errBody = await response.json();
+            if (errBody.code === 'FILE_UPLOAD_QUOTA_EXCEEDED') {
+              if (errBody.quota) setFileQuota(errBody.quota);
+              usePaywallModalStore.getState().open('file_upload_exhausted');
+              return;
+            }
+          } catch { /* ignore */ }
+        }
         const errorText = await response.text();
         console.error('API Error:', response.status, errorText);
         throw new Error(`Server error: ${response.status}`);
@@ -1527,6 +1618,10 @@ export function ChatPage() {
       }
 
       if (data.success && data.data) {
+        // ⭐ Cập nhật file quota từ response (nếu có)
+        if (data.data.fileQuota) {
+          setFileQuota(data.data.fileQuota);
+        }
         apiSuccess = true;
         // Support both 'answer' and 'message' fields for compatibility
         const fullContent = data.data.answer || data.data.message || '';
@@ -1564,9 +1659,32 @@ export function ChatPage() {
           }).catch((err) => console.warn('[ChatPage] Failed to save assistant (non-stream):', err?.message));
         }
 
-        // Generate follow-up questions based on user question and AI response
-        const followUps = generateFollowUpQuestions(userMessage, fullContent, language);
-        setSuggestedFollowUps(followUps);
+        // ⭐ Generate AI-powered follow-up questions
+        generateFollowUpWithAI(userMessage, fullContent, messages, language, viewMode)
+          .then(followUps => setSuggestedFollowUps(followUps))
+          .catch(() => setSuggestedFollowUps(generateFollowUpQuestions(userMessage, fullContent, language)));
+
+        // ⭐ Post chat metric (async, fire-and-forget) cho admin analytics
+        try {
+          const latencyMs = Date.now() - chatStartTime;
+          const confidenceVal = typeof data.data.confidence === 'number'
+            ? data.data.confidence
+            : (typeof data.data.confidence === 'string' ? parseFloat(data.data.confidence) : 0.8);
+          const confidencePct = confidenceVal <= 1 ? confidenceVal * 100 : confidenceVal;
+
+          fetch('/api/admin/chat-metrics', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              conversationId: currentConvId || undefined,
+              latencyMs,
+              confidence: confidencePct,
+              botId: selectedAgentId || undefined,
+              language,
+              userMode: viewMode === 'at_specialist' ? 'specialist' : 'endUser',
+            }),
+          }).catch(() => { /* silent fail - không ảnh hưởng UX */ });
+        } catch { /* ignore */ }
       } else {
         addMessage({
           role: 'assistant',
@@ -1650,10 +1768,7 @@ export function ChatPage() {
     if (window.innerWidth < 768) {
       setSidebarOpen(false);
     }
-
-    setTimeout(() => {
-      textareaRef.current?.focus();
-    }, 100);
+    // Note: removed textarea.focus() to prevent viewport jump on mobile
   };
 
   // Send với text cho trước (dùng cho suggested questions)
@@ -1861,14 +1976,21 @@ export function ChatPage() {
   };
 
   const handleAttachmentSelect = (_type: string, accept: string) => {
-    // Check limit before opening file picker
+    // Check session limit before opening file picker
     const limitCheck = canAddFiles();
     if (!limitCheck.allowed) {
       alert(limitCheck.reason);
       setShowAttachmentMenu(false);
       return;
     }
-    
+
+    // ⭐ Check monthly file upload quota
+    if (fileQuotaExhausted) {
+      setShowAttachmentMenu(false);
+      usePaywallModalStore.getState().open('file_upload_exhausted');
+      return;
+    }
+
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = accept;
@@ -2101,27 +2223,23 @@ export function ChatPage() {
       {/* ============== SIDEBAR ============== */}
       <aside
         className={clsx(
-          'h-full bg-white border-r border-slate-200 flex flex-col transition-all duration-300',
+          'h-screen bg-white border-r border-slate-200 flex flex-col transition-all duration-300 shrink-0',
           sidebarOpen ? 'w-72' : 'w-0 overflow-hidden',
-          'max-md:fixed max-md:left-0 max-md:top-0 max-md:z-50 max-md:h-screen',
+          'max-md:fixed max-md:left-0 max-md:top-0 max-md:z-50',
           !sidebarOpen && 'max-md:-translate-x-full'
         )}
       >
           {/* Logo Area */}
-          <div className="p-6 border-b border-white/50">
-            <div className="flex items-center gap-3 mb-1">
-              <img src={madaLogo} alt="MADA" className="h-12" />
-              <div>
-                <h1 className="font-black text-xl tracking-tight text-on-background">MADA AI</h1>
-                <p className="text-[10px] uppercase tracking-widest text-primary font-bold">Universal Access</p>
-              </div>
+          <div className="p-4 border-b border-white/50 shrink-0">
+            <div className="flex items-center justify-center">
+              <img src={madaLogo} alt="MADA" className="h-14" />
             </div>
           </div>
 
         {/* View Mode Toggle đã di chuyển lên Header */}
 
         {/* View Mode Toggle */}
-        <div className="px-4 mb-3">
+        <div className="px-4 mb-3 shrink-0">
           <div className="bg-slate-100 rounded-xl p-0.5 flex">
             <button
               onClick={viewMode === 'end_user' ? undefined : toggleViewMode}
@@ -2133,7 +2251,7 @@ export function ChatPage() {
               )}
             >
               <span className="material-symbols-outlined text-sm">person</span>
-              <span>Người dùng</span>
+              <span>{language === 'vi' ? 'Người dùng' : language === 'en' ? 'End user' : language === 'ar' ? 'المستخدم' : 'Utilisateur'}</span>
             </button>
             <button
               onClick={viewMode === 'at_specialist' ? undefined : toggleViewMode}
@@ -2145,13 +2263,13 @@ export function ChatPage() {
               )}
             >
               <span className="material-symbols-outlined text-sm">engineering</span>
-              <span>Chuyên gia</span>
+              <span>{language === 'vi' ? 'Chuyên gia' : language === 'en' ? 'Specialist' : language === 'ar' ? 'خبير' : 'Spécialiste'}</span>
             </button>
           </div>
         </div>
 
         {/* New Chat Button */}
-        <div className="px-4 mb-4 mt-2">
+        <div className="px-4 mb-4 mt-2 shrink-0">
           <button
             onClick={handleNewChat}
             className="w-full text-white rounded-full py-2.5 px-4 flex items-center justify-center gap-2 font-semibold shadow-md hover:opacity-90 transition-all bg-primary hover:bg-primary/90 text-sm"
@@ -2161,12 +2279,12 @@ export function ChatPage() {
           </button>
         </div>
 
-        {/* Category Navigation */}
-        <nav className="flex-1 px-3 space-y-1 overflow-y-auto">
+        {/* Category Navigation - CỐ ĐỊNH (không scroll) */}
+        <nav className="px-3 space-y-1 shrink-0">
           {categories.map((category) => {
             const isActive = activeCategory === category;
             const label = CATEGORY_LABELS[category];
-            
+
             // Material Design 3 colors for categories
             const categoryColors: Record<ATCategory, { bg: string; icon: string; active: string }> = {
               vision: { bg: 'bg-blue-100', icon: 'text-blue-600', active: 'bg-blue-500 text-white' },
@@ -2246,9 +2364,9 @@ export function ChatPage() {
             );
           })}
 
-          {/* Sample Questions - Hiển thị khi có category được chọn */}
+          {/* Sample Questions - Hiển thị khi có category được chọn (CỐ ĐỊNH theo 7 bot) */}
           {activeCategory && SAMPLE_QUESTIONS[activeCategory]?.[viewMode]?.[language]?.length > 0 && (
-            <div className="mt-4 pt-4 border-t border-slate-100">
+            <div className="mt-4 pt-4 border-t border-slate-100 shrink-0">
               <p className="text-[10px] font-bold uppercase tracking-widest text-violet-600 px-4 mb-2 flex items-center gap-1">
                 <span className="material-symbols-outlined text-sm">lightbulb</span>
                 {language === 'vi' ? 'Câu hỏi gợi ý' : language === 'en' ? 'Suggested Questions' : language === 'ar' ? 'أسئلة مقترحة' : 'Questions suggérées'}
@@ -2282,10 +2400,11 @@ export function ChatPage() {
               </div>
             </div>
           )}
+        </nav>
 
-          {/* Recent Chats Section */}
-          <div className="pt-6 pb-4">
-            <div className="flex items-center justify-between px-4 mb-3">
+          {/* Recent Chats Section - SCROLLABLE */}
+          <div className="pt-4 flex-1 min-h-0 overflow-y-auto">
+            <div className="flex items-center justify-between px-4 mb-3 shrink-0">
               <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">{language === 'vi' ? 'Lịch sử gần đây' : language === 'en' ? 'Recent History' : language === 'ar' ? 'السجل الأخير' : 'Historique récent'}</p>
               {historyConversations.length > 0 && (
                 <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">
@@ -2397,10 +2516,9 @@ export function ChatPage() {
               )}
             </div>
           </div>
-        </nav>
 
-        {/* User Profile */}
-        <div className="p-4 border-t border-slate-100">
+        {/* User Profile - Fixed at bottom */}
+        <div className="shrink-0 p-4 border-t border-slate-100 bg-white">
           <div className="bg-slate-50 rounded-2xl p-4">
             <button
               type="button"
@@ -2654,7 +2772,6 @@ export function ChatPage() {
                         key={index}
                         onClick={() => {
                           setInputValue(typeof item === 'string' ? item : item.text);
-                          textareaRef.current?.focus();
                         }}
                         className="group bg-white border border-outline-variant rounded-2xl p-4 text-left hover:shadow-lg hover:border-primary/30 transition-all duration-200"
                       >
@@ -2761,92 +2878,13 @@ export function ChatPage() {
                 <div ref={messagesEndRef} />
               </div>
 
-              {/* Category Quick Questions - Show AFTER AI finishes responding */}
-              {activeCategory && !inputValue && messages.length > 0 && !isLoading && (
-                <div className="mb-4 animate-fade-in" role="region" aria-label={isEndUser
-                  ? (language === 'vi' ? 'Gợi ý câu hỏi' : language === 'en' ? 'Suggested Questions' : 'اقتراحات سريعة')
-                  : 'Quick suggestions'
-                }>
-                  {/* Compact Header - High contrast, semantic */}
-                  <div className="flex items-center justify-between mb-2.5 px-1">
-                    <div className="flex items-center gap-2">
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-900 text-white text-[10px] font-bold uppercase tracking-wider">
-                        <span className="material-symbols-outlined text-[11px] leading-none" style={{ fontVariationSettings: "'FILL' 1" }}>
-                          {CATEGORY_ICONS[activeCategory]}
-                        </span>
-                        {isEndUser
-                          ? (language === 'vi' ? 'Gợi ý' : language === 'en' ? 'Suggestions' : 'اقتراحات')
-                          : 'Quick'
-                        }
-                      </span>
-                      <span className="text-[10px] text-slate-600 font-semibold hidden sm:inline">
-                        {language === 'vi' ? 'Chạm để dùng ngay' : 'Tap to use'}
-                      </span>
-                    </div>
-                    <button
-                      onClick={() => setActiveCategory(null)}
-                      className="text-[10px] text-slate-700 hover:text-slate-900 px-2 py-1 rounded hover:bg-slate-200 transition-colors flex items-center gap-1 font-medium focus:outline-none focus:ring-2 focus:ring-slate-900 focus:ring-offset-1"
-                      aria-label={language === 'vi' ? 'Đóng' : 'Close'}
-                    >
-                      <X className="w-3 h-3" />
-                      {language === 'vi' ? 'Đóng' : 'Close'}
-                    </button>
-                  </div>
-
-                  {/* Horizontal Scrollable Pills - High Contrast, WCAG AAA */}
-                  <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent">
-                    {currentQuestions.slice(0, 6).map((question, index) => (
-                      <div
-                        key={index}
-                        className="group/pill flex-shrink-0 flex items-stretch rounded-full border-2 border-slate-900 bg-white hover:bg-slate-50 transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] overflow-hidden max-w-[320px] shadow-sm"
-                      >
-                        {/* Action 1: Fill to input (edit icon) */}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleSelectSampleQuestion(question);
-                          }}
-                          className="flex items-center gap-1.5 pl-3 pr-2 py-1.5 text-slate-900 hover:bg-slate-100 transition-colors focus:outline-none focus:ring-2 focus:ring-slate-900 focus:ring-offset-1"
-                          aria-label={language === 'vi' ? `Điền vào ô nhập: ${question}` : `Fill input: ${question}`}
-                          title={language === 'vi' ? 'Điền vào ô nhập để chỉnh sửa' : 'Fill input to edit'}
-                        >
-                          <span className="material-symbols-outlined text-[13px] leading-none flex-shrink-0" style={{ fontVariationSettings: "'FILL' 1" }}>
-                            {index % 6 === 0 ? 'lightbulb' : index % 6 === 1 ? 'search' : index % 6 === 2 ? 'info' : index % 6 === 3 ? 'help' : index % 6 === 4 ? 'smart_toy' : 'chat'}
-                          </span>
-                          <span className="text-xs font-semibold truncate max-w-[180px]">
-                            {question.length > 36 ? question.slice(0, 36) + '…' : question}
-                          </span>
-                        </button>
-
-                        {/* Divider */}
-                        <div className="w-px bg-slate-900/20" />
-
-                        {/* Action 2: Send immediately (send icon) */}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleSendWithText(question);
-                          }}
-                          className="flex items-center justify-center px-2.5 py-1.5 bg-slate-900 text-white hover:bg-slate-700 transition-colors focus:outline-none focus:ring-2 focus:ring-slate-900 focus:ring-offset-1"
-                          aria-label={language === 'vi' ? `Gửi ngay: ${question}` : `Send now: ${question}`}
-                          title={language === 'vi' ? 'Gửi câu hỏi này ngay' : 'Send this question now'}
-                        >
-                          <span className="material-symbols-outlined text-[13px] leading-none" style={{ fontVariationSettings: "'FILL' 1" }}>
-                            send
-                          </span>
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
           )}
         </div>
 
-        {/* ============== INPUT AREA - Fixed Bottom Bar ============== */}
-        <div className="relative bottom-0 left-0 w-full bg-[#f9f9ff] pt-6 pb-6 px-4 md:px-8 z-30 border-t border-slate-200">
-          <div className="max-w-3xl mx-auto relative flex flex-col gap-4">
+        {/* ============== INPUT AREA - Sticky Bottom Bar ============== */}
+        <div className="bg-[#f9f9ff] pt-4 pb-6 px-4 md:px-8 border-t border-slate-200/50">
+          <div className="max-w-3xl mx-auto relative flex flex-col gap-3">
 
             {/* File upload status with limits */}
             {selectedFiles.length > 0 && (
@@ -2867,6 +2905,112 @@ export function ChatPage() {
               </div>
             )}
 
+            {/* File attachments display - Grid 2 cột, full width bên ngoài pill input */}
+            {selectedFiles.length > 0 && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3 w-full" role="list" aria-label={language === 'vi' ? 'Danh sách tệp đính kèm' : 'Attached files list'}>
+                {selectedFiles.map((file, index) => {
+                  const isError = file.size > 50 * 1024 * 1024; // 50MB limit
+                  const status = file.isLoading ? 'loading' : isError ? 'error' : 'ready';
+
+                  // Helper format file size
+                  const formatSize = (bytes: number) => {
+                    if (bytes < 1024) return `${bytes} B`;
+                    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+                    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+                  };
+
+                  return (
+                    <div
+                      key={index}
+                      role="listitem"
+                      className={clsx(
+                        'group/file relative flex items-center gap-2.5 rounded-xl border px-3 py-2 transition-all min-w-0',
+                        status === 'ready' && 'bg-white border-emerald-300 hover:border-emerald-500 hover:shadow-md',
+                        status === 'loading' && 'bg-blue-50 border-blue-300',
+                        status === 'error' && 'bg-red-50 border-red-300'
+                      )}
+                      aria-label={`${file.name} - ${status}`}
+                    >
+                      {/* File type icon */}
+                      <div className={clsx(
+                        'flex-shrink-0 w-9 h-9 rounded-lg flex items-center justify-center',
+                        file.type === 'application/pdf' && 'bg-red-100 text-red-600',
+                        file.type.includes('word') && 'bg-blue-100 text-blue-600',
+                        file.type.startsWith('image/') && 'bg-pink-100 text-pink-600',
+                        !['application/pdf'].includes(file.type) && !file.type.includes('word') && !file.type.startsWith('image/') && 'bg-slate-100 text-slate-600'
+                      )}>
+                        {file.type === 'application/pdf' ? (
+                          <span className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>picture_as_pdf</span>
+                        ) : file.type.includes('word') ? (
+                          <span className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>description</span>
+                        ) : file.type.startsWith('image/') ? (
+                          <span className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>image</span>
+                        ) : (
+                          <span className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>attach_file</span>
+                        )}
+                      </div>
+
+                      {/* File info - flex-1 min-w-0 để truncate đúng */}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-semibold text-slate-900 truncate">
+                          {file.name}
+                        </p>
+                        <div className="flex items-center gap-1 mt-0.5 min-w-0">
+                          {status === 'ready' && (
+                            <>
+                              <span className="material-symbols-outlined text-[12px] text-emerald-600 flex-shrink-0" style={{ fontVariationSettings: "'FILL' 1" }}>
+                                check_circle
+                              </span>
+                              <span className="text-[10px] font-medium text-emerald-700 truncate">
+                                {language === 'vi' ? `Sẵn sàng · ${formatSize(file.size)}` : `Ready · ${formatSize(file.size)}`}
+                              </span>
+                            </>
+                          )}
+                          {status === 'loading' && (
+                            <>
+                              <Loader2 className="w-3 h-3 text-blue-600 animate-spin flex-shrink-0" />
+                              <span className="text-[10px] font-medium text-blue-700 truncate">
+                                {language === 'vi' ? 'Đang xử lý...' : 'Processing...'}
+                              </span>
+                            </>
+                          )}
+                          {status === 'error' && (
+                            <>
+                              <span className="material-symbols-outlined text-[12px] text-red-600 flex-shrink-0" style={{ fontVariationSettings: "'FILL' 1" }}>
+                                error
+                              </span>
+                              <span className="text-[10px] font-medium text-red-700 truncate">
+                                {language === 'vi' ? 'Quá lớn (>50MB)' : 'Too large (>50MB)'}
+                              </span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Remove button */}
+                      {!file.isLoading && (
+                        <button
+                          onClick={() => handleRemoveFile(index)}
+                          className="flex-shrink-0 w-6 h-6 rounded-full bg-slate-100 hover:bg-red-100 flex items-center justify-center text-slate-500 hover:text-red-600 transition-all hover:scale-110"
+                          title={language === 'vi' ? 'Xóa' : 'Remove'}
+                          aria-label={`Remove ${file.name}`}
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      )}
+
+                      {/* Loading overlay */}
+                      {file.isLoading && (
+                        <div className="absolute inset-0 bg-white/60 rounded-xl flex items-center justify-center pointer-events-none">
+                          <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
             {/* Redesigned Pill Input with Layered Shadow - Material Design 3 Style */}
             <div className="relative">
               {/* Floating Lightning Icon */}
@@ -2884,16 +3028,50 @@ export function ChatPage() {
                 <div className="flex items-center gap-1 pl-1 relative" ref={attachmentMenuRef}>
                   <button
                     onClick={handleFileAttach}
+                    disabled={fileQuotaExhausted}
                     className={clsx(
                       'p-2 rounded-full transition-colors',
-                      showAttachmentMenu
+                      fileQuotaExhausted
+                        ? 'opacity-40 cursor-not-allowed text-on-surface-variant'
+                        : showAttachmentMenu
                         ? 'bg-primary text-white'
                         : 'text-on-surface-variant hover:text-on-background hover:bg-surface-container-low'
                     )}
-                    title="Đính kèm"
+                    title={
+                      fileQuotaExhausted
+                        ? (language === 'vi' ? 'Đã hết lượt tải file tháng này' : language === 'en' ? 'Monthly upload limit reached' : language === 'ar' ? 'تم الوصول للحد الشهري' : 'Limite mensuelle atteinte')
+                        : 'Đính kèm'
+                    }
                   >
                     <Plus className="w-5 h-5" />
                   </button>
+
+                  {/* File upload quota badge — nhỏ, hiện cạnh nút attach khi có user */}
+                  {user && fileQuota && fileQuota.limit !== -1 && (
+                    <button
+                      onClick={() => {
+                        if (fileQuotaExhausted) {
+                          usePaywallModalStore.getState().open('file_upload_exhausted');
+                        }
+                      }}
+                      className={clsx(
+                        'hidden md:flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold transition-colors',
+                        fileQuotaExhausted
+                          ? 'bg-rose-100 text-rose-700 hover:bg-rose-200'
+                          : fileQuota.remaining <= 3
+                          ? 'bg-amber-100 text-amber-700 hover:bg-amber-200'
+                          : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
+                      )}
+                      title={
+                        fileQuotaExhausted
+                          ? (language === 'vi' ? 'Đã hết lượt tải file' : language === 'en' ? 'File upload quota exhausted' : language === 'ar' ? 'تم استنفاد الحصة' : 'Quota de téléchargement épuisée')
+                          : (language === 'vi' ? `Còn ${fileQuota.remaining}/${fileQuota.limit} lượt upload tháng này` : `${fileQuota.remaining}/${fileQuota.limit} uploads left this month`)
+                      }
+                    >
+                      <span className="material-symbols-outlined text-[12px]">cloud_upload</span>
+                      <span>{fileQuotaExhausted ? '0' : fileQuota.remaining}/{fileQuota.limit}</span>
+                    </button>
+                  )}
 
                   {/* Attachment Menu */}
                   {showAttachmentMenu && (
@@ -3045,105 +3223,6 @@ export function ChatPage() {
                   style={{ minHeight: '40px', maxHeight: '100px' }}
                 />
 
-                {/* File attachments display - Cards with status (loading/ready/error) */}
-                {selectedFiles.length > 0 && (
-                  <div className="flex flex-wrap gap-2 pb-2" role="list" aria-label={language === 'vi' ? 'Danh sách tệp đính kèm' : 'Attached files list'}>
-                    {selectedFiles.map((file, index) => {
-                      const isError = file.size > 50 * 1024 * 1024; // 50MB limit
-                      const status = file.isLoading ? 'loading' : isError ? 'error' : 'ready';
-                      
-                      return (
-                        <div
-                          key={index}
-                          role="listitem"
-                          className={clsx(
-                            'group/file relative flex items-center gap-2 rounded-xl border-2 px-3 py-2 min-w-[200px] max-w-[280px] transition-all',
-                            status === 'ready' && 'bg-white border-emerald-300 hover:border-emerald-500 hover:shadow-md',
-                            status === 'loading' && 'bg-blue-50 border-blue-300',
-                            status === 'error' && 'bg-red-50 border-red-300'
-                          )}
-                          aria-label={`${file.name} - ${status}`}
-                        >
-                          {/* File type icon */}
-                          <div className={clsx(
-                            'flex-shrink-0 w-9 h-9 rounded-lg flex items-center justify-center',
-                            file.type === 'application/pdf' && 'bg-red-100 text-red-600',
-                            file.type.includes('word') && 'bg-blue-100 text-blue-600',
-                            file.type.startsWith('image/') && 'bg-pink-100 text-pink-600',
-                            !['application/pdf'].includes(file.type) && !file.type.includes('word') && !file.type.startsWith('image/') && 'bg-slate-100 text-slate-600'
-                          )}>
-                            {file.type === 'application/pdf' ? (
-                              <span className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>picture_as_pdf</span>
-                            ) : file.type.includes('word') ? (
-                              <span className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>description</span>
-                            ) : file.type.startsWith('image/') ? (
-                              <span className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>image</span>
-                            ) : (
-                              <span className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>attach_file</span>
-                            )}
-                          </div>
-
-                          {/* File info */}
-                          <div className="flex-1 min-w-0">
-                            <p className="text-xs font-semibold text-slate-900 truncate max-w-[180px]">
-                              {file.name}
-                            </p>
-                            <div className="flex items-center gap-1 mt-0.5">
-                              {status === 'ready' && (
-                                <>
-                                  <span className="material-symbols-outlined text-[12px] text-emerald-600" style={{ fontVariationSettings: "'FILL' 1" }}>
-                                    check_circle
-                                  </span>
-                                  <span className="text-[10px] font-medium text-emerald-700">
-                                    {language === 'vi' ? `Sẵn sàng · ${(file.size / 1024).toFixed(0)} KB` : `Ready · ${(file.size / 1024).toFixed(0)} KB`}
-                                  </span>
-                                </>
-                              )}
-                              {status === 'loading' && (
-                                <>
-                                  <Loader2 className="w-3 h-3 text-blue-600 animate-spin" />
-                                  <span className="text-[10px] font-medium text-blue-700">
-                                    {language === 'vi' ? 'Đang xử lý...' : 'Processing...'}
-                                  </span>
-                                </>
-                              )}
-                              {status === 'error' && (
-                                <>
-                                  <span className="material-symbols-outlined text-[12px] text-red-600" style={{ fontVariationSettings: "'FILL' 1" }}>
-                                    error
-                                  </span>
-                                  <span className="text-[10px] font-medium text-red-700">
-                                    {language === 'vi' ? 'Quá lớn (>50MB)' : 'Too large (>50MB)'}
-                                  </span>
-                                </>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Remove button (only for ready files) */}
-                          {!file.isLoading && (
-                            <button
-                              onClick={() => handleRemoveFile(index)}
-                              className="flex-shrink-0 w-6 h-6 rounded-full bg-slate-100 hover:bg-red-100 flex items-center justify-center text-slate-500 hover:text-red-600 transition-all hover:scale-110"
-                              title={language === 'vi' ? 'Xóa' : 'Remove'}
-                              aria-label={`Remove ${file.name}`}
-                            >
-                              <X className="w-3 h-3" />
-                            </button>
-                          )}
-
-                          {/* Loading overlay */}
-                          {file.isLoading && (
-                            <div className="absolute inset-0 bg-white/60 rounded-xl flex items-center justify-center pointer-events-none">
-                              <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-
                 {/* Right Icons & Send - Material Design 3 Style */}
                 <div className="flex items-center gap-1 pr-1">
                   {/* Voice Button */}
@@ -3247,17 +3326,17 @@ function MessageBubble({
   if (message.role === 'user') {
     return (
       <div className="flex items-end gap-3 justify-end animate-fade-in group flex-col items-end">
-        {/* Hiển thị attachments - Cards bên dưới bubble */}
+        {/* Hiển thị file cards đã gửi — đặt phía trên bubble user message */}
         {message.attachments && message.attachments.length > 0 && (
           <div className="flex flex-col gap-2 justify-end mb-1 max-w-[80%]" role="list" aria-label={language === 'vi' ? 'Tệp đính kèm đã gửi' : 'Sent attachments'}>
             {message.attachments.map((attachment, idx) => (
-              <div 
+              <div
                 key={idx}
                 role="listitem"
                 className={clsx(
                   'flex items-center gap-3 px-4 py-3 rounded-2xl rounded-br-sm text-sm border-2 transition-all',
-                  attachment.preview 
-                    ? 'bg-white/95 backdrop-blur-sm border-white/40 shadow-md' 
+                  attachment.preview
+                    ? 'bg-white/95 backdrop-blur-sm border-white/40 shadow-md'
                     : 'bg-white/90 border-white/30 shadow-sm'
                 )}
               >
@@ -3273,8 +3352,8 @@ function MessageBubble({
                     <img src={attachment.preview} alt={attachment.name} className="w-10 h-10 object-cover rounded-lg" />
                   ) : (
                     <span className="material-symbols-outlined text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>
-                      {attachment.type.includes('pdf') ? 'picture_as_pdf' : 
-                       attachment.type.includes('image') ? 'image' : 
+                      {attachment.type.includes('pdf') ? 'picture_as_pdf' :
+                       attachment.type.includes('image') ? 'image' :
                        attachment.type.includes('word') || attachment.type.includes('document') ? 'description' :
                        'attach_file'}
                     </span>
@@ -3297,8 +3376,8 @@ function MessageBubble({
             ))}
           </div>
         )}
-        <div className="max-w-[80%] px-6 py-4 bg-[#0047ff] text-white rounded-3xl rounded-tr-sm shadow-[0_10px_40px_-10px_rgba(0,71,255,0.3)]" dir={language === 'ar' ? 'rtl' : 'ltr'}>
-          <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+        <div className="max-w-[80%] px-4 py-3 bg-[#0047ff] text-white rounded-2xl" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+          <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.content}</p>
         </div>
       </div>
     );
@@ -3316,12 +3395,10 @@ function MessageBubble({
           [ TRỢ LÝ CNHT MADA // {new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) } ]
         </div>
         
-        <div className="px-4 py-3 bg-white rounded-2xl rounded-tl-none border-2 border-slate-100 shadow-sm text-slate-700 leading-relaxed" dir={language === 'ar' ? 'rtl' : 'ltr'} lang={language === 'ar' ? 'ar' : language === 'vi' ? 'vi' : language === 'en' ? 'en' : 'fr'}>
-          <div className="text-sm [&_p]:mb-3 [&_p]:leading-relaxed [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:my-3 [&_ul]:space-y-1.5 [&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:my-3 [&_ol]:space-y-1.5 [&_li]:leading-relaxed [&_li]:mb-1 [&_h3]:text-base [&_h3]:font-bold [&_h3]:mt-4 [&_h3]:mb-2 [&_h2]:text-lg [&_h2]:font-bold [&_h2]:mt-4 [&_h2]:mb-2 [&_strong]:font-bold [&_code]:bg-slate-100 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-xs [&_pre]:bg-slate-100 [&_pre]:p-3 [&_pre]:rounded-lg [&_pre]:overflow-x-auto [&_pre]:my-3 [&_blockquote]:border-l-4 [&_blockquote]:border-slate-300 [&_blockquote]:pl-3 [&_blockquote]:italic [&_blockquote]:text-slate-600 [&_a]:text-blue-500 [&_a]:underline">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-              {message.content}
-            </ReactMarkdown>
-          </div>
+        <div className="text-sm text-slate-700 leading-relaxed [&_p]:mb-3 [&_p]:leading-relaxed [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:my-3 [&_ul]:space-y-1.5 [&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:my-3 [&_ol]:space-y-1.5 [&_li]:leading-relaxed [&_li]:mb-1 [&_h3]:text-base [&_h3]:font-bold [&_h3]:mt-4 [&_h3]:mb-2 [&_h2]:text-lg [&_h2]:font-bold [&_h2]:mt-4 [&_h2]:mb-2 [&_strong]:font-bold [&_code]:bg-slate-100 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-xs [&_pre]:bg-slate-100 [&_pre]:p-3 [&_pre]:rounded-lg [&_pre]:overflow-x-auto [&_pre]:my-3 [&_blockquote]:border-l-4 [&_blockquote]:border-slate-300 [&_blockquote]:pl-3 [&_blockquote]:italic [&_blockquote]:text-slate-600 [&_a]:text-blue-500 [&_a]:underline" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+            {message.content}
+          </ReactMarkdown>
         </div>
 
         {/* Expert Consultation Banner - Always LTR */}
@@ -3519,8 +3596,13 @@ function MessageBubble({
                     confidence={product.confidence ? Math.round(product.confidence * 100) : undefined}
                     language={language}
                     onViewDetails={() => {
-                      if (product.product_url || product.source_url) {
-                        window.open(product.product_url || product.source_url, '_blank');
+                      const url = product.product_url || product.source_url;
+                      // ✅ Validate URL trước khi mở (tránh Safari báo "trang không hợp lệ" với manual:<ts>)
+                      if (url && /^https?:\/\//i.test(url)) {
+                        window.open(url, '_blank', 'noopener,noreferrer');
+                      } else {
+                        // Fallback: mở consultation modal nếu URL rỗng / invalid
+                        onRequestConsultation?.();
                       }
                     }}
                     onRequestConsult={() => {

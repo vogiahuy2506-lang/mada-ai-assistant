@@ -7,7 +7,7 @@ import clsx from 'clsx';
 import { systemApi } from '@/lib/api';
 import { CheckCircle, Loader2, AlertCircle } from 'lucide-react';
 
-type Tab = 'general' | 'plans' | 'security' | 'ai' | 'integrations' | 'live';
+type Tab = 'general' | 'plans' | 'security' | 'ai' | 'integrations' | 'live' | 'system';
 type Language = 'vi' | 'en' | 'ar' | 'fr';
 
 // Translation object
@@ -439,6 +439,8 @@ export function AdminSettings() {
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [userStats, setUserStats] = useState<UserStats | null>(null);
   const [kbStats, setKbStats] = useState<KnowledgeStats | null>(null);
+  const [dbGrouped, setDbGrouped] = useState<Record<string, Array<{ key: string; value: any; type: string; description: string }>>>({});
+  const [dbCategories, setDbCategories] = useState<Record<string, { label: string; icon: string }>>({});
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -470,6 +472,14 @@ export function AdminSettings() {
       Promise.all([adminApi.getUserStats(), adminApi.getKnowledgeStats()]).then(([u, k]) => {
         if (u.success && u.data) setUserStats(u.data);
         if (k.success && k.data) setKbStats(k.data);
+      });
+    }
+    if (tab === 'system') {
+      adminApi.getSettings().then((res) => {
+        if (res.success && res.data && (res.data as any).grouped) {
+          setDbGrouped((res.data as any).grouped);
+          setDbCategories((res.data as any).categories || {});
+        }
       });
     }
   }, [tab]);
@@ -534,6 +544,7 @@ export function AdminSettings() {
             { id: 'ai', label: lang.tabs.ai, icon: 'psychology' },
             { id: 'integrations', label: lang.tabs.integrations, icon: 'extension' },
             { id: 'live', label: lang.tabs.live, icon: 'monitor_heart' },
+            { id: 'system', label: 'System DB', icon: 'storage' },
           ] as { id: Tab; label: string; icon: string }[]
         ).map((t) => (
           <button
@@ -1139,6 +1150,62 @@ export function AdminSettings() {
                 <p>• POST /api/auth/login | POST /api/auth/register</p>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+    {tab === 'system' && (
+        <div className="relative bg-gradient-to-br from-white/80 to-white/40 backdrop-blur-xl rounded-3xl border-3 border-black p-8 md:p-12 shadow-[12px_12px_0px_0px_#000]">
+          <div className="relative z-10 space-y-6">
+            <div>
+              <h3 className="text-xl font-black text-on-surface">System Settings (DB)</h3>
+              <p className="text-sm text-on-surface-variant mt-1">
+                Toàn bộ cấu hình hệ thống được lưu trong <code className="text-xs bg-slate-100 px-1.5 py-0.5 rounded">system_settings</code> table.
+                Auto-group theo prefix key (ai_*, file_upload_*, ...).
+              </p>
+            </div>
+
+            {Object.keys(dbGrouped).length === 0 ? (
+              <div className="p-8 text-center bg-white/60 rounded-2xl border-2 border-dashed border-black/20">
+                <span className="material-symbols-outlined text-3xl text-on-surface-variant">inbox</span>
+                <p className="text-sm text-on-surface-variant mt-2">Đang tải...</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {Object.entries(dbGrouped).map(([catKey, items]) => {
+                  const cat = dbCategories[catKey] || { label: catKey, icon: 'settings' };
+                  return (
+                    <div key={catKey} className="bg-white/60 rounded-2xl border-2 border-black p-5 shadow-[3px_3px_0px_0px_#000]">
+                      <div className="flex items-center gap-2 mb-3">
+                        <span className="material-symbols-outlined text-primary">{cat.icon}</span>
+                        <h4 className="font-bold text-on-surface">{cat.label}</h4>
+                        <span className="ml-auto text-xs bg-slate-100 px-2 py-0.5 rounded-full">{items.length}</span>
+                      </div>
+                      <div className="space-y-1.5">
+                        {items.map((item) => (
+                          <div key={item.key} className="flex items-center justify-between text-sm p-2 rounded-lg hover:bg-slate-50">
+                            <div className="flex-1 min-w-0">
+                              <div className="font-mono text-xs text-on-surface truncate">{item.key}</div>
+                              {item.description && (
+                                <div className="text-[10px] text-on-surface-variant truncate">{item.description}</div>
+                              )}
+                            </div>
+                            <div className={clsx(
+                              'ml-2 px-2 py-0.5 rounded text-xs font-mono',
+                              item.type === 'number' && 'bg-blue-100 text-blue-700',
+                              item.type === 'boolean' && 'bg-purple-100 text-purple-700',
+                              item.type === 'string' && 'bg-slate-100 text-slate-700',
+                              item.type === 'json' && 'bg-amber-100 text-amber-700'
+                            )}>
+                              {String(item.value)}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       )}

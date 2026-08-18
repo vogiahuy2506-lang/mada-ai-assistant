@@ -39,8 +39,10 @@ const ALLOWED_HOSTS = [
   // Github (cho icon/demo)
   'raw.githubusercontent.com',
   'user-images.githubusercontent.com',
-  // Generic
+  // Generic image hosts
   'i.imgur.com',
+  'i.pravatar.cc',
+  'picsum.photos',
 ];
 
 /**

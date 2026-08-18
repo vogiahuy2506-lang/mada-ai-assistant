@@ -413,6 +413,9 @@ class VectorStore {
             madaCategory: r.madaCategory,
             botId: r.botId,
             createdAt: new Date().toISOString(),
+            // ⭐ Thêm thumbnailUrl cho sản phẩm
+            thumbnailUrl: r.thumbnailUrl,
+            galleryImages: r.galleryImages,
           },
           distance: r.distance,
           score: 1 - (r.distance || 0),
@@ -442,6 +445,9 @@ class VectorStore {
             madaCategory: match.metadata?.madaCategory || '',
             botId: match.metadata?.botId || '',
             createdAt: new Date().toISOString(),
+            // ⭐ Thêm thumbnailUrl cho sản phẩm
+            thumbnailUrl: match.metadata?.thumbnailUrl || '',
+            galleryImages: match.metadata?.galleryImages || '',
           },
           distance: match.distance,
           score: 1 - (match.distance || 0),

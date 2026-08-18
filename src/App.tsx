@@ -17,6 +17,8 @@ const AdminSettings = lazy(() => import('@/pages/admin/AdminSettings').then(m =>
 const AdminAgents = lazy(() => import('@/pages/admin/AdminAgents').then(m => ({ default: m.AdminAgents })));
 const AdminConsultations = lazy(() => import('@/pages/admin/AdminConsultations').then(m => ({ default: m.AdminConsultations })));
 const AdminProducts = lazy(() => import('@/pages/admin/AdminProducts').then(m => ({ default: m.AdminProducts })));
+const AdminScraper = lazy(() => import('@/pages/admin/AdminScraper').then(m => ({ default: m.AdminScraper })));
+const AdminAudit = lazy(() => import('@/pages/admin/AdminAudit').then(m => ({ default: m.AdminAudit })));
 const DataManagerPage = lazy(() => import('@/pages/DataManagerPage').then(m => ({ default: m.DataManagerPage })));
 const ExpertPage = lazy(() => import('@/pages/ExpertPage').then(m => ({ default: m.ExpertPage })));
 const ProfilePage = lazy(() => import('@/pages/ProfilePage').then(m => ({ default: m.ProfilePage })));
@@ -149,11 +151,28 @@ function App() {
               </RoleGuard>
             }
           />
+          <Route
+            path="/admin/scraper"
+            element={
+              <RoleGuard requiredRole="admin">
+                <AdminScraper />
+              </RoleGuard>
+            }
+          />
+          <Route
+            path="/admin/audit"
+            element={
+              <RoleGuard requiredRole="admin">
+                <AdminAudit />
+              </RoleGuard>
+            }
+          />
           {/* Legacy admin routes - redirect */}
           <Route path="/admin/roles" element={<Navigate to="/admin/users" replace />} />
           <Route path="/admin/ai" element={<Navigate to="/admin/settings" replace />} />
           <Route path="/admin/stats" element={<Navigate to="/admin/analytics" replace />} />
           <Route path="/admin/deploy" element={<Navigate to="/admin/settings" replace />} />
+          <Route path="/admin/crawler" element={<Navigate to="/admin/scraper" replace />} />
         </Routes>
       </Suspense>
 

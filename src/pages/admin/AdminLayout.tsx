@@ -19,6 +19,8 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Tổng quan', labelEn: 'Overview', labelAr: 'نظرة عامة', labelFr: 'Aperçu', href: '/admin', icon: 'dashboard' },
   { label: 'Người dùng', labelEn: 'Users', labelAr: 'المستخدمين', labelFr: 'Utilisateurs', href: '/admin/users', icon: 'group' },
   { label: 'Sản phẩm', labelEn: 'Products', labelAr: 'المنتجات', labelFr: 'Produits', href: '/admin/products', icon: 'inventory_2' },
+  { label: 'Scraper & KB', labelEn: 'Scraper & KB', labelAr: 'الكاشطة', labelFr: 'Scraper', href: '/admin/scraper', icon: 'cloud_download' },
+  { label: 'Audit Logs', labelEn: 'Audit', labelAr: 'تدقيق', labelFr: 'Audit', href: '/admin/audit', icon: 'history_edu' },
   { label: 'Nhật ký', labelEn: 'Logs', labelAr: 'السجلات', labelFr: 'Journaux', href: '/admin/logs', icon: 'receipt_long' },
   { label: 'Phân tích', labelEn: 'Analytics', labelAr: 'التحليلات', labelFr: 'Analytique', href: '/admin/analytics', icon: 'analytics' },
   { label: 'Agents', labelEn: 'Agents', labelAr: 'الوكلاء', labelFr: 'Agents', href: '/admin/agents', icon: 'smart_toy' },

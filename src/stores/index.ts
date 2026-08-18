@@ -253,8 +253,8 @@ export const useAuthModalStore = create<AuthModalState>((set, get) => ({
 // Paywall Modal Store
 interface PaywallModalState {
   isOpen: boolean;
-  reason: 'anonymous_exhausted' | 'user_exhausted';
-  open: (reason?: 'anonymous_exhausted' | 'user_exhausted') => void;
+  reason: 'anonymous_exhausted' | 'user_exhausted' | 'file_upload_exhausted';
+  open: (reason?: 'anonymous_exhausted' | 'user_exhausted' | 'file_upload_exhausted') => void;
   close: () => void;
 }
 

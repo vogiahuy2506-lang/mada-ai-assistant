@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { AdminLayout } from './AdminLayout';
 import { adminApi, AdminUser, KnowledgeStats, UserStats } from './adminApi';
 
@@ -19,31 +19,32 @@ export function AdminOverview() {
   const [userStats, setUserStats] = useState<UserStats | null>(null);
   const [kbStats, setKbStats] = useState<KnowledgeStats | null>(null);
   const [recentUsers, setRecentUsers] = useState<AdminUser[]>([]);
+  const [filterBotId, setFilterBotId] = useState<string>('');
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const [us, kbs, users] = await Promise.all([
-          adminApi.getUserStats(),
-          adminApi.getKnowledgeStats(),
-          adminApi.listUsers(),
-        ]);
-        if (us.success && us.data) setUserStats(us.data);
-        if (kbs.success && kbs.data) setKbStats(kbs.data);
-        if (users.success && users.data) {
-          setRecentUsers(
-            [...users.data.users]
-              .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-              .slice(0, 5)
-          );
-        }
-      } finally {
-        setLoading(false);
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [us, kbs, users] = await Promise.all([
+        adminApi.getUserStats(),
+        adminApi.getKnowledgeStats(filterBotId ? { botId: filterBotId } : undefined),
+        adminApi.listUsers(),
+      ]);
+      if (us.success && us.data) setUserStats(us.data);
+      if (kbs.success && kbs.data) setKbStats(kbs.data);
+      if (users.success && users.data) {
+        setRecentUsers(
+          [...users.data.users]
+            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+            .slice(0, 5)
+        );
       }
-    };
-    load();
-  }, []);
+    } finally {
+      setLoading(false);
+    }
+  }, [filterBotId]);
+
+  useEffect(() => { load(); }, [load]);
 
   return (
     <AdminLayout
@@ -87,7 +88,9 @@ export function AdminOverview() {
           <div>
             <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">TÀI LIỆU KB</p>
             <h3 className="text-xl font-black text-on-surface">{kbStats?.totalDocuments ?? '—'}</h3>
-            <p className="text-[10px] text-on-surface-variant mt-1">{kbStats?.totalCategories ?? 0} danh mục</p>
+            <p className="text-[10px] text-on-surface-variant mt-1">
+              {filterBotId ? `Bot: ${filterBotId}` : `${kbStats?.totalCategories ?? 0} danh mục`}
+            </p>
           </div>
         </div>
 
@@ -111,6 +114,52 @@ export function AdminOverview() {
             <h3 className="text-xl font-black text-on-surface">{userStats?.suspended ?? '—'}</h3>
             <p className="text-[10px] text-on-surface-variant mt-1">Cần xử lý</p>
           </div>
+        </div>
+      </section>
+
+      {/* KB Filter + Per-Bot Breakdown */}
+      <section className="relative bg-gradient-to-br from-white/80 to-white/40 backdrop-blur-xl rounded-3xl border-3 border-black p-8 md:p-12 shadow-[12px_12px_0px_0px_#000] mb-12">
+        <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
+          <div>
+            <h3 className="text-2xl font-black text-on-surface">Kho tri thức theo Bot</h3>
+            <p className="text-sm text-on-surface-variant">Lọc theo 7 bot MADA chuyên biệt</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="text-xs font-bold text-gray-500 uppercase">Bot ID:</label>
+            <select
+              value={filterBotId}
+              onChange={(e) => setFilterBotId(e.target.value)}
+              className="h-10 px-3 rounded-lg border-2 border-black font-label-md bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+            >
+              <option value="">Tất cả 7 bot</option>
+              <option value="bot-hearing">Bot 1: Hearing</option>
+              <option value="bot-vision">Bot 2: Vision</option>
+              <option value="bot-speech">Bot 3: Speech</option>
+              <option value="bot-cognitive">Bot 4: Cognitive</option>
+              <option value="bot-neuro">Bot 5: Neuro-Movement</option>
+              <option value="bot-mobility">Bot 6: Mobility</option>
+              <option value="bot-regulatory">Bot 7: Regulatory</option>
+            </select>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+          {kbStats?.perBot && kbStats.perBot.length > 0 ? (
+            kbStats.perBot.map((row: any) => (
+              <button
+                key={row.botId}
+                onClick={() => setFilterBotId(filterBotId === row.botId ? '' : row.botId)}
+                className={`text-left p-3 rounded-xl border-2 border-black transition-all hover:-translate-y-0.5 hover:shadow-[3px_3px_0px_0px_#000] ${filterBotId === row.botId ? 'bg-primary text-white' : 'bg-white'}`}
+              >
+                <div className="text-[10px] font-bold uppercase opacity-70">{row.botId.replace('bot-', '')}</div>
+                <div className="text-2xl font-black mt-1">{row.count}</div>
+                <div className="text-[10px] mt-1 opacity-60">tài liệu</div>
+              </button>
+            ))
+          ) : (
+            <div className="col-span-7 text-sm text-on-surface-variant text-center py-8">
+              Chưa có dữ liệu knowledge items theo bot. Chạy crawl + ingest trong /admin/scraper.
+            </div>
+          )}
         </div>
       </section>
 

@@ -20,8 +20,10 @@ name: Deploy to VPS (Compute Engine)
 
 on:
   push:
-    branches: [main]
-  workflow_dispatch:
+    branches:
+      - main
+      - feat/code-review-and-cleanup   # Tạm thời để test; xóa sau khi deploy lên main xong
+  workflow_dispatch:                  # Cho phép trigger thủ công từ Actions tab
 
 env:
   REGISTRY: ghcr.io

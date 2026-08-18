@@ -1,59 +1,49 @@
-# MADA AI Assistant - Production Dockerfile
-# Multi-stage build với Esbuild cho server bundle
+# Stage 1: Build frontend + server bundle
+FROM node:22-alpine AS builder
 
-# Stage 1: Build
-FROM node:20-alpine AS builder
+RUN apk add --no-cache python3 make g++ cairo-dev pango-dev jpeg-dev giflib-dev librsvg-dev
 
 WORKDIR /app
 
-# Copy package files
 COPY package*.json ./
 
-# Install dependencies (bao gồm dev để chạy vite/esbuild)
 RUN npm ci
 
-# Copy source code
 COPY . .
 
-# Build frontend + server (esbuild → dist/server.cjs + vite → dist/assets)
 RUN npm run build
 
 # Stage 2: Production
-FROM node:20-alpine AS production
+FROM node:22-alpine AS production
+
+RUN apk add --no-cache python3 make g++ cairo pango jpeg giflib librsvg tini wget curl
+
+RUN addgroup -g 1001 -S nodejs && adduser -S nodejs -u 1001
 
 WORKDIR /app
 
-# Install runtime dependencies cho native modules (better-sqlite3, sharp)
-RUN apk add --no-cache python3 make g++ cairo-dev pango-dev jpeg-dev giflib-dev librsvg-dev
-
-# Create non-root user for security
-RUN addgroup -g 1001 -S nodejs && \
-    adduser -S nodejs -u 1001
-
-# Copy package files
 COPY package*.json ./
+COPY entrypoint.sh ./
+RUN chmod +x ./entrypoint.sh
 
-# Install production dependencies only (skip dev)
-RUN npm ci --only=production && npm cache clean --force
+# Use prebuilt binaries (Alpine glibc/musl matches host); rebuild from source if needed
+RUN npm ci --only=production && npm rebuild && npm cache clean --force
 
-# Copy built artifacts from builder
 COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/data ./data
+COPY data ./data
 COPY --from=builder /app/server ./server
 
-# Create data directory for ingestion logs
-RUN mkdir -p ./data/chroma ./data/ingestion_log.json && \
-    chown -R nodejs:nodejs ./data
+RUN chown -R nodejs:nodejs ./data ./entrypoint.sh
 
-# Set ownership
 USER nodejs
 
-# Expose port 3000 (theo WBS Task 11)
+ENV NODE_ENV=production
+ENV PORT=3000
+
 EXPOSE 3000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1
+HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:${PORT:-3000}/api/health || exit 1
 
-# Start command - chạy bundled server.mjs (ESM)
+ENTRYPOINT ["./entrypoint.sh"]
 CMD ["node", "dist/server.mjs"]

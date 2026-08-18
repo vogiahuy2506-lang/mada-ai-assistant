@@ -76,9 +76,8 @@ data/ingestion_log.json
 !.gitignore
 .gitattributes
 
-# CI/CD
-.github/
-!.github/workflows/
+# CI/CD - allow workflow files
+# (removed .github/ rule so workflow files can be committed)
 
 # Documentation
 docs/_build/
@@ -93,3 +92,11 @@ site/
 
 # TypeScript incremental build cache
 *.tsbuildinfo
+
+# Deploy helpers (local config, contains VPS IP)
+.deploy-config
+.ssh-public-key.txt
+.ssh-private-key.txt
+
+# Local test images
+mada-ai-assistant:local-test

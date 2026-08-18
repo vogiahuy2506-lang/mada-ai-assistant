@@ -214,7 +214,7 @@ export const PLANS: SubscriptionPlan[] = [
     features: [
       'Unlimited câu hỏi',
       'Unlimited tài liệu',
-      'Full RAG với Milvus',
+      'Full RAG với Pinecone',
       'Multi-user access',
       'Auto scraping',
       'Custom integrations',

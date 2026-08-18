@@ -35,9 +35,8 @@ MADA AI Assistant là một ứng dụng web AI-powered được phát triển �
 - Checkout và Portal integration
 
 ### 5. Multi-Vector Database
-- **Mock** - Development (không cần setup)
-- **Pinecone** - Cloud vector database
-- **Milvus** - Self-hosted vector database (Docker)
+- **Mock** - Development (không cần setup, fallback tự động khi Pinecone chưa cấu hình)
+- **Pinecone** - Cloud vector database (mặc định production)
 
 ---
 
@@ -64,8 +63,8 @@ Chỉnh sửa file `.env`:
 # Gemini API Key (bắt buộc)
 GEMINI_API_KEY=your_gemini_api_key_here
 
-# Vector Database (tùy chọn)
-VECTOR_DB_PROVIDER=mock  # hoặc pinecone, milvus
+# Vector Database (mặc định: pinecone; fallback in-memory nếu thiếu key)
+VECTOR_DB_PROVIDER=pinecone
 ```
 
 ### 3. Chạy ứng dụng
@@ -125,26 +124,194 @@ mada-ai-assistant/
 │       ├── scraper.ts
 │       └── payments.ts
 ├── scripts/
-│   └── setup-milvus.sh     # Milvus setup
 ├── docs/
 │   ├── TECHNICAL_DOCUMENTATION.md
-│   ├── MILVUS_SETUP_GUIDE.md
 │   └── SCRAPING_GUIDE.md
 └── data/                   # SQLite DB, uploads
 ```
 
 ---
 
-## 🗄️ Vector Database Options
+## 🚀 Deploy to VPS (Compute Engine)
 
-### Option 1: Mock (Mặc định)
-Không cần setup, chạy ngay.
+Hướng dẫn deploy production lên Google Cloud Compute Engine (hoặc bất kỳ VPS Ubuntu/Debian nào) thông qua Docker + GitHub Actions CI/CD.
 
-```env
-VECTOR_DB_PROVIDER=mock
+### Kiến trúc
+
+```
+Local ──git push──▶ GitHub
+                          │
+                  GitHub Actions CI/CD
+                  (lint + build + Docker build)
+                          │
+                          └──▶ Push image lên GHCR
+                                       │
+                                       └──▶ SSH vào VPS
+                                                ├──▶ docker compose pull
+                                                ├──▶ docker compose up -d
+                                                └──▶ Health check
 ```
 
-### Option 2: Pinecone (Cloud)
+### Bước 1 — Setup VPS (chạy 1 lần)
+
+SSH vào VM và chạy script setup:
+
+```bash
+# Upload script setup lên VPS
+scp scripts/setup-vps.sh user@IP_VPS:~/
+
+# SSH vào VPS và chạy
+ssh user@IP_VPS
+chmod +x setup-vps.sh
+./setup-vps.sh
+```
+
+Script này s�:
+- Cài Docker + Docker Compose
+- Tạo thư mục `/app/mada-assistant`
+- Tạo file `.env` template
+- Setup firewall (UFW) mở port 22, 80, 443
+- Cài cron job backup DB SQLite mỗi ngày lúc 3h sáng
+
+Sau khi script chạy xong, edit `/app/mada-assistant/.env` và điền API keys thật:
+
+```bash
+nano /app/mada-assistant/.env
+# Sửa MADA_IMAGE, GEMINI_API_KEY, PINECONE_API_KEY, JWT_SECRET...
+```
+
+### Bước 2 — Copy config files lên VPS
+
+```bash
+# Từ máy local
+scp docker-compose.yml user@IP_VPS:/app/mada-assistant/
+scp nginx/nginx.conf user@IP_VPS:/app/mada-assistant/nginx/
+```
+
+Tạo thư mục certs (để dành cho HTTPS):
+
+```bash
+ssh user@IP_VPS "mkdir -p /app/mada-assistant/nginx/certs"
+```
+
+### Bước 3 — Cấu hình GitHub Secrets
+
+Vào **GitHub Repo → Settings → Secrets and variables → Actions → New repository secret**:
+
+| Secret | Giá trị | Cách lấy |
+|--------|---------|----------|
+| `VPS_HOST` | IP public của VM | GCP Console → VM instances |
+| `VPS_USER` | User SSH (vd: `vohuy`) | Local: `whoami` |
+| `VPS_SSH_KEY` | Private SSH key | `cat ~/.ssh/id_rsa` |
+| `GEMINI_API_KEY` | API key Gemini | https://aistudio.google.com/apikey |
+| `PINECONE_API_KEY` | API key Pinecone | https://pinecone.io |
+
+**Public key** thì copy lên VPS:
+
+```bash
+ssh-copy-id user@IP_VPS
+```
+
+### Bước 4 — Push code & auto-deploy
+
+```bash
+git add .
+git commit -m "Setup CI/CD for VPS deployment"
+git push origin main
+```
+
+GitHub Actions sẽ tự động:
+1. ✅ Lint + build
+2. ✅ Build Docker image → push lên GHCR (`ghcr.io/<user>/mada-ai-assistant:<sha>`)
+3. ✅ SSH vào VPS
+4. ✅ Pull image mới + restart containers
+5. ✅ Health check
+
+Xem tiến trình tại: **GitHub → Actions tab**
+
+### Bước 5 — Setup HTTPS (tuỳ chọn)
+
+```bash
+# Trên VPS - stop nginx trước
+cd /app/mada-assistant
+docker compose stop nginx
+
+# Cài certbot
+sudo apt install -y certbot
+
+# Cấp cert (thay your-domain.com bằng domain thật)
+sudo certbot certonly --standalone -d your-domain.com
+
+# Copy cert vào nginx/certs
+sudo cp /etc/letsencrypt/live/your-domain.com/fullchain.pem nginx/certs/
+sudo cp /etc/letsencrypt/live/your-domain.com/privkey.pem nginx/certs/
+
+# Uncomment block server { listen 443 ssl... } trong nginx.conf
+nano nginx/nginx.conf
+
+# Restart nginx
+docker compose up -d nginx
+```
+
+Auto-renew cert:
+
+```bash
+# Cron renew cert mỗi tháng
+0 0 1 * * certbot renew --quiet && cp /etc/letsencrypt/live/your-domain.com/*.pem /app/mada-assistant/nginx/certs/ && cd /app/mada-assistant && docker compose restart nginx
+```
+
+### Commands hữu ích trên VPS
+
+```bash
+cd /app/mada-assistant
+
+# Xem logs
+docker compose logs -f app
+docker compose logs -f nginx
+
+# Restart service
+docker compose restart app
+
+# Update thủ công (nếu CI/CD lỗi)
+docker compose pull app
+docker compose up -d
+
+# Backup DB thủ công
+./backup-db.sh
+
+# Restore DB từ backup
+docker run --rm \
+  -v mada-assistant_mada-data:/target \
+  -v $(pwd)/backup:/backup \
+  alpine \
+  tar xzf /backup/mada-db-20240101.tgz -C /target
+
+# Check health
+curl http://localhost/api/health
+```
+
+### Database (SQLite) trên VPS
+
+App dùng SQLite file-based (`/app/data/mada.db`), được mount qua Docker volume `mada-data`. Mọi restart container sẽ **giữ nguyên DB**. Backup tự động mỗi ngày bởi cron job, lưu tại `/app/mada-assistant/backup/`.
+
+Nếu cần chuyển sang PostgreSQL/MySQL, cần sửa code backend (`server/lib/db.ts` hiện hardcode `better-sqlite3`).
+
+### Workflows có sẵn
+
+| File | Mục đích |
+|------|----------|
+| `.github/workflows/ci-cd.yml` | CI: lint + test + build (chạy trên mọi push/PR) |
+| `.github/workflows/deploy-vps.yml` | CD: build image + deploy lên VPS (chạy khi push vào `main`) |
+| `.github/workflows/deploy.yml` | CD cũ: deploy lên Cloud Run (giữ làm backup hoặc xóa nếu không dùng) |
+
+---
+
+## 🗄️ Vector Database Options
+
+### Option 1: In-Memory (Mặc định fallback)
+Không cần setup. Tự động kích hoạt khi PINECONE_API_KEY không hợp lệ hoặc unset. Phù hợp dev/test.
+
+### Option 2: Pinecone (Cloud - Khuyến nghị production)
 Cần tài khoản Pinecone.
 
 ```env
@@ -152,22 +319,6 @@ VECTOR_DB_PROVIDER=pinecone
 PINECONE_API_KEY=your_key_here
 PINECONE_INDEX_NAME=mada-knowledge-base
 ```
-
-### Option 3: Milvus (Docker)
-Cần Docker Desktop.
-
-```bash
-# Khởi động Milvus
-./scripts/setup-milvus.sh start
-
-# Hoặc dùng npm script
-npm run milvus:start
-
-# Migration dữ liệu
-npm run milvus:migrate
-```
-
-Xem chi tiết: [docs/MILVUS_SETUP_GUIDE.md](docs/MILVUS_SETUP_GUIDE.md)
 
 ---
 
@@ -288,12 +439,8 @@ npm run dev:all      # Cả hai
 npm run build         # Production build
 npm run lint         # Check linting
 
-# Milvus
-npm run milvus:start    # Khởi động Milvus (Docker)
-npm run milvus:stop     # Dừng Milvus
-npm run milvus:status   # Kiểm tra trạng thái
-npm run milvus:logs     # Xem logs
-npm run milvus:health   # Health check
+# Pinecone migration
+npm run pinecone:migrate  # Sync data lên Pinecone
 
 # Data
 curl -X POST http://localhost:3001/api/data/sample    # Load sample data
@@ -314,17 +461,14 @@ curl -X POST http://localhost:3001/api/data/comprehensive  # Load full KB
 
 ## 🐳 Docker Deployment
 
-### Full Stack với Milvus
+### Full Stack với Pinecone
 
 ```bash
-# Khởi động Milvus
-./scripts/setup-milvus.sh start
-
 # Build và chạy app
 docker-compose up -d
 
 # Migration dữ liệu
-npm run milvus:migrate
+npm run pinecone:migrate
 
 # Khởi động server
 npm run server
@@ -431,9 +575,6 @@ docker-compose build
 # Start all services
 docker-compose up -d
 
-# Start with Milvus (optional)
-docker-compose --profile with-milvus up -d
-
 # Start with monitoring (optional)
 docker-compose --profile monitoring up -d
 ```
@@ -444,7 +585,6 @@ docker-compose --profile monitoring up -d
 |---------|------|-------------|
 | frontend | 5173 | React Vite app |
 | backend | 3000 | Express API server |
-| milvus | 19530 | Vector database (optional) |
 | prometheus | 9090 | Metrics (optional) |
 | grafana | 3001 | Dashboards (optional) |
 
@@ -475,7 +615,7 @@ CORS_ORIGINS=https://yourdomain.com
 ## 📝 Changelog
 
 ### v1.0.0 (August 2026)
-- ✅ Multi-vector database support (Mock, Pinecone, Milvus)
+- ✅ Multi-vector database support (Pinecone cloud + in-memory fallback)
 - ✅ Auto scraping với Cron
 - ✅ Stripe payment integration
 - ✅ Upload file (PDF, DOCX, TXT, CSV)

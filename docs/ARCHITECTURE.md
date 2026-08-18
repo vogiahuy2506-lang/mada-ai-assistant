@@ -50,9 +50,9 @@ MADA AI is an Assistive Technology (AT) consultation assistant that combines RAG
 │   ┌─────────────────────┐     ┌─────────────────────┐                       │
 │   │    Vector DB       │     │   SQLite Database   │                       │
 │   │  ┌───────────────┐ │     │  ┌───────────────┐ │                       │
-│   │  │   Milvus     │ │     │  │    Users      │ │                       │
-│   │  │   ChromaDB   │ │     │  │   Sessions    │ │                       │
-│   │  │   Pinecone   │ │     │  │ Consultations │ │                       │
+│   │  │   Pinecone   │ │     │  │    Users      │ │                       │
+│   │  │  In-Memory   │ │     │  │   Sessions    │ │                       │
+│   │  │  Fallback    │ │     │  │ Consultations │ │                       │
 │   │  └───────────────┘ │     │  └───────────────┘ │                       │
 │   └─────────────────────┘     └─────────────────────┘                       │
 │                                                                             │
@@ -105,7 +105,7 @@ User Query
     │
     ▼
 ┌─────────────────┐
-│  Vector Search  │ ←── Milvus / ChromaDB / Pinecone / Mock
+│  Vector Search  │ ←── Pinecone (cloud) / In-memory fallback
 └─────────────────┘
     │
     ▼
@@ -119,20 +119,13 @@ Response
 
 ### Vector DB Options
 
-1. **Milvus** (Recommended for production)
-   - Docker: `docker-compose --profile with-vector up -d milvus`
-   - UI: Attractiveness on port 3000
+1. **Pinecone** (Recommended for production — cloud)
+   - Requires `PINECONE_API_KEY` và `PINECONE_INDEX_NAME`
 
-2. **ChromaDB** (For development)
-   - Docker: `docker-compose --profile with-chroma up -d chromadb`
-   - HTTP API on port 8000
-
-3. **Pinecone** (Cloud-based)
-   - Requires `PINECONE_API_KEY` and `PINECONE_ENVIRONMENT`
-
-4. **Mock** (Default, no external service)
-   - In-memory similarity search
-   - Good for development
+2. **In-Memory Fallback** (Default khi Pinecone chưa cấu hình)
+   - Cosine similarity search trong RAM
+   - Persist metadata xuống `data/chroma/documents.json`
+   - Phù hợp dev/test
 
 ## Data Flow
 
@@ -217,17 +210,11 @@ Response + Sources
 ### Docker
 
 ```bash
-# Basic (no vector DB)
-docker-compose up -d app
+# Basic
+docker-compose up -d
 
-# With Milvus
-docker-compose --profile with-vector up -d
-
-# With ChromaDB
-docker-compose --profile with-chroma up -d
-
-# Full stack with proxy
-docker-compose --profile with-vector up -d nginx
+# With nginx reverse proxy
+docker-compose --profile with-proxy up -d
 ```
 
 ### Environment Variables
@@ -235,10 +222,9 @@ docker-compose --profile with-vector up -d nginx
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `GEMINI_API_KEY` | Google Gemini API key | Required |
-| `VECTOR_DB_PROVIDER` | Vector DB: milvus/chroma/pinecone/mock | mock |
-| `MILVUS_HOST` | Milvus server host | localhost |
-| `CHROMADB_URL` | ChromaDB server URL | localhost:8000 |
+| `VECTOR_DB_PROVIDER` | Vector DB: pinecone | pinecone |
 | `PINECONE_API_KEY` | Pinecone API key | - |
+| `PINECONE_INDEX_NAME` | Pinecone index name | mada-knowledge-base |
 | `NODE_ENV` | Environment | production |
 
 ## Monitoring

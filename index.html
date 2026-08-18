@@ -26,21 +26,37 @@
   </head>
   <body>
     <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
 
-    <!-- Service Worker Registration -->
+    <!-- Cache Buster: Unregister old Service Workers + clear stale caches -->
     <script>
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js')
-            .then((registration) => {
-              console.log('SW registered:', registration.scope);
-            })
-            .catch((error) => {
-              console.log('SW registration failed:', error);
-            });
-        });
-      }
+      (async function () {
+        if ('serviceWorker' in navigator) {
+          try {
+            const regs = await navigator.serviceWorker.getRegistrations();
+            await Promise.all(regs.map((r) => r.unregister()));
+            console.log('[CacheBust] Unregistered', regs.length, 'Service Worker(s)');
+          } catch (e) { console.warn('[CacheBust] SW unregister failed', e); }
+        }
+        if ('caches' in window) {
+          try {
+            const keys = await caches.keys();
+            await Promise.all(keys.map((k) => caches.delete(k)));
+            console.log('[CacheBust] Cleared', keys.length, 'cache(s)');
+          } catch (e) { console.warn('[CacheBust] Cache clear failed', e); }
+        }
+      })();
+    </script>
+
+    <script type="module" src="/src/main.tsx?v=cb1"></script>
+
+    <!-- Service Worker Registration (disabled for dev) -->
+    <script>
+      // Disabled in dev to prevent stale cache issues
+      // if ('serviceWorker' in navigator) {
+      //   window.addEventListener('load', () => {
+      //     navigator.serviceWorker.register('/sw.js').catch(() => {});
+      //   });
+      // }
     </script>
   </body>
 </html>

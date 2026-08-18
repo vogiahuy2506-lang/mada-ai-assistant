@@ -318,6 +318,11 @@ app.use(cors({
     if (/^http:\/\/localhost(:\d+)?$/.test(origin)) return callback(null, true);
     if (/^http:\/\/127\.0\.0\.1(:\d+)?$/.test(origin)) return callback(null, true);
 
+    // Allow any Cloud Run service URL (*.run.app)
+    // URL format: https://service-hash.region-hash.run.app or https://project-number.region-hash.run.app
+    console.log('[CORS] Checking origin:', origin);
+    if (/^https:\/\/[a-zA-Z0-9.-]+\.run\.app$/.test(origin)) return callback(null, true);
+
     // Production origins (set via env)
     if (process.env.CORS_ORIGINS) {
       const allowed = process.env.CORS_ORIGINS.split(',').map(s => s.trim());
@@ -4821,10 +4826,24 @@ app.post('/api/kb/scrape-with-suggest', async (req, res) => {
   }
 });
 
+// Serve frontend static files (production)
+const clientDistPath = path.join(__dirname, 'client');
+if (fs.existsSync(clientDistPath)) {
+  app.use(express.static(clientDistPath));
+  // SPA fallback - serve index.html for all non-API routes
+  app.get(/^(?!\/api\/|\/uploads\/).*/, (_req, res) => {
+    res.sendFile(path.join(clientDistPath, 'index.html'), (err) => {
+      if (err) res.status(404).json({ success: false, error: 'Not found' });
+    });
+  });
+  console.log(`📦 Serving frontend from ${clientDistPath}`);
+}
+
 // Start server
 app.listen(PORT, () => {
   console.log(`🚀 MADA AI Server running on http://localhost:${PORT}`);
   console.log(`📚 API Documentation: http://localhost:${PORT}/api/health`);
+  console.log(`🌐 Frontend: http://localhost:${PORT}/`);
   console.log(`⚡ RAG Enabled: ${ragInitialized}`);
   console.log(`🤖 Gemini Configured: ${!!process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'your_gemini_api_key_here'}`);
   console.log(`🛡️  Guardrails: Active`);

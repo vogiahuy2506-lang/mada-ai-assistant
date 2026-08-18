@@ -59,7 +59,7 @@ Sau khi crawl xong, 3 file sẽ được tạo trong `data/`:
 ## Bước tiếp theo: Ingest vào Vector Store
 
 ```bash
-# Ingest vào SQLite + Milvus/Pinecone
+# Ingest vào SQLite + Pinecone
 npx tsx server/scripts/ingest-scraped.ts
 ```
 

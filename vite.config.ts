@@ -4,6 +4,7 @@ import path from 'path'
 
 export default defineConfig({
   plugins: [react()],
+  optimizeDeps: { force: true, include: ["react", "react-dom", "react-dom/client", "zustand", "zustand/middleware"] },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

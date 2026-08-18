@@ -1,15 +1,9 @@
 /**
- * VectorStore - Multi-Provider Vector Database
+ * VectorStore - Pinecone Vector Database
  *
- * Hỗ trợ 2 Vector Database providers:
- * 1. Pinecone (cloud): Semantic search với AI embeddings - cloud hosted
- * 2. Milvus (local/cloud): High-performance vector DB - cần Docker
+ * Single-provider: Pinecone (cloud). Cần PINECONE_API_KEY trong .env.
  *
- * Auto-detect: Milvus → Pinecone
- *
- * Để chọn provider cụ thể, set trong .env:
- *   VECTOR_DB_PROVIDER=milvus    (local, cần Docker)
- *   VECTOR_DB_PROVIDER=pinecone  (cloud, cần API key)
+ * Khi không có Pinecone, fallback về in-memory cosine search (chỉ dùng dev/test).
  */
 
 // @ts-nocheck
@@ -17,7 +11,6 @@ import path from 'path';
 import fs from 'fs';
 import { Pinecone } from '@pinecone-database/pinecone';
 import { pineconeConfig } from './pinecone';
-import { milvusClient, milvusConfig, isMilvusConfigured } from './milvus';
 
 // ============== EMBEDDING PROVIDER ==============
 
@@ -138,24 +131,24 @@ interface SearchResult {
 
 function cosineSimilarity(a: number[], b: number[]): number {
   if (a.length !== b.length) return 0;
-  
+
   let dotProduct = 0;
   let normA = 0;
   let normB = 0;
-  
+
   for (let i = 0; i < a.length; i++) {
     dotProduct += a[i] * b[i];
     normA += a[i] * a[i];
     normB += b[i] * b[i];
   }
-  
+
   const denominator = Math.sqrt(normA) * Math.sqrt(normB);
   return denominator > 0 ? dotProduct / denominator : 0;
 }
 
 // ============== VECTOR STORE MAIN CLASS ==============
 
-export type VectorDBProvider = 'pinecone' | 'milvus' | 'auto';
+export type VectorDBProvider = 'pinecone' | 'memory';
 
 class VectorStore {
   // Provider instances
@@ -164,10 +157,10 @@ class VectorStore {
 
   // State
   private isInitialized = false;
-  private activeDbProvider: VectorDBProvider = 'pinecone';
+  private activeDbProvider: VectorDBProvider = 'memory';
   private dataDir: string = '';
 
-  // In-memory store (backup khi không có vector DB)
+  // In-memory store (fallback khi không có Pinecone — dùng cho dev/test)
   private inMemoryStore: Map<string, any> = new Map();
 
   // LRU cache query embeddings (tiết kiệm 300-800ms / hit)
@@ -189,7 +182,6 @@ class VectorStore {
   private setCachedEmbedding(query: string, vec: number[]): void {
     const key = query.trim().toLowerCase().slice(0, 200);
     if (this.embeddingCache.size >= VectorStore.CACHE_MAX) {
-      // Xóa entry cũ nhất
       const firstKey = this.embeddingCache.keys().next().value;
       if (firstKey) this.embeddingCache.delete(firstKey);
     }
@@ -203,16 +195,15 @@ class VectorStore {
       this.dataDir = path.join(process.cwd(), 'data', 'chroma');
       fs.mkdirSync(this.dataDir, { recursive: true });
 
-      // Load in-memory data từ disk
+      // Load in-memory data từ disk (cũng dùng làm mirror cho Pinecone)
       await this.loadInMemoryData();
 
-      // Detect và initialize provider
-      const preferredProvider = (process.env.VECTOR_DB_PROVIDER || 'auto') as VectorDBProvider;
-
-      if (preferredProvider === 'auto') {
-        await this.initializeAutoProvider();
-      } else {
-        await this.initializeProvider(preferredProvider);
+      // Thử initialize Pinecone; nếu fail thì fallback in-memory
+      try {
+        await this.initializePinecone();
+      } catch (e) {
+        console.warn('⚠️  Pinecone unavailable — falling back to in-memory vector store');
+        this.activeDbProvider = 'memory';
       }
 
       this.isInitialized = true;
@@ -224,75 +215,16 @@ class VectorStore {
     }
   }
 
-  private async initializeAutoProvider(): Promise<void> {
-    console.log('🔍 Auto-detecting Vector DB provider...');
-
-    // Thử Milvus trước (local, fast)
-    try {
-      await this.initializeProvider('milvus');
-      return;
-    } catch (e) {
-      console.log('⚠️  Milvus not available, trying Pinecone...');
-    }
-
-    // Thử Pinecone
-    try {
-      await this.initializeProvider('pinecone');
-      return;
-    } catch (e) {
-      console.error('❌ No vector DB provider available. Set PINECONE_API_KEY or start Milvus.');
-      throw e;
-    }
-  }
-
-  private async initializeProvider(provider: VectorDBProvider): Promise<void> {
-    switch (provider) {
-      case 'milvus':
-        await this.initializeMilvus();
-        break;
-      case 'pinecone':
-        await this.initializePinecone();
-        break;
-      default:
-        throw new Error(`Unknown vector DB provider: ${provider}`);
-    }
-  }
-
-  private async initializeMilvus(): Promise<void> {
-    if (!isMilvusConfigured()) {
-      throw new Error('Milvus not configured');
-    }
-
-    console.log(`🔌 Connecting to Milvus at ${milvusConfig.address}...`);
-    
-    const connected = await milvusClient.connect();
-    if (!connected) {
-      throw new Error('Failed to connect to Milvus');
-    }
-
-    // Create collection if not exists
-    await milvusClient.createCollection();
-    await milvusClient.loadCollection();
-
-    this.activeDbProvider = 'milvus';
-    console.log(`✅ Connected to Milvus (collection: ${milvusConfig.collectionName})`);
-  }
-
   private async initializePinecone(): Promise<void> {
     const apiKey = process.env.PINECONE_API_KEY;
     if (!apiKey || apiKey === 'your_pinecone_api_key_here') {
       throw new Error('Pinecone not configured');
     }
 
-    try {
-      this.pinecone = new Pinecone({ apiKey });
-      this.pineconeIndex = this.pinecone.Index(pineconeConfig.indexName);
-      this.activeDbProvider = 'pinecone';
-      console.log(`✅ Connected to Pinecone index: ${pineconeConfig.indexName}`);
-    } catch (error) {
-      console.error('Failed to initialize Pinecone:', error);
-      throw error;
-    }
+    this.pinecone = new Pinecone({ apiKey });
+    this.pineconeIndex = this.pinecone.Index(pineconeConfig.indexName);
+    this.activeDbProvider = 'pinecone';
+    console.log(`✅ Connected to Pinecone index: ${pineconeConfig.indexName}`);
   }
 
   private async loadInMemoryData(): Promise<void> {
@@ -321,7 +253,7 @@ class VectorStore {
 
   private saveMetadataToDisk(): void {
     if (!this.dataDir) return;
-    
+
     const docsPath = path.join(this.dataDir, 'documents.json');
     const docs = Array.from(this.inMemoryStore.values()).map(({ embedding, ...doc }) => doc);
     fs.writeFileSync(docsPath, JSON.stringify(docs, null, 2));
@@ -336,29 +268,7 @@ class VectorStore {
       this.inMemoryStore.set(doc.id, { ...doc, embedding });
     }
 
-    // Add to Milvus if using
-    if (this.activeDbProvider === 'milvus' && milvusClient.isReady()) {
-      try {
-        const embeddings = await provider.embedBatch(documents.map(d => d.content));
-        const vectors = documents.map((doc, i) => ({
-          id: doc.id,
-          content: doc.content,
-          embedding: embeddings[i],
-          source: doc.metadata.source,
-          type: doc.metadata.type,
-          title: doc.metadata.title || '',
-          category: doc.metadata.category || '',
-          // ⭐ MỚI: lưu MADA filter fields
-          madaCategory: doc.metadata.madaCategory || '',
-          botId: doc.metadata.botId || '',
-        }));
-        await milvusClient.insert(vectors);
-      } catch (err) {
-        console.error('Failed to add to Milvus:', err);
-      }
-    }
-
-    // Add to Pinecone if using
+    // Sync to Pinecone if using
     if (this.activeDbProvider === 'pinecone' && this.pineconeIndex) {
       try {
         const embeddings = await provider.embedBatch(documents.map(d => d.content));
@@ -371,7 +281,6 @@ class VectorStore {
             type: doc.metadata.type,
             title: doc.metadata.title || '',
             category: doc.metadata.category || '',
-            // ⭐ MỚI: lưu MADA filter fields
             madaCategory: doc.metadata.madaCategory || '',
             botId: doc.metadata.botId || '',
           },
@@ -399,32 +308,6 @@ class VectorStore {
     const queryEmbedding = cachedVec || await provider.embed(query);
     if (!cachedVec) this.setCachedEmbedding(query, queryEmbedding);
 
-    // Search Milvus if using
-    if (this.activeDbProvider === 'milvus' && milvusClient.isReady()) {
-      try {
-        const results = await milvusClient.search(queryEmbedding, topK, filter);
-        return results.map((r: any) => ({
-          content: r.content,
-          metadata: {
-            source: r.source,
-            type: r.type,
-            title: r.title,
-            category: r.category,
-            madaCategory: r.madaCategory,
-            botId: r.botId,
-            createdAt: new Date().toISOString(),
-            // ⭐ Thêm thumbnailUrl cho sản phẩm
-            thumbnailUrl: r.thumbnailUrl,
-            galleryImages: r.galleryImages,
-          },
-          distance: r.distance,
-          score: 1 - (r.distance || 0),
-        }));
-      } catch (err) {
-        console.error('Milvus search failed:', err);
-      }
-    }
-
     // Search Pinecone if using
     if (this.activeDbProvider === 'pinecone' && this.pineconeIndex) {
       try {
@@ -445,7 +328,6 @@ class VectorStore {
             madaCategory: match.metadata?.madaCategory || '',
             botId: match.metadata?.botId || '',
             createdAt: new Date().toISOString(),
-            // ⭐ Thêm thumbnailUrl cho sản phẩm
             thumbnailUrl: match.metadata?.thumbnailUrl || '',
             galleryImages: match.metadata?.galleryImages || '',
           },
@@ -457,7 +339,7 @@ class VectorStore {
       }
     }
 
-    // Default: In-memory search (with filter)
+    // Fallback: In-memory search (with filter)
     return this.searchInMemory(queryEmbedding, topK, filter);
   }
 
@@ -477,7 +359,6 @@ class VectorStore {
     const results: Array<{ doc: any; score: number }> = [];
 
     this.inMemoryStore.forEach(doc => {
-      // ⭐ MỚI: Apply filter nếu có
       if (filter?.botId && doc.metadata?.botId !== filter.botId) return;
       if (filter?.madaCategory && doc.metadata?.madaCategory !== filter.madaCategory) return;
 
@@ -499,7 +380,6 @@ class VectorStore {
     const provider = getEmbeddingProvider();
     console.log(`🔄 Re-indexing ${this.inMemoryStore.size} documents...`);
 
-    // Re-embed all documents
     for (const [id, doc] of this.inMemoryStore) {
       try {
         const embedding = await provider.embed(doc.content);
@@ -509,12 +389,6 @@ class VectorStore {
       }
     }
 
-    // Sync to Milvus if using
-    if (this.activeDbProvider === 'milvus' && milvusClient.isReady()) {
-      console.log('   Syncing to Milvus...');
-      await milvusClient.flush();
-    }
-
     this.saveMetadataToDisk();
     console.log(`✅ Re-indexed ${this.inMemoryStore.size} documents`);
     return { count: this.inMemoryStore.size, provider: this.activeDbProvider };
@@ -522,68 +396,43 @@ class VectorStore {
 
   async deleteDocument(id: string): Promise<void> {
     this.inMemoryStore.delete(id);
-    
-    if (this.activeDbProvider === 'milvus' && milvusClient.isReady()) {
-      await milvusClient.deleteById([id]);
-    }
-    
+
     if (this.activeDbProvider === 'pinecone' && this.pineconeIndex) {
       await this.pineconeIndex.deleteOne(id);
     }
-    
+
     this.saveMetadataToDisk();
   }
 
   async getStats(): Promise<any> {
     const provider = getEmbeddingProvider();
-    
-    let totalDocuments = this.inMemoryStore.size;
-    let extraStats = {};
-
-    if (this.activeDbProvider === 'milvus' && milvusClient.isReady()) {
-      try {
-        const stats = await milvusClient.getCollectionStats();
-        totalDocuments = stats.rowCount;
-        extraStats = { milvusStats: stats };
-      } catch {}
-    }
 
     return {
-      totalDocuments,
-      collectionName: this.activeDbProvider === 'milvus' ? milvusConfig.collectionName : pineconeConfig.indexName,
+      totalDocuments: this.inMemoryStore.size,
+      indexName: pineconeConfig.indexName,
       isInitialized: this.isInitialized,
       provider: this.activeDbProvider,
       dimension: provider.dimension,
       storage: this.activeDbProvider,
-      ...extraStats,
     };
   }
 
   async clear(): Promise<void> {
     this.inMemoryStore.clear();
-    
-    if (this.activeDbProvider === 'milvus' && milvusClient.isReady()) {
-      await milvusClient.dropCollection();
-      await milvusClient.createCollection();
-      await milvusClient.loadCollection();
-    }
-    
+
     if (this.activeDbProvider === 'pinecone' && this.pineconeIndex) {
       await this.pineconeIndex.deleteAll();
     }
-    
+
     const docsPath = path.join(this.dataDir, 'documents.json');
     if (fs.existsSync(docsPath)) {
       fs.unlinkSync(docsPath);
     }
-    
+
     console.log('🗑️ Vector store cleared');
   }
 
   async shutdown(): Promise<void> {
-    if (this.activeDbProvider === 'milvus' && milvusClient.isReady()) {
-      await milvusClient.disconnect();
-    }
     console.log('🔌 Vector store disconnected');
   }
 }

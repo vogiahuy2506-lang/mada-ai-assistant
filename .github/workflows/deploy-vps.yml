@@ -93,10 +93,9 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
+            type=raw,value=latest
+            type=raw,value=main-${{ github.sha }}
             type=ref,event=branch
-            type=sha,prefix={{branch}}-
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=raw,value={{date}},enable={{is_default_branch}}
           labels: |
             org.opencontainers.image.title=MADA AI Assistant
             org.opencontainers.image.description=Assistive technology advisor

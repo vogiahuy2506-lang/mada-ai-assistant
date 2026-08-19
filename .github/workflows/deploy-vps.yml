@@ -131,7 +131,22 @@ jobs:
           command_timeout: 10m
           script: |
             set -e
-            cd /app/mada-ai-assistant
+            APP_DIR="/app/mada-ai-assistant"
+
+            # Tạo thư mục nếu chưa có
+            sudo mkdir -p /app
+            sudo chown $USER:$USER /app
+
+            # Clone hoặc pull project
+            if [ -d "$APP_DIR/.git" ]; then
+              echo "📥 Pulling latest changes..."
+              cd $APP_DIR && git pull origin main
+            else
+              echo "📦 Cloning repository..."
+              git clone https://github.com/vogiahuy2506-lang/mada-ai-assistant.git $APP_DIR
+            fi
+
+            cd $APP_DIR
 
             echo "🔐 Logging in to GHCR..."
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin

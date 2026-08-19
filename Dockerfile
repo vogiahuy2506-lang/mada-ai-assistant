@@ -30,10 +30,8 @@ RUN chmod +x ./entrypoint.sh
 RUN npm ci --only=production && npm rebuild && npm cache clean --force
 
 COPY --from=builder /app/dist ./dist
-COPY data ./data
+RUN mkdir -p ./data && chown -R nodejs:nodejs ./data
 COPY --from=builder /app/server ./server
-
-RUN chown -R nodejs:nodejs ./data ./entrypoint.sh
 
 USER nodejs
 

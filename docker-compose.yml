@@ -13,7 +13,7 @@
 services:
   # Application - All-in-one (API + static frontend)
   app:
-    image: ${MADA_IMAGE:-ghcr.io/vohuy/mada-ai-assistant:latest}
+    image: ${MADA_IMAGE:-ghcr.io/vogiahuy2506-lang/mada-ai-assistant:latest}
     container_name: mada-app
     expose:
       - "3000"

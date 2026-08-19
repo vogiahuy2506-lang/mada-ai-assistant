@@ -111,7 +111,14 @@ class DataIngestionService {
         case 'web':
           this.updateJob(jobId, { progress: 20, stage: 'Đang cào dữ liệu web' });
           onProgress?.('scraping', 20, 'Đang tải và phân tích trang web');
-          content = await this.scrapeWebContent(source.source);
+          // Nếu caller đã cung cấp sẵn content (vd MADA scraper), dùng luôn.
+          // Tránh re-fetch gây block bởi Cloudflare/WAF khi UA bị reject.
+          if (source.content && source.content.trim().length > 100) {
+            console.log(`📋 Using pre-scraped content for ${source.source} (${source.content.length} chars)`);
+            content = source.content;
+          } else {
+            content = await this.scrapeWebContent(source.source);
+          }
           break;
 
         case 'text':
@@ -186,6 +193,18 @@ class DataIngestionService {
       this.updateJob(jobId, { progress: 85, stage: 'Đang vector hóa' });
       onProgress?.('embedding', 85, 'Đang tạo embedding và lưu vào Vector DB');
       const chunks = chunkText(content, 800, 150);
+      console.log(`📦 Chunked "${title}" → ${chunks.length} chunks (${content.length} chars, lang=${source.language || 'vi'})`);
+      if (chunks.length === 0) {
+        this.updateJob(jobId, {
+          status: 'failed', progress: 100,
+          error: 'Chunking produced 0 chunks — content quá ngắn hoặc rỗng sau cleanText',
+          completed_at: new Date().toISOString(),
+        });
+        return {
+          success: false, documentsAdded: 0, taskId: jobId,
+          message: 'Nội dung sau khi làm sạch quá ngắn (< 1 từ) — không thể chunk',
+        };
+      }
       const documents: Document[] = chunks.map((chunk) => ({
         id: generateId(),
         content: chunk,

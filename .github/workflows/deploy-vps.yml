@@ -137,13 +137,13 @@ jobs:
             sudo mkdir -p /app
             sudo chown $USER:$USER /app
 
-            # Clone hoặc pull project
+            # Clone hoặc pull project (dùng token để clone private repo)
             if [ -d "$APP_DIR/.git" ]; then
               echo "📥 Pulling latest changes..."
               cd $APP_DIR && git pull origin main
             else
               echo "📦 Cloning repository..."
-              git clone https://github.com/vogiahuy2506-lang/mada-ai-assistant.git $APP_DIR
+              git clone https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/vogiahuy2506-lang/mada-ai-assistant.git $APP_DIR
             fi
 
             cd $APP_DIR

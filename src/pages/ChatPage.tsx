@@ -852,7 +852,7 @@ export function ChatPage() {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showAgentMenu, setShowAgentMenu] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<{ fileId: string; name: string; type: string; size: number; content?: string; originalFile?: File; isLoading?: boolean; isCancelling?: boolean }[]>([]);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+   
   const [_cancellingFiles, setCancellingFiles] = useState<Set<string>>(new Set());
   const [isGeneratingResponse, setIsGeneratingResponse] = useState(false);
 
@@ -873,7 +873,7 @@ export function ChatPage() {
 
   const fileQuotaExhausted = !!fileQuota && fileQuota.limit !== -1 && fileQuota.remaining <= 0;
   const [activeCategory, setActiveCategory] = useState<ATCategory | null>(null);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+   
   const [_suggestedFollowUps, setSuggestedFollowUps] = useState<string[]>([]);
   const [isDragging, setIsDragging] = useState(false);
 
@@ -1376,8 +1376,8 @@ export function ChatPage() {
 
     // Xây dựng message với nội dung file
     let fullMessage = userMessage;
-    let attachmentsForMessage: { name: string; type: string; preview?: string }[] = [];
-    let attachmentsForApi: any[] = [];
+    const attachmentsForMessage: { name: string; type: string; preview?: string }[] = [];
+    const attachmentsForApi: any[] = [];
     
     if (selectedFiles.length > 0) {
       console.log('[DEBUG] Processing files:', selectedFiles.length);

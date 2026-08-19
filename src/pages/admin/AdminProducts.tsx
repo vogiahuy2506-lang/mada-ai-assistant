@@ -5,42 +5,13 @@ import { AIImportCard } from './AIImportCard';
 import { formatPrice } from '../../lib/formatPrice';
 import { getImageUrl } from '../../lib/imageProxy';
 import {
-  Plus, RefreshCw, X, Save, Loader2, AlertCircle,
-  Edit2, Trash2, Eye, EyeOff, Star, StarOff,
-  ExternalLink, Globe, Link as LinkIcon, Image as ImageIcon,
-  FolderPlus, CheckCircle,
+  Plus, RefreshCw, Save, Loader2,
+  FolderPlus,
 } from 'lucide-react';
 import clsx from 'clsx';
 
 // ==================== ICONS ====================
-const CATEGORY_ICONS: Record<string, string> = {
-  vision: 'visibility', hearing: 'hearing', mobility: 'accessible',
-  cognition: 'psychology', communication: 'forum', daily_living: 'home',
-  education: 'school', web_accessibility: 'language', general: 'inventory_2',
-};
-
-const CAT_COLORS: Record<string, string> = {
-  vision: 'bg-blue-100 text-blue-700',
-  hearing: 'bg-yellow-100 text-yellow-700',
-  mobility: 'bg-rose-100 text-rose-700',
-  cognition: 'bg-purple-100 text-purple-700',
-  communication: 'bg-cyan-100 text-cyan-700',
-  daily_living: 'bg-green-100 text-green-700',
-  education: 'bg-indigo-100 text-indigo-700',
-  general: 'bg-gray-100 text-gray-700',
-};
-
-const STATUS_STYLES: Record<string, string> = {
-  published: 'bg-emerald-50 text-emerald-600',
-  archived: 'bg-slate-100 text-slate-500',
-  draft: 'bg-amber-50 text-amber-600',
-};
-
-// Neo-brutalist style helpers
-const NB_INPUT = 'w-full rounded-xl px-4 py-3 font-bold bg-white text-black placeholder:text-slate-400 border-2 border-black focus:outline-none focus:shadow-[3px_3px_0px_0px_#000] focus:-translate-x-[1px] focus:-translate-y-[1px] transition-all';
-const NB_INPUT_ICON = 'w-full rounded-xl py-3 pl-10 pr-4 font-bold bg-white text-black placeholder:text-slate-400 border-2 border-black focus:outline-none focus:shadow-[3px_3px_0px_0px_#000] focus:-translate-x-[1px] focus:-translate-y-[1px] transition-all';
-const NB_SECTION = 'p-5 rounded-xl bg-white border-2 border-black shadow-[4px_4px_0px_0px_#000]';
-const NB_LABEL = 'block text-xs font-black text-black uppercase tracking-wider mb-1.5 ml-1';
+// (Icons removed - unused)
 
 // ==================== MODALS ====================
 function CategoryModal({ category, onSave, onClose }: {

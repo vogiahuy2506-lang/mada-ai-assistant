@@ -3,7 +3,7 @@ import { AdminLayout } from './AdminLayout';
 import { adminApi } from './adminApi';
 import { useLanguageStore } from '@/stores';
 import {
-  Play, RefreshCw, Database, FileText, CheckCircle, AlertCircle,
+  Play, RefreshCw, Database, CheckCircle, AlertCircle,
   Loader2, Trash2, Plus, ToggleLeft, ToggleRight, ExternalLink,
   CloudDownload,
 } from 'lucide-react';

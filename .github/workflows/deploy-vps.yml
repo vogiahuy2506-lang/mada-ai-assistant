@@ -133,10 +133,10 @@ jobs:
             set -e
             APP_DIR="/app/mada-ai-assistant"
 
-            # Xóa thư mục cũ nếu có
+            # Xóa thư mục cũ (dùng sudo vì có cert files)
             if [ -d "$APP_DIR" ]; then
               echo "🗑️ Removing old deployment..."
-              rm -rf $APP_DIR
+              sudo rm -rf $APP_DIR
             fi
 
             echo "📦 Cloning repository..."

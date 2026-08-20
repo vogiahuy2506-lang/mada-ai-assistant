@@ -2178,7 +2178,7 @@ export function ChatPage() {
       {/* Drag & Drop Overlay */}
       {isDragging && (
         <div className="fixed inset-0 z-[100] bg-violet-500/20 backdrop-blur-sm flex items-center justify-center pointer-events-none">
-          <div className="bg-white rounded-3xl p-8 shadow-2xl border-4 border-dashed border-violet-400">
+          <div className="bg-white rounded-3xl p-8 shadow-xl border-4 border-dashed border-violet-400">
             <div className="flex flex-col items-center gap-4">
               <div className="w-20 h-20 bg-violet-100 rounded-full flex items-center justify-center">
                 <span className="material-symbols-outlined text-violet-600 text-5xl" style={{ fontVariationSettings: "'FILL' 1" }}>
@@ -2555,7 +2555,7 @@ export function ChatPage() {
             {showProfileMenu && user && (
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setShowProfileMenu(false)} />
-                <div className="absolute left-4 right-4 bottom-24 z-50 bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-2">
+                <div className="absolute left-4 right-4 bottom-24 z-50 bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden animate-in slide-in-from-bottom-2">
                   <div className="px-4 py-3 border-b border-slate-100">
                     <p className="text-sm font-bold truncate">{user.name}</p>
                     <p className="text-[10px] text-slate-400 truncate">{user.email}</p>

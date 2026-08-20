@@ -481,6 +481,24 @@ db.exec(`
 
 console.log('✅ Schema created');
 
+// ============== MIGRATIONS ==============
+
+function runMigrations() {
+  try {
+    // Add device_id column for anonymous sessions (2026-08-20)
+    const cols = db.prepare("PRAGMA table_info(chat_conversations)").all() as any[];
+    const colNames = cols.map((c: any) => c.name);
+    if (!colNames.includes('device_id')) {
+      db.exec(`ALTER TABLE chat_conversations ADD COLUMN device_id TEXT`);
+      console.log('✅ Added device_id to chat_conversations');
+    }
+  } catch (err) {
+    console.error('Migration error:', err);
+  }
+}
+
+runMigrations();
+
 // ============== SEED ADMIN ==============
 
 function seedAdmin() {

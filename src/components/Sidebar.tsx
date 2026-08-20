@@ -268,6 +268,7 @@ export function Sidebar({ variant = 'user', onSelectQuestion }: SidebarProps) {
         'border-r-2 border-zinc-200 dark:border-zinc-800',
         'transition-all duration-300',
         'overflow-y-auto hidden md:block',
+        'pb-20', // Space for collapse button
         isCollapsed ? 'w-16' : 'w-56'
       )}
     >

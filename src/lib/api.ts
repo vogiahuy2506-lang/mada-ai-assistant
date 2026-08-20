@@ -31,6 +31,17 @@ export interface ApiError {
 
 const TOKEN_KEY = 'mada-access-token';
 const REFRESH_KEY = 'mada-refresh-token';
+const DEVICE_KEY = 'mada-device-id';
+
+// Generate or get device ID for anonymous users
+export function getDeviceId(): string {
+  let deviceId = localStorage.getItem(DEVICE_KEY);
+  if (!deviceId) {
+    deviceId = 'anon-' + Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
+    localStorage.setItem(DEVICE_KEY, deviceId);
+  }
+  return deviceId;
+}
 
 export function getAccessToken(): string | null {
   return localStorage.getItem(TOKEN_KEY);
@@ -256,17 +267,21 @@ export interface ChatMessage {
 
 export const userHistoryApi = {
   async list(params?: { search?: string; limit?: number }) {
-    const query = new URLSearchParams(params as any).toString();
+    const deviceId = getDeviceId();
+    const query = new URLSearchParams({ ...params as any, device_id: deviceId }).toString();
     return request<{ conversations: ChatConversation[] }>(`/user/history${query ? `?${query}` : ''}`);
   },
   async get(id: string) {
-    return request<{ conversation: ChatConversation; messages: ChatMessage[] }>(`/user/history/${id}`);
+    const deviceId = getDeviceId();
+    return request<{ conversation: ChatConversation; messages: ChatMessage[] }>(`/user/history/${id}?device_id=${encodeURIComponent(deviceId)}`);
   },
   async create(data: { conversationId?: string; title: string; agentId?: string; language: string; firstMessage?: string }) {
-    return request<{ id: string }>('/user/history', { method: 'POST', body: JSON.stringify(data) });
+    const deviceId = getDeviceId();
+    return request<{ id: string }>('/user/history', { method: 'POST', body: JSON.stringify({ ...data, deviceId }) });
   },
   async addMessage(conversationId: string, data: { role: string; content: string; agentId?: string; sources?: any; confidence?: number; language?: string }) {
-    return request<{ messageId: string }>(`/user/history/${conversationId}/messages`, { method: 'POST', body: JSON.stringify(data) });
+    const deviceId = getDeviceId();
+    return request<{ messageId: string }>(`/user/history/${conversationId}/messages`, { method: 'POST', body: JSON.stringify({ ...data, deviceId }) });
   },
   async update(id: string, updates: { title?: string; is_pinned?: boolean }) {
     return request<{ success: boolean }>(`/user/history/${id}`, { method: 'PATCH', body: JSON.stringify(updates) });

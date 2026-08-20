@@ -13,6 +13,7 @@ const router = Router();
 router.get('/history', optionalAuth, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user?.id || null;
+    const deviceId = req.query.device_id as string || null;
     const { limit = '50', search = '' } = req.query;
 
     let conversations: any[];
@@ -32,8 +33,23 @@ router.get('/history', optionalAuth, async (req: AuthRequest, res: Response) => 
       conversations = search
         ? stmt.all(userId, searchPattern, searchPattern, Number(limit))
         : stmt.all(userId, Number(limit));
+    } else if (deviceId) {
+      // Anonymous user - lấy conversations theo device_id
+      const stmt = db.prepare(`
+        SELECT id, title, agent_id, language, message_count, last_message_preview,
+               is_pinned, created_at, updated_at
+        FROM chat_conversations
+        WHERE device_id = ? AND user_id IS NULL
+        ${search ? 'AND (title LIKE ? OR last_message_preview LIKE ?)' : ''}
+        ORDER BY is_pinned DESC, updated_at DESC
+        LIMIT ?
+      `);
+      const searchPattern = search ? `%${String(search)}%` : null;
+      conversations = search
+        ? stmt.all(deviceId, searchPattern, searchPattern, Number(limit))
+        : stmt.all(deviceId, Number(limit));
     } else {
-      // Anonymous - chỉ trả về conversations không có user_id (shared public)
+      // Không có userId và deviceId - không có lịch sử
       conversations = [];
     }
 
@@ -52,10 +68,23 @@ router.get('/history/:id', optionalAuth, async (req: AuthRequest, res: Response)
   try {
     const { id } = req.params;
     const userId = req.user?.id || null;
+    const deviceId = req.query.device_id as string || null;
 
-    const conv = db.prepare(
-      `SELECT * FROM chat_conversations WHERE id = ?${userId ? ' AND user_id = ?' : ''}`
-    ).get(...(userId ? [id, userId] : [id]));
+    // Kiểm tra quyền truy cập: user sở hữu hoặc device sở hữu
+    let conv;
+    if (userId) {
+      conv = db.prepare(
+        `SELECT * FROM chat_conversations WHERE id = ? AND user_id = ?`
+      ).get(id, userId);
+    } else if (deviceId) {
+      conv = db.prepare(
+        `SELECT * FROM chat_conversations WHERE id = ? AND device_id = ? AND user_id IS NULL`
+      ).get(id, deviceId);
+    } else {
+      conv = db.prepare(
+        `SELECT * FROM chat_conversations WHERE id = ? AND user_id IS NULL AND device_id IS NULL`
+      ).get(id);
+    }
 
     if (!conv) {
       return res.status(404).json({ success: false, error: 'Conversation not found' });
@@ -85,25 +114,26 @@ router.get('/history/:id', optionalAuth, async (req: AuthRequest, res: Response)
 /**
  * POST /api/user/history
  * Tạo conversation mới (khi bắt đầu chat)
- * Body: { conversationId?, title, agentId, language, firstMessage? }
+ * Body: { conversationId?, title, agentId, language, firstMessage?, deviceId? }
  */
 router.post('/history', optionalAuth, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user?.id || null;
-    const { conversationId, title, agentId, language, firstMessage } = req.body;
+    const { conversationId, title, agentId, language, firstMessage, deviceId } = req.body;
 
     const id = conversationId || uuidv4();
     const now = new Date().toISOString();
 
     const stmt = db.prepare(`
       INSERT INTO chat_conversations
-        (id, user_id, title, agent_id, language, message_count, last_message_preview, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (id, user_id, device_id, title, agent_id, language, message_count, last_message_preview, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     stmt.run(
       id,
       userId,
+      deviceId || null,
       title || 'Cuộc trò chuyện mới',
       agentId || null,
       language || 'vi',
@@ -137,6 +167,7 @@ router.post('/history/:id/messages', optionalAuth, async (req: AuthRequest, res:
   try {
     const { id: convId } = req.params;
     const userId = req.user?.id || null;
+    const deviceId = req.body.deviceId || req.query.device_id as string || null;
     const { role, content, agentId, sources, confidence, language } = req.body;
 
     if (!role || !content) {
@@ -147,10 +178,21 @@ router.post('/history/:id/messages', optionalAuth, async (req: AuthRequest, res:
       return res.status(400).json({ success: false, error: 'role không hợp lệ' });
     }
 
-    // Verify conversation exists và thuộc về user (nếu đã đăng nhập)
-    const conv = db.prepare(
-      `SELECT id, user_id, title FROM chat_conversations WHERE id = ?${userId ? ' AND (user_id = ? OR user_id IS NULL)' : ''}`
-    ).get(...(userId ? [convId, userId] : [convId]));
+    // Verify conversation exists và thuộc về user/device
+    let conv;
+    if (userId) {
+      conv = db.prepare(
+        `SELECT id, user_id, title FROM chat_conversations WHERE id = ? AND user_id = ?`
+      ).get(convId, userId);
+    } else if (deviceId) {
+      conv = db.prepare(
+        `SELECT id, user_id, title FROM chat_conversations WHERE id = ? AND device_id = ? AND user_id IS NULL`
+      ).get(convId, deviceId);
+    } else {
+      conv = db.prepare(
+        `SELECT id, user_id, title FROM chat_conversations WHERE id = ? AND user_id IS NULL AND device_id IS NULL`
+      ).get(convId);
+    }
 
     if (!conv) {
       return res.status(404).json({ success: false, error: 'Conversation not found' });

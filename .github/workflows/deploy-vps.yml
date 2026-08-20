@@ -133,12 +133,8 @@ jobs:
             set -e
             APP_DIR="/app/mada-ai-assistant"
 
-            # Tạo thư mục nếu chưa có
-            sudo mkdir -p /app
-            sudo chown $USER:$USER /app
-
-            # Xóa và clone lại project (luôn dùng token mới)
-            if [ -d "$APP_DIR/.git" ]; then
+            # Xóa thư mục cũ nếu có
+            if [ -d "$APP_DIR" ]; then
               echo "🗑️ Removing old deployment..."
               rm -rf $APP_DIR
             fi

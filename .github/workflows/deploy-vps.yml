@@ -132,48 +132,77 @@ jobs:
           script: |
             set -e
             APP_DIR="/app/mada-ai-assistant"
+            MIN_DISK_GB=2
 
-            # Xóa thư mục cũ (dùng sudo vì có cert files)
+            echo "Stop old containers..."
             if [ -d "$APP_DIR" ]; then
-              echo "🗑️ Removing old deployment..."
+              cd $APP_DIR
+              sudo docker compose down --remove-orphans || true
+            fi
+
+            echo "Pre-deploy cleanup..."
+            sudo docker system prune -f --filter "until=24h" || true
+            sudo docker image prune -af --filter "until=24h" || true
+
+            FREE_GB=$(df -BG / | tail -1 | awk '{print $4}' | tr -d 'G')
+            echo "Disk free: ${FREE_GB}GB (min: ${MIN_DISK_GB}GB)"
+            if [ "$FREE_GB" -lt "$MIN_DISK_GB" ]; then
+              echo "Low disk, deep clean..."
+              sudo docker system prune -af || true
+              sudo journalctl --vacuum-size=50M || true
+              sudo apt-get clean || true
+              FREE_GB=$(df -BG / | tail -1 | awk '{print $4}' | tr -d 'G')
+              echo "Disk after cleanup: ${FREE_GB}GB"
+              if [ "$FREE_GB" -lt "$MIN_DISK_GB" ]; then
+                echo "Not enough disk space (${FREE_GB}GB < ${MIN_DISK_GB}GB). Aborting."
+                exit 1
+              fi
+            fi
+
+            echo "Removing old deployment..."
+            if [ -d "$APP_DIR" ]; then
               sudo rm -rf $APP_DIR
             fi
 
-            echo "📦 Cloning repository..."
-            git clone https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/vogiahuy2506-lang/mada-ai-assistant.git $APP_DIR
+            echo "Cloning repository..."
+            sudo git clone https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/vogiahuy2506-lang/mada-ai-assistant.git $APP_DIR
 
             cd $APP_DIR
 
-            echo "🔐 Logging in to GHCR..."
-            echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+            echo "Logging in to GHCR..."
+            echo "${{ secrets.GHCR_TOKEN }}" | sudo docker login ghcr.io -u "${{ github.actor }}" --password-stdin
 
-            echo "🛑 Stopping old containers..."
-            docker compose down --remove-orphans || true
+            echo "Pulling new image..."
+            sudo docker compose pull app
 
-            echo "📥 Pulling new image..."
-            docker compose pull app
+            echo "Starting containers..."
+            sudo docker compose up -d --remove-orphans
 
-            echo "🚀 Starting containers..."
-            docker compose up -d --remove-orphans
+            echo "Pruning old images..."
+            sudo docker image prune -f
 
-            echo "🧹 Pruning old images..."
-            docker image prune -f
-
-            echo "⏳ Waiting for health check..."
-            for i in 1 2 3 4 5 6 7 8 9 10; do
+            echo "Waiting for health check..."
+            HEALTHY=false
+            for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
               sleep 5
-              if curl -sf http://localhost/api/health > /dev/null 2>&1; then
-                echo "✅ App is healthy"
+              HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' http://localhost/api/health || echo "000")
+              if [ "$HTTP_CODE" = "200" ]; then
+                echo "App is healthy (HTTP $HTTP_CODE)"
+                HEALTHY=true
                 break
               fi
-              if [ "$i" = "10" ]; then
-                echo "� Health check failed after 50s"
-                docker compose logs --tail=50 app
-                exit 1
-              fi
+              echo "Attempt $i: HTTP $HTTP_CODE"
             done
 
-            echo "✅ Deploy completed successfully at $(date)"
+            if [ "$HEALTHY" != "true" ]; then
+              echo "Health check failed after 75s. App logs:"
+              sudo docker compose logs --tail=80 app
+              echo "--- Container status ---"
+              sudo docker compose ps
+              exit 1
+            fi
+
+            echo "Deploy completed successfully at $(date)"
 
       - name: Deploy Summary
         if: success()

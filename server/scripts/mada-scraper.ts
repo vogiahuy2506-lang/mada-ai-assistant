@@ -282,10 +282,30 @@ export async function scrapeCategoryListing(
   maxPages = 5,
   language: 'en' | 'ar' = 'en'
 ): Promise<ProductListItem[]> {
+  // Validate category slug against MADA_CATEGORIES
+  const category = MADA_CATEGORIES.find(c => c.slug === categorySlug);
+  if (!category) {
+    console.warn(`   ⚠️  Unknown category: ${categorySlug}. Available: ${MADA_CATEGORIES.map(c => c.slug).join(', ')}`);
+    return [];
+  }
+
   const products: ProductListItem[] = [];
-  const basePath = language === 'ar'
-    ? `/ar/technology-category/body-function/${categorySlug}/`
-    : `/technology-category/body-function/${categorySlug}/`;
+
+  // Build URL based on category type
+  let basePath: string;
+  if (categorySlug === 'regulatory-standards') {
+    // Special case: static portal page
+    basePath = '/assistive-technology-portal/';
+  } else if (categorySlug === 'mobility-and-transportation') {
+    // Special case: different parent taxonomy
+    basePath = language === 'ar'
+      ? `/ar/technology-category/activities-and-participation/${categorySlug}/`
+      : `/technology-category/activities-and-participation/${categorySlug}/`;
+  } else {
+    basePath = language === 'ar'
+      ? `/ar/technology-category/body-function/${categorySlug}/`
+      : `/technology-category/body-function/${categorySlug}/`;
+  }
 
   for (let page = 1; page <= maxPages; page++) {
     const url = page === 1

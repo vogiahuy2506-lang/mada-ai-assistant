@@ -286,11 +286,15 @@ interface ChatState {
   messages: ChatMessage[];
   isLoading: boolean;
   conversationId: string | null;
+  // ⭐ Edit message state
+  editingMessageId: string | null;
+  editingMessageText: string;
   addMessage: (message: Omit<ChatMessage, 'id' | 'timestamp'>) => void;
   setMessages: (messages: ChatMessage[]) => void;
   clearMessages: () => void;
   setLoading: (loading: boolean) => void;
   setConversationId: (id: string | null) => void;
+  setEditingMessage: (id: string | null, text?: string) => void;
 }
 
 // Conversation history entry (for sidebar recent list)
@@ -325,6 +329,9 @@ export const useChatStore = create<ChatState>((set) => ({
   messages: [],
   isLoading: false,
   conversationId: null,
+  // ⭐ Edit message state
+  editingMessageId: null,
+  editingMessageText: '',
   addMessage: (message) => set((state) => ({
     messages: [...state.messages, {
       ...message,
@@ -336,6 +343,7 @@ export const useChatStore = create<ChatState>((set) => ({
   clearMessages: () => set({ messages: [] }),
   setLoading: (isLoading) => set({ isLoading }),
   setConversationId: (conversationId) => set({ conversationId }),
+  setEditingMessage: (id, text) => set({ editingMessageId: id, editingMessageText: text ?? '' }),
 }));
 
 // Conversation history store (persisted)

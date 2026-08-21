@@ -192,28 +192,30 @@ export function AIImportCard({ categories, onImportSuccess }: AIImportCardProps)
 
   return (
     <>
-      {/* Compact card trigger */}
-      <div className="mb-5 relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 p-[1px] shadow-lg shadow-purple-500/25">
+      {/* Compact card trigger - Industrial style matching AdminProducts */}
+      <div className="mb-5 relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 p-[3px] shadow-lg shadow-purple-500/25">
         <div className="bg-white rounded-2xl p-5 flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-purple-500/30">
-            <Sparkles className="w-6 h-6 text-white" />
+          <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-purple-500/30 border-[3px] border-black">
+            <Sparkles className="w-7 h-7 text-white" />
           </div>
           <div className="flex-1 min-w-0">
-            <h3 className="font-bold text-on-surface flex items-center gap-2">
-              AI Import từ Website
-              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-gradient-to-r from-indigo-500 to-purple-500 text-white">
+            <div className="flex items-center gap-2 mb-1">
+              <h3 className="font-black text-lg text-black flex items-center gap-2">
+                AI Import từ Website
+              </h3>
+              <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-gradient-to-r from-indigo-500 to-purple-500 text-white border-2 border-black">
                 BETA
               </span>
-            </h3>
+            </div>
             <p className="text-sm text-on-surface-variant mt-0.5">
               Paste URL sản phẩm → AI tự động trích xuất tên, giá, ảnh
             </p>
           </div>
           <button
             onClick={() => setOpen(true)}
-            className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-label-md shadow-lg shadow-purple-500/30 hover:shadow-xl hover:shadow-purple-500/40 transition-all flex items-center gap-2"
+            className="px-6 py-3 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-black shadow-[3px_3px_0px_0px_#000] hover:shadow-[4px_4px_0px_0px_#000] hover:-translate-x-[1px] hover:-translate-y-[1px] transition-all flex items-center gap-2 border-[3px] border-black"
           >
-            <Sparkles className="w-4 h-4" />
+            <Sparkles className="w-5 h-5" />
             Mở công cụ
           </button>
         </div>
@@ -222,19 +224,19 @@ export function AIImportCard({ categories, onImportSuccess }: AIImportCardProps)
       {/* Full-screen modal */}
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm overflow-y-auto">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl my-8 overflow-hidden flex flex-col max-h-[90vh]">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl my-8 overflow-hidden flex flex-col max-h-[90vh] border-[4px] border-black shadow-[8px_8px_0px_0px_#000]">
             {/* Header */}
-            <div className="relative overflow-hidden bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 p-6">
+            <div className="relative overflow-hidden bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 p-6 border-b-[4px] border-black">
               <div className="absolute inset-0 opacity-20" style={{
                 background: 'radial-gradient(circle at 30% 30%, rgba(255,255,255,0.5) 0%, transparent 50%)',
               }}></div>
               <div className="relative flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
-                    <Sparkles className="w-6 h-6 text-white" />
+                  <div className="w-14 h-14 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center border-[3px] border-black shadow-[3px_3px_0px_0px_rgba(0,0,0,0.3)]">
+                    <Sparkles className="w-7 h-7 text-white" />
                   </div>
                   <div>
-                    <h2 className="text-xl font-bold text-white">AI Import từ Website</h2>
+                    <h2 className="text-xl font-black text-white">AI Import từ Website</h2>
                     <p className="text-sm text-white/80 mt-0.5">
                       Paste URL sản phẩm bất kỳ → AI tự động trích xuất
                     </p>
@@ -242,7 +244,7 @@ export function AIImportCard({ categories, onImportSuccess }: AIImportCardProps)
                 </div>
                 <button
                   onClick={() => { setOpen(false); reset(); }}
-                  className="w-9 h-9 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center text-white hover:bg-white/30 transition-all"
+                  className="w-12 h-12 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center text-white hover:bg-white/30 transition-all border-[3px] border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,0.3)]"
                 >
                   <span className="material-symbols-outlined">close</span>
                 </button>
@@ -252,27 +254,33 @@ export function AIImportCard({ categories, onImportSuccess }: AIImportCardProps)
             {/* Body */}
             <div className="flex-1 overflow-y-auto p-6 space-y-5">
               {/* Step 1: Input URL */}
-              <div className="space-y-3">
-                <label className="block text-sm font-bold text-on-surface">
-                  🔗 URL trang sản phẩm
-                </label>
-                <div className="flex gap-3">
+              <div className="p-5 bg-white rounded-xl border-[3px] border-black shadow-[4px_4px_0px_0px_#000]">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-xl bg-indigo-100 border-[2px] border-black flex items-center justify-center">
+                    <span className="material-symbols-outlined text-indigo-600 text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>link</span>
+                  </div>
+                  <div>
+                    <h3 className="font-black text-base text-black">Nhập URL sản phẩm</h3>
+                    <span className="text-xs text-slate-500">Bước 1/2: Quét trang web</span>
+                  </div>
+                </div>
+                <div className="flex flex-col md:flex-row gap-3">
                   <div className="relative flex-1">
-                    <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant">link</span>
+                    <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">link</span>
                     <input
                       type="url"
                       value={url}
                       onChange={(e) => setUrl(e.target.value)}
                       placeholder="https://shopabc.com/products/iphone-15"
                       disabled={loading || saving}
-                      className="w-full h-12 pl-11 pr-4 rounded-xl border border-outline bg-surface-container-low font-label-md text-on-surface placeholder:text-on-surface-variant/60 focus:outline-none focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500 transition-all"
+                      className="w-full h-12 pl-11 pr-4 rounded-xl border-2 border-black bg-white font-bold text-sm text-black placeholder:text-slate-400 focus:outline-none focus:shadow-[3px_3px_0px_0px_#000] focus:-translate-x-[1px] focus:-translate-y-[1px] transition-all"
                     />
                   </div>
                   <select
                     value={category}
                     onChange={(e) => setCategory(e.target.value)}
                     disabled={loading || saving}
-                    className="h-12 px-4 rounded-xl border border-outline bg-surface-container-low font-label-md text-on-surface focus:outline-none focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500 transition-all min-w-[180px]"
+                    className="h-12 px-4 rounded-xl border-2 border-black bg-white font-bold text-sm text-black focus:outline-none focus:shadow-[3px_3px_0px_0px_#000] focus:-translate-x-[1px] focus:-translate-y-[1px] transition-all min-w-[180px]"
                   >
                     <option value="">-- Danh mục --</option>
                     {categories.map((c) => (
@@ -282,7 +290,7 @@ export function AIImportCard({ categories, onImportSuccess }: AIImportCardProps)
                   <button
                     onClick={handlePreview}
                     disabled={loading || saving || !url.trim()}
-                    className="px-6 h-12 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-bold shadow-lg shadow-purple-500/30 hover:shadow-xl hover:shadow-purple-500/40 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2"
+                    className="px-6 h-12 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-black shadow-[3px_3px_0px_0px_#000] hover:shadow-[4px_4px_0px_0px_#000] hover:-translate-x-[1px] hover:-translate-y-[1px] disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2 border-[2px] border-black"
                   >
                     {loading ? (
                       <>
@@ -299,16 +307,13 @@ export function AIImportCard({ categories, onImportSuccess }: AIImportCardProps)
                 </div>
                 {/* Progress message khi đang loading */}
                 {loading && progressMessage && (
-                  <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-indigo-50 border border-indigo-200">
+                  <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-indigo-50 border-2 border-indigo-300 mt-3">
                     <Loader2 className="w-4 h-4 animate-spin text-indigo-600" />
-                    <span className="text-sm text-indigo-900 font-medium">{progressMessage}</span>
+                    <span className="text-sm text-indigo-900 font-bold">{progressMessage}</span>
                   </div>
                 )}
-                <p className="text-xs text-on-surface-variant">
-                  💡 Paste URL <b>trang sản phẩm</b> hoặc <b>trang danh mục</b>. Không phải trang chủ shop (homepage không có cấu trúc sản phẩm).
-                </p>
-                <div className="flex flex-wrap gap-2 mt-2">
-                  <span className="text-xs text-on-surface-variant">Ví dụ nhanh:</span>
+                <div className="flex flex-wrap gap-2 mt-3">
+                  <span className="text-xs text-slate-600 font-medium">Ví dụ nhanh:</span>
                   {[
                     { label: '📱 Điện thoại (Cellphones)', url: 'https://cellphones.com.vn/mobile.html' },
                     { label: '💻 Laptop (TGDD)', url: 'https://www.thegioididong.com/laptop' },
@@ -318,7 +323,7 @@ export function AIImportCard({ categories, onImportSuccess }: AIImportCardProps)
                       key={ex.url}
                       type="button"
                       onClick={() => setUrl(ex.url)}
-                      className="text-xs px-2.5 py-1 rounded-md bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 transition-colors"
+                      className="text-xs px-2.5 py-1 rounded-lg bg-white text-indigo-700 hover:bg-indigo-50 border-2 border-black font-bold transition-colors shadow-[2px_2px_0px_0px_#000]"
                     >
                       {ex.label}
                     </button>
@@ -340,84 +345,87 @@ export function AIImportCard({ categories, onImportSuccess }: AIImportCardProps)
               {/* Step 2: Preview */}
               {preview && (
                 <>
-                  <div className="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 rounded-2xl p-5">
-                    <div className="flex items-center gap-2 mb-3">
-                      <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-                      <h3 className="font-bold text-emerald-900">
-                        Đã trích xuất thành công {preview.totalFound} sản phẩm
-                      </h3>
+                  <div className="bg-white rounded-xl border-[3px] border-black shadow-[4px_4px_0px_0px_#000] overflow-hidden">
+                    <div className="px-5 py-4 bg-gradient-to-r from-emerald-500 to-teal-600 border-b-[3px] border-black flex items-center gap-3">
+                      <CheckCircle2 className="w-6 h-6 text-white" />
+                      <div className="flex-1">
+                        <h3 className="font-black text-white">
+                          Đã trích xuất thành công {preview.totalFound} sản phẩm
+                        </h3>
+                      </div>
                       <span className={clsx(
-                        'px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider',
+                        'px-3 py-1 rounded-lg text-xs font-black border-2 border-black',
                         methodLabel[preview.method]?.color || 'bg-slate-100 text-slate-700'
                       )}>
                         {methodLabel[preview.method]?.label || preview.method}
                       </span>
-                      <span className="text-xs text-emerald-700 ml-auto">
+                      <span className="px-3 py-1 rounded-lg text-xs font-black bg-white text-emerald-800 border-2 border-black">
                         ⏱️ {(preview.durationMs / 1000).toFixed(1)}s
                       </span>
                     </div>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
-                      <StatBox label="Có giá" value={`${preview.stats.withPrice}/${preview.totalFound}`} />
-                      <StatBox label="Có ảnh" value={`${preview.stats.withImage}/${preview.totalFound}`} />
-                      <StatBox label="Còn hàng" value={`${preview.stats.inStock}/${preview.totalFound}`} />
-                      <StatBox label="Có thương hiệu" value={`${preview.stats.withBrand}/${preview.totalFound}`} />
+                    <div className="p-5">
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        <StatBox label="Có giá" value={`${preview.stats.withPrice}/${preview.totalFound}`} color="emerald" />
+                        <StatBox label="Có ảnh" value={`${preview.stats.withImage}/${preview.totalFound}`} color="blue" />
+                        <StatBox label="Còn hàng" value={`${preview.stats.inStock}/${preview.totalFound}`} color="green" />
+                        <StatBox label="Có thương hiệu" value={`${preview.stats.withBrand}/${preview.totalFound}`} color="purple" />
+                      </div>
                     </div>
                   </div>
 
                   {/* Product list */}
-                  <div>
-                    <h3 className="font-bold text-on-surface mb-3 flex items-center gap-2">
-                      <span className="material-symbols-outlined">inventory_2</span>
-                      Preview ({Math.min(preview.products.length, 20)}/{preview.totalFound})
-                    </h3>
-                    <div className="space-y-2 max-h-96 overflow-y-auto pr-2">
+                  <div className="bg-white rounded-xl border-[3px] border-black shadow-[4px_4px_0px_0px_#000] overflow-hidden">
+                    <div className="px-5 py-4 border-b-[2px] border-black bg-slate-50">
+                      <h3 className="font-black text-base text-black flex items-center gap-2">
+                        <span className="material-symbols-outlined">inventory_2</span>
+                        Preview ({Math.min(preview.products.length, 20)}/{preview.totalFound})
+                      </h3>
+                    </div>
+                    <div className="space-y-2 p-4 max-h-80 overflow-y-auto">
                       {preview.products.slice(0, 20).map((p, idx) => (
-                        <div key={idx} className="flex gap-3 p-3 bg-surface-container-low rounded-xl border border-outline-variant/30 hover:border-purple-500/40 transition-all">
+                        <div key={idx} className="flex gap-3 p-3 bg-white rounded-xl border-2 border-black hover:border-indigo-500 hover:shadow-[3px_3px_0px_0px_#000] transition-all">
                           {p.imageUrl ? (
                             <img
                               src={getImageUrl(p.imageUrl)}
                               alt={p.name}
-                              className="w-16 h-16 object-cover rounded-lg flex-shrink-0 bg-white"
+                              className="w-14 h-14 object-cover rounded-lg flex-shrink-0 bg-white border-2 border-black"
                               onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                             />
                           ) : (
-                            <div className="w-16 h-16 rounded-lg bg-slate-200 flex items-center justify-center flex-shrink-0">
+                            <div className="w-14 h-14 rounded-lg bg-slate-200 flex items-center justify-center flex-shrink-0 border-2 border-black">
                               <span className="material-symbols-outlined text-slate-400">image_not_supported</span>
                             </div>
                           )}
                           <div className="flex-1 min-w-0">
-                            <h4 className="font-bold text-sm text-on-surface line-clamp-1">{p.name}</h4>
+                            <h4 className="font-bold text-sm text-black line-clamp-1">{p.name}</h4>
                             <div className="flex items-center gap-2 mt-1 flex-wrap">
                               <span className={clsx(
-                                'text-xs px-2 py-0.5 rounded-md font-bold',
+                                'text-xs px-2 py-0.5 rounded-md font-black border-2 border-black',
                                 p.price > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'
                               )}>
                                 {formatPrice(p.price, p.currency)}
                               </span>
                               {p.brand && (
-                                <span className="text-xs px-2 py-0.5 rounded-md bg-blue-100 text-blue-700">
+                                <span className="text-xs px-2 py-0.5 rounded-md bg-blue-100 text-blue-700 font-bold border-2 border-black">
                                   {p.brand}
                                 </span>
                               )}
                               {p.inStock ? (
-                                <span className="text-xs px-2 py-0.5 rounded-md bg-green-100 text-green-700">
+                                <span className="text-xs px-2 py-0.5 rounded-md bg-green-100 text-green-700 font-bold border-2 border-black">
                                   ✓ Còn hàng
                                 </span>
                               ) : (
-                                <span className="text-xs px-2 py-0.5 rounded-md bg-red-100 text-red-700">
+                                <span className="text-xs px-2 py-0.5 rounded-md bg-red-100 text-red-700 font-bold border-2 border-black">
                                   ✗ Hết hàng
                                 </span>
                               )}
                             </div>
-                            {p.description && (
-                              <p className="text-xs text-on-surface-variant mt-1 line-clamp-2">{p.description}</p>
-                            )}
                           </div>
                           <a
                             href={p.url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center text-on-surface-variant hover:bg-purple-500 hover:text-white transition-all flex-shrink-0"
+                            className="w-8 h-8 rounded-lg bg-white border-2 border-black flex items-center justify-center text-slate-600 hover:bg-indigo-500 hover:text-white transition-all shadow-[2px_2px_0px_0px_#000]"
                             title="Mở sản phẩm"
                           >
                             <ExternalLink className="w-4 h-4" />
@@ -431,20 +439,20 @@ export function AIImportCard({ categories, onImportSuccess }: AIImportCardProps)
             </div>
 
             {/* Footer */}
-            <div className="border-t border-outline-variant p-5 bg-surface-container-low/50">
+            <div className="border-t-[3px] border-black p-5 bg-slate-50">
               <div className="flex items-center justify-between mb-3 text-sm">
-                <span className="text-on-surface-variant">
+                <span className="text-slate-700 font-bold">
                   {preview
                     ? `Sẵn sàng lưu ${preview.totalFound} sản phẩm`
                     : 'Nhập URL để bắt đầu quét'}
                 </span>
-                <label className="flex items-center gap-2 cursor-pointer text-xs text-on-surface-variant">
+                <label className="flex items-center gap-2 cursor-pointer text-sm font-bold text-slate-700">
                   <input
                     type="checkbox"
                     checked={onlyValid}
                     onChange={(e) => setOnlyValid(e.target.checked)}
                     disabled={saving}
-                    className="w-4 h-4 rounded border-outline text-purple-600 focus:ring-purple-500"
+                    className="w-5 h-5 rounded border-2 border-black text-indigo-600 focus:ring-indigo-500"
                   />
                   <span>Chỉ lưu SP có giá</span>
                 </label>
@@ -452,23 +460,23 @@ export function AIImportCard({ categories, onImportSuccess }: AIImportCardProps)
               <div className="flex items-center justify-end gap-3">
                 <button
                   onClick={() => { setOpen(false); reset(); }}
-                  className="px-5 py-2.5 rounded-xl border border-outline font-label-md text-on-surface hover:bg-surface-container-high transition-all"
+                  className="px-6 py-3 rounded-xl border-[3px] border-black font-black text-black bg-white shadow-[3px_3px_0px_0px_#000] hover:shadow-[4px_4px_0px_0px_#000] hover:-translate-x-[1px] hover:-translate-y-[1px] transition-all"
                 >
                   Hủy
                 </button>
                 <button
                   onClick={handleSave}
                   disabled={!preview || saving || loading}
-                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-label-md shadow-lg shadow-emerald-500/25 flex items-center gap-2 hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                  className="px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-black shadow-[3px_3px_0px_0px_#000] hover:shadow-[4px_4px_0px_0px_#000] hover:-translate-x-[1px] hover:-translate-y-[1px] disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2 border-[3px] border-black"
                 >
                   {saving ? (
                     <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <Loader2 className="w-5 h-5 animate-spin" />
                       Đang lưu...
                     </>
                   ) : (
                     <>
-                      <Save className="w-4 h-4" />
+                      <Save className="w-5 h-5" />
                       Lưu vào kho tri thức
                     </>
                   )}
@@ -482,11 +490,19 @@ export function AIImportCard({ categories, onImportSuccess }: AIImportCardProps)
   );
 }
 
-function StatBox({ label, value }: { label: string; value: string }) {
+function StatBox({ label, value, color }: { label: string; value: string; color: string }) {
+  const colorMap: Record<string, { bg: string; text: string; border: string }> = {
+    emerald: { bg: 'bg-emerald-100', text: 'text-emerald-800', border: 'border-emerald-300' },
+    blue: { bg: 'bg-blue-100', text: 'text-blue-800', border: 'border-blue-300' },
+    green: { bg: 'bg-green-100', text: 'text-green-800', border: 'border-green-300' },
+    purple: { bg: 'bg-purple-100', text: 'text-purple-800', border: 'border-purple-300' },
+  };
+  const colors = colorMap[color] || colorMap.blue;
+
   return (
-    <div className="bg-white rounded-lg p-3 border border-emerald-200">
-      <p className="text-xs text-on-surface-variant">{label}</p>
-      <p className="font-bold text-emerald-900 mt-0.5">{value}</p>
+    <div className={clsx('rounded-xl p-3 border-[2px] border-black bg-white shadow-[2px_2px_0px_0px_#000]', colors.bg)}>
+      <p className="text-xs text-slate-600 font-bold">{label}</p>
+      <p className={clsx('font-black text-lg mt-0.5', colors.text)}>{value}</p>
     </div>
   );
 }

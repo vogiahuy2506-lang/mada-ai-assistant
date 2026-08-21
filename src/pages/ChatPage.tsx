@@ -15,12 +15,12 @@ import {
   Settings, Smartphone, Brain, Eye, Accessibility,
   Users, MoreHorizontal, Gift, Wallet, CreditCard,
   PiggyBank, Handshake, ZoomIn, PlusCircle, Monitor,
-  Ear
+  Ear, Edit2
 } from 'lucide-react';
 import clsx from 'clsx';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { CATEGORY_INFO, SAMPLE_QUESTIONS, type ATCategory, type Language, type SuggestedProduct } from '@/types';
+import { CATEGORY_INFO, SAMPLE_QUESTIONS, AT_SPECIALIST_KEYWORDS, type ATCategory, type Language, type SuggestedProduct } from '@/types';
 import { t } from '@/lib/translations';
 import { userHistoryApi, fileQuotaApi, type FileUploadQuota } from '@/lib/api';
 
@@ -877,6 +877,36 @@ export function ChatPage() {
   const [_suggestedFollowUps, setSuggestedFollowUps] = useState<string[]>([]);
   const [isDragging, setIsDragging] = useState(false);
 
+  // ⭐ AT Specialist Suggestion State
+  const [showATSuggestion, setShowATSuggestion] = useState(false);
+
+  // ⭐ Function to check if message contains AT keywords
+  const checkATKeyword = useCallback((message: string): boolean => {
+    const lowerMessage = message.toLowerCase();
+
+    for (const [category, keywords] of Object.entries(AT_SPECIALIST_KEYWORDS)) {
+      // Check simple keywords (1 match triggers)
+      const simpleMatch = keywords.simple.some(keyword =>
+        lowerMessage.includes(keyword.toLowerCase())
+      );
+      if (simpleMatch) {
+        console.log(`[AT Suggestion] Triggered by category: ${category} (simple keyword)`);
+        return true;
+      }
+
+      // Check complex keywords (need 1 match, these are more specific)
+      const complexMatch = keywords.complex.some(keyword =>
+        lowerMessage.includes(keyword.toLowerCase())
+      );
+      if (complexMatch) {
+        console.log(`[AT Suggestion] Triggered by category: ${category} (complex keyword)`);
+        return true;
+      }
+    }
+
+    return false;
+  }, []);
+
   // ⭐ AI-powered follow-up questions generator
   const generateFollowUpWithAI = useCallback(async (
     userMessage: string,
@@ -1326,6 +1356,11 @@ export function ChatPage() {
     setIsGeneratingResponse(true);
     setStreamingContent('');
     setUserHasScrolled(false); // Reset scroll state when new message is sent
+
+    // ⭐ Check AT keyword after user sends message
+    if (!isEndUser && checkATKeyword(userMessage)) {
+      setShowATSuggestion(true);
+    }
 
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
@@ -3187,21 +3222,38 @@ export function ChatPage() {
                 <div className="flex items-center gap-1 pr-1">
                   {/* AT Specialist Quick Switch Button - Visible in both modes */}
                   {isEndUser ? (
-                    <button
-                      onClick={toggleViewMode}
-                      className="p-2 rounded-full transition-all bg-violet-100 text-violet-600 hover:bg-violet-200"
-                      title={language === 'vi' ? 'Chuyển sang chuyên gia AT' : language === 'en' ? 'Switch to AT Specialist' : 'Passer au spécialiste AT'}
-                    >
-                      <Accessibility className="w-5 h-5" />
-                    </button>
+                    <div className="relative group/switch">
+                      <button
+                        onClick={toggleViewMode}
+                        className={clsx(
+                          "p-2 rounded-full transition-all bg-violet-100 text-violet-600 hover:bg-violet-200",
+                          showATSuggestion && "ring-2 ring-amber-400 ring-offset-2 animate-pulse"
+                        )}
+                        title={language === 'vi' ? 'Chuyển sang chuyên gia AT' : language === 'en' ? 'Switch to AT Specialist' : language === 'ar' ? 'التبديل إلى خبير AT' : 'Passer au spécialiste AT'}
+                      >
+                        <Accessibility className="w-5 h-5" />
+                      </button>
+                      {/* Custom Tooltip */}
+                      <div className="absolute bottom-full right-0 mb-2 px-3 py-1.5 bg-slate-900 text-white text-xs font-medium rounded-lg whitespace-nowrap opacity-0 invisible group-hover/switch:opacity-100 group-hover/switch:visible transition-all duration-200 translate-y-1 group-hover/switch:translate-y-0 shadow-lg z-50">
+                        {language === 'vi' ? 'Chuyên gia AT' : language === 'en' ? 'AT Specialist' : language === 'ar' ? 'خبير AT' : 'Spécialiste AT'}
+                        <div className="absolute top-full right-4 border-4 border-transparent border-t-slate-900"></div>
+                      </div>
+                    </div>
                   ) : (
-                    <button
-                      onClick={toggleViewMode}
-                      className="p-2 rounded-full transition-all bg-violet-100 text-violet-600 hover:bg-violet-200"
-                      title={language === 'vi' ? 'Chuyển về chế độ người dùng' : language === 'en' ? 'Switch to end user mode' : 'Basculer vers le mode utilisateur'}
-                    >
-                      <Users className="w-5 h-5" />
-                    </button>
+                    <div className="relative group/switch">
+                      <button
+                        onClick={toggleViewMode}
+                        className="p-2 rounded-full transition-all bg-violet-100 text-violet-600 hover:bg-violet-200"
+                        title={language === 'vi' ? 'Chuyển về chế độ người dùng' : language === 'en' ? 'Switch to end user mode' : language === 'ar' ? 'التبديل إلى وضع المستخدم' : 'Basculer vers le mode utilisateur'}
+                      >
+                        <Users className="w-5 h-5" />
+                      </button>
+                      {/* Custom Tooltip */}
+                      <div className="absolute bottom-full right-0 mb-2 px-3 py-1.5 bg-slate-900 text-white text-xs font-medium rounded-lg whitespace-nowrap opacity-0 invisible group-hover/switch:opacity-100 group-hover/switch:visible transition-all duration-200 translate-y-1 group-hover/switch:translate-y-0 shadow-lg z-50">
+                        {language === 'vi' ? 'Người dùng cuối' : language === 'en' ? 'End User' : language === 'ar' ? 'المستخدم النهائي' : 'Utilisateur final'}
+                        <div className="absolute top-full right-4 border-4 border-transparent border-t-slate-900"></div>
+                      </div>
+                    </div>
                   )}
                   {/* Voice Button */}
                   <button
@@ -3215,8 +3267,8 @@ export function ChatPage() {
                           : 'text-on-surface-variant hover:text-on-background hover:bg-surface-container-low'
                     )}
                     title={isRecording 
-                      ? (language === 'vi' ? 'Dừng ghi âm' : 'Stop recording')
-                      : (language === 'vi' ? 'Ghi âm' : 'Record')}
+                      ? (language === 'vi' ? 'Dừng ghi âm' : language === 'en' ? 'Stop recording' : language === 'ar' ? 'إيقاف التسجيل' : 'Arrêter l\'enregistrement')
+                      : (language === 'vi' ? 'Ghi âm' : language === 'en' ? 'Record' : language === 'ar' ? 'تسجيل' : 'Enregistrer')}
                   >
                     {isRecording || isListening ? <Volume2 className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
                   </button>
@@ -3243,6 +3295,39 @@ export function ChatPage() {
               </div>
             </div>
 
+            {/* ⭐ AT Specialist Suggestion Banner - clickable */}
+            {showATSuggestion && (
+              <button
+                onClick={() => {
+                  toggleViewMode();
+                  setShowATSuggestion(false);
+                }}
+                className="w-full mx-3 mb-2 px-4 py-2.5 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 rounded-xl border border-amber-200 dark:border-amber-700/50 animate-fadeIn hover:from-amber-100 hover:to-orange-100 dark:hover:from-amber-900/30 dark:hover:to-orange-900/30 transition-all text-left"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-amber-100 dark:bg-amber-900/50 flex items-center justify-center">
+                    <Sparkles className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium text-amber-800 dark:text-amber-300">
+                      {language === 'vi' ? 'Có vẻ câu hỏi của bạn liên quan đến thiết bị hỗ trợ' :
+                       language === 'en' ? 'Your question seems related to assistive devices' :
+                       language === 'ar' ? 'يبدو أن سؤالك يتعلق بأجهزة المساعدة' :
+                       'Votre question semble liée aux appareils d\'assistance'}
+                    </p>
+                    <p className="text-[11px] text-amber-700/80 dark:text-amber-400/80 mt-0.5 flex items-center gap-1">
+                      <Accessibility className="w-3 h-3" />
+                      {language === 'vi' ? 'Nhấn vào đây để hỏi chuyên gia AT' :
+                       language === 'en' ? 'Click here to ask AT Specialist' :
+                       language === 'ar' ? 'انقر هنا للسؤال عن متخصص AT' :
+                       'Cliquez ici pour demander au spécialiste AT'}
+                    </p>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-amber-500 flex-shrink-0" />
+                </div>
+              </button>
+            )}
+
             {/* Footer - Professional AI Support */}
             <p className="text-center text-[11px] text-on-surface-variant/70 mt-6 uppercase tracking-wider font-medium">
               {language === 'vi' ? 'MADA AI - HỖ TRỢ TƯ VẤN CHUYÊN GIA AT' : language === 'en' ? 'MADA AI - SUPPORTING AT EXPERTS' : language === 'ar' ? '.MADA AI - دعم خبراء AT' : 'MADA AI - SOUTIEN AUX EXPERTS AT'}
@@ -3267,16 +3352,16 @@ export function ChatPage() {
 }
 
 // Message Bubble Component with Product Cards & Standards
-function MessageBubble({ 
-  message, 
-  onCopy, 
-  copiedId, 
-  onSpeak, 
+function MessageBubble({
+  message,
+  onCopy,
+  copiedId,
+  onSpeak,
   speakingId,
   onRequestConsultation,
   language = 'vi' as Language
-}: { 
-  message: Message; 
+}: {
+  message: Message;
   onCopy: (content: string, id: string) => void;
   copiedId: string | null;
   onSpeak: (text: string, id: string) => void;
@@ -3287,6 +3372,11 @@ function MessageBubble({
   const [showSources, setShowSources] = useState(false);
   const [feedback, setFeedback] = useState<'like' | 'dislike' | null>(null);
   const confidence = message.confidence || 85;
+
+  // ⭐ Edit message state from store
+  const { editingMessageId, editingMessageText, setEditingMessage, setMessages, setLoading } = useChatStore();
+  const [localEditText, setLocalEditText] = useState('');
+  const currentEditingId = editingMessageId;
   
   // Detect if AI couldn't find data in Knowledge Base
   const noDataIndicators = [
@@ -3302,9 +3392,11 @@ function MessageBubble({
   void detectedCategory;
 
   if (message.role === 'user') {
+    const isEditing = currentEditingId === message.id;
+
     return (
       <div className="flex items-end gap-3 justify-end animate-fade-in group flex-col items-end">
-        {/* Hiển thị file cards đã gửi — đặt phía trên bubble user message */}
+        {/* Hiển thị file cards đã gửi */}
         {message.attachments && message.attachments.length > 0 && (
           <div className="flex flex-col gap-2 justify-end mb-1 max-w-[80%]" role="list" aria-label={language === 'vi' ? 'Tệp đính kèm đã gửi' : 'Sent attachments'}>
             {message.attachments.map((attachment, idx) => (
@@ -3318,14 +3410,7 @@ function MessageBubble({
                     : 'bg-white/90 border-white/30 shadow-sm'
                 )}
               >
-                {/* File thumbnail/icon */}
-                <div className={clsx(
-                  'flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center',
-                  attachment.type.includes('pdf') && 'bg-red-100 text-red-600',
-                  attachment.type.includes('image') && 'bg-pink-100 text-pink-600',
-                  (attachment.type.includes('word') || attachment.type.includes('document')) && 'bg-blue-100 text-blue-600',
-                  !attachment.type.includes('pdf') && !attachment.type.includes('image') && !attachment.type.includes('word') && !attachment.type.includes('document') && 'bg-slate-100 text-slate-600'
-                )}>
+                <div className="flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center">
                   {attachment.preview ? (
                     <img src={attachment.preview} alt={attachment.name} className="w-10 h-10 object-cover rounded-lg" />
                   ) : (
@@ -3337,16 +3422,10 @@ function MessageBubble({
                     </span>
                   )}
                 </div>
-
-                {/* File info */}
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-semibold text-slate-900 truncate max-w-[200px]">
-                    {attachment.name}
-                  </p>
+                  <p className="text-xs font-semibold text-slate-900 truncate max-w-[200px]">{attachment.name}</p>
                   <p className="text-[10px] text-slate-500 mt-0.5 flex items-center gap-1">
-                    <span className="material-symbols-outlined text-[10px]" style={{ fontVariationSettings: "'FILL' 1" }}>
-                      check_circle
-                    </span>
+                    <span className="material-symbols-outlined text-[10px]" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
                     {language === 'vi' ? 'Đã đính kèm' : 'Attached'}
                   </p>
                 </div>
@@ -3354,8 +3433,80 @@ function MessageBubble({
             ))}
           </div>
         )}
-        <div className="max-w-[80%] px-4 py-3 bg-[#0047ff] text-white rounded-2xl" dir={language === 'ar' ? 'rtl' : 'ltr'}>
-          <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.content}</p>
+        <div className="max-w-[80%] px-4 py-3 bg-[#0047ff] text-white rounded-2xl group-hover/rounded-br-sm relative" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+          {isEditing ? (
+            <div className="space-y-2">
+              <textarea
+                value={localEditText}
+                onChange={(e) => setLocalEditText(e.target.value)}
+                className="w-full p-2 rounded-lg bg-white/20 text-white placeholder-white/60 resize-none text-sm"
+                rows={3}
+                autoFocus
+              />
+              <div className="flex gap-2 justify-end">
+                <button
+                  onClick={() => {
+                    setEditingMessage(null);
+                    setLocalEditText('');
+                  }}
+                  className="px-3 py-1 text-xs bg-white/20 hover:bg-white/30 rounded-full transition-colors"
+                >
+                  {language === 'vi' ? 'Hủy' : 'Cancel'}
+                </button>
+                <button
+                  onClick={() => {
+                    if (localEditText.trim()) {
+                      const currentMessages = useChatStore.getState().messages;
+                      const msgIndex = currentMessages.findIndex(m => m.id === message.id);
+                      if (msgIndex !== -1) {
+                        // Keep messages up to and including edited one
+                        const updatedMessages = [...currentMessages];
+                        updatedMessages[msgIndex] = { ...updatedMessages[msgIndex], content: localEditText.trim() };
+                        // Clear AI responses after edited message
+                        setMessages(updatedMessages.slice(0, msgIndex + 1));
+                        setLoading(true);
+                        setEditingMessage(null);
+                        setLocalEditText('');
+                        // Store edited text for resend
+                        localStorage.setItem('resendMessage', localEditText.trim());
+                        // Reload page to trigger resend
+                        window.location.reload();
+                      }
+                    }
+                  }}
+                  className="px-3 py-1 text-xs bg-white text-[#0047ff] hover:bg-white/90 rounded-full font-medium transition-colors"
+                >
+                  {language === 'vi' ? 'Gửi lại' : language === 'en' ? 'Resend' : language === 'ar' ? 'إعادة الإرسال' : 'Renvoyer'}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.content}</p>
+          )}
+          {/* Action Buttons - chỉ hiện khi không edit */}
+          {!isEditing && (
+            <div className="absolute -bottom-10 left-0 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+              <button
+                onClick={() => navigator.clipboard.writeText(message.content)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/90 hover:bg-white shadow-md border border-black/10 transition-all text-xs font-bold text-slate-700 hover:text-black"
+                title={language === 'vi' ? 'Sao chép' : language === 'en' ? 'Copy' : language === 'ar' ? 'نسخ' : 'Copier'}
+              >
+                <Copy className="w-3.5 h-3.5" />
+                <span>{language === 'vi' ? 'Sao chép' : language === 'en' ? 'Copy' : language === 'ar' ? 'نسخ' : 'Copier'}</span>
+              </button>
+              <button
+                onClick={() => {
+                  setEditingMessage(message.id, message.content);
+                  setLocalEditText(message.content);
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/90 hover:bg-white shadow-md border border-black/10 transition-all text-xs font-bold text-slate-700 hover:text-black"
+                title={language === 'vi' ? 'Sửa' : language === 'en' ? 'Edit' : language === 'ar' ? 'تعديل' : 'Modifier'}
+              >
+                <Edit2 className="w-3.5 h-3.5" />
+                <span>{language === 'vi' ? 'Sửa' : language === 'en' ? 'Edit' : language === 'ar' ? 'تعديل' : 'Modifier'}</span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
     );

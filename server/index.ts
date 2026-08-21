@@ -65,6 +65,7 @@ import { startScheduler } from './lib/scraping-scheduler';
 // Auth imports
 import './lib/db'; // Initialize DB
 import db, { getFileUploadQuota, trackFileUpload } from './lib/db';
+import { authenticate, requireRole } from './lib/auth';
 import authRoutes from './routes/auth';
 import userRoutes from './routes/users';
 import userHistoryRoutes from './routes/userHistory';
@@ -220,8 +221,7 @@ app.get('/api/system/settings', (req, res) => {
 });
 
 // API endpoint to update system settings (admin only)
-app.put('/api/system/settings', (req, res) => {
-  // TODO: Add admin authentication check
+app.put('/api/system/settings', authenticate, requireRole('admin'), (req, res) => {
   const { anonymousLimit, defaultPlanLimit, maxFilesPerSession, maxFilesTotal, maxFileSizeMB, websiteUrl } = req.body;
 
   if (anonymousLimit !== undefined) systemSettings.anonymousLimit = anonymousLimit;

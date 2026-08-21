@@ -722,3 +722,60 @@ export const CATEGORY_INFO: Record<ATCategory, {
     greetingFr: 'Bonjour! Je suis votre assistant **IA** spécialisé dans l\'**Éducation**. Je peux vous aider avec les **appareils d\'assistance à l\'apprentissage**, les **logiciels d\'éducation spéciale**, les **guides pédagogiques**, et les **solutions technologiques d\'assistance éducative** pour les personnes en situation de handicap.',
   },
 };
+
+// Keyword để detect khi nào nên gợi ý chuyên gia AT
+export const AT_SPECIALIST_KEYWORDS: Record<ATCategory, {
+  simple: string[];       // Từ thường - cần 1 từ để trigger
+  complex: string[];      // Từ chuyên môn - trigger nhanh hơn
+}> = {
+  vision: {
+    simple: ['mù', 'khiếm thị', 'blindness', 'blind', 'visual impairment', 'visual disability',
+             'chữ nổi', 'braille', 'đọc màn hình', 'screen reader', 'lúp', 'magnifier'],
+    complex: ['phần mềm đọc màn hình', 'kính lúp điện tử', 'braille display', 'braille notetaker',
+              'zoomtext', 'jaws', 'nvda', 'orcam', 'aira', 'be my eyes', 'optelec']
+  },
+  hearing: {
+    simple: ['điếc', 'khiếm thính', 'deaf', 'hearing loss', 'deafness', 'người điếc',
+             'máy trợ thính', 'hearing aid', 'máy trợ tai'],
+    complex: ['thiết bị phản hồi âm thanh', 'alerting device', 'personal amplifier',
+              'hearing loop', 'fm system', 'thiết bị khuếch đại', 'cochlear implant',
+              'hearing dog', 'chó trợ thính', 'subtitles', 'caption', 'phụ đề']
+  },
+  mobility: {
+    simple: ['xe lăn', 'wheelchair', 'xe scooter', 'xe điện', 'nạng', 'crutch',
+             'walker', 'tàn tật', 'disability', 'paralysis', 'liệt', 'cụt chi',
+             'prosthetic', 'người khuyết tật', 'disabled'],
+    complex: ['prosthesis', 'orthotic', 'bộ phận giả', 'chân giả', 'tay giả',
+              'exoskeleton', 'exosuit', 'power wheelchair', 'xe lăn điện', 'xe lăn thường',
+              'standing wheelchair', 'smart wheelchair', 'prosthetic limb', 'orthopedic']
+  },
+  cognition: {
+    simple: ['tự kỷ', 'autism', 'down syndrome', 'trí nhớ', 'memory', 'nhận thức',
+             'cognitive', 'học tập', 'learning disability', 'chậm phát triển',
+             'intellectual disability', 'mất trí', 'suy giảm nhận thức', ' Alzheimer'],
+    complex: ['aac device', 'giao tiếp tăng альт', 'augmentative communication',
+              'switch access', 'eye tracking', 'thiết bị điều khiển bằng mắt',
+              'cognitive aid', 'memory aid', 'personal digital assistant', 'pda']
+  },
+  communication: {
+    simple: ['giao tiếp', 'communication', 'nói', 'speech', 'ngôn ngữ',
+             'language disorder', 'rối loạn ngôn ngữ', 'câm', 'mute', 'không nói được'],
+    complex: ['aac', 'speech generating device', 'sgd', 'communication board',
+              'pecs', 'thiết bị tạo giọng nói', 'text to speech', 'tts',
+              'speech synthesizer', 'voice synthesizer', 'communication app', 'tap to speak']
+  },
+  daily_living: {
+    simple: ['ăn uống', 'vệ sinh', 'sinh hoạt', 'daily living', 'tự lập',
+             'independent living', 'hỗ trợ sinh hoạt', 'chăm sóc cá nhân'],
+    complex: ['eating aid', 'feeding device', 'adaptive utensil', 'dressing aid',
+              'bathroom aid', 'shower chair', 'toilet aid', 'bed rail', 'grab bar',
+              'smart home', 'nhà thông minh', 'home automation', 'environmental control']
+  },
+  education: {
+    simple: ['học tập', 'học', 'education', 'learning', 'giáo dục đặc biệt',
+             'special education', 'ưu tiên giao thông', 'thiết bị học tập'],
+    complex: ['assistive technology education', 'iep', 'individualized education program',
+              'learning accommodation', 'accessibility in education', 'educational software',
+              'text to speech for students', 'reading pen', 'bút đọc sách']
+  }
+};

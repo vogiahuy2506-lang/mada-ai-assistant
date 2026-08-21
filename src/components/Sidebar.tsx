@@ -267,13 +267,13 @@ export function Sidebar({ variant = 'user', onSelectQuestion }: SidebarProps) {
         'bg-white dark:bg-zinc-900',
         'border-r-2 border-zinc-200 dark:border-zinc-800',
         'transition-all duration-300',
-        'overflow-y-auto hidden md:block',
-        'pb-20', // Space for collapse button
+        'flex flex-col',
+        'overflow-hidden',
         isCollapsed ? 'w-16' : 'w-56'
       )}
     >
       {/* Logo Area */}
-      <div className="h-14 flex items-center justify-center border-b border-zinc-200 dark:border-zinc-800">
+      <div className="h-14 flex items-center justify-center border-b border-zinc-200 dark:border-zinc-800 flex-shrink-0">
         <a href="/" className="font-black text-xl tracking-tight">
           {isCollapsed ? 'M' : 'MADA'}
         </a>
@@ -289,7 +289,7 @@ export function Sidebar({ variant = 'user', onSelectQuestion }: SidebarProps) {
       )}
 
       {/* Menu Items */}
-      <nav className="p-2 flex flex-col gap-0.5">
+      <nav className="p-2 flex flex-col gap-0.5 flex-shrink-0">
         {items.map((item) => (
           <button
             key={item.id}
@@ -315,14 +315,14 @@ export function Sidebar({ variant = 'user', onSelectQuestion }: SidebarProps) {
         ))}
       </nav>
 
-      {/* Categories Section (for user variant) */}
+      {/* Categories Section (for user variant) - Scrollable */}
       {variant === 'user' && (
         <>
-          <div className="px-4 py-2">
+          <div className="px-4 py-2 flex-shrink-0">
             <div className="h-px bg-zinc-200 dark:bg-zinc-700" />
           </div>
 
-          <nav className="px-2 pb-2 flex flex-col gap-0.5">
+          <nav className="px-2 pb-2 flex flex-col gap-0.5 flex-shrink-0">
             {!isCollapsed && (
               <p className="text-[10px] font-semibold uppercase tracking-widest text-zinc-400 px-3 py-1.5">
                 {labels.categories}
@@ -359,13 +359,15 @@ export function Sidebar({ variant = 'user', onSelectQuestion }: SidebarProps) {
           </nav>
 
           {/* Sample Questions - Hiển thị khi có category được chọn */}
-          <SampleQuestions 
-            category={activeCategory as ATCategory | null}
-            viewMode={viewMode}
-            language={language}
-            onSelectQuestion={onSelectQuestion || (() => {})}
-            isCollapsed={isCollapsed}
-          />
+          <div className="flex-1 overflow-y-auto min-h-0">
+            <SampleQuestions 
+              category={activeCategory as ATCategory | null}
+              viewMode={viewMode}
+              language={language}
+              onSelectQuestion={onSelectQuestion || (() => {})}
+              isCollapsed={isCollapsed}
+            />
+          </div>
         </>
       )}
 

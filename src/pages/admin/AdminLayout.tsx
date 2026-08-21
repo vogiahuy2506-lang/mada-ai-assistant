@@ -107,14 +107,8 @@ export function AdminLayout({
       {/* SIDEBAR */}
       <aside className="h-screen w-64 fixed left-0 top-0 border-r border-white/10 z-50 flex flex-col p-4 gap-2 backdrop-blur-xl bg-white/70 border-white/40 shadow-[0_4px_12px_rgba(0,0,0,0.03)]">
         {/* Logo */}
-        <div className="mb-6 px-2 flex items-center gap-3">
-          <img src={madaLogo} alt="MADA" className="h-10 w-auto" />
-          <div>
-            <h1 className="font-display-lg text-base font-bold tracking-tight text-slate-900 leading-tight">MADA AI</h1>
-            <p className="font-label-sm text-on-surface-variant leading-none">
-              {language === 'vi' ? 'Universal Access' : language === 'en' ? 'Universal Access' : language === 'ar' ? 'وصول عالمي' : 'Accès Universel'}
-            </p>
-          </div>
+        <div className="mb-6 px-2 flex items-center">
+          <img src={madaLogo} alt="MADA" className="h-12 w-auto" />
         </div>
 
         <nav className="flex-1 space-y-1">

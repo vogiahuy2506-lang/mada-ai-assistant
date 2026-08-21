@@ -1565,7 +1565,7 @@ export function ChatPage() {
             const confidencePct = typeof confidence === 'number'
               ? (confidence <= 1 ? confidence * 100 : confidence)
               : 0.8 * 100;
-            fetch('/api/admin/chat-metrics', {
+            fetch('/api/public/track', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -1672,7 +1672,7 @@ export function ChatPage() {
             : (typeof data.data.confidence === 'string' ? parseFloat(data.data.confidence) : 0.8);
           const confidencePct = confidenceVal <= 1 ? confidenceVal * 100 : confidenceVal;
 
-          fetch('/api/admin/chat-metrics', {
+          fetch('/api/public/track', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -2279,44 +2279,47 @@ export function ChatPage() {
           </button>
         </div>
 
-        {/* Category Navigation - CỐ ĐỊNH (không scroll) */}
-        <nav className="px-3 space-y-1 shrink-0">
-          {categories.map((category) => {
-            const isActive = activeCategory === category;
-            const label = CATEGORY_LABELS[category];
+        {/* All Scrollable Content */}
+        <div className="flex-1 min-h-0 overflow-y-auto">
+          
+          {/* Category Navigation */}
+          <nav className="space-y-1 px-3 pt-2 pb-2">
+            {categories.map((category) => {
+              const isActive = activeCategory === category;
+              const label = CATEGORY_LABELS[category];
 
-            // Material Design 3 colors for categories
-            const categoryColors: Record<ATCategory, { bg: string; icon: string; active: string }> = {
-              vision: { bg: 'bg-blue-100', icon: 'text-blue-600', active: 'bg-blue-500 text-white' },
-              hearing: { bg: 'bg-indigo-100', icon: 'text-indigo-600', active: 'bg-indigo-500 text-white' },
-              mobility: { bg: 'bg-emerald-100', icon: 'text-emerald-600', active: 'bg-emerald-500 text-white' },
-              cognition: { bg: 'bg-rose-100', icon: 'text-rose-500', active: 'bg-rose-500 text-white' },
-              communication: { bg: 'bg-amber-100', icon: 'text-amber-600', active: 'bg-amber-500 text-white' },
-              daily_living: { bg: 'bg-purple-100', icon: 'text-purple-600', active: 'bg-purple-500 text-white' },
-              education: { bg: 'bg-teal-100', icon: 'text-teal-600', active: 'bg-teal-500 text-white' },
-            };
-            const colors = categoryColors[category];
-            
-            return (
-              <button
-                key={category}
-                onClick={() => {
-                  if (isActive) {
-                    setActiveCategory(null);
-                  } else {
-                    const hasMessages = messages.length > 0;
-                    if (hasMessages && activeConversationId && messages.length > 0) {
-                      addOrUpdateConversation({
-                        id: activeConversationId,
-                        title: messages[0]?.content?.slice(0, 40) || (language === 'vi' ? 'Cuộc trò chuyện' : language === 'en' ? 'Conversation' : language === 'ar' ? 'محادثة' : 'Conversation'),
-                        date: new Date().toISOString().slice(0, 10),
-                        preview: messages[messages.length - 1]?.content ?? '',
-                        messages: messages.length,
-                        pinned: false,
-                        category: activeCategory,
-                        createdAt: Date.now() - 60_000,
-                        updatedAt: Date.now(),
-                      });
+              // Material Design 3 colors for categories
+              const categoryColors: Record<ATCategory, { bg: string; icon: string; active: string }> = {
+                vision: { bg: 'bg-blue-100', icon: 'text-blue-600', active: 'bg-blue-500 text-white' },
+                hearing: { bg: 'bg-indigo-100', icon: 'text-indigo-600', active: 'bg-indigo-500 text-white' },
+                mobility: { bg: 'bg-emerald-100', icon: 'text-emerald-600', active: 'bg-emerald-500 text-white' },
+                cognition: { bg: 'bg-rose-100', icon: 'text-rose-500', active: 'bg-rose-500 text-white' },
+                communication: { bg: 'bg-amber-100', icon: 'text-amber-600', active: 'bg-amber-500 text-white' },
+                daily_living: { bg: 'bg-purple-100', icon: 'text-purple-600', active: 'bg-purple-500 text-white' },
+                education: { bg: 'bg-teal-100', icon: 'text-teal-600', active: 'bg-teal-500 text-white' },
+              };
+              const colors = categoryColors[category];
+              
+              return (
+                <button
+                  key={category}
+                  onClick={() => {
+                    if (isActive) {
+                      setActiveCategory(null);
+                    } else {
+                      const hasMessages = messages.length > 0;
+                      if (hasMessages && activeConversationId && messages.length > 0) {
+                        addOrUpdateConversation({
+                          id: activeConversationId,
+                          title: messages[0]?.content?.slice(0, 40) || (language === 'vi' ? 'Cuộc trò chuyện' : language === 'en' ? 'Conversation' : language === 'ar' ? 'محادثة' : 'Conversation'),
+                          date: new Date().toISOString().slice(0, 10),
+                          preview: messages[messages.length - 1]?.content ?? '',
+                          messages: messages.length,
+                          pinned: false,
+                          category: activeCategory,
+                          createdAt: Date.now() - 60_000,
+                          updatedAt: Date.now(),
+                        });
                     }
                     window.speechSynthesis?.cancel();
                     setSpeakingId(null);
@@ -2402,123 +2405,80 @@ export function ChatPage() {
           )}
         </nav>
 
-          {/* Recent Chats Section - SCROLLABLE */}
-          <div className="pt-4 flex-1 min-h-0 overflow-y-auto">
-            <div className="flex items-center justify-between px-4 mb-3 shrink-0">
-              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">{language === 'vi' ? 'Lịch sử gần đây' : language === 'en' ? 'Recent History' : language === 'ar' ? 'السجل الأخير' : 'Historique récent'}</p>
-              {historyConversations.length > 0 && (
-                <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">
-                  {historyConversations.length}
-                </span>
-              )}
-            </div>
+        {/* Recent Chats Header */}
+        <div className="flex items-center justify-between px-4 mb-3 shrink-0 mt-2">
+            {historyConversations.length > 0 && (
+              <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">
+                {historyConversations.length}
+              </span>
+            )}
+          </div>
 
-            {/* Search box */}
-            <div className="px-2 mb-3">
-              <div className="relative">
-                <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                <input
-                  type="text"
-                  value={historySearch}
-                  onChange={(e) => setHistorySearchQuery(e.target.value)}
-                  placeholder={language === 'vi' ? 'Tìm hội thoại...' : language === 'en' ? 'Search conversations...' : language === 'ar' ? 'البحث في المحادثات...' : 'Rechercher...'}
-                  className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 border border-slate-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-300 text-slate-700 placeholder:text-slate-400 transition-colors"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-1 px-1">
-              {historyConversations.length === 0 && (
-                <div className="flex flex-col items-center justify-center text-center px-4 py-8 text-slate-400">
-                  <MessageSquare className="w-7 h-7 mb-2 opacity-40" />
-                  <p className="text-xs font-medium">{language === 'vi' ? 'Chưa có hội thoại nào' : language === 'en' ? 'No conversations yet' : language === 'ar' ? 'لا توجد محادثات' : 'Pas de conversations'}</p>
-                  <p className="text-[10px] mt-1 opacity-70">{language === 'vi' ? 'Bắt đầu chat để lưu lịch sử tự động' : language === 'en' ? 'Start chatting to save history automatically' : language === 'ar' ? 'ابدأ المحادثة للحفظ التلقائي' : 'Commencez à discuter'}</p>
-                </div>
-              )}
-
-              {filteredConversations().reduce((acc, conv, idx, arr) => {
-                const prevDate = idx > 0 ? formatRelativeDate(arr[idx - 1].updatedAt) : null;
-                const curDate = formatRelativeDate(conv.updatedAt);
-                const showHeader = prevDate !== curDate;
-                acc.push(
-                  <div key={conv.id}>
-                    {showHeader && (
-                      <p className="px-3 pt-3 pb-1.5 text-[10px] font-bold text-slate-300 uppercase tracking-widest">
-                        {curDate}
-                      </p>
-                    )}
-                    <div
-                      onClick={() => handleSelectConversation(conv.id)}
-                      className={clsx(
-                        'group relative flex items-center gap-2.5 px-3 py-2 rounded-xl cursor-pointer transition-all',
-                        activeConversationId === conv.id
-                          ? 'bg-slate-800 text-white shadow-md'
-                          : 'hover:bg-slate-50 text-slate-600'
-                      )}
-                    >
-                      {conv.pinned ? (
-                        <Pin className={clsx(
-                          'w-3.5 h-3.5 flex-shrink-0 fill-current',
-                          activeConversationId === conv.id ? 'text-amber-400' : 'text-amber-500'
-                        )} />
-                      ) : (
-                        <History className={clsx('w-3.5 h-3.5 flex-shrink-0', activeConversationId === conv.id ? 'text-slate-300' : 'text-slate-400')} />
-                      )}
-                      <p className="flex-1 text-sm truncate font-medium">{conv.title}</p>
-                      <span className={clsx(
-                        'text-[9px] font-bold tabular-nums px-1.5 py-0.5 rounded-full',
-                        activeConversationId === conv.id
-                          ? 'bg-white/15 text-white'
-                          : 'bg-slate-100 text-slate-500'
-                      )}>
-                        {conv.messages}
-                      </span>
-                      <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button
-                          onClick={(e) => handlePinConversation(e, conv.id)}
-                          className={clsx(
-                            'p-1.5 rounded transition-colors',
-                            activeConversationId === conv.id
-                              ? 'hover:bg-white/10'
-                              : 'hover:bg-slate-200'
-                          )}
-                          title={conv.pinned ? (language === 'vi' ? 'Bỏ ghim' : language === 'en' ? 'Unpin' : language === 'ar' ? 'إلغاء التثبيت' : 'Désépingler') : (language === 'vi' ? 'Ghim' : language === 'en' ? 'Pin' : language === 'ar' ? 'تثبيت' : 'Épingler')}
-                        >
-                          {conv.pinned ? (
-                            <PinOff className="w-3.5 h-3.5" />
-                          ) : (
-                            <Pin className="w-3.5 h-3.5" />
-                          )}
-                        </button>
-                        <button
-                          onClick={(e) => handleDeleteConversation(e, conv.id)}
-                          className={clsx(
-                            'p-1.5 rounded transition-colors',
-                            activeConversationId === conv.id
-                              ? 'hover:bg-white/10'
-                              : 'hover:bg-slate-200'
-                          )}
-                          title={language === 'vi' ? 'Xóa cuộc trò chuyện' : language === 'en' ? 'Delete conversation' : language === 'ar' ? 'حذف المحادثة' : 'Supprimer la conversation'}
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                );
-                return acc;
-              }, [] as React.ReactNode[])}
-
-              {historyConversations.length > 0 && filteredConversations().length === 0 && historySearch.trim() !== '' && (
-                <div className="text-center px-4 py-6 text-xs text-slate-400">
-                  {language === 'vi' ? `Không tìm thấy hội thoại "${historySearch}"` : language === 'en' ? `No conversations found "${historySearch}"` : language === 'ar' ? `لا توجد محادثات "${historySearch}"` : `Aucune conversation trouvée "${historySearch}"`}
-                </div>
-              )}
+          {/* Search box */}
+          <div className="px-2 mb-3">
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              <input
+                type="text"
+                value={historySearch}
+                onChange={(e) => setHistorySearchQuery(e.target.value)}
+                placeholder={language === 'vi' ? 'Tìm hội thoại...' : language === 'en' ? 'Search conversations...' : language === 'ar' ? 'البحث في المحادثات...' : 'Rechercher...'}
+                className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 border border-slate-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-300 text-slate-700 placeholder:text-slate-400 transition-colors"
+              />
             </div>
           </div>
 
-        {/* User Profile - Fixed at bottom */}
-        <div className="shrink-0 p-4 border-t border-slate-100 bg-white">
+          <div className="space-y-1 px-1">
+            {historyConversations.length === 0 && (
+              <div className="flex flex-col items-center justify-center text-center px-4 py-8 text-slate-400">
+                <MessageSquare className="w-7 h-7 mb-2 opacity-40" />
+                <p className="text-xs font-medium">{language === 'vi' ? 'Chưa có hội thoại nào' : language === 'en' ? 'No conversations yet' : language === 'ar' ? 'لا توجد محادثات' : 'Pas de conversations'}</p>
+                <p className="text-[10px] mt-1 opacity-70">{language === 'vi' ? 'Bắt đầu chat để lưu lịch sử tự động' : language === 'en' ? 'Start chatting to save history automatically' : language === 'ar' ? 'ابدأ المحادثة للحفظ التلقائي' : 'Commencez à discuter'}</p>
+              </div>
+            )}
+
+            {filteredConversations().reduce((acc, conv, idx, arr) => {
+              const prevDate = idx > 0 ? formatRelativeDate(arr[idx - 1].updatedAt) : null;
+              const curDate = formatRelativeDate(conv.updatedAt);
+              const showHeader = prevDate !== curDate;
+              acc.push(
+                <div key={conv.id}>
+                  {showHeader && (
+                    <p className="px-3 pt-3 pb-1.5 text-[10px] font-bold text-slate-300 uppercase tracking-widest">
+                      {curDate}
+                    </p>
+                  )}
+                  <button
+                    onClick={() => handleSelectConversation(conv.id)}
+                    className={clsx(
+                      'w-full flex items-start gap-2.5 px-3 py-2.5 rounded-xl transition-colors text-left group',
+                      conv.id === activeConversationId
+                        ? 'bg-primary/10 text-primary'
+                        : 'hover:bg-slate-50 text-slate-600'
+                    )}
+                  >
+                    <MessageSquare className={clsx('w-4 h-4 mt-0.5 flex-shrink-0', conv.id === activeConversationId ? 'text-primary' : 'text-slate-400 group-hover:text-slate-500')} />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-1">
+                        <p className="text-xs font-semibold truncate">{conv.title}</p>
+                        {conv.category && (
+                          <span className="text-[9px] px-1.5 py-0.5 bg-slate-100 rounded-full text-slate-400 flex-shrink-0">
+                            {CATEGORY_ICONS[conv.category as ATCategory]}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-slate-400 truncate mt-0.5">{conv.preview}</p>
+                    </div>
+                  </button>
+                </div>
+              );
+              return acc;
+            }, [] as React.ReactNode[])}
+          </div>
+        </div>
+
+        {/* User Profile */}
+        <div className="shrink-0 p-4 mx-3 mb-3 border-t border-slate-100 bg-white">
           <div className="bg-slate-50 rounded-2xl p-4">
             <button
               type="button"
@@ -3225,6 +3185,24 @@ export function ChatPage() {
 
                 {/* Right Icons & Send - Material Design 3 Style */}
                 <div className="flex items-center gap-1 pr-1">
+                  {/* AT Specialist Quick Switch Button - Visible in both modes */}
+                  {isEndUser ? (
+                    <button
+                      onClick={toggleViewMode}
+                      className="p-2 rounded-full transition-all bg-violet-100 text-violet-600 hover:bg-violet-200"
+                      title={language === 'vi' ? 'Chuyển sang chuyên gia AT' : language === 'en' ? 'Switch to AT Specialist' : 'Passer au spécialiste AT'}
+                    >
+                      <Accessibility className="w-5 h-5" />
+                    </button>
+                  ) : (
+                    <button
+                      onClick={toggleViewMode}
+                      className="p-2 rounded-full transition-all bg-violet-100 text-violet-600 hover:bg-violet-200"
+                      title={language === 'vi' ? 'Chuyển về chế độ người dùng' : language === 'en' ? 'Switch to end user mode' : 'Basculer vers le mode utilisateur'}
+                    >
+                      <Users className="w-5 h-5" />
+                    </button>
+                  )}
                   {/* Voice Button */}
                   <button
                     onClick={handleVoiceRecord}

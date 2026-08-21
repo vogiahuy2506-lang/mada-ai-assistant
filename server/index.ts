@@ -647,6 +647,17 @@ app.get('/api/admin/chat-metrics', async (req, res) => {
   }
 });
 
+// POST /api/admin/chat-metrics - Track chat metrics (no auth required, fire-and-forget)
+app.post('/api/admin/chat-metrics', async (req, res) => {
+  try {
+    const { conversationId, latencyMs, confidence, botId, language, userMode } = req.body;
+    // Fire-and-forget: just acknowledge and skip logging to avoid noise
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+});
+
 // ============== GLOBAL ERROR HANDLER (Multer + JSON) ==============
 app.use((err: any, _req: any, res: any, _next: any) => {
   console.error('🚨 Global error handler:', err.message);

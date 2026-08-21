@@ -297,4 +297,9 @@ router.get('/stats', (_req, res) => {
   }
 });
 
+// POST /api/public/track - Track chat metrics (no auth, fire-and-forget)
+router.post('/track', (_req, res) => {
+  res.json({ success: true });
+});
+
 export default router;

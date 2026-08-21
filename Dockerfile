@@ -29,9 +29,9 @@ RUN chmod +x ./entrypoint.sh
 # Use prebuilt binaries (Alpine glibc/musl matches host); rebuild from source if needed
 RUN npm ci --only=production && npm rebuild && npm cache clean --force
 
-# Copy pre-built dist (built locally or mounted)
-COPY dist ./dist
-COPY server ./server
+# Copy pre-built dist from builder stage
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/server ./server
 RUN mkdir -p ./data && chown -R nodejs:nodejs ./data
 
 USER nodejs

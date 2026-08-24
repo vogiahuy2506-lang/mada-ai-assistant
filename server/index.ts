@@ -323,11 +323,19 @@ app.use(cors({
     console.log('[CORS] Checking origin:', origin);
     if (/^https:\/\/[a-zA-Z0-9.-]+\.run\.app$/.test(origin)) return callback(null, true);
 
+    // Production domains (hardcoded + env)
+    const productionDomains = [
+      'https://mada.digiso.vn',
+      'https://www.mada.digiso.vn',
+    ];
+
     // Production origins (set via env)
     if (process.env.CORS_ORIGINS) {
       const allowed = process.env.CORS_ORIGINS.split(',').map(s => s.trim());
-      if (allowed.includes(origin)) return callback(null, true);
+      productionDomains.push(...allowed);
     }
+
+    if (productionDomains.includes(origin)) return callback(null, true);
 
     return callback(new Error(`CORS: origin ${origin} not allowed`));
   },

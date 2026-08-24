@@ -56,7 +56,9 @@ services:
       - "443:443"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx/certs:/etc/nginx/certs:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - ./nginx/options-ssl-nginx.conf:/etc/nginx/options-ssl-nginx.conf:ro
+      - mada-certbot:/var/www/certbot:ro
       - mada-nginx-logs:/var/log/nginx
     depends_on:
       app:
@@ -72,6 +74,8 @@ volumes:
   mada-data:
     driver: local
   mada-uploads:
+    driver: local
+  mada-certbot:
     driver: local
   mada-nginx-logs:
     driver: local

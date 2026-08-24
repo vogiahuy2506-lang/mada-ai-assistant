@@ -464,3 +464,33 @@ router.post('/import-url/save', async (req, res) => {
 });
 
 export default router;
+
+// ============== GET /import-url/metadata (SCRAPE META TAGS) ==============
+// Thêm sau vì cần import scrapeProductMetadata
+import { scrapeProductMetadata } from '../lib/scrapeProductMetadata';
+
+/**
+ * GET /api/scraper/import-url/metadata?url=<url>
+ *
+ * Scrape Open Graph / meta tags từ URL để pre-fill form sản phẩm.
+ * Trả về nhanh: title, description, image, siteName.
+ */
+router.get('/import-url/metadata', async (req, res) => {
+  try {
+    const { url } = req.query;
+
+    if (!url || typeof url !== 'string') {
+      return res.status(400).json({ success: false, error: 'Thiếu tham số url' });
+    }
+
+    const metadata = await scrapeProductMetadata(url);
+
+    res.json({
+      success: true,
+      data: metadata,
+    });
+  } catch (err: any) {
+    console.error('[import-url/metadata] error:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});

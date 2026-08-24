@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import db from '../lib/db';
 import { syncProductToKnowledge, syncAllPublishedProducts } from '../lib/syncKbProducts';
+import { syncItemToVector } from '../lib/syncItemToVector';
 
 const router = Router();
 
@@ -305,7 +306,7 @@ router.delete('/products/:id', requireAdmin, (req, res) => {
 });
 
 // POST /api/admin/products/:id/publish
-router.post('/products/:id/publish', requireAdmin, (req, res) => {
+router.post('/products/:id/publish', requireAdmin, async (req, res) => {
   try {
     const { status } = req.body;
 
@@ -327,10 +328,22 @@ router.post('/products/:id/publish', requireAdmin, (req, res) => {
       console.error(`⚠️ [publish] Failed to sync ${product.id} to knowledge_items:`, syncErr.message);
     }
 
+    // ⭐ Auto-upsert lên vector store ngay lập tức (không cần chạy script tay)
+    let vectorResult: any = null;
+    if (syncResult?.knowledge_item_id && status === 'published') {
+      try {
+        vectorResult = await syncItemToVector(syncResult.knowledge_item_id);
+        console.log(`🔎 [publish] Vector sync ${product.id} → ${vectorResult.indexed ? '✅ indexed' : '❌ failed: ' + vectorResult.error}`);
+      } catch (vecErr: any) {
+        console.error(`⚠️ [publish] Vector sync failed for ${product.id}:`, vecErr.message);
+      }
+    }
+
     res.json({
       success: true,
       data: product,
-      sync: syncResult, // trả về cho client biết
+      sync: syncResult,
+      vector: vectorResult, // trả về cho client biết
     });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
@@ -921,6 +934,136 @@ router.post('/agents/test', requireAdmin, async (req, res) => {
         agentName: agent.name,
       },
     });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ============== USERS MANAGEMENT ==============
+
+// GET /api/admin/users - Get all users
+router.get('/users', requireAdmin, (req, res) => {
+  try {
+    const users = db.prepare(`
+      SELECT id, email, name, role, plan, status, provider, quota_used, quota_limit, 
+             created_at, updated_at, last_login_at, avatar
+      FROM users 
+      ORDER BY created_at DESC
+    `).all();
+    res.json({ success: true, data: users });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// GET /api/admin/users/:id - Get single user
+router.get('/users/:id', requireAdmin, (req, res) => {
+  try {
+    const user = db.prepare(`
+      SELECT id, email, name, role, plan, status, provider, quota_used, quota_limit, 
+             created_at, updated_at, last_login_at, avatar
+      FROM users WHERE id = ?
+    `).get(req.params.id);
+    
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+    res.json({ success: true, data: user });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// PUT /api/admin/users/:id/status - Update user status
+router.put('/users/:id/status', requireAdmin, (req, res) => {
+  try {
+    const { status } = req.body;
+    if (!['active', 'suspended', 'pending'].includes(status)) {
+      return res.status(400).json({ success: false, error: 'Invalid status' });
+    }
+    
+    const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.params.id);
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+    
+    db.prepare('UPDATE users SET status = ?, updated_at = ? WHERE id = ?')
+      .run(status, new Date().toISOString(), req.params.id);
+    
+    res.json({ success: true, message: `User status updated to ${status}` });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// PUT /api/admin/users/:id/role - Update user role
+router.put('/users/:id/role', requireAdmin, (req, res) => {
+  try {
+    const { role } = req.body;
+    if (!['admin', 'user'].includes(role)) {
+      return res.status(400).json({ success: false, error: 'Invalid role' });
+    }
+    
+    const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.params.id) as any;
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+    
+    db.prepare('UPDATE users SET role = ?, updated_at = ? WHERE id = ?')
+      .run(role, new Date().toISOString(), req.params.id);
+    
+    res.json({ success: true, message: `User role updated to ${role}` });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// DELETE /api/admin/users/:id - Delete user
+router.delete('/users/:id', requireAdmin, (req, res) => {
+  try {
+    const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.params.id) as any;
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+    
+    // Delete related data first
+    db.prepare('DELETE FROM sessions WHERE user_id = ?').run(req.params.id);
+    db.prepare('DELETE FROM audit_logs WHERE user_id = ?').run(req.params.id);
+    db.prepare('DELETE FROM users WHERE id = ?').run(req.params.id);
+    
+    res.json({ success: true, message: 'User deleted successfully' });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// POST /api/admin/users - Create new user manually
+router.post('/users', requireAdmin, (req, res) => {
+  try {
+    const { email, name, password, role = 'user' } = req.body;
+    
+    if (!email || !name || !password) {
+      return res.status(400).json({ success: false, error: 'Email, name, password là bắt buộc' });
+    }
+    
+    const normalizedEmail = email.trim().toLowerCase();
+    const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(normalizedEmail);
+    if (existing) {
+      return res.status(409).json({ success: false, error: 'Email đã tồn tại' });
+    }
+    
+    const { hashPassword } = require('../lib/auth');
+    const id = `user-${uuidv4()}`;
+    const passwordHash = hashPassword(password);
+    const now = new Date().toISOString();
+    
+    db.prepare(`
+      INSERT INTO users (id, email, name, password_hash, role, plan, status, provider, quota_used, quota_limit, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, 'free', 'active', 'email', 0, 10, ?, ?)
+    `).run(id, normalizedEmail, name.trim(), passwordHash, role, now, now);
+    
+    const user = db.prepare('SELECT id, email, name, role, plan, status FROM users WHERE id = ?').get(id);
+    res.status(201).json({ success: true, data: user });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
   }

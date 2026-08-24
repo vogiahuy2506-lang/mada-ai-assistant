@@ -1238,3 +1238,4 @@ function ToggleRow({ label, desc, value }: { label: string; desc: string; value:
     </div>
   );
 }
+export default AdminSettings;

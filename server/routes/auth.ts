@@ -357,6 +357,17 @@ async function exchangeCodeForTokens(code: string, req: any, res: any) {
 
     const googleUser = await userResponse.json() as { id: string; email: string; name: string; picture: string };
     
+    // 🔐 Check domain restriction
+    const allowedDomains = process.env.ALLOWED_GOOGLE_DOMAINS;
+    if (allowedDomains) {
+      const domains = allowedDomains.split(',').map(d => d.trim().toLowerCase().replace('@', ''));
+      const userDomain = googleUser.email.split('@')[1]?.toLowerCase();
+      if (!userDomain || !domains.includes(userDomain)) {
+        console.error(`Google OAuth blocked: ${googleUser.email} not in allowed domains: ${allowedDomains}`);
+        return res.redirect('/?error=google_domain_not_allowed');
+      }
+    }
+    
     // Find or create user in database
     const email = googleUser.email.toLowerCase();
     let user = db.prepare('SELECT * FROM users WHERE google_id = ?').get(googleUser.id) as UserRow | undefined;

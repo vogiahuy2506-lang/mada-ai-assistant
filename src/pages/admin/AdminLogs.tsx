@@ -288,3 +288,4 @@ export function AdminLogs() {
     </AdminLayout>
   );
 }
+export default AdminLogs;

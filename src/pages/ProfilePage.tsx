@@ -665,3 +665,5 @@ function SecurityTab() {
     </div>
   );
 }
+
+export default ProfilePage;

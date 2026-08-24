@@ -403,3 +403,4 @@ export function AdminConsultations() {
     </AdminLayout>
   );
 }
+export default AdminConsultations;

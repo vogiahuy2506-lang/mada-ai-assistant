@@ -193,29 +193,29 @@ export function AIImportCard({ categories, onImportSuccess }: AIImportCardProps)
   return (
     <>
       {/* Compact card trigger - Industrial style matching AdminProducts */}
-      <div className="mb-5 relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 p-[3px] shadow-lg shadow-purple-500/25">
-        <div className="bg-white rounded-2xl p-5 flex items-center gap-4">
-          <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-purple-500/30 border-[3px] border-black">
-            <Sparkles className="w-7 h-7 text-white" />
+      <div className="mb-5 relative overflow-hidden rounded-xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 p-[2px] shadow-md shadow-purple-500/20">
+        <div className="bg-white rounded-xl px-4 py-3 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-md shadow-purple-500/30 border-2 border-black">
+            <Sparkles className="w-5 h-5 text-white" />
           </div>
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1">
-              <h3 className="font-black text-lg text-black flex items-center gap-2">
+            <div className="flex items-center gap-2 mb-0.5">
+              <h3 className="font-black text-sm text-black flex items-center gap-2">
                 AI Import từ Website
               </h3>
-              <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-gradient-to-r from-indigo-500 to-purple-500 text-white border-2 border-black">
+              <span className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-gradient-to-r from-indigo-500 to-purple-500 text-white border border-black">
                 BETA
               </span>
             </div>
-            <p className="text-sm text-on-surface-variant mt-0.5">
+            <p className="text-xs text-on-surface-variant">
               Paste URL sản phẩm → AI tự động trích xuất tên, giá, ảnh
             </p>
           </div>
           <button
             onClick={() => setOpen(true)}
-            className="px-6 py-3 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-black shadow-[3px_3px_0px_0px_#000] hover:shadow-[4px_4px_0px_0px_#000] hover:-translate-x-[1px] hover:-translate-y-[1px] transition-all flex items-center gap-2 border-[3px] border-black"
+            className="px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-black text-xs shadow-[2px_2px_0px_0px_#000] hover:shadow-[3px_3px_0px_0px_#000] hover:-translate-x-[1px] hover:-translate-y-[1px] transition-all flex items-center gap-1.5 border-2 border-black"
           >
-            <Sparkles className="w-5 h-5" />
+            <Sparkles className="w-3.5 h-3.5" />
             Mở công cụ
           </button>
         </div>
@@ -505,4 +505,7 @@ function StatBox({ label, value, color }: { label: string; value: string; color:
       <p className={clsx('font-black text-lg mt-0.5', colors.text)}>{value}</p>
     </div>
   );
+
 }
+
+export default AIImportCard;

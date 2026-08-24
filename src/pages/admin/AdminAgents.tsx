@@ -679,3 +679,4 @@ export function AdminAgents() {
     </AdminLayout>
   );
 }
+export default AdminAgents;

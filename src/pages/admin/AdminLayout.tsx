@@ -192,14 +192,14 @@ export function AdminLayout({
             <div className="flex gap-2">
               <button
                 className="w-10 h-10 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-primary/10 hover:text-primary transition-all"
-                aria-label="Thông báo"
+                aria-label={language === 'vi' ? 'Thông báo' : language === 'en' ? 'Notifications' : language === 'ar' ? 'الإشعارات' : 'Notifications'}
               >
                 <span className="material-symbols-outlined">notifications</span>
               </button>
               <button
                 onClick={toggleTheme}
                 className="w-10 h-10 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-primary/10 hover:text-primary transition-all"
-                aria-label="Cài đặt"
+                aria-label={language === 'vi' ? 'Cài đặt' : language === 'en' ? 'Settings' : language === 'ar' ? 'الإعدادات' : 'Paramètres'}
               >
                 <span className="material-symbols-outlined">{isDark ? 'light_mode' : 'settings'}</span>
               </button>
@@ -259,11 +259,11 @@ export function AdminLayout({
             <section className="flex flex-col md:flex-row justify-between items-end gap-6">
               <div>
                 <h2 className="font-display-lg text-headline-lg text-on-surface leading-tight">
-                  {titleEn && language === 'en' ? titleEn : titleAr && language === 'ar' ? titleAr : title} <span className="animate-pulse">👋</span>
+                  {language === 'en' ? titleEn : language === 'ar' ? titleAr : title} <span className="animate-pulse">👋</span>
                 </h2>
                 {subtitle && (
                   <p className="font-body-lg text-on-surface-variant mt-2 max-w-2xl">
-                    {subtitleEn && language === 'en' ? subtitleEn : subtitleAr && language === 'ar' ? subtitleAr : subtitle}
+                    {language === 'en' ? subtitleEn : language === 'ar' ? subtitleAr : subtitle}
                   </p>
                 )}
               </div>
@@ -296,4 +296,7 @@ export function AdminLayout({
       )}
     </div>
   );
+
 }
+
+export default AdminLayout;

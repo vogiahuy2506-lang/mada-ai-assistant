@@ -3747,3 +3747,4 @@ function MessageBubble({
     </div>
   );
 }
+export default ChatPage;

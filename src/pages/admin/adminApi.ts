@@ -300,6 +300,14 @@ export const adminApi = {
     });
   },
 
+  // ============== URL IMPORT / SCRAPE METADATA ==============
+  async scrapeUrlMetadata(url: string) {
+    return request<{
+      success: boolean;
+      data?: { title: string; description: string; image: string; siteName: string; url: string };
+    }>(`/scraper/import-url/metadata?url=${encodeURIComponent(url)}`);
+  },
+
   // ============== AUDIT LOGS ==============
   async getAuditLogs(params?: { action?: string; user_id?: string; limit?: number; offset?: number }) {
     const p = new URLSearchParams();

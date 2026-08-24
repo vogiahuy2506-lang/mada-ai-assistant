@@ -271,3 +271,4 @@ export function AdminOverview() {
     </AdminLayout>
   );
 }
+export default AdminOverview;

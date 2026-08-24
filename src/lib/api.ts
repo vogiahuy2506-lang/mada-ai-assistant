@@ -216,15 +216,20 @@ export const fileQuotaApi = {
   /** Lấy quota file upload của user hiện tại (cần auth). */
   async getMyQuota() {
     const token = getAccessToken();
-    const res = await fetch('/api/user/file-quota', {
-      method: 'GET',
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    });
-    const json = await res.json();
-    if (!res.ok || !json.success) {
-      return { success: false as const, error: json.error || 'Failed' };
+    if (!token) return { success: false as const, error: 'Not logged in' };
+    try {
+      const res = await fetch('/api/user/file-quota', {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.success) {
+        return { success: false as const, error: json.error || 'Failed' };
+      }
+      return { success: true as const, data: json.data as FileUploadQuota };
+    } catch {
+      return { success: false as const, error: 'Network error' };
     }
-    return { success: true as const, data: json.data as FileUploadQuota };
   },
 
   /** Lấy plan limits cho tất cả gói (public). */

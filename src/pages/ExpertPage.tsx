@@ -320,3 +320,5 @@ export function ExpertPage() {
     </div>
   );
 }
+
+export default ExpertPage;

@@ -460,3 +460,4 @@ export function AdminAnalytics() {
     </AdminLayout>
   );
 }
+export default AdminAnalytics;

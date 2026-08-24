@@ -978,3 +978,5 @@ export function DataManagerPage() {
     </div>
   );
 }
+
+export default DataManagerPage;

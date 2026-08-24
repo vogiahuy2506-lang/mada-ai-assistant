@@ -79,7 +79,7 @@ async function request<T>(
 
     // Try to refresh on 401
     if (res.status === 401 && retry && getRefreshToken()) {
-      const refreshRes = await fetch(`${API_BASE}/api/auth/refresh`, {
+      const refreshRes = await fetch(`${API_BASE}/auth/refresh`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ refreshToken: getRefreshToken() }),
@@ -191,10 +191,10 @@ export interface SystemSettings {
 }
 
 export const systemApi = {
-  async getSettings(): Promise<{ success: boolean; data: SystemSettings }> {
+  async getSettings() {
     return request<SystemSettings>('/system/settings');
   },
-  async updateSettings(updates: Partial<SystemSettings>): Promise<{ success: boolean; data: SystemSettings }> {
+  async updateSettings(updates: Partial<SystemSettings>) {
     return request<SystemSettings>('/system/settings', {
       method: 'PUT',
       body: JSON.stringify(updates),

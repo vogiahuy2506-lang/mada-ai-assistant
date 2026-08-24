@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Sidebar } from '@/components';
 import {
   CloudUpload, Globe, FileText,
@@ -33,6 +34,7 @@ interface KnowledgeStats {
 }
 
 export function DataManagerPage() {
+  const navigate = useNavigate();
   const [knowledgeItems, setKnowledgeItems] = useState<KnowledgeItem[]>([]);
   const [stats, setStats] = useState<KnowledgeStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -598,10 +600,7 @@ export function DataManagerPage() {
                         Đóng
                       </button>
                       <button
-                        onClick={() => {
-                          // Navigate to chat with suggestions
-                          window.location.href = '/chat';
-                        }}
+                        onClick={() => navigate('/chat')}
                         className="flex-1 py-2 px-4 bg-gradient-to-r from-violet-500 to-indigo-600 text-white rounded-xl font-bold hover:shadow-lg transition-all"
                       >
                         Hỏi MADA về chủ đề này

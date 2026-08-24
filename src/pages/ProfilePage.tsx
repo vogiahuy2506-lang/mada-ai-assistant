@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useThemeStore, useLanguageStore } from '@/stores';
 import {
   User, Settings, History, Star, Bell, Shield, Moon, Sun,
@@ -18,6 +19,7 @@ const TABS = [
 ];
 
 export function ProfilePage() {
+  const navigate = useNavigate();
   const { isDark, toggleTheme } = useThemeStore();
   const { language, setLanguage } = useLanguageStore();
   const [activeTab, setActiveTab] = useState<TabType>('profile');
@@ -499,7 +501,7 @@ function HistoryTab() {
         <div
           key={conv.id}
           className="bg-white dark:bg-[#2e3038] rounded-xl border-2 border-[#191b23] p-4 hover:-translate-y-1 hover:-translate-x-1 hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-all cursor-pointer"
-          onClick={() => window.location.href = `/chat?conv=${conv.id}`}
+          onClick={() => navigate(`/chat?conv=${conv.id}`)}
         >
           <div className="flex items-start justify-between">
             <div className="flex-1">

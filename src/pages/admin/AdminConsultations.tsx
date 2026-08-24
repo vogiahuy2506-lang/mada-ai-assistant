@@ -1,29 +1,25 @@
 import { useState, useEffect } from 'react';
 import { AdminLayout } from './AdminLayout';
-import { adminApi } from './adminApi';
+import { adminApi, type Consultation } from './adminApi';
 import clsx from 'clsx';
 
 export function AdminConsultations() {
-  const [requests, setRequests] = useState<any[]>([]);
+  const [requests, setRequests] = useState<Consultation[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [selectedRequest, setSelectedRequest] = useState<any | null>(null);
+  const [selectedRequest, setSelectedRequest] = useState<Consultation | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
   const fetchRequests = async () => {
     try {
       setLoading(true);
-      setError(null);
-      const res = await adminApi.getConsultations({ 
-        status: statusFilter !== 'all' ? statusFilter : undefined 
+      const res = await adminApi.getConsultations({
+        status: statusFilter !== 'all' ? statusFilter : undefined,
       });
       if (res.success && res.data) {
-        setRequests(res.data);
-      } else {
-        setError(res.error || 'Failed to load consultations');
+        setRequests(Array.isArray(res.data.data) ? res.data.data : []);
       }
     } catch (err: any) {
-      setError(err.message);
+      console.error('Failed to load consultations:', err);
     } finally {
       setLoading(false);
     }

@@ -5,7 +5,7 @@ import { AIImportCard } from './AIImportCard';
 import { formatPrice } from '../../lib/formatPrice';
 import { getImageUrl } from '../../lib/imageProxy';
 import {
- Plus, RefreshCw, Save, Loader2, FolderPlus, CheckCircle2,
+ Plus, RefreshCw, Loader2, CheckCircle2, AlertCircle,
 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -158,37 +158,45 @@ function ProductModal({ product, categories, defaultCategory, onSave, onClose }:
  const [importMeta, setImportMeta] = useState<{title: string; description: string; image: string; siteName: string} | null>(null);
 
  const handleSave = async () => {
-   if (!form.title || !form.category) { setError('Cần nhập tên và chọn danh mục'); return; }
+   if (!form.title.trim()) { setError('Vui lòng nhập tên sản phẩm'); return; }
+   if (!form.category) { setError('Vui lòng chọn danh mục'); return; }
   setSaving(true); setError('');
   try {
    const iso_codes = form.iso_codes.split(',').map(s => s.trim()).filter(Boolean);
    await onSave({ ...form, iso_codes: iso_codes as any, featured: !!form.featured });
-  } catch (e: any) { setError(e.message); } finally { setSaving(false); }
+  } catch (e) { setError((e as Error)?.message || 'Lỗi không xác định'); } finally { setSaving(false); }
  };
 
- // ============== URL IMPORT ==============
- const handleImportFromUrl = async () => {
-   const url = form.source_url || form.product_url;
-   if (!url) { setImportError('Nhập URL vào ô Link Nguồn hoặc Link mua hàng trước'); return; }
-   setImporting(true); setImportError(''); setImportSuccess(false);
-   try {
-     const res = await adminApi.scrapeUrlMetadata(url);
-     if (res.success && res.data) {
-       const meta = res.data;
-       if (meta.title && !form.title) setForm(f => ({ ...f, title: meta.title }));
-       if (meta.description && !form.description) setForm(f => ({ ...f, description: meta.description }));
-       if (meta.image && !form.image_url) setForm(f => ({ ...f, image_url: meta.image }));
-       if (meta.title && !form.title_en) setForm(f => ({ ...f, title_en: meta.title }));
-       if (meta.description && !form.description_en) setForm(f => ({ ...f, description_en: meta.description }));
-       // Hỏi người dùng: muốn import vào con chat không?
-       setImportMeta(meta);
-       setImportSuccess(true);
-     } else {
-       setImportError(res.error || 'Không lấy được metadata từ URL này');
-     }
-   } catch (e: any) { setImportError(e.message); }
-   finally { setImporting(false); }
- };
+// ============== URL IMPORT ==============
+const handleImportFromUrl = async () => {
+  const url = (form.source_url || form.product_url || '').trim();
+  if (!url) { setImportError('Nhập URL vào ô Link Nguồn hoặc Link mua hàng trước'); return; }
+  if (!/^https?:\/\//i.test(url)) {
+    setImportError('URL phải bắt đầu bằng http:// hoặc https://');
+    return;
+  }
+  setImporting(true); setImportError(''); setImportSuccess(false);
+  try {
+    const res = await adminApi.scrapeUrlMetadata(url);
+    if (res.success && res.data) {
+      const meta = res.data;
+      if (meta.title && !form.title) setForm((f) => ({ ...f, title: meta.title }));
+      if (meta.description && !form.description) setForm((f) => ({ ...f, description: meta.description }));
+      if (meta.image && !form.image_url) setForm((f) => ({ ...f, image_url: meta.image }));
+      if (meta.title && !form.title_en) setForm((f) => ({ ...f, title_en: meta.title }));
+      if (meta.description && !form.description_en) setForm((f) => ({ ...f, description_en: meta.description }));
+      // Hỏi người dùng: muốn import vào con chat không?
+      setImportMeta(meta);
+      setImportSuccess(true);
+    } else {
+      setImportError(res.error || 'Không lấy được metadata từ URL này');
+    }
+  } catch (e) {
+    setImportError((e as Error)?.message || 'Lỗi không xác định');
+  } finally {
+    setImporting(false);
+  }
+};
 
  return (
   <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -300,10 +308,10 @@ function ProductModal({ product, categories, defaultCategory, onSave, onClose }:
          <div className="flex-1">
           <p className="text-sm font-medium text-green-800 mb-1">Đã lấy metadata!</p>
           <div className="flex gap-2">
-           <button type="button" onClick={() => window.open('http://localhost:5173/chat', '_blank')}
+<button type="button" onClick={() => window.open(`${window.location.origin}/chat`, '_blank')}
             className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-green-600 text-white text-xs font-medium hover:bg-green-700">
             <span className="material-symbols-outlined text-sm">chat</span> Mở Chat
-           </button>
+          </button>
            <button type="button" onClick={() => { setImportSuccess(false); setImportMeta(null); }}
             className="px-3 py-1.5 rounded-lg bg-white border border-green-300 text-green-700 text-xs font-medium hover:bg-green-50">
             Tiếp tục sửa
@@ -571,52 +579,6 @@ function CategoryCard({ category, productCount, onEdit, onAddProduct }: {
  );
 }
 
-// ==================== METRIC CARD ====================
-function MetricCard({ icon, label, value, subValue, color, rotate = 0 }: {
- icon: string; label: string; value: string | number; subValue?: string; color: string; rotate?: number;
-}) {
- const colorMap: Record<string, { bg: string; text: string; accent: string }> = {
-  blue: { bg: 'bg-blue-100', text: 'text-blue-700', accent: 'bg-blue-500' },
-  purple: { bg: 'bg-purple-100', text: 'text-purple-700', accent: 'bg-purple-500' },
-  amber: { bg: 'bg-amber-100', text: 'text-amber-700', accent: 'bg-amber-500' },
-  green: { bg: 'bg-green-100', text: 'text-green-700', accent: 'bg-green-500' },
-  rose: { bg: 'bg-rose-100', text: 'text-rose-700', accent: 'bg-rose-500' },
- };
- const colors = colorMap[color] || colorMap.blue;
-
- return (
-  <div className={clsx(
-   'relative bg-white rounded-2xl p-5 border-[3px] border-black',
-   'shadow-[1px_1px_0px_0px_#000]',
-   ' ',
-   'transition-all duration-200',
-   'flex items-center gap-4'
-  )}>
-   <div className={clsx(
-    'w-14 h-14 rounded-xl border-[3px] border-black flex items-center justify-center',
-    'shadow-[1px_1px_0px_0px_#000]',
-    colors.bg
-   )}>
-    <span className={clsx('material-symbols-outlined text-2xl', colors.text)} style={{ fontVariationSettings: "'FILL' 1" }}>{icon}</span>
-   </div>
-   <div className="flex-1 min-w-0">
-    <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1">{label}</p>
-    <div className="flex items-center gap-2">
-     <h3 className="text-3xl font-black text-black leading-none">{value}</h3>
-     {subValue && (
-      <span className={clsx(
-       'px-2.5 py-1 rounded-md border-2 border-black text-[10px] font-black',
-       colors.accent, 'text-white'
-      )}>
-       {subValue}
-      </span>
-     )}
-    </div>
-   </div>
-  </div>
- );
-}
-
 // ==================== MAIN PAGE ====================
 export function AdminProducts() {
  const [products, setProducts] = useState<Product[]>([]);
@@ -685,13 +647,6 @@ export function AdminProducts() {
   await loadCategories();
  };
 
- const handleDeleteCategory = async (cat: Category) => {
-  if (!confirm(`Xóa "${cat.name_vi}"?`)) return;
-  const res = await adminApi.deleteCategory(cat.id);
-  if (!res.success) alert(res.error);
-  else await loadCategories();
- };
-
  const handleSaveProduct = async (data: Partial<Product>) => {
   if (editingProduct) { await adminApi.updateProduct(editingProduct.id, data); }
   else { await adminApi.createProduct(data); }
@@ -715,39 +670,46 @@ const handleTogglePublish = async (prod: Product) => {
 const handlePublishAll = async () => {
   if (!confirm('Đăng tất cả sản phẩm để user có thể tìm kiếm?')) return;
   const unpublished = products.filter(p => p.status !== 'published');
-  let count = 0;
-  for (const p of unpublished) {
-    await adminApi.publishProduct(p.id, 'published');
-    count++;
+  if (unpublished.length === 0) {
+    alert('Không có sản phẩm nào cần đăng!');
+    return;
   }
-  alert(`Đã đăng ${count} sản phẩm!`);
-  await loadProducts();
+  try {
+    const result = await adminApi.bulkPublish({ scope: 'all_unpublished' });
+    const msg = result?.message || `Đã đăng ${unpublished.length} sản phẩm`;
+    alert(`✅ ${msg}`);
+    await loadProducts();
+  } catch (e) {
+    alert(`❌ Lỗi: ${(e as Error)?.message || 'Không thể đăng hàng loạt'}`);
+  }
 };
 
 const handleBulkPublish = async () => {
   if (selectedProducts.size === 0) return;
   if (!confirm(`Đăng ${selectedProducts.size} sản phẩm đã chọn?`)) return;
-  let count = 0;
-  for (const id of selectedProducts) {
-    await adminApi.publishProduct(id, 'published');
-    count++;
+  try {
+    const result = await adminApi.bulkPublish({ ids: Array.from(selectedProducts), scope: 'selected' });
+    const msg = result?.message || `Đã đăng ${selectedProducts.size} sản phẩm`;
+    alert(`✅ ${msg}`);
+    setSelectedProducts(new Set());
+    await loadProducts();
+  } catch (e) {
+    alert(`❌ Lỗi: ${(e as Error)?.message || 'Không thể đăng hàng loạt'}`);
   }
-  alert(`Đã đăng ${count} sản phẩm!`);
-  setSelectedProducts(new Set());
-  await loadProducts();
 };
 
 const handleBulkUnpublish = async () => {
   if (selectedProducts.size === 0) return;
   if (!confirm(`Bỏ đăng ${selectedProducts.size} sản phẩm đã chọn?`)) return;
-  let count = 0;
-  for (const id of selectedProducts) {
-    await adminApi.publishProduct(id, 'draft');
-    count++;
+  try {
+    const result = await adminApi.bulkUnpublish({ ids: Array.from(selectedProducts), scope: 'selected' });
+    const msg = result?.message || `Đã bỏ đăng ${selectedProducts.size} sản phẩm`;
+    alert(`✅ ${msg}`);
+    setSelectedProducts(new Set());
+    await loadProducts();
+  } catch (e) {
+    alert(`❌ Lỗi: ${(e as Error)?.message || 'Không thể bỏ đăng hàng loạt'}`);
   }
-  alert(`Đã bỏ đăng ${count} sản phẩm!`);
-  setSelectedProducts(new Set());
-  await loadProducts();
 };
 
 const totalPages = Math.ceil(totalProducts / pageSize);
@@ -792,7 +754,11 @@ const totalPages = Math.ceil(totalProducts / pageSize);
      </div>
      <div>
       <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">SẢN PHẨM</p>
-      <h3 className="text-xl font-black text-on-surface">{totalProducts.toLocaleString()}</h3>
+      {loading ? (
+       <div className="w-16 h-6 bg-gray-200 rounded animate-pulse"></div>
+      ) : (
+       <h3 className="text-xl font-black text-on-surface">{totalProducts.toLocaleString()}</h3>
+      )}
       <p className="text-[10px] text-on-surface-variant mt-0.5">trong hệ thống</p>
      </div>
     </div>
@@ -802,7 +768,11 @@ const totalPages = Math.ceil(totalProducts / pageSize);
      </div>
      <div>
       <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">DANH MỤC</p>
-      <h3 className="text-xl font-black text-on-surface">{categories.length}</h3>
+      {loading ? (
+       <div className="w-10 h-6 bg-gray-200 rounded animate-pulse"></div>
+      ) : (
+       <h3 className="text-xl font-black text-on-surface">{categories.length}</h3>
+      )}
       <p className="text-[10px] text-on-surface-variant mt-0.5">active</p>
      </div>
     </div>
@@ -812,11 +782,30 @@ const totalPages = Math.ceil(totalProducts / pageSize);
      </div>
      <div>
       <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">ĐÃ XUẤT BẢN</p>
-      <h3 className="text-xl font-black text-on-surface">{products.filter(p => p.status === 'published').length}</h3>
+      {loading ? (
+       <div className="w-10 h-6 bg-gray-200 rounded animate-pulse"></div>
+      ) : (
+       <h3 className="text-xl font-black text-on-surface">{products.filter(p => p.status === 'published').length}</h3>
+      )}
       <p className="text-[10px] text-on-surface-variant mt-0.5">sản phẩm</p>
      </div>
     </div>
    </section>
+
+   {/* Error Banner */}
+   {!loading && categories.length === 0 && (
+    <div className="mb-6 p-4 bg-red-50 border-2 border-red-300 rounded-xl flex items-center gap-3">
+     <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
+     <div>
+      <p className="font-semibold text-red-700">Không thể tải danh mục</p>
+      <p className="text-sm text-red-600">Vui lòng kiểm tra server và thử refresh trang</p>
+     </div>
+     <button onClick={() => { loadCategories(); loadProducts(); }}
+      className="ml-auto px-3 py-1 bg-red-500 text-white text-sm rounded-lg hover:bg-red-600">
+      Thử lại
+     </button>
+    </div>
+   )}
 
    {/* AI Import Card */}
    <AIImportCard categories={categories} onImportSuccess={loadProducts} />

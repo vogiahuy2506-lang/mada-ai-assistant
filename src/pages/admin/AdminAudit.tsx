@@ -49,6 +49,7 @@ export function AdminAudit() {
   const [filterAction, setFilterAction] = useState('');
   const [filterUser, setFilterUser] = useState('');
   const [loading, setLoading] = useState(true);
+  const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -111,18 +112,18 @@ export function AdminAudit() {
   };
 
   const stats = [
-    { label: isEn ? 'TOTAL LOGS' : 'TỔNG LOG', value: total, color: 'from-primary/10 to-primary/5', iconColor: 'text-primary', icon: 'list_alt', iconBg: 'bg-primary/20' },
-    { label: isEn ? 'DISTINCT ACTIONS' : 'HÀNH ĐỘNG', value: actions.length, color: 'from-green-50/80 to-green-100/40', iconColor: 'text-green-600', icon: 'category', iconBg: 'bg-green-200' },
+    { label: isEn ? 'TOTAL EVENTS' : 'TỔNG SỰ KIỆN', value: total, color: 'from-primary/10 to-primary/5', iconColor: 'text-primary', icon: 'list_alt', iconBg: 'bg-primary/20' },
+    { label: isEn ? 'ACTION TYPES' : 'LOẠI HÀNH ĐỘNG', value: actions.length, color: 'from-green-50/80 to-green-100/40', iconColor: 'text-green-600', icon: 'category', iconBg: 'bg-green-200' },
     { label: isEn ? 'DISPLAYING' : 'ĐANG HIỂN THỊ', value: logs.length, color: 'from-blue-50/80 to-blue-100/40', iconColor: 'text-blue-600', icon: 'visibility', iconBg: 'bg-blue-200' },
     { label: isEn ? 'MAX LIMIT' : 'GIỚI HẠN', value: 200, color: 'from-purple-50/80 to-purple-100/40', iconColor: 'text-purple-600', icon: 'data_usage', iconBg: 'bg-purple-200' },
   ];
 
   return (
     <AdminLayout
-      title={isEn ? 'Audit Logs' : 'Audit Logs'}
-      titleEn="Audit Logs"
-      subtitle={isEn ? 'Track every admin action across the MADA AI system.' : 'Truy vết toàn bộ thao tác của admin trong hệ thống MADA AI.'}
-      subtitleEn="Track every admin action across the MADA AI system."
+      title={isEn ? 'Activity Logs' : 'Nhật ký Hoạt động'}
+      titleEn="Activity Logs"
+      subtitle={isEn ? 'Track every user & admin action across the MADA AI system.' : 'Truy vết mọi hành vi của người dùng & admin trong hệ thống MADA AI.'}
+      subtitleEn="Track every user & admin action across the MADA AI system."
       showLayoutTitle={false}
     >
       {/* Hero Banner */}
@@ -132,12 +133,12 @@ export function AdminAudit() {
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-purple-500/10 via-transparent to-transparent rounded-3xl"></div>
           <div className="max-w-2xl relative z-10 py-8 px-6">
             <h2 className="text-4xl font-black text-on-surface mb-4 tracking-tight">
-              {isEn ? 'Audit Logs' : 'Audit Logs'}
+              {isEn ? 'Activity Logs' : 'Nhật ký Hoạt động'}
             </h2>
             <p className="text-lg font-medium text-on-surface-variant border-l-4 border-purple-500 pl-6 py-2 bg-white/40 backdrop-blur-sm rounded-r-xl">
               {isEn
-                ? 'Every admin action (login, CRUD, crawl, ingest, approval, payment) is recorded in the audit_logs table.'
-                : 'Mọi thao tác admin (login, CRUD, crawl, ingest, approval, payment) đều được ghi lại tại bảng audit_logs.'}
+                ? 'Every user & admin action (login, CRUD, crawl, ingest, approval, payment) is recorded — track behaviour, audit changes, and investigate violations.'
+                : 'Mọi hành vi của người dùng & admin (đăng nhập, CRUD, crawl, ingest, duyệt, thanh toán) đều được ghi lại — theo dõi hành vi, truy vết thay đổi và điều tra vi phạm.'}
             </p>
           </div>
         </div>
@@ -229,90 +230,161 @@ export function AdminAudit() {
         </div>
       </div>
 
-      {/* Logs Table */}
-      <section className="bg-white/70 backdrop-blur-xl rounded-3xl border-[3px] border-black shadow-[6px_6px_0px_0px_#000] overflow-hidden">
+      {/* Logs List */}
+      <section className="relative bg-gradient-to-br from-white/80 to-white/40 backdrop-blur-xl rounded-3xl border-[3px] border-black shadow-[6px_6px_0px_0px_#000] overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-b from-white/40 to-transparent rounded-3xl pointer-events-none"></div>
+
         {loading ? (
-          <div className="p-16 text-center">
+          <div className="relative z-10 p-16 text-center">
             <RefreshCw className="w-8 h-8 mx-auto animate-spin text-purple-500" />
           </div>
         ) : logs.length === 0 ? (
-          <div className="p-16 text-center">
+          <div className="relative z-10 p-16 text-center">
             <span className="material-symbols-outlined text-7xl text-on-surface-variant/30 mb-3 inline-block" style={{ fontVariationSettings: "'FILL' 0" }}>history_edu</span>
             <p className="text-sm text-on-surface-variant mt-2">
-              {isEn ? 'No audit logs yet. Try logging in or performing CRUD actions.' : 'Chưa có audit log nào. Thử tạo thao tác (login, CRUD product, etc.)'}
+              {isEn ? 'No activity logs yet. Try logging in or performing CRUD actions.' : 'Chưa có nhật ký hoạt động nào. Thử tạo thao tác (login, CRUD product, etc.)'}
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-purple-500/5 text-left text-xs font-bold uppercase tracking-wider text-on-surface-variant border-b-2 border-black/10">
-                <tr>
-                  <th className="px-5 py-3">{isEn ? 'Time' : 'Thời gian'}</th>
-                  <th className="px-5 py-3">{isEn ? 'User' : 'User'}</th>
-                  <th className="px-5 py-3">{isEn ? 'Action' : 'Hành động'}</th>
-                  <th className="px-5 py-3">Target</th>
-                  <th className="px-5 py-3">Details</th>
-                  <th className="px-5 py-3">IP</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-outline-variant/50">
-                {logs.map((log) => (
-                  <tr key={log.id} className="hover:bg-purple-500/5 transition-colors">
-                    <td className="px-5 py-3 text-xs whitespace-nowrap">
-                      <div className="flex items-center gap-1.5 text-on-surface font-medium">
-                        <Clock className="w-3.5 h-3.5 text-on-surface-variant" />
-                        {formatDate(log.created_at)}
-                      </div>
-                    </td>
-                    <td className="px-5 py-3 text-xs">
-                      <div className="flex items-center gap-1.5">
-                        <div className="w-6 h-6 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white text-[10px] font-bold">
-                          <UserIcon className="w-3 h-3" />
-                        </div>
-                        <span className="font-mono text-on-surface">{log.user_id || '—'}</span>
-                      </div>
-                    </td>
-                    <td className="px-5 py-3">
-                      <span className={clsx(
-                        'inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border-2',
-                        badgeClass(log.action)
-                      )}>
-                        <span className="material-symbols-outlined text-[12px]" style={{ fontVariationSettings: "'FILL' 1" }}>
-                          {log.action.includes('delete') || log.action.includes('reject') ? 'cancel' :
-                           log.action.includes('create') || log.action.includes('approve') ? 'check_circle' :
-                           log.action.includes('update') || log.action.includes('edit') ? 'edit' :
-                           log.action.includes('login') ? 'login' :
-                           log.action.includes('crawl') || log.action.includes('ingest') ? 'cloud_download' :
-                           'bolt'}
-                        </span>
-                        {log.action}
+          <div className="relative z-10 divide-y divide-black/10">
+            {logs.map((log) => {
+              const isExpanded = expandedLogId === log.id;
+              return (
+                <div key={log.id} className="py-4 px-6 hover:bg-purple-500/5 transition-colors">
+                  <div className="flex items-start gap-4">
+                    {/* Action badge */}
+                    <span className={clsx(
+                      'inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border-2 shrink-0',
+                      badgeClass(log.action)
+                    )}>
+                      <span className="material-symbols-outlined text-[14px]" style={{ fontVariationSettings: "'FILL' 1" }}>
+                        {log.action.includes('delete') || log.action.includes('reject') ? 'cancel' :
+                         log.action.includes('create') || log.action.includes('approve') ? 'check_circle' :
+                         log.action.includes('update') || log.action.includes('edit') ? 'edit' :
+                         log.action.includes('login') ? 'login' :
+                         log.action.includes('logout') ? 'logout' :
+                         log.action.includes('crawl') || log.action.includes('ingest') ? 'cloud_download' :
+                         log.action.includes('payment') ? 'payments' :
+                         'bolt'}
                       </span>
-                    </td>
-                    <td className="px-5 py-3 text-xs font-mono text-on-surface-variant max-w-xs truncate">
-                      {log.target || '—'}
-                    </td>
-                    <td className="px-5 py-3 text-xs text-on-surface-variant max-w-md">
-                      {log.details ? (
-                        <details className="cursor-pointer">
-                          <summary className="text-purple-600 hover:text-purple-700 font-bold hover:underline inline-flex items-center gap-1">
-                            {isEn ? 'view JSON' : 'xem JSON'}
-                          </summary>
-                          <pre className="mt-2 text-[10px] bg-slate-50 border border-slate-200 p-3 rounded-lg overflow-x-auto font-mono">
+                      {log.action}
+                    </span>
+
+                    {/* Main info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <div className="flex items-center gap-1.5 text-on-surface-variant">
+                          <Clock className="w-3.5 h-3.5" />
+                          <span className="font-mono text-xs font-bold tabular-nums">{formatDate(log.created_at)}</span>
+                        </div>
+                        {log.user_id && (
+                          <span className="flex items-center gap-1 text-xs text-on-surface-variant">
+                            <div className="w-4 h-4 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white">
+                              <UserIcon className="w-2.5 h-2.5" />
+                            </div>
+                            <span className="font-mono">{log.user_id}</span>
+                          </span>
+                        )}
+                        {log.target && (
+                          <span className="font-mono text-xs text-on-surface-variant bg-gray-100 px-2 py-0.5 rounded border border-black/10 truncate max-w-xs">
+                            {log.target}
+                          </span>
+                        )}
+                      </div>
+                      {log.details && (
+                        <p className="text-xs text-on-surface-variant font-mono truncate">
+                          {log.details.replace(/\s+/g, ' ').slice(0, 200)}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Detail toggle */}
+                    <button
+                      onClick={() => setExpandedLogId(isExpanded ? null : log.id)}
+                      className={clsx(
+                        'shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border-2 border-black transition-all',
+                        isExpanded
+                          ? 'bg-purple-500 text-white shadow-[2px_2px_0px_0px_#000]'
+                          : 'bg-white text-on-surface hover:bg-purple-500/10 shadow-[2px_2px_0px_0px_#000] hover:shadow-[3px_3px_0px_0px_#000]'
+                      )}
+                    >
+                      <span className="material-symbols-outlined text-sm">
+                        {isExpanded ? 'expand_less' : 'expand_more'}
+                      </span>
+                      {isExpanded ? (isEn ? 'Close' : 'Thu gọn') : (isEn ? 'Details' : 'Chi tiết')}
+                    </button>
+                  </div>
+
+                  {isExpanded && (
+                    <div className="mt-4 ml-[1px] bg-gradient-to-br from-slate-50 to-white rounded-2xl border-2 border-black p-5 shadow-[4px_4px_0px_0px_#000]">
+                      {/* Summary grid */}
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+                        <div className="bg-white rounded-lg border border-black/10 p-3">
+                          <p className="text-[10px] uppercase font-bold tracking-wider text-on-surface-variant mb-1">ID</p>
+                          <p className="font-mono text-xs font-bold text-on-surface truncate">{log.id}</p>
+                        </div>
+                        <div className="bg-white rounded-lg border border-black/10 p-3">
+                          <p className="text-[10px] uppercase font-bold tracking-wider text-on-surface-variant mb-1">{isEn ? 'User' : 'User'}</p>
+                          <p className="font-mono text-xs font-bold text-on-surface truncate">{log.user_id || '—'}</p>
+                        </div>
+                        <div className="bg-white rounded-lg border border-black/10 p-3">
+                          <p className="text-[10px] uppercase font-bold tracking-wider text-on-surface-variant mb-1">{isEn ? 'Action' : 'Hành động'}</p>
+                          <p className={clsx('inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border', badgeClass(log.action))}>
+                            {log.action}
+                          </p>
+                        </div>
+                        <div className="bg-white rounded-lg border border-black/10 p-3">
+                          <p className="text-[10px] uppercase font-bold tracking-wider text-on-surface-variant mb-1">IP Address</p>
+                          <p className="font-mono text-xs font-bold text-on-surface">{log.ip_address || '—'}</p>
+                        </div>
+                      </div>
+
+                      {/* Target */}
+                      {log.target && (
+                        <div className="mb-4">
+                          <h5 className="text-xs font-black uppercase tracking-wider text-on-surface mb-2 flex items-center gap-1.5">
+                            <span className="material-symbols-outlined text-sm">target</span>
+                            {isEn ? 'Target / Resource' : 'Đối tượng'}
+                          </h5>
+                          <div className="bg-white rounded-lg border border-black/10 p-3 font-mono text-xs text-on-surface break-all">
+                            {log.target}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* User-Agent */}
+                      {log.user_agent && (
+                        <div className="mb-4">
+                          <h5 className="text-xs font-black uppercase tracking-wider text-on-surface mb-2 flex items-center gap-1.5">
+                            <span className="material-symbols-outlined text-sm">devices</span>
+                            {isEn ? 'User Agent (Browser / Device)' : 'Thiết bị / Trình duyệt'}
+                          </h5>
+                          <div className="bg-white rounded-lg border border-black/10 p-3 font-mono text-[11px] text-on-surface-variant break-all">
+                            {log.user_agent}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Raw details JSON */}
+                      {log.details && (
+                        <div>
+                          <h5 className="text-xs font-black uppercase tracking-wider text-on-surface mb-2 flex items-center gap-1.5">
+                            <span className="material-symbols-outlined text-sm">data_object</span>
+                            {isEn ? 'Change Payload (JSON)' : 'Dữ liệu thay đổi (JSON)'}
+                          </h5>
+                          <pre className="bg-slate-900 rounded-lg p-3 font-mono text-xs text-emerald-300 break-all whitespace-pre-wrap border-2 border-black overflow-x-auto">
                             {(() => {
                               try { return JSON.stringify(JSON.parse(log.details), null, 2); }
                               catch { return log.details; }
                             })()}
                           </pre>
-                        </details>
-                      ) : '—'}
-                    </td>
-                    <td className="px-5 py-3 text-xs font-mono text-on-surface-variant">
-                      {log.ip_address || '—'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </section>

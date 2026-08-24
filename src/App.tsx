@@ -17,10 +17,10 @@ const lazyNamed = <T,>(name: keyof T & string, loader: () => Promise<MaybeDefaul
 const ChatPage = lazyNamed<{ ChatPage: typeof import('@/pages/ChatPage').ChatPage }>('ChatPage', () => import('@/pages/ChatPage'));
 const AdminOverview = lazyNamed<{ AdminOverview: typeof import('@/pages/admin/AdminOverview').AdminOverview }>('AdminOverview', () => import('@/pages/admin/AdminOverview'));
 const AdminUsers = lazyNamed<{ AdminUsers: typeof import('@/pages/admin/AdminUsers').AdminUsers }>('AdminUsers', () => import('@/pages/admin/AdminUsers'));
-const AdminLogs = lazyNamed<{ AdminLogs: typeof import('@/pages/admin/AdminLogs').AdminLogs }>('AdminLogs', () => import('@/pages/admin/AdminLogs'));
 const AdminAnalytics = lazyNamed<{ AdminAnalytics: typeof import('@/pages/admin/AdminAnalytics').AdminAnalytics }>('AdminAnalytics', () => import('@/pages/admin/AdminAnalytics'));
 const AdminSettings = lazyNamed<{ AdminSettings: typeof import('@/pages/admin/AdminSettings').AdminSettings }>('AdminSettings', () => import('@/pages/admin/AdminSettings'));
 const AdminAgents = lazyNamed<{ AdminAgents: typeof import('@/pages/admin/AdminAgents').AdminAgents }>('AdminAgents', () => import('@/pages/admin/AdminAgents'));
+const AdminPrompts = lazyNamed<{ AdminPrompts: typeof import('@/pages/admin/AdminPrompts').AdminPrompts }>('AdminPrompts', () => import('@/pages/admin/AdminPrompts'));
 const AdminConsultations = lazyNamed<{ AdminConsultations: typeof import('@/pages/admin/AdminConsultations').AdminConsultations }>('AdminConsultations', () => import('@/pages/admin/AdminConsultations'));
 const AdminProducts = lazyNamed<{ AdminProducts: typeof import('@/pages/admin/AdminProducts').AdminProducts }>('AdminProducts', () => import('@/pages/admin/AdminProducts'));
 const AdminScraper = lazyNamed<{ AdminScraper: typeof import('@/pages/admin/AdminScraper').AdminScraper }>('AdminScraper', () => import('@/pages/admin/AdminScraper'));
@@ -113,7 +113,7 @@ function App() {
             path="/admin/logs"
             element={
               <RoleGuard requiredRole="admin">
-                <AdminLogs />
+                <AdminAudit />
               </RoleGuard>
             }
           />
@@ -150,6 +150,14 @@ function App() {
             }
           />
           <Route
+            path="/admin/prompts"
+            element={
+              <RoleGuard requiredRole="admin">
+                <AdminPrompts />
+              </RoleGuard>
+            }
+          />
+          <Route
             path="/admin/products"
             element={
               <RoleGuard requiredRole="admin">
@@ -165,20 +173,13 @@ function App() {
               </RoleGuard>
             }
           />
-          <Route
-            path="/admin/audit"
-            element={
-              <RoleGuard requiredRole="admin">
-                <AdminAudit />
-              </RoleGuard>
-            }
-          />
           {/* Legacy admin routes - redirect */}
           <Route path="/admin/roles" element={<Navigate to="/admin/users" replace />} />
           <Route path="/admin/ai" element={<Navigate to="/admin/settings" replace />} />
           <Route path="/admin/stats" element={<Navigate to="/admin/analytics" replace />} />
           <Route path="/admin/deploy" element={<Navigate to="/admin/settings" replace />} />
           <Route path="/admin/crawler" element={<Navigate to="/admin/scraper" replace />} />
+          <Route path="/admin/audit" element={<Navigate to="/admin/logs" replace />} />
         </Routes>
       </Suspense>
 

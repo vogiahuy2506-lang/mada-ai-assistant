@@ -350,6 +350,111 @@ router.post('/products/:id/publish', requireAdmin, async (req, res) => {
   }
 });
 
+// ============== BULK PUBLISH (FAST) ==============
+// POST /api/admin/products/bulk-publish
+// Body: { ids?: string[], scope?: 'all_unpublished' | 'selected' }
+// - Nếu scope='all_unpublished' → publish tất cả SP đang không phải 'published'
+// - Nếu scope='selected' → publish theo ids[]
+// ⭐ Tối ưu: UPDATE + sync knowledge_items chạy song song (Promise.all),
+//   vector embedding chạy nền (fire-and-forget) → response trả về ngay trong <1s
+router.post('/products/bulk-publish', requireAdmin, async (req, res) => {
+  try {
+    const { ids, scope = 'selected' } = req.body || {};
+    const now = new Date().toISOString();
+
+    let targetIds: string[] = [];
+    if (scope === 'all_unpublished') {
+      const rows = db.prepare("SELECT id FROM kb_products WHERE status != 'published'").all() as { id: string }[];
+      targetIds = rows.map((r) => r.id);
+    } else if (Array.isArray(ids) && ids.length > 0) {
+      targetIds = ids;
+    } else {
+      return res.status(400).json({ success: false, error: 'ids[] hoặc scope=all_unpublished là bắt buộc' });
+    }
+
+    if (targetIds.length === 0) {
+      return res.json({ success: true, updated: 0, message: 'Không có sản phẩm nào cần cập nhật' });
+    }
+
+    // 1) UPDATE status='published' cho tất cả trong1 lệnh SQL
+    const placeholders = targetIds.map(() => '?').join(',');
+    const updateResult = db.prepare(
+      `UPDATE kb_products SET status = 'published', updated_at = ? WHERE id IN (${placeholders})`
+    ).run(now, ...targetIds);
+
+    // 2) Sync sang knowledge_items song song (nhanh - chỉ SQL)
+    const syncResults: { id: string; action: string; knowledge_item_id?: string; error?: string }[] = [];
+    await Promise.all(
+      targetIds.map(async (id) => {
+        try {
+          const product = db.prepare('SELECT * FROM kb_products WHERE id = ?').get(id) as any;
+          if (!product) {
+            syncResults.push({ id, action: 'skip', error: 'not_found' });
+            return;
+          }
+          const r = syncProductToKnowledge(product);
+          syncResults.push({ id, action: r.action, knowledge_item_id: r.knowledge_item_id });
+          // 3) Vector sync chạy nền (fire-and-forget) - không block response
+          if (r.knowledge_item_id) {
+            syncItemToVector(r.knowledge_item_id)
+              .then((v) => console.log(`🔎 [bulk-publish] Vector ${id} → ${v.indexed ? '✅' : '❌ ' + v.error}`))
+              .catch((e) => console.error(`⚠️ [bulk-publish] Vector ${id} failed:`, e?.message));
+          }
+        } catch (e: any) {
+          syncResults.push({ id, action: 'error', error: e?.message });
+        }
+      })
+    );
+
+    res.json({
+      success: true,
+      updated: updateResult.changes,
+      scope,
+      sync: syncResults,
+      message: `Đã đăng ${updateResult.changes} sản phẩm (vector sync đang chạy nền)`,
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// POST /api/admin/products/bulk-unpublish
+// Body: { ids?: string[], scope?: 'all_published' | 'selected' }
+router.post('/products/bulk-unpublish', requireAdmin, (req, res) => {
+  try {
+    const { ids, scope = 'selected' } = req.body || {};
+    const now = new Date().toISOString();
+
+    let targetIds: string[] = [];
+    if (scope === 'all_published') {
+      const rows = db.prepare("SELECT id FROM kb_products WHERE status = 'published'").all() as { id: string }[];
+      targetIds = rows.map((r) => r.id);
+    } else if (Array.isArray(ids) && ids.length > 0) {
+      targetIds = ids;
+    } else {
+      return res.status(400).json({ success: false, error: 'ids[] hoặc scope=all_published là bắt buộc' });
+    }
+
+    if (targetIds.length === 0) {
+      return res.json({ success: true, updated: 0, message: 'Không có sản phẩm nào cần cập nhật' });
+    }
+
+    const placeholders = targetIds.map(() => '?').join(',');
+    const updateResult = db.prepare(
+      `UPDATE kb_products SET status = 'draft', updated_at = ? WHERE id IN (${placeholders})`
+    ).run(now, ...targetIds);
+
+    res.json({
+      success: true,
+      updated: updateResult.changes,
+      scope,
+      message: `Đã bỏ đăng ${updateResult.changes} sản phẩm`,
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // ============== ADMIN AGENTS ==============
 
 // GET /api/admin/agents
@@ -1037,33 +1142,107 @@ router.delete('/users/:id', requireAdmin, (req, res) => {
   }
 });
 
-// POST /api/admin/users - Create new user manually
+// POST /api/admin/users/:id/reset-password - Reset password & return new temp password
+router.post('/users/:id/reset-password', requireAdmin, (req, res) => {
+  try {
+    const { id } = req.params;
+    const user = db.prepare('SELECT id, email FROM users WHERE id = ?').get(id);
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'User không tồn tại' });
+    }
+
+    const generateTempPassword = () => {
+      const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+      const lower = 'abcdefghjkmnpqrstuvwxyz';
+      const digit = '23456789';
+      const all = upper + lower + digit;
+      let pwd =
+        upper.charAt(Math.floor(Math.random() * upper.length)) +
+        lower.charAt(Math.floor(Math.random() * lower.length)) +
+        digit.charAt(Math.floor(Math.random() * digit.length));
+      for (let i = 0; i < 9; i++) {
+        pwd += all.charAt(Math.floor(Math.random() * all.length));
+      }
+      // Shuffle to avoid predictable positions
+      return pwd.split('').sort(() => Math.random() - 0.5).join('');
+    };
+    const tempPassword = generateTempPassword();
+
+    const { hashPassword } = require('../lib/auth');
+    const passwordHash = hashPassword(tempPassword);
+    const now = new Date().toISOString();
+
+    db.prepare('UPDATE users SET password_hash = ?, updated_at = ?, must_reset_password = 1 WHERE id = ?')
+      .run(passwordHash, now, id);
+
+    res.json({
+      success: true,
+      data: {
+        id,
+        email: user.email,
+        tempPassword,
+        message: 'Đã reset mật khẩu. Nhân viên nên đổi MK khi đăng nhập lần đầu.',
+      },
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// POST /api/admin/users - Create new user manually (returns temp password)
 router.post('/users', requireAdmin, (req, res) => {
   try {
-    const { email, name, password, role = 'user' } = req.body;
-    
-    if (!email || !name || !password) {
-      return res.status(400).json({ success: false, error: 'Email, name, password là bắt buộc' });
+    const { email, name, password, role = 'user', plan = 'free' } = req.body;
+
+    if (!email || !name) {
+      return res.status(400).json({ success: false, error: 'Email và tên là bắt buộc' });
     }
-    
+
     const normalizedEmail = email.trim().toLowerCase();
     const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(normalizedEmail);
     if (existing) {
-      return res.status(409).json({ success: false, error: 'Email đã tồn tại' });
+      return res.status(409).json({ success: false, error: 'Email đã tồn tại trong hệ thống' });
     }
-    
+
+    // Generate temp password if not provided (or use provided one)
+    let tempPassword = password;
+    let isGenerated = false;
+    if (!tempPassword) {
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+      tempPassword = '';
+      for (let i = 0; i < 12; i++) {
+        tempPassword += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      isGenerated = true;
+    } else if (tempPassword.length < 6) {
+      return res.status(400).json({ success: false, error: 'Mật khẩu phải tối thiểu 6 ký tự' });
+    }
+
     const { hashPassword } = require('../lib/auth');
     const id = `user-${uuidv4()}`;
-    const passwordHash = hashPassword(password);
+    const passwordHash = hashPassword(tempPassword);
     const now = new Date().toISOString();
-    
+
+    // quota based on plan
+    const quotaLimit = plan === 'enterprise' ? 999999 : plan === 'pro' ? 1000 : 10;
+
     db.prepare(`
-      INSERT INTO users (id, email, name, password_hash, role, plan, status, provider, quota_used, quota_limit, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, 'free', 'active', 'email', 0, 10, ?, ?)
-    `).run(id, normalizedEmail, name.trim(), passwordHash, role, now, now);
-    
+      INSERT INTO users (id, email, name, password_hash, role, plan, status, provider, quota_used, quota_limit, must_reset_password, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, 'active', 'email', 0, ?, ?, ?, ?)
+    `).run(id, normalizedEmail, name.trim(), passwordHash, role, plan, quotaLimit, isGenerated ? 1 : 0, now, now);
+
     const user = db.prepare('SELECT id, email, name, role, plan, status FROM users WHERE id = ?').get(id);
-    res.status(201).json({ success: true, data: user });
+    res.status(201).json({
+      success: true,
+      data: {
+        ...user,
+        tempPassword,
+        passwordGenerated: isGenerated,
+        message: isGenerated
+          ? 'Tạo tài khoản thành công. Vui lòng gửi mật khẩu cho nhân viên qua kênh bảo mật.'
+          : 'Tạo tài khoản thành công.',
+      },
+    });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
   }

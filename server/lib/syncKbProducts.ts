@@ -189,8 +189,8 @@ function insertKnowledgeItemWithContent(
       id, title, description, content, source, source_type, url,
       category, iso_codes, wcag_level, who_gate_area,
       auto_classified, confidence, status, chunk_count, language,
-      metadata, indexed, indexed_at, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0.8, ?, 1, ?, ?, 0, NULL, ?, ?)
+      metadata, indexed, indexed_at, created_by, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0.8, ?, 1, ?, ?, 0, NULL, NULL, ?, ?)
   `).run(
     id,
     product.title,

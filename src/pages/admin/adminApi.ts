@@ -191,6 +191,21 @@ export const adminApi = {
   async publishProduct(id: string, status: 'published' | 'draft' | 'archived') {
     return request<{ success: boolean; data?: Product }>(`/admin/products/${id}/publish`, { method: 'POST', body: JSON.stringify({ status }) });
   },
+  // ⚠️ Bulk endpoints return flat shape (không wrap trong `data`):
+  //   { success: boolean, updated, scope, sync?, message, error? }
+  // → Cast trực tiếp để frontend dùng .updated / .message / .error ngay
+  async bulkPublish(payload: { ids?: string[]; scope?: 'all_unpublished' | 'selected' }) {
+    return (await request<any>(
+      `/admin/products/bulk-publish`,
+      { method: 'POST', body: JSON.stringify(payload) }
+    )) as { success: boolean; updated: number; scope: string; sync: any[]; message: string; error?: string };
+  },
+  async bulkUnpublish(payload: { ids?: string[]; scope?: 'all_published' | 'selected' }) {
+    return (await request<any>(
+      `/admin/products/bulk-unpublish`,
+      { method: 'POST', body: JSON.stringify(payload) }
+    )) as { success: boolean; updated: number; scope: string; message: string; error?: string };
+  },
 
   // ============== AGENTS ==============
   async getAgents() {
@@ -302,10 +317,9 @@ export const adminApi = {
 
   // ============== URL IMPORT / SCRAPE METADATA ==============
   async scrapeUrlMetadata(url: string) {
-    return request<{
-      success: boolean;
-      data?: { title: string; description: string; image: string; siteName: string; url: string };
-    }>(`/scraper/import-url/metadata?url=${encodeURIComponent(url)}`);
+    return request<{ title: string; description: string; image: string; siteName: string; url: string }>(
+      `/scraper/import-url/metadata?url=${encodeURIComponent(url)}`
+    );
   },
 
   // ============== AUDIT LOGS ==============
@@ -335,5 +349,30 @@ export const adminApi = {
         body: JSON.stringify(payload),
       }
     );
+  },
+
+  // ============== SYSTEM PROMPTS ==============
+  async getPrompts() {
+    return request<{
+      data: Array<{
+        key: string;
+        name: string;
+        description: string;
+        defaultValue: string;
+        currentValue: string;
+      }>;
+    }>('/admin/prompts');
+  },
+  async updatePrompt(key: string, value: string) {
+    return request<{ success: boolean }>(`/admin/prompts/${key}`, {
+      method: 'PUT',
+      body: JSON.stringify({ value }),
+    });
+  },
+  async resetPrompt(key: string) {
+    return request<{ success: boolean }>(`/admin/prompts/${key}`, { method: 'DELETE' });
+  },
+  async resetAllPrompts() {
+    return request<{ success: boolean }>('/admin/prompts', { method: 'DELETE' });
   },
 };

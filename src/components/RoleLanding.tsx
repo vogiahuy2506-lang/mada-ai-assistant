@@ -25,15 +25,17 @@ export function RoleLanding() {
     }
 
     if (googleAuth === 'success' && accessToken && refreshToken && expiresAt) {
-      // Process Google OAuth login
-      loginWithGoogle({ accessToken, refreshToken, expiresAt });
+      // Process Google OAuth login then mark ready
+      loginWithGoogle({ accessToken, refreshToken, expiresAt })
+        .catch((err) => console.error('Google login failed:', err))
+        .finally(() => setReady(true));
       return;
     }
 
     // Đợi 1 tick để store hydrate từ localStorage
     const id = setTimeout(() => setReady(true), 100);
     return () => clearTimeout(id);
-  }, [searchParams]);
+  }, [searchParams, loginWithGoogle, navigate]);
 
   if (!ready) {
     return (

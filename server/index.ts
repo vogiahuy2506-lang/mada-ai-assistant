@@ -10,6 +10,9 @@ import dotenv from 'dotenv';
 import { v4 as uuidv4 } from 'uuid';
 import session from 'express-session';
 
+// ============== SYSTEM PROMPTS MODULE ==============
+import { buildSystemPrompt, CATEGORY_LABELS } from './lib/prompts/systemPrompts';
+
 // ============== HELPERS ==============
 
 /**
@@ -79,6 +82,7 @@ import productsRoutes from './routes/products';
 import consultationRoutes from './routes/consultation';
 import adminRoutes from './routes/admin';
 import adminScraperRoutes from './routes/admin-scraper';
+import promptsRoutes from './routes/prompts';
 import urlImportRoutes from './routes/urlImport';
 import publicRoutes from './routes/public';
 
@@ -467,6 +471,7 @@ app.use('/api/admin', approvalRoutes);
 app.use('/api/consultation', consultationRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/admin/scraper', adminScraperRoutes);
+app.use('/api/admin/prompts', promptsRoutes);
 // Public routes (no auth required)
 app.use('/api/public', publicRoutes);
 app.get('/api/admin/logs', async (req, res) => {
@@ -2264,9 +2269,7 @@ const MODE_PERSONA_INSTRUCTIONS: Record<string, Record<'endUser' | 'specialist',
 };
 
 /**
- * Lấy system instruction chuẩn cho ngôn ngữ (fallback về 'vi' nếu unknown).
- * Có thể append agentPrompt sau (optional).
- *
+ * ⭐ Lấy system instruction từ module prompts
  * Hỗ trợ 2 persona:
  *   - 'endUser' (mặc định): giọng đời thường, thân thiện
  *   - 'specialist': thuật ngữ kỹ thuật, dẫn chứng tiêu chuẩn
@@ -2276,13 +2279,7 @@ function getSystemInstruction(
   agentPrompt?: string,
   userMode: 'endUser' | 'specialist' = 'endUser'
 ): string {
-  const langCode = (['vi', 'en', 'ar', 'fr'].includes(lang) ? lang : 'vi') as 'vi' | 'en' | 'ar' | 'fr';
-  const base = FULL_LANGUAGE_INSTRUCTIONS[langCode];
-
-  // Thêm persona overlay theo chế độ người dùng
-  const personaOverlay = MODE_PERSONA_INSTRUCTIONS[langCode]?.[userMode] || MODE_PERSONA_INSTRUCTIONS.vi.endUser;
-
-  return agentPrompt ? `${base}\n\n${personaOverlay}\n\n${agentPrompt}` : `${base}\n\n${personaOverlay}`;
+  return buildSystemPrompt(lang, userMode, agentPrompt);
 }
 
 /**

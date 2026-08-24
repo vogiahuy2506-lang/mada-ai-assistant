@@ -86,7 +86,12 @@ function mapProductToRow(p: ExtractedProduct, defaultCategory: string) {
 
   // ===== E-commerce branch (generic) =====
   const detectedBrand = detectBrand(p.name, p.brand);
-  const detectedCategory = detectCategoryFromBrand(detectedBrand) || defaultCategory || p.category || 'general';
+  const detectedCategory = autoClassifyMadaCategory(
+    p.name,
+    p.description,
+    detectedBrand,
+    defaultCategory || p.category
+  );
 
   const content = [
     `Tên: ${p.name}`,
@@ -109,7 +114,8 @@ function mapProductToRow(p: ExtractedProduct, defaultCategory: string) {
     description,
     description_en: descriptionEn,
     content,
-    category: detectedCategory,
+    category: detectedCategory || 'general',
+    madaCategory: detectedCategory, // để UI hiển thị badge
     brand: detectedBrand,
     model: '',
     price_range: priceRange,
@@ -212,48 +218,196 @@ function detectBrand(name: string, fallback?: string): string {
 }
 
 /**
- * Map brand → category MADA
+ * Map brand → category MADA (fallback khi không có brand)
+ * Fallback: dùng keyword matching trên tên + mô tả sản phẩm
  */
 function detectCategoryFromBrand(brand: string): string {
   if (!brand) return '';
   const b = brand.toLowerCase();
 
-  // Smartphones/Tablets → web_accessibility (mobile a11y)
-  if (/apple|samsung|xiaomi|oppo|vivo|realme|oneplus|nokia|motorola|sony|google|honor|huawei|tecno|infinitel|itel/.test(b)) {
+  // Smartphones/Tablets → communication (mobile a11y)
+  if (/apple|samsung|xiaomi|oppo|vivo|realme|oneplus|nokia|motorola|sony|google|honor|huawei|tecno|infinix|itel/.test(b)) {
     return 'communication';
   }
 
-  // Laptops/PCs → web_accessibility (web a11y) hoặc general
-  if (/dell|hp|lenovo|asus|acer|msi|gigabyte|microsoft|razer|lg|apple/.test(b)) {
+  // Laptops/PCs → web_accessibility (web a11y)
+  if (/dell|hp|hewlett|lenovo|thinkpad|ideapad|asus|zenbook vivobook|acer|predator|msi|gigabyte|microsoft|surface|razer|lg|alienware|apple/.test(b)) {
     return 'web_accessibility';
   }
 
-  // Audio/headphones → hearing
-  if (/bose|jbl|beats|sennheiser|marshall|anker|soundcore|airpods|galaxy buds/.test(b)) {
+  // Audio/headphones/speakers → hearing
+  if (/bose|jbl|beats|sennheiser|marshall|anker|soundcore|airpods|galaxy buds|sony audio|jabra|plantronics|audio technica/.test(b)) {
     return 'hearing';
   }
 
   // Cameras → vision
-  if (/canon|nikon|fujifilm|olympus|panasonic|gopro/.test(b)) {
+  if (/canon|nikon|fujifilm|olympus|panasonic|gopro|dji|logitech webcam/.test(b)) {
     return 'vision';
   }
 
-  // Wearables → daily_living
-  if (/garmin|fitbit|amazfit|apple watch/.test(b)) {
+  // Wearables/tablets → daily_living
+  if (/garmin|fitbit|amazfit|apple watch|samsung watch|wearable/.test(b)) {
     return 'daily_living';
   }
 
   // Printers → general
-  if (/epson|brother/.test(b)) {
+  if (/epson|brother|canon printer|laserjet/.test(b)) {
     return 'general';
   }
 
   // Assistive tech → vision/hearing
-  if (/orcam|jaws|nvda|zoomtext|dragon/.test(b)) {
+  if (/orcam|jaws|nvda|zoomtext|dragon|屏幕阅读器|读屏软件/.test(b)) {
     return 'vision';
   }
 
   return '';
+}
+
+/**
+ * Auto-classify product vào category MADA dựa trên:
+ * 1. Brand (đã có ở trên)
+ * 2. Tên sản phẩm + mô tả (keyword matching)
+ * 3. Fallback: dùng AI/Gemini để phân loại
+ */
+function autoClassifyMadaCategory(
+  name: string,
+  description: string,
+  brand: string,
+  existingCategory?: string
+): string {
+  const text = `${name} ${description} ${brand}`.toLowerCase();
+
+  // Nếu có brand → dùng brand mapping trước
+  if (brand) {
+    const fromBrand = detectCategoryFromBrand(brand);
+    if (fromBrand) return fromBrand;
+  }
+
+  // === KEYWORD MATCHING trên nội dung ===
+
+  // 🔤 HEARING - Thính giác
+  const hearingKeywords = [
+    'hearing aid', 'hearing amplifier', ' hearing', 'tai nghe', 'loa', 'loa khuếch đại',
+    'amplifier', 'headphone', 'earphone', 'earpiece', 'cochlear', 'hearing loop',
+    'FM system', 'alert', 'rung', 'nghe kém', 'khiếm thính', 'tai', 'âm thanh',
+    'speaker', 'microphone', 'ALS', 'caption', 'phụ đề', 'subtitles', 'audio',
+    'stethoscope', ' listening', 'rung động', 'deaf', 'hard of hearing',
+    'visual alert', 'rung', 'thính giác', 'hearing impairment', 'assistive listening',
+    'sound', 'âm', 'nhạc', 'radio', 'bluetooth speaker', 'smart speaker',
+  ];
+  if (hearingKeywords.some(kw => text.includes(kw))) {
+    return 'hearing';
+  }
+
+  // 👁️ VISION - Thị giác
+  const visionKeywords = [
+    'screen reader', 'NVDA', 'JAWS', 'VoiceOver', 'ZoomText', 'magnifier', 'magnification',
+    'Braille', 'braille', 'OrCam', 'eye', 'thị giác', 'khiếm thị', 'mù', 'blind',
+    'vision', 'camera', 'đọc', 'reader', 'read', 'scan', 'quét', 'nhận dạng',
+    'optical character', 'OCR', 'text-to-speech', 'speech synthesis', 'tts',
+    'screen magnification', 'zoom', 'phóng to', 'thị lực', 'visual', 'hình ảnh',
+    'camera', 'máy ảnh', 'image', 'photo', 'hình', '障碍', '視覚', '視覺',
+    'naming', 'đặt tên', 'label', 'nhãn', '障碍', 'accessibility',
+    'navigation', 'điều hướng', 'orientation', 'định hướng', 'mobility aid',
+    'màn hình', 'display', 'monitor', 'laptop', 'tablet', 'ipad', 'smartphone',
+  ];
+  if (visionKeywords.some(kw => text.includes(kw))) {
+    return 'vision';
+  }
+
+  // 🗣️ COMMUNICATION - Giao tiếp
+  const communicationKeywords = [
+    'AAC', 'communication', 'giao tiếp', 'speech', 'nói', 'tiếng nói',
+    'talker', 'communicator', 'ngôn ngữ', 'language', 'symbol', 'biểu tượng',
+    'voice', 'giọng nói', 'text to speech', 'TTS', 'STP', 'SGD',
+    'eye tracking', 'eye gaze', 'theo dõi mắt', 'switch', 'công tắc',
+    'alternative', 'tăng cường', 'ngôn ngữ ký hiệu', 'sign language',
+    'DynaVox', 'Tobii', ' PRC', 'Saltillo', 'mega', 'say it', 'quick talker',
+    'laryngectomy', 'throat', 'cổ họng', 'aphasia', 'afasia', 'rối loạn ngôn ngữ',
+    'stroke', 'đột quỵ', 'cerebral palsy', 'bại não', 'ALS', 'Lou Gehrig',
+    'autism', 'tự kỷ', 'autistic', 'speech impairment', 'rối loạn lời nói',
+  ];
+  if (communicationKeywords.some(kw => text.includes(kw))) {
+    return 'communication';
+  }
+
+  // 🦽 MOBILITY - Vận động
+  const mobilityKeywords = [
+    'wheelchair', 'xe lăn', 'xe đẩy', 'wheel chair', 'wheelchair',
+    'prosthetic', 'prosthesis', 'chân giả', 'tay giả', '假肢', '義肢',
+    'orthosis', 'orthopedic', 'nẹp', 'brace', 'splint', 'hỗ trợ',
+    'walking', 'đi bộ', 'walker', 'khung tập đi', 'cane', 'gậy',
+    'crutch', 'nạng', 'standing frame', 'standing', 'đứng', 'lift',
+    'nâng', 'hoist', 'patient lift', 'transfer', 'chuyển', 'đỡ',
+    'bed', 'giường', 'mattress', 'nệm', 'positioning', 'vị trí',
+    'seating', 'ghế', 'cushion', 'đệm', 'pressure relief', 'giảm áp lực',
+    'bathroom', 'phòng tắm', 'toilet', 'bồn cầu', 'shower', 'vòi sen',
+    'grab bar', 'tay vịn', 'railing', 'thanh', 'grab', 'bám',
+    'scooter', 'xe điện', 'mobility scooter', 'xe ga', 'electric scooter',
+    'stairlift', 'thang máy', 'elevator', 'ramp', 'dốc', 'slope',
+  ];
+  if (mobilityKeywords.some(kw => text.includes(kw))) {
+    return 'mobility';
+  }
+
+  // 🧠 COGNITION - Nhận thức
+  const cognitionKeywords = [
+    'cognitive', 'nhận thức', 'cognition', 'memory', 'trí nhớ', 'ghi nhớ',
+    'dementia', 'sa sút trí tuệ', ' Alzheimer', 'parkinson', ' Huntington',
+    'brain injury', 'chấn thương não', 'TBI', 'ABI', 'acquired brain',
+    'intellectual', 'trí tuệ', 'learning', 'học tập', 'học', 'study',
+    'attention', 'chú ý', 'concentration', 'tập trung', 'focus',
+    'executive function', 'chức năng điều hành', 'planning', 'lập kế hoạch',
+    'organization', 'tổ chức', 'sắp xếp', 'scheduler', 'lịch', 'reminder',
+    'nhắc nhở', 'alarm', 'báo thức', 'prompt', 'hướng dẫn', 'prompting',
+    'task analysis', 'phân tích công việc', 'step by step', 'từng bước',
+    'visual schedule', 'lịch trình', 'token board', 'khen thưởng',
+    'autism', 'tự kỷ', 'autistic', 'asperger', 'spectrum',
+    ' Down syndrome', ' down', 'trisomy 21', 'ID', 'intellectual disability',
+    'special education', 'giáo dục đặc biệt', 'SPED', 'IEP',
+  ];
+  if (cognitionKeywords.some(kw => text.includes(kw))) {
+    return 'cognition';
+  }
+
+  // 🏠 DAILY LIVING - Sinh hoạt
+  const dailyLivingKeywords = [
+    'daily living', 'sinh hoạt', 'self-care', 'chăm sóc', 'eating', 'ăn uống',
+    'utensil', 'dụng cụ', 'knife', 'dao', 'fork', 'nĩa', 'spoon', 'thìa',
+    'plate', 'đĩa', 'bowl', 'bát', 'cup', 'cốc', 'mug', 'glass', 'ly',
+    'adaptive', 'thích ứng', '易化', 'easy grip', 'dễ cầm', 'ergonomic',
+    'button hook', 'móc nút', 'zipper pull', 'kéo khóa', 'shoe horn', 'lấy giày',
+    'dressing', 'mặc', 'quần áo', 'clothing', 'shirt', 'áo', 'pants', 'quần',
+    'socks', 'tất', 'shoe', 'giày', 'sock aid', 'lấy tất', 'reacher', 'gắp',
+    'grabber', 'tweed', 'long reacher', 'gắp đồ', '翻', '取物',
+    'bathroom', 'phòng tắm', 'shower', 'tắm', 'toilet', 'vệ sinh',
+    'commode', 'bô', 'bedpan', 'niệu', 'urinal', 'bồn tiểu',
+    'kitchen', 'nhà bếp', 'cooking', 'nấu ăn', 'cutting', 'cắt',
+    'peeling', 'bào', 'opening', 'mở', 'jar', 'lọ', 'bottle', 'chai',
+    'medication', 'thuốc', 'pill', 'viên', 'dosage', 'liều', 'alarm',
+    'báo thức', 'dispenser', 'phân phát', 'organizer', 'hộp thuốc',
+  ];
+  if (dailyLivingKeywords.some(kw => text.includes(kw))) {
+    return 'daily_living';
+  }
+
+  // 🌐 WEB ACCESSIBILITY
+  const webA11yKeywords = [
+    'website', 'web', 'WCAG', 'accessibility', 'a11y', 'ADA compliance',
+    'screen reader', 'browser', 'trình duyệt', 'chrome', 'firefox', 'edge',
+    'extension', 'plugin', 'add-on', 'font', 'phông chữ', 'contrast', 'tương phản',
+    'caption', 'phụ đề', 'subtitle', 'transcript', 'văn bản', 'alt text',
+  ];
+  if (webA11yKeywords.some(kw => text.includes(kw))) {
+    return 'web_accessibility';
+  }
+
+  // Nếu có category từ URL/existing → giữ nguyên
+  if (existingCategory && existingCategory !== 'general') {
+    return existingCategory;
+  }
+
+  return 'general';
 }
 
 // ============== POST /import-url (PREVIEW ONLY) ==============

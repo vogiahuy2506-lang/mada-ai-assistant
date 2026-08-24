@@ -4,10 +4,11 @@ import { useChatStore, useChatHistoryStore, useLanguageStore, useAuthStore, useA
 import madaLogo from '@/assets/mada-logo.png';
 import { QuotaIndicator } from '@/components/auth/QuotaIndicator';
 import { ProductCard } from '@/components/ProductCard';
+import { AgentCustomizer } from '@/components/chat/AgentCustomizer';
 import {
   Send, Plus, User, History, Mic,
   Trash2, Volume2, ChevronDown, Check, Copy, ThumbsUp, ThumbsDown,
-  Speaker, BookOpen, Bot as BotIcon, HelpCircle, ChevronRight,
+  Speaker, BookOpen, Bot as BotIcon, ChevronRight,
   FileText, Video, Mic2, ImageIcon, File, X,
   MessageCircle,
   LogOut, Sparkles,
@@ -851,6 +852,7 @@ export function ChatPage() {
   const [showAttachmentMenu, setShowAttachmentMenu] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showAgentMenu, setShowAgentMenu] = useState(false);
+  const [showAgentCustomizer, setShowAgentCustomizer] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<{ fileId: string; name: string; type: string; size: number; content?: string; originalFile?: File; isLoading?: boolean; isCancelling?: boolean }[]>([]);
    
   const [_cancellingFiles, setCancellingFiles] = useState<Set<string>>(new Set());
@@ -1045,11 +1047,11 @@ export function ChatPage() {
     }
     
     if (googleAuth === 'success' && accessToken && refreshToken) {
-      // Store tokens
-      localStorage.setItem('mada_access_token', accessToken);
-      localStorage.setItem('mada_refresh_token', refreshToken);
+      // Store tokens (khớp với key trong lib/api.ts)
+      localStorage.setItem('mada-access-token', accessToken);
+      localStorage.setItem('mada-refresh-token', refreshToken);
       if (expiresAt) {
-        localStorage.setItem('mada_token_expires_at', expiresAt);
+        localStorage.setItem('mada-token-expires-at', expiresAt);
       }
       
       // Fetch user info
@@ -2667,17 +2669,21 @@ export function ChatPage() {
                     </button>
                     );
                   })}
+                  <div className="p-2 border-t border-outline-variant/50">
+                    <button
+                      onClick={() => {
+                        setShowAgentMenu(false);
+                        setShowAgentCustomizer(true);
+                      }}
+                      className="w-full flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm font-medium text-slate-700 transition-colors"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                      {language === 'vi' ? 'Tùy chỉnh Agents...' : language === 'en' ? 'Customize Agents...' : 'تخصيص الوكلاء...'}
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
-
-            {/* Divider */}
-            <div className="w-px h-6 bg-outline-variant/50"></div>
-
-            {/* Navigation Links */}
-            <nav className="hidden xl:flex items-center gap-4 text-sm font-medium text-on-surface-variant">
-              <a className="hover:text-primary transition-colors" href="#">{language === 'vi' ? 'MADA Assistant' : language === 'en' ? 'MADA Assistant' : language === 'ar' ? 'مساعد MADA' : 'Assistant MADA'}</a>
-            </nav>
 
             {/* Divider */}
             <div className="w-px h-6 bg-outline-variant/50"></div>
@@ -2725,10 +2731,6 @@ export function ChatPage() {
               )}
             </div>
 
-            {/* Help Button */}
-            <button className="bg-white/60 p-2 rounded-full border border-white/80 hover:bg-white/80 transition-colors">
-              <HelpCircle className="w-5 h-5 text-on-surface-variant" />
-            </button>
           </div>
         </header>
 
@@ -3347,6 +3349,10 @@ export function ChatPage() {
           </div>
         </div>
       </main>
+      {/* Agent Customizer Modal */}
+      {showAgentCustomizer && (
+        <AgentCustomizer onClose={() => setShowAgentCustomizer(false)} />
+      )}
     </div>
   );
 }

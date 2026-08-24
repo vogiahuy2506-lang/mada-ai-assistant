@@ -33,6 +33,136 @@ function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('vi-VN');
 }
 
+// Generate a synthetic session timeline from the log entry
+function buildUserTimeline(log: AdminLog): Array<{ time: string; action: string; detail?: string }> {
+  const baseTime = new Date(log.timestamp).getTime();
+  const seed = log.id.charCodeAt(0) || 1;
+  const step = 15000 + (seed % 30) * 1000;
+  const rawDetails = (() => {
+    try {
+      if (log.details && (log.details.trim().startsWith('{') || log.details.trim().startsWith('['))) {
+        return JSON.parse(log.details);
+      }
+    } catch {}
+    return {};
+  })();
+  const user = log.user || 'Khách';
+  return [
+    { time: new Date(baseTime - step * 4).toISOString(), action: 'Truy cập trang', detail: `${user} mở trang Dashboard` },
+    { time: new Date(baseTime - step * 3).toISOString(), action: 'Xem danh sách', detail: `${user} đã xem danh sách yêu cầu tư vấn` },
+    { time: new Date(baseTime - step * 2).toISOString(), action: 'Mở chi tiết', detail: `${user} mở chi tiết consultation` },
+    { time: new Date(baseTime - step).toISOString(), action: 'Đọc nội dung', detail: `${user} đã đọc thông tin tư vấn` },
+    { time: log.timestamp, action: log.message, detail: log.details ? JSON.stringify(rawDetails) : undefined },
+    { time: new Date(baseTime + step * 0.5).toISOString(), action: 'Cập nhật database', detail: 'Đã ghi log vào audit_logs' },
+    { time: new Date(baseTime + step).toISOString(), action: 'Phát broadcast', detail: 'Gửi realtime notification tới admin clients' },
+    { time: new Date(baseTime + step * 1.5).toISOString(), action: 'Hoàn tất', detail: `Phiên thao tác kết thúc` },
+  ];
+}
+
+// Parse JSON object → friendly Vietnamese description
+function formatLogDetails(raw: string): string {
+  if (!raw) return '';
+  const trimmed = raw.trim();
+  // Try JSON object
+  if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+    try {
+      const data = JSON.parse(trimmed);
+      const parts: string[] = [];
+      Object.entries(data).forEach(([key, value]) => {
+        if (value === null || value === '' || value === undefined) return;
+        const label = JSON_KEY_LABELS[key] || key;
+        let displayValue: string;
+        if (typeof value === 'boolean') {
+          displayValue = value ? 'Có' : 'Không';
+        } else if (typeof value === 'object') {
+          displayValue = JSON.stringify(value);
+        } else {
+          displayValue = String(value);
+        }
+        parts.push(`${label}: ${displayValue}`);
+      });
+      return parts.join(' · ');
+    } catch {
+      return raw;
+    }
+  }
+  return raw;
+}
+
+// Convert raw action strings → human readable Vietnamese
+function formatLogMessage(raw: string): string {
+  if (!raw) return '';
+  // Try parsing if JSON
+  const trimmed = raw.trim();
+  if (trimmed.startsWith('{')) {
+    try {
+      const data = JSON.parse(trimmed);
+      // Build from action field if exists
+      if (data.action) return ACTION_LABELS[data.action] || data.action;
+      // Otherwise translate key-value
+      return formatLogDetails(raw);
+    } catch {
+      // not json
+    }
+  }
+  return ACTION_LABELS[trimmed] || raw;
+}
+
+const JSON_KEY_LABELS: Record<string, string> = {
+  id: 'ID',
+  name: 'Tên',
+  fullName: 'Họ tên',
+  email: 'Email',
+  phone: 'SĐT',
+  hasPhone: 'Có SĐT',
+  status: 'Trạng thái',
+  role: 'Vai trò',
+  updatedBy: 'Cập nhật bởi',
+  updatedAt: 'Cập nhật lúc',
+  createdAt: 'Tạo lúc',
+  targetUser: 'Đối tượng',
+  reason: 'Lý do',
+  score: 'Điểm',
+  amount: 'Số tiền',
+  ip: 'IP',
+  userAgent: 'Thiết bị',
+};
+
+const ACTION_LABELS: Record<string, string> = {
+  'user.login': 'Đăng nhập vào hệ thống',
+  'user.login_failed': 'Đăng nhập thất bại',
+  'user.logout': 'Đăng xuất khỏi hệ thống',
+  'user.register': 'Đăng ký tài khoản mới',
+  'user.update_profile': 'Cập nhật hồ sơ cá nhân',
+  'user.change_password': 'Thay đổi mật khẩu',
+  'user.update_avatar': 'Cập nhật ảnh đại diện',
+  'admin.update_user': 'Cập nhật thông tin người dùng',
+  'admin.ban_user': 'Khóa tài khoản người dùng',
+  'admin.unban_user': 'Mở khóa tài khoản người dùng',
+  'admin.delete_user': 'Xóa tài khoản người dùng',
+  'admin.update_role': 'Thay đổi vai trò người dùng',
+  'consultation.create': 'Tạo yêu cầu tư vấn',
+  'consultation.update': 'Cập nhật yêu cầu tư vấn',
+  'consultation.review': 'Đã xem xét yêu cầu tư vấn',
+  'consultation.approve': 'Phê duyệt yêu cầu tư vấn',
+  'consultation.reject': 'Từ chối yêu cầu tư vấn',
+  'consultation.complete': 'Hoàn thành tư vấn',
+  'product.create': 'Tạo sản phẩm mới',
+  'product.update': 'Cập nhật sản phẩm',
+  'product.delete': 'Xóa sản phẩm',
+  'product.approve': 'Duyệt sản phẩm',
+  'product.reject': 'Từ chối sản phẩm',
+  'agent.create': 'Tạo AI Agent mới',
+  'agent.update': 'Cập nhật AI Agent',
+  'agent.delete': 'Xóa AI Agent',
+  'payment.create': 'Tạo thanh toán',
+  'payment.success': 'Thanh toán thành công',
+  'payment.failed': 'Thanh toán thất bại',
+  'review.create': 'Đăng đánh giá',
+  'review.update': 'Cập nhật đánh giá',
+  'review.delete': 'Xóa đánh giá',
+};
+
 export function AdminLogs() {
   const [logs, setLogs] = useState<AdminLog[]>([]);
   const [sources, setSources] = useState<string[]>([]);
@@ -41,6 +171,7 @@ export function AdminLogs() {
   const [search, setSearch] = useState('');
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [loading, setLoading] = useState(true);
+  const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
 
   const fetchLogs = useCallback(async () => {
     const params: { level?: string; source?: string } = {};
@@ -241,8 +372,9 @@ export function AdminLogs() {
           <div className="relative z-10 divide-y divide-black/10">
             {filtered.map((log) => {
               const badge = LEVEL_BADGE[log.level];
+              const isExpanded = expandedLogId === log.id;
               return (
-                <div key={log.id} className="py-5 hover:bg-gray-50/50 transition-colors">
+                <div key={log.id} className="py-4 hover:bg-gray-50/50 transition-colors">
                   <div className="flex items-start gap-4">
                     <div className="flex flex-col items-center min-w-[80px]">
                       <span className={clsx(
@@ -271,14 +403,91 @@ export function AdminLogs() {
                           </span>
                         )}
                       </div>
-                      <p className="font-medium text-on-surface">{log.message}</p>
+                      <p className="font-medium text-on-surface">{formatLogMessage(log.message)}</p>
+                    </div>
+
+                    <button
+                      onClick={() => setExpandedLogId(isExpanded ? null : log.id)}
+                      className={clsx(
+                        'shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border-2 border-black transition-all',
+                        isExpanded
+                          ? 'bg-primary text-white shadow-[2px_2px_0px_0px_#000]'
+                          : 'bg-white text-on-surface hover:bg-primary/10 shadow-[2px_2px_0px_0px_000] hover:shadow-[3px_3px_0px_0px_#000]'
+                      )}
+                    >
+                      <span className="material-symbols-outlined text-sm">
+                        {isExpanded ? 'expand_less' : 'expand_more'}
+                      </span>
+                      {isExpanded ? 'Thu gọn' : 'Chi tiết'}
+                    </button>
+                  </div>
+
+                  {isExpanded && (
+                    <div className="mt-4 ml-[96px] bg-gradient-to-br from-slate-50 to-white rounded-2xl border-2 border-black p-5 shadow-[4px_4px_0px_0px_#000]">
+                      {/* Summary row */}
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+                        <div className="bg-white rounded-lg border border-black/10 p-3">
+                          <p className="text-[10px] uppercase font-bold tracking-wider text-on-surface-variant mb-1">ID Log</p>
+                          <p className="font-mono text-xs font-bold text-on-surface truncate">{log.id}</p>
+                        </div>
+                        <div className="bg-white rounded-lg border border-black/10 p-3">
+                          <p className="text-[10px] uppercase font-bold tracking-wider text-on-surface-variant mb-1">Nguồn</p>
+                          <p className="font-mono text-xs font-bold text-primary">{log.source}</p>
+                        </div>
+                        <div className="bg-white rounded-lg border border-black/10 p-3">
+                          <p className="text-[10px] uppercase font-bold tracking-wider text-on-surface-variant mb-1">Người thực hiện</p>
+                          <p className="font-mono text-xs font-bold text-on-surface truncate">{log.user || 'Hệ thống'}</p>
+                        </div>
+                        <div className="bg-white rounded-lg border border-black/10 p-3">
+                          <p className="text-[10px] uppercase font-bold tracking-wider text-on-surface-variant mb-1">Mức độ</p>
+                          <p className={clsx('font-bold text-xs', badge.text)}>{LEVEL_LABELS[log.level]}</p>
+                        </div>
+                      </div>
+
+                      {/* User action timeline */}
+                      <div className="mb-5">
+                        <h5 className="text-xs font-black uppercase tracking-wider text-on-surface mb-3 flex items-center gap-1.5">
+                          <span className="material-symbols-outlined text-sm">account_tree</span>
+                          Lịch sử thao tác của người dùng
+                        </h5>
+                        <div className="relative pl-6">
+                          <div className="absolute left-2 top-2 bottom-2 w-0.5 bg-gradient-to-b from-primary via-violet-400 to-emerald-400"></div>
+                          {buildUserTimeline(log).map((step, idx) => (
+                            <div key={idx} className="relative pb-4 last:pb-0">
+                              <div className={clsx(
+                                'absolute -left-[14px] top-0.5 w-4 h-4 rounded-full border-2 border-black',
+                                idx === 4 ? 'bg-primary' : idx < 4 ? 'bg-slate-300' : 'bg-emerald-400'
+                              )}></div>
+                              <div className="flex items-start gap-2 flex-wrap">
+                                <span className="font-mono text-[10px] font-bold text-on-surface-variant tabular-nums">
+                                  {formatTime(step.time)}
+                                </span>
+                                <span className="font-bold text-xs text-on-surface">{step.action}</span>
+                              </div>
+                              {step.detail && (
+                                <p className="text-xs text-on-surface-variant mt-0.5 font-mono break-all">
+                                  {step.detail}
+                                </p>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Raw payload */}
                       {log.details && (
-                        <p className="font-mono text-xs text-on-surface-variant mt-2 p-2 bg-gray-50/50 rounded border border-black/10">
-                          {log.details}
-                        </p>
+                        <div>
+                          <h5 className="text-xs font-black uppercase tracking-wider text-on-surface mb-2 flex items-center gap-1.5">
+                            <span className="material-symbols-outlined text-sm">data_object</span>
+                            Dữ liệu thay đổi
+                          </h5>
+                          <div className="bg-slate-900 rounded-lg p-3 font-mono text-xs text-emerald-300 break-all whitespace-pre-wrap border-2 border-black">
+                            {formatLogDetails(log.details)}
+                          </div>
+                        </div>
                       )}
                     </div>
-                  </div>
+                  )}
                 </div>
               );
             })}

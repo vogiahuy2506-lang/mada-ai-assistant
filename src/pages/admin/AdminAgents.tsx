@@ -660,7 +660,7 @@ export function AdminAgents() {
       <div className="fixed bottom-6 right-6 z-50">
         <button
           onClick={() => {
-            setFormData({ name: '', description: '', avatar: '🤖', systemPrompt: '', capabilities: [] });
+            setFormData({ name: '', description: '', avatar: '🤖', system_prompt: '', capabilities: [] });
             setEditingId(null);
             setShowForm(true);
           }}

@@ -100,10 +100,12 @@ const getMenuItems = (variant: string, onNewChat: () => void): MenuItem[] => {
       { id: 'users', label: 'Quản lý người dùng', icon: 'people', href: '/admin/users' },
       { id: 'roles', label: 'Quản lý phân quyền', icon: 'admin_panel_settings', href: '/admin/roles' },
       { id: 'ai', label: 'Quản lý AI', icon: 'psychology', href: '/admin/ai' },
+      { id: 'agents', label: 'Quản lý Agent', icon: 'smart_toy', href: '/admin/agents' },
       { id: 'logs', label: 'Nhật ký hệ thống', icon: 'receipt_long', href: '/admin/logs' },
       { id: 'stats', label: 'Thống kê', icon: 'analytics', href: '/admin/stats' },
       { id: 'deploy', label: 'Triển khai', icon: 'rocket_launch', href: '/admin/deploy' },
       { id: 'settings', label: 'Cài đặt', icon: 'settings', href: '/admin/settings' },
+      { id: 'prompts', label: 'System Prompts', icon: 'edit_note', href: '/admin/prompts' },
     ],
   };
 
@@ -297,7 +299,7 @@ export function Sidebar({ variant = 'user', onSelectQuestion }: SidebarProps) {
               if (item.onClick) {
                 item.onClick();
               } else if (item.href) {
-                window.location.href = item.href;
+                navigate(item.href);
               }
             }}
             className={clsx(

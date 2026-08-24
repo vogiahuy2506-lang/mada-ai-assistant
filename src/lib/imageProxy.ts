@@ -28,12 +28,24 @@ const ALLOWED_HOSTS = [
   // Shop VN không cần proxy (CDN public)
   'cdn.tgdd.vn',
   'cdn.cellphones.com.vn',
+  'cdn2.cellphones.com.vn',
   'cdn.fptshop.com.vn',
   'images.fpt.shop',
   'cdn.dienmayxanh.com',
   'img.dienmayxanh.com',
   'product.hstatic.net',
   'cdn.viettelstore.vn',
+  'cdn-lazada.zdn.vn',
+  'cdn.shopee.vn',
+  'tikicdn.com',
+  'salt.tikicdn.com',
+  // Shopify CDN
+  'cdn.shopify.com',
+  'cdn3.mywot.com',
+  'cdn4.mywot.com',
+  // WordPress/WooCommerce
+  'woocommerce.com',
+  'wp.com',
   // Wikimedia
   'upload.wikimedia.org',
   // Github (cho icon/demo)
@@ -43,6 +55,20 @@ const ALLOWED_HOSTS = [
   'i.imgur.com',
   'i.pravatar.cc',
   'picsum.photos',
+  // Google/Facebook CDN
+  'googleusercontent.com',
+  'ggpht.com',
+  'fbcdn.net',
+  'akamai.net',
+  'akamaized.net',
+  'cloudfront.net',
+  'stackpathdns.com',
+  'cdn.jsdelivr.net',
+  // Other common CDNs
+  'res.cloudinary.com',
+  'cloudinary.com',
+  'imgix.net',
+  'images.unsplash.com',
 ];
 
 /**
@@ -67,8 +93,9 @@ const GARBAGE_URL_PATTERNS = [
  * - Input: URL gốc từ DB
  * - Output: URL đã xử lý (proxy nếu cần) hoặc '' để fallback gradient
  */
-export function getImageUrl(originalUrl: string | null | undefined): string {
-  if (!originalUrl) return '';
+export function getImageUrl(originalUrl: string | null | undefined | unknown): string {
+  // Defensive: reject non-string input
+  if (!originalUrl || typeof originalUrl !== 'string') return '';
 
   // Nếu đã qua proxy rồi thì giữ nguyên (tránh double-proxy)
   if (originalUrl.startsWith('/api/mada-image')) return originalUrl;
@@ -95,7 +122,7 @@ export function getImageUrl(originalUrl: string | null | undefined): string {
     return originalUrl;
   }
 
-  // Unknown host - cố thử load trực tiếp (browser sẽ fail nếu có hotlink protection)
+  // Unknown host - vẫn load trực tiếp (browser sẽ fail nếu có hotlink protection)
   return originalUrl;
 }
 

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { AdminLayout } from './AdminLayout';
 import { adminApi, UserStats, KnowledgeStats } from './adminApi';
 import { getAccessToken } from '@/lib/api';
@@ -96,7 +96,6 @@ export function AdminAnalytics() {
   const [analytics, setAnalytics] = useState<ApiAnalytics | null>(null);
   const [chatMetrics, setChatMetrics] = useState<ChatMetrics | null>(null);
   const [loading, setLoading] = useState(true);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   // Load analytics data
   useEffect(() => {

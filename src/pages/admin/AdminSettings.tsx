@@ -6,8 +6,9 @@ import { useLanguageStore } from '@/stores';
 import clsx from 'clsx';
 import { systemApi } from '@/lib/api';
 import { CheckCircle, Loader2, AlertCircle } from 'lucide-react';
+import { PromptsEditor } from './PromptsEditor';
 
-type Tab = 'general' | 'plans' | 'security' | 'ai' | 'integrations' | 'live' | 'system';
+type Tab = 'general' | 'plans' | 'security' | 'ai' | 'integrations' | 'live' | 'system' | 'prompts';
 type Language = 'vi' | 'en' | 'ar' | 'fr';
 
 // Translation object
@@ -22,6 +23,8 @@ const t = {
       ai: 'AI Models',
       integrations: 'Tích hợp',
       live: 'Trạng thái thật',
+      system: 'System DB',
+      prompts: 'System Prompts',
     },
     general: {
       sectionTitle: 'Thông tin chung',
@@ -1207,6 +1210,13 @@ export function AdminSettings() {
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* SYSTEM PROMPTS TAB */}
+      {tab === 'prompts' && (
+        <div className="relative bg-gradient-to-br from-white/80 to-white/40 backdrop-blur-xl rounded-3xl border-3 border-black p-8 md:p-12 shadow-[12px_12px_0px_0px_#000]">
+          <PromptsEditor />
         </div>
       )}
     </AdminLayout>

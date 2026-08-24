@@ -55,8 +55,7 @@ export default function AdminUsers() {
     const res = await fetch(`/api${path}`, { ...init, headers });
 
     if (res.status === 401 && retry && getRefreshToken()) {
-      const refresh = await authApi.refresh?.();
-      // Fallback if authApi doesn't expose refresh directly:
+      // Fallback: hit /api/auth/refresh directly to swap the access token
       const refreshRes = await fetch('/api/auth/refresh', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

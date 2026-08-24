@@ -56,7 +56,7 @@ export function AdminLayout({
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuthStore();
-  const { isDark, toggleTheme } = useThemeStore();
+  const { isDark } = useThemeStore();
   const { language } = useLanguageStore();
 
   const getNavLabel = (item: NavItem) => {

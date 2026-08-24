@@ -260,8 +260,8 @@ export function LandingPage() {
                   {i}
                 </div>
                 <div>
-                  <h3 className="font-bold text-lg mb-1">{t(`landing.how${i}Title`)}</h3>
-                  <p className="text-sm text-zinc-600 leading-relaxed">{t(`landing.how${i}Desc`)}</p>
+                  <h3 className="font-bold text-lg mb-1">{t(`landing.how${i}Title` as any)}</h3>
+                  <p className="text-sm text-zinc-600 leading-relaxed">{t(`landing.how${i}Desc` as any)}</p>
                 </div>
               </div>
             ))}

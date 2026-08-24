@@ -392,6 +392,7 @@ function ToggleSetting({ label, description, checked, onChange }: { label: strin
 
 // History Tab Component - Lấy data thật từ backend
 function HistoryTab() {
+  const navigate = useNavigate();
   const { language } = useLanguageStore();
   const [conversations, setConversations] = useState<ChatConversation[]>([]);
   const [loading, setLoading] = useState(true);

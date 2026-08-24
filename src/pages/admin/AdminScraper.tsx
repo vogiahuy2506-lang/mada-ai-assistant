@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { AdminLayout } from './AdminLayout';
 import { adminApi } from './adminApi';
 import { useLanguageStore } from '@/stores';
+import type { Language } from '@/types';
 import {
   Play, RefreshCw, Database, CheckCircle, AlertCircle,
   Loader2, Trash2, Plus, ToggleLeft, ToggleRight, ExternalLink,
@@ -199,8 +200,8 @@ const I18N = {
     crawlError: { en: 'Crawl error', vi: 'Lỗi crawl' },
     ingestComplete: { en: 'Ingest complete', vi: 'Ingest hoàn tất' },
     ingestChunksAdded: {
-      en: (n: number) => `chunks added`,
-      vi: (n: number) => `chunks đã thêm`,
+      en: (_n: number) => `chunks added`,
+      vi: (_n: number) => `chunks đã thêm`,
     },
     ingestErrors: { en: 'Errors', vi: 'Lỗi' },
     ingestError: { en: 'Ingest error', vi: 'Lỗi ingest' },
@@ -218,22 +219,21 @@ const I18N = {
 
 type Lang = 'en' | 'vi';
 
-function i18n<T>(val: { en: T; vi: T }, lang: Lang): T {
-  return val[lang];
+// Fallback to 'vi' when Language doesn't have a translation (ar/fr fallback to vi)
+const toLang = (l: Language): Lang => (l === 'en' ? 'en' : 'vi');
+
+function i18n<T>(val: { en: T; vi: T }, lang: Language): T {
+  return val[toLang(lang)];
 }
 
-function i18nFn<T>(val: (n: number) => T, n: number, lang: Lang): T;
-function i18nFn2<T>(val: (n: number, t: number) => T, n: number, t: number, lang: Lang): T {
-  return val(n, t);
-}
-function i18nDyn<T>(val: { en: (n: number) => T; vi: (n: number) => T }, n: number, lang: Lang): T {
-  return val[lang](n);
+function i18nDyn<T>(val: { en: (n: number) => T; vi: (n: number) => T }, n: number, lang: Language): T {
+  return val[toLang(lang)](n);
 }
 function i18nDyn2<T>(
   val: { en: (n: number, t: number) => T; vi: (n: number, t: number) => T },
-  n: number, t: number, lang: Lang
+  n: number, t: number, lang: Language
 ): T {
-  return val[lang](n, t);
+  return val[toLang(lang)](n, t);
 }
 
 // ============== COMPONENT ==============
@@ -355,11 +355,7 @@ export function AdminScraper() {
   };
 
   const handleDeleteSource = async (id: string) => {
-    if (!confirm(i18nDyn(I18N.msg.confirmDeleteSource, id, language === 'en' ? 'en' : 'vi', language).replace('{id}', id))) return;
-    // Fix: pass correct language param
-    const confirmText = isEn
-      ? `Delete source "${id}"?`
-      : `Xóa source "${id}"?`;
+    const confirmText = i18n(I18N.msg.confirmDeleteSource, language)(id);
     if (!confirm(confirmText)) return;
     setBusy(`del-${id}`);
     try {
@@ -470,7 +466,7 @@ export function AdminScraper() {
     {
       label: i18n(I18N.stats.cron.label, language),
       value: activeCronCount,
-      sub: i18nDyn2(I18N.stats.cron.sub, activeCronCount, sources.length, language as Lang),
+      sub: i18nDyn(I18N.stats.cron.sub, activeCronCount, language),
       color: 'from-green-50/80 to-green-100/40',
       iconColor: 'text-green-600',
       icon: 'schedule',
@@ -479,7 +475,7 @@ export function AdminScraper() {
     {
       label: i18n(I18N.stats.running.label, language),
       value: runningCount,
-      sub: i18nDyn2(I18N.stats.running.sub, runningCount, jobs.length, language as Lang),
+      sub: i18nDyn2(I18N.stats.running.sub, runningCount, jobs.length, language),
       color: 'from-blue-50/80 to-blue-100/40',
       iconColor: 'text-blue-600',
       icon: 'autorenew',
@@ -739,7 +735,7 @@ export function AdminScraper() {
               <div className="w-8 h-8 rounded-full bg-purple-500 text-white border-2 border-black flex items-center justify-center font-black text-xs shadow-[2px_2px_0px_0px_#000]">2</div>
               <span className="material-symbols-outlined text-base text-purple-700" style={{ fontVariationSettings: "'FILL' 1" }}>auto_awesome</span>
               <span className="font-medium text-on-surface">
-                {i18nDyn(I18N.pipeline.steps.step2, fileStats?.productCount || 0, language)}({fileStats?.chunkCount || 0})
+                {i18nDyn2(I18N.pipeline.steps.step2, fileStats?.productCount || 0, fileStats?.chunkCount || 0, language)}
               </span>
             </li>
             <li className="flex items-center gap-3 p-2.5 rounded-xl bg-purple-50 border-2 border-purple-200">

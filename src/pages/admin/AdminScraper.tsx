@@ -223,9 +223,8 @@ function i18n<T>(val: { en: T; vi: T }, lang: Lang): T {
 }
 
 function i18nFn<T>(val: (n: number) => T, n: number, lang: Lang): T;
-function i18nFn2<T>(val: (n: number, t: number) => T, n: number, t: number, lang: Lang): T;
-function i18nFn2(val: Function, n: number, t?: number, lang?: Lang = 'vi') {
-  return val(n, t!);
+function i18nFn2<T>(val: (n: number, t: number) => T, n: number, t: number, lang: Lang): T {
+  return val(n, t);
 }
 function i18nDyn<T>(val: { en: (n: number) => T; vi: (n: number) => T }, n: number, lang: Lang): T {
   return val[lang](n);

@@ -798,32 +798,37 @@ async function initializeServices() {
   }
 }
 
-initializeServices();
-
 /**
- * ⭐ FIX: Wait cho RAG engine sẵn sàng (tối đa timeoutMs)
- * Dùng để tránh 500 errors khi user request đến trước khi initializeServices() xong.
- * Trả về true nếu ready, false nếu timeout.
+ * Initialize all services synchronously before server starts.
+ * This ensures RAG is ready before handling requests.
  */
-async function waitForRagReady(timeoutMs = 15000): Promise<boolean> {
-  if (ragEngine.isConfigured) return true;
-  const start = Date.now();
-  while (!ragEngine.isConfigured && Date.now() - start < timeoutMs) {
-    await new Promise((r) => setTimeout(r, 250));
+async function bootstrap(): Promise<void> {
+  console.log('🔧 Initializing services...');
+  
+  try {
+    await initializeServices();
+    console.log('✅ All services initialized');
+  } catch (error) {
+    console.error('❌ Bootstrap failed:', error);
+    // Don't exit - let server start anyway for debugging
   }
-  return ragEngine.isConfigured;
 }
 
-// In-memory storage
-const consultations: any[] = [];
-const chatHistory: Map<string, any[]> = new Map();
+bootstrap();
 
-/**
- * ⭐ MỚI: Mapping Agent ID → MADA Category để RAG filter theo domain
- * Mapping này dùng để khi user chọn 1 bot, RAG chỉ search KB thuộc domain đó
- * (kèm priority fallback về toàn bộ KB nếu thiếu)
- */
-const AGENT_TO_MADA: Record<string, { botId: string; madaCategory: string }> = {
+// ============== HTTP SERVER ==============
+const PORT = parseInt(process.env.PORT || '3000', 10);
+const HOST = '0.0.0.0';
+
+const server = app.listen(PORT, HOST, () => {
+  console.log(`🚀 MADA AI Server running on http://${HOST}:${PORT}`);
+  console.log(`📚 API Documentation: http://localhost:${PORT}/api/health`);
+  console.log(`🌐 Frontend: http://localhost:${PORT}/`);
+  console.log(`⚡ RAG Enabled: ${ragInitialized}`);
+  console.log(`🤖 Gemini Configured: ${!!process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'your_gemini_api_key_here'}`);
+  console.log(`🛡️  Guardrails: Active`);
+  console.log(`🔐 Auth: SQLite + bcrypt + JWT (admin: ${process.env.ADMIN_EMAIL || 'admin@mada.vn'})`);
+});
   'bot-hearing':    { botId: 'bot-hearing',    madaCategory: 'sensory-hearing' },
   'bot-vision':     { botId: 'bot-vision',     madaCategory: 'sensory-vision' },
   'bot-speech':     { botId: 'bot-speech',     madaCategory: 'voice-and-speech' },

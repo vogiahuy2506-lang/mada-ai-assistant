@@ -19,6 +19,7 @@ async function loadPdfjs() {
   }
 }
 
+let mammoth: any = null;
 async function loadMammoth() {
   if (mammoth) return mammoth;
   try {
@@ -31,6 +32,7 @@ async function loadMammoth() {
   }
 }
 
+let XLSX: any = null;
 async function loadXLSX() {
   if (XLSX) return XLSX;
   try {
@@ -63,7 +65,7 @@ async function loadTesseract() {
 
 /**
  * Parse PDF using pdfjs-dist
- * Falls back to OCR for scanned PDFs
+ * Falls back to OCR for scanned PDFs or PDFs with encoding issues
  */
 export async function parsePDFFile(filePath: string): Promise<string> {
   if (!fs.existsSync(filePath)) {
@@ -116,10 +118,27 @@ export async function parsePDFFile(filePath: string): Promise<string> {
       .replace(/\n{3,}/g, '\n\n')
       .trim();
 
-    // If text is too short and has images, try OCR
-    if (text.length < 100 && hasImages) {
-      console.log(`📄 PDF "${path.basename(filePath)}" appears to be scanned (${text.length} chars text, has images) — trying OCR...`);
-      const ocrText = await extractPDFTextWithOCR(buffer, path.basename(filePath));
+    // If text is too short, has encoding issues, or has images, try OCR
+    const hasGarbledText = (text.match(/[?]{2,}/g) || []).length > 5;
+    const hasLowConfidenceChars = (text.match(/[Æ€§¶©®™]/g) || []).length > text.length * 0.1;
+
+    if (text.length < 100 || hasGarbledText || hasLowConfidenceChars || hasImages) {
+      console.log(`📄 PDF "${path.basename(filePath)}" needs OCR (text=${text.length} chars, garbled=${hasGarbledText}, images=${hasImages})`);
+      
+      // Try multiple OCR methods
+      let ocrText = await extractPDFTextWithOCR(buffer, path.basename(filePath));
+      
+      // If OCR still fails, try pdftotext as last resort
+      if (!ocrText || ocrText.length < 50) {
+        console.log('📄 Trying pdftotext as fallback...');
+        try {
+          const { execSync } = await import('child_process');
+          ocrText = execSync(`pdftotext "${filePath}" - 2>&1`, { encoding: 'utf8', maxBuffer: 10 * 1024 * 1024 });
+        } catch (e) {
+          console.warn('pdftotext failed:', (e as Error).message);
+        }
+      }
+      
       if (ocrText && ocrText.length > text.length) {
         console.log(`📄 OCR succeeded: ${ocrText.length} chars vs ${text.length} chars from pdfjs`);
         return ocrText;
@@ -135,12 +154,36 @@ export async function parsePDFFile(filePath: string): Promise<string> {
 }
 
 /**
- * OCR fallback for scanned PDFs — render each page as image and run Tesseract
+ * Pre-process image for better OCR results
+ */
+async function preprocessImageForOCR(imgPath: string): Promise<Buffer> {
+  try {
+    const sharp = await import('sharp');
+
+    return await sharp.default(imgPath)
+      // Convert to grayscale
+      .grayscale()
+      // Increase contrast
+      .linear(1.3, -(128 * 0.3)) // contrast enhancement
+      // Sharpen
+      .sharpen({ sigma: 0.5 })
+      // Threshold to make text clearer (binarize)
+      .threshold(128)
+      .toBuffer();
+  } catch (e) {
+    // Return original if processing fails
+    return fs.readFileSync(imgPath);
+  }
+}
+
+/**
+ * OCR fallback for scanned PDFs or PDFs with encoding issues
+ * Uses ghostscript for best rendering quality
  */
 async function extractPDFTextWithOCR(buffer: Buffer, filename: string): Promise<string> {
   const tess = await loadTesseract();
   if (!tess) {
-    console.warn('tesseract.js not available, cannot OCR scanned PDF');
+    console.warn('tesseract.js not available');
     return '';
   }
 
@@ -162,74 +205,125 @@ async function extractPDFTextWithOCR(buffer: Buffer, filename: string): Promise<
 
     const texts: string[] = [];
     const pageCount = Math.min(pdf.numPages, 30);
+    const timestamp = Date.now();
 
     console.log(`📄 OCR processing ${pageCount} pages of ${filename}`);
 
-    // Check if pdftoppm is available (Linux/Windows with poppler)
-    let pdftoppmAvailable = false;
+    // Try ghostscript first (better rendering for complex fonts)
+    let gsAvailable = false;
     try {
       const { execSync } = await import('child_process');
-      execSync('pdftoppm -v 2>&1', { stdio: 'pipe' });
-      pdftoppmAvailable = true;
+      execSync('gs --version 2>&1', { stdio: 'pipe' });
+      gsAvailable = true;
     } catch {}
 
-    if (pdftoppmAvailable) {
-      console.log('📄 Using pdftoppm for PDF rendering...');
-      const { execSync } = await import('child_process');
-      const pdfFilePath = `${tmpDir}/${Date.now()}_${pathModule.basename(filename)}`;
-      fs.writeFileSync(pdfFilePath, buffer);
+    // Write PDF to temp file
+    const pdfFilePath = `${tmpDir}/${timestamp}_${pathModule.basename(filename)}`;
+    fs.writeFileSync(pdfFilePath, buffer);
 
-      try {
-        const outputPrefix = `${tmpDir}/${Date.now()}_page`;
-        execSync(`pdftoppm -r 200 -png "${pdfFilePath}" "${outputPrefix}"`, { stdio: 'pipe' });
+    try {
+      if (gsAvailable) {
+        console.log('📄 Using ghostscript for PDF rendering (300 DPI)...');
+        const { execSync } = await import('child_process');
+
+        // Use ghostscript to render PDF pages
+        execSync(
+          `gs -dBATCH -dNOPAUSE -sDEVICE=png16m -r300 -sOutputFile="${tmpDir}/${timestamp}_page-%d.png" "${pdfFilePath}" 2>&1`,
+          { stdio: 'pipe' }
+        );
 
         const imageFiles = fs.readdirSync(tmpDir)
-          .filter(f => f.startsWith(pathModule.basename(outputPrefix)) && f.endsWith('.png'))
+          .filter(f => f.startsWith(`${timestamp}_page`) && f.endsWith('.png'))
           .sort();
 
+        console.log(`📄 Generated ${imageFiles.length} images for OCR`);
+
+        // Pre-process all images first
+        const processedImages: string[] = [];
         for (const imgFile of imageFiles) {
-          const imgPath = `${tmpDir}/${imgFile}`;
           try {
-            const { data } = await tess.recognize(imgPath, 'vie+eng', { logger: false });
-            if (data.text.trim()) {
+            const processedPath = `${tmpDir}/${imgFile.replace('.png', '-processed.png')}`;
+            await preprocessImageForOCR(`${tmpDir}/${imgFile}`).then(buf => {
+              fs.writeFileSync(processedPath, buf);
+            });
+            processedImages.push(processedPath);
+          } catch (e) {
+            processedImages.push(`${tmpDir}/${imgFile}`);
+          }
+        }
+
+        // Use worker for better performance - support English, Vietnamese, Arabic
+        const worker = await tess.createWorker('eng+vie+ara');
+
+        for (let i = 0; i < processedImages.length; i++) {
+          const imgPath = processedImages[i];
+          const origFile = imageFiles[i];
+          try {
+            const { data } = await worker.recognize(imgPath);
+            if (data.text.trim() && data.confidence > 50) {
               texts.push(data.text.trim());
+              console.log(`📄 OCR ${origFile}: ${data.text.length} chars (conf: ${data.confidence.toFixed(0)}%)`);
             }
           } catch (pageErr) {
-            console.warn(`OCR failed for ${imgFile}`);
+            console.warn(`OCR failed for ${origFile}`);
           }
         }
-      } finally {
-        // Cleanup
+
+        await worker.terminate();
+      } else {
+        // Fallback to pdftoppm
+        let pdftoppmAvailable = false;
         try {
-          const files = fs.readdirSync(tmpDir);
-          for (const f of files) {
-            if (f.includes(Date.now().toString())) {
-              fs.unlinkSync(`${tmpDir}/${f}`);
-            }
-          }
+          const { execSync } = await import('child_process');
+          execSync('pdftoppm -v 2>&1', { stdio: 'pipe' });
+          pdftoppmAvailable = true;
         } catch {}
-      }
-    } else {
-      // Fallback: use pdfjs-dist text extraction only
-      console.log('📄 pdftoppm not available, falling back to text extraction only');
-      for (let pageNum = 1; pageNum <= pageCount; pageNum++) {
-        const page = await pdf.getPage(pageNum);
-        const textContent = await page.getTextContent();
-        const pageText = textContent.items
-          .map((item: any) => item.str)
-          .filter(Boolean)
-          .join(' ');
-        if (pageText.trim()) {
-          texts.push(pageText);
+
+        if (pdftoppmAvailable) {
+          console.log('📄 Using pdftoppm for PDF rendering...');
+          const { execSync } = await import('child_process');
+
+          execSync(
+            `pdftoppm -r 300 -png "${pdfFilePath}" "${tmpDir}/${timestamp}_page"`,
+            { stdio: 'pipe' }
+          );
+
+          const imageFiles = fs.readdirSync(tmpDir)
+            .filter(f => f.startsWith(`${timestamp}_page`) && f.endsWith('.png'))
+            .sort();
+
+          const worker = await tess.createWorker('eng+vie+ara');
+
+          for (const imgFile of imageFiles) {
+            const imgPath = `${tmpDir}/${imgFile}`;
+            try {
+              const { data } = await worker.recognize(imgPath);
+              if (data.text.trim() && data.confidence > 50) {
+                texts.push(data.text.trim());
+              }
+            } catch {}
+          }
+
+          await worker.terminate();
         }
       }
+    } finally {
+      // Cleanup temp files
+      try {
+        const files = fs.readdirSync(tmpDir);
+        for (const f of files) {
+          if (f.includes(timestamp.toString())) {
+            fs.unlinkSync(`${tmpDir}/${f}`);
+          }
+        }
+      } catch {}
     }
 
     const result = texts.join('\n\n');
-    console.log(`📄 OCR/extraction: ${result.length} chars from ${filename}`);
+    console.log(`📄 OCR result: ${result.length} chars from ${filename}`);
     return result;
   } catch (err) {
-    console.warn('OCR fallback failed:', err);
+    console.warn('OCR failed:', (err as Error).message);
     return '';
   }
 }
@@ -272,23 +366,23 @@ export async function parseExcelFile(filePath: string): Promise<string> {
   }
 
   const xlsx = await loadXLSX();
-  const ext = path.extname(filePath).toLowerCase();
 
   try {
     const workbook = xlsx.readFile(filePath);
-    let allText = [];
+    let allText: string[] = [];
 
     for (const sheetName of workbook.SheetNames) {
       const sheet = workbook.Sheets[sheetName];
-      const data = xlsx.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const data: any[][] = xlsx.utils.sheet_to_json(sheet, { header: 1, defval: '' });
 
       allText.push(`=== SHEET: ${sheetName} ===`);
 
       for (const row of data) {
         // Filter out completely empty rows
-        if (row.some(cell => cell !== '')) {
+        if (row.some((cell) => cell !== '')) {
           // Convert row to readable text
-          const rowText = row.map(cell => {
+          const rowText = row.map((cell) => {
             if (cell === null || cell === undefined || cell === '') return '';
             // Handle numbers, dates, etc.
             if (typeof cell === 'number') return cell.toString();

@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { AdminLayout } from './AdminLayout';
 import { adminApi, AdminUser, KnowledgeStats, UserStats } from './adminApi';
+import { useTranslation } from '@/lib/translations';
 
 function timeAgo(iso: string | null): string {
   if (!iso) return 'Chưa đăng nhập';
@@ -46,10 +47,17 @@ export function AdminOverview() {
 
   useEffect(() => { load(); }, [load]);
 
+  const { t } = useTranslation();
   return (
     <AdminLayout
-      title="Tổng quan hệ thống"
-      subtitle="Theo dõi người dùng, kho tri thức và hoạt động của MADA AI theo thời gian thực."
+      title={t('admin.topBar.overview')}
+      titleEn="System Overview"
+      titleAr="نظرة عامة على النظام"
+      titleFr="Aperçu du système"
+      subtitle={t('admin.topBar.overviewSub')}
+      subtitleEn="Track users, knowledge base and MADA AI activity in real time."
+      subtitleAr="تتبع المستخدمين وقاعدة المعرفة ونشاط MADA AI في الوقت الفعلي."
+      subtitleFr="Suivez les utilisateurs, la base de connaissances et l'activité MADA AI en temps réel."
       showLayoutTitle={false}
     >
       {/* Hero Banner Section */}
@@ -59,10 +67,10 @@ export function AdminOverview() {
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-primary/10 via-transparent to-transparent rounded-3xl"></div>
           <div className="max-w-2xl relative z-10 py-8 px-6">
             <h2 className="text-4xl font-black text-on-surface mb-4 tracking-tight">
-              Tổng quan hệ thống
+              {t('admin.overview.title')}
             </h2>
             <p className="text-lg font-medium text-on-surface-variant border-l-4 border-primary pl-6 py-2 bg-white/40 backdrop-blur-sm rounded-r-xl">
-              Theo dõi người dùng, kho tri thức và hoạt động của MADA AI theo thời gian thực.
+              {t('admin.overview.subtitle')}
             </p>
           </div>
         </div>

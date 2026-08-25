@@ -14,15 +14,16 @@
  * Tất cả routes yêu cầu admin role.
  */
 
-import { Router, Response } from 'express';
+import { Router } from 'express';
 import fs from 'fs';
 import path from 'path';
 import { spawn } from 'child_process';
-import { authenticate, requireRole, AuthRequest } from '../lib/auth';
+import { authenticate, requireRole } from '../lib/auth';
 import db from '../lib/db';
 
 const router = Router();
-router.use(authenticate, requireRole('admin'));
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+router.use(authenticate as any, requireRole('admin') as any);
 
 // ============== HELPERS ==============
 
@@ -110,7 +111,7 @@ router.get('/mada-categories', (_req, res) => {
 
 // ============== POST /api/admin/scraper/crawl-mada ==============
 
-router.post('/crawl-mada', (req: AuthRequest, res: Response) => {
+router.post('/crawl-mada', (req, res) => {
   const { category = 'all' } = req.body || {};
   const jobId = `crawl-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
 
@@ -163,7 +164,7 @@ router.post('/crawl-mada', (req: AuthRequest, res: Response) => {
       ).run(
         `crawl-${jobId}`,
         `crawl_mada_${job.status}`,
-        req.user?.id || 'admin',
+        String((req as any).user?.id) || 'admin',
         `scraper/${category}`,
         JSON.stringify({ exitCode: code, category }),
         new Date().toISOString()
@@ -257,7 +258,7 @@ interface RagChunk {
   metadata?: Record<string, any>;
 }
 
-router.post('/ingest-rag-chunks', async (req: AuthRequest, res: Response) => {
+router.post('/ingest-rag-chunks', async (req, res) => {
   const { chunks: inputChunks, dryRun = false } = req.body || {};
 
   let chunks: RagChunk[];
@@ -323,7 +324,7 @@ router.post('/ingest-rag-chunks', async (req: AuthRequest, res: Response) => {
     ).run(
       `ingest-${Date.now()}`,
       'ingest_rag_chunks',
-      req.user?.id || 'admin',
+      (req.user as any)?.id || 'admin',
       `knowledge_items`,
       JSON.stringify({ count: chunks.length, added: totalAdded, errors: errors.length }),
       new Date().toISOString()
@@ -355,7 +356,7 @@ router.get('/sources', (_req, res) => {
 
 // ============== POST /api/admin/scraper/sources ==============
 
-router.post('/sources', (req: AuthRequest, res: Response) => {
+router.post('/sources', (req, res) => {
   const { id, name, url, category, schedule, enabled = true } = req.body || {};
 
   if (!id || !name || !url) {
@@ -387,7 +388,7 @@ router.post('/sources', (req: AuthRequest, res: Response) => {
   }
 });
 
-router.delete('/sources/:id', (req: AuthRequest, res: Response) => {
+router.delete('/sources/:id', (req, res) => {
   try {
     const result = db.prepare('DELETE FROM scheduled_sources WHERE id = ?').run(req.params.id);
     if (result.changes === 0) {
@@ -399,7 +400,7 @@ router.delete('/sources/:id', (req: AuthRequest, res: Response) => {
   }
 });
 
-router.post('/sources/:id/toggle', (req: AuthRequest, res: Response) => {
+router.post('/sources/:id/toggle', (req, res) => {
   try {
     const enabled = req.body?.enabled ? 'active' : 'inactive';
     const result = db.prepare(

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { AdminLayout } from './AdminLayout';
 import { adminApi, type Consultation } from './adminApi';
+import { useTranslation } from '@/lib/translations';
 import clsx from 'clsx';
 
 export function AdminConsultations() {
@@ -53,18 +54,24 @@ export function AdminConsultations() {
     contacted: 'bg-green-100 text-green-800 border-green-300',
   };
 
+  const { t } = useTranslation();
+
   const statusLabels = {
-    pending: 'Chờ xử lý',
-    reviewed: 'Đã xem',
-    contacted: 'Đã liên hệ',
+    pending: t('admin.consult.status.pending'),
+    reviewed: t('admin.consult.status.reviewed'),
+    contacted: t('admin.consult.status.contacted'),
   };
 
   return (
     <AdminLayout
-      title="Quản lý Yêu cầu Tư vấn"
-      titleEn="Consultation Requests Management"
-      subtitle="Xem và xử lý các yêu cầu tư vấn từ người dùng."
-      subtitleEn="View and manage consultation requests from users."
+      title={t('admin.topBar.consultations')}
+      titleEn="Consultation Requests"
+      titleAr="طلبات الاستشارة"
+      titleFr="Demandes de consultation"
+      subtitle={t('admin.topBar.consultationsSub')}
+      subtitleEn="View and process consultation requests from users."
+      subtitleAr="عرض ومعالجة طلبات الاستشارة من المستخدمين."
+      subtitleFr="Voir et traiter les demandes de consultation des utilisateurs."
       showLayoutTitle={false}
     >
       {/* Hero Banner Section */}
@@ -74,10 +81,10 @@ export function AdminConsultations() {
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-primary/10 via-transparent to-transparent rounded-3xl"></div>
           <div className="max-w-2xl relative z-10 py-8 px-6">
             <h2 className="text-4xl font-black text-on-surface mb-4 tracking-tight flex items-center gap-4">
-              Quản lý Yêu cầu Tư vấn
+              {t('admin.consult.title')}
             </h2>
             <p className="text-lg font-medium text-on-surface-variant border-l-4 border-primary pl-6 py-2 bg-white/40 backdrop-blur-sm rounded-r-xl">
-              Xem và xử lý các yêu cầu tư vấn từ người dùng.
+              {t('admin.consult.subtitle')}
             </p>
           </div>
         </div>
@@ -154,7 +161,7 @@ export function AdminConsultations() {
                 : 'bg-transparent text-on-surface-variant hover:bg-yellow-50 border-transparent hover:border-black transition-colors'
             )}
           >
-            Chờ xử lý
+            {t('admin.consult.status.pending')}
           </button>
           <button
             onClick={() => setStatusFilter('reviewed')}
@@ -165,7 +172,7 @@ export function AdminConsultations() {
                 : 'bg-transparent text-on-surface-variant hover:bg-blue-50 border-transparent hover:border-black transition-colors'
             )}
           >
-            Đã xem
+            {t('admin.consult.status.reviewed')}
           </button>
           <button
             onClick={() => setStatusFilter('contacted')}
@@ -176,7 +183,7 @@ export function AdminConsultations() {
                 : 'bg-transparent text-on-surface-variant hover:bg-green-50 border-transparent hover:border-black transition-colors'
             )}
           >
-            Đã liên hệ
+            {t('admin.consult.status.contacted')}
           </button>
         </div>
         <div>

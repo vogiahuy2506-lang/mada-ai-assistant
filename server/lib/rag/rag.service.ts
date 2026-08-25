@@ -66,7 +66,7 @@ class RAGService {
         WHERE status = 'published'
       `).all() as any[];
 
-      return rows.map(row => ({
+      return rows.map((row: any) => ({
         id: row.id,
         name: { vi: row.title || '', en: row.title_en || row.title || '' },
         description: {
@@ -87,7 +87,7 @@ class RAGService {
         useCases: [],
         targetSymptoms: [],
         language: row.language || 'vi',
-      }));
+      })) as unknown as Product[];
     } catch (err) {
       console.error('[RAG] Error fetching database products:', err);
       return [];
@@ -120,27 +120,14 @@ class RAGService {
 
     // Compute keyword-based scores
     const queryLower = query.toLowerCase();
-    const queryWords = queryLower.split(/\s+/).filter((w) => w.length > 2);
+    const queryWords = queryLower.split(/\s+/).filter((_w) => _w.length > 2);
 
     const scored = candidates.map((product) => {
-      const searchText = [
-        product.name.vi,
-        product.name.en,
-        product.description.vi,
-        product.description.en,
-        product.subcategory,
-        product.brand,
-        product.model,
-        ...product.keywords,
-        ...product.useCases,
-        ...product.targetSymptoms,
-      ].join(' ').toLowerCase();
-
       const matchedKeywords = product.keywords.filter((k) =>
         queryLower.includes(k.toLowerCase()) || k.toLowerCase().includes(queryLower)
       );
       const matchedUseCases = product.useCases.filter((uc) =>
-        uc.toLowerCase().split(/\s+/).some((w) => queryWords.some(qw => uc.toLowerCase().includes(qw)))
+        uc.toLowerCase().split(/\s+/).some(() => queryWords.some(qw => uc.toLowerCase().includes(qw)))
       );
 
       let baseScore = 0.2;

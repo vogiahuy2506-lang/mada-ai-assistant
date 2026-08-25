@@ -19,7 +19,6 @@ const TABS = [
 ];
 
 export function ProfilePage() {
-  const navigate = useNavigate();
   const { isDark, toggleTheme } = useThemeStore();
   const { language, setLanguage } = useLanguageStore();
   const [activeTab, setActiveTab] = useState<TabType>('profile');

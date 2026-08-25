@@ -4,6 +4,7 @@ import { adminApi, Product, Category } from './adminApi';
 import { AIImportCard } from './AIImportCard';
 import { formatPrice } from '../../lib/formatPrice';
 import { getImageUrl } from '../../lib/imageProxy';
+import { useTranslation } from '@/lib/translations';
 import {
  Plus, RefreshCw, Loader2, CheckCircle2, AlertCircle,
 } from 'lucide-react';
@@ -18,6 +19,7 @@ function CategoryModal({ category, onSave, onClose }: {
  onSave: (data: Partial<Category> & { id?: string }) => Promise<void>;
  onClose: () => void;
 }) {
+ const { t } = useTranslation();
  const [form, setForm] = useState({
   id: category?.id || '',
   name_vi: category?.name_vi || '',
@@ -33,7 +35,7 @@ function CategoryModal({ category, onSave, onClose }: {
  const [error, setError] = useState('');
 
  const handleSave = async () => {
-  if (!form.name_vi || !form.name_en) { setError('Cần nhập tên Tiếng Việt và English'); return; }
+  if (!form.name_vi || !form.name_en) { setError(t('admin.products.pleaseEnterBothNames')); return; }
   setSaving(true); setError('');
   try { await onSave(form); } catch (e: any) { setError(e.message); } finally { setSaving(false); }
  };
@@ -44,8 +46,8 @@ function CategoryModal({ category, onSave, onClose }: {
    <div className="relative w-full max-w-xl rounded-2xl overflow-hidden bg-white border-[4px] border-black shadow-[1px_1px_0px_0px_#000]">
     <div className="flex items-center justify-between p-5 border-b-[3px] border-black bg-yellow-200">
      <div>
-      <h2 className="text-lg font-black text-black">{category ? 'Sửa Danh mục' : 'Tạo Danh mục mới'}</h2>
-      <p className="text-xs text-black/70 mt-0.5">{category ? 'Cập nhật thông tin' : 'Thêm danh mục mới'}</p>
+      <h2 className="text-lg font-black text-black">{category ? t('admin.products.categoryEdit') : t('admin.products.categoryNew')}</h2>
+      <p className="text-xs text-black/70 mt-0.5">{category ? t('admin.products.categoryUpdateHint') : t('admin.products.categoryAddHint')}</p>
      </div>
      <button onClick={onClose} className="w-9 h-9 rounded-xl bg-white border-2 border-black flex items-center justify-center text-black hover:bg-red-200 transition-all">
       <span className="material-symbols-outlined">close</span>
@@ -62,7 +64,7 @@ function CategoryModal({ category, onSave, onClose }: {
      )}
 
      <div>
-      <label className="block text-xs font-black text-black uppercase tracking-wider mb-1.5 ml-1">Icon</label>
+       <label className="block text-xs font-black text-black uppercase tracking-wider mb-1.5 ml-1">{t('admin.products.categoryIcon')}</label>
       <div className="flex items-center gap-3">
        <div className="w-11 h-11 rounded-xl bg-yellow-300 border-2 border-black shadow-[1px_1px_0px_0px_#000] flex items-center justify-center text-black font-black">
         M
@@ -86,12 +88,12 @@ function CategoryModal({ category, onSave, onClose }: {
 
      <div className="grid grid-cols-2 gap-4">
       <div>
-       <label className="block text-xs font-black text-black uppercase tracking-wider mb-1.5 ml-1">Mô tả (VI)</label>
+       <label className="block text-xs font-black text-black uppercase tracking-wider mb-1.5 ml-1">{t('admin.products.descVi')}</label>
        <textarea value={form.description_vi} onChange={(e) => setForm({...form, description_vi: e.target.value})} rows={2} 
         className="w-full px-4 py-3 rounded-xl border border-outline bg-surface-container-low font-label-md text-on-surface placeholder:text-on-surface-variant/60 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all resize-none" />
       </div>
       <div>
-       <label className="block text-xs font-black text-black uppercase tracking-wider mb-1.5 ml-1">Mô tả (EN)</label>
+       <label className="block text-xs font-black text-black uppercase tracking-wider mb-1.5 ml-1">{t('admin.products.descEn')}</label>
        <textarea value={form.description_en} onChange={(e) => setForm({...form, description_en: e.target.value})} rows={2} 
         className="w-full px-4 py-3 rounded-xl border border-outline bg-surface-container-low font-label-md text-on-surface placeholder:text-on-surface-variant/60 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all resize-none" />
       </div>
@@ -99,12 +101,12 @@ function CategoryModal({ category, onSave, onClose }: {
 
      <div className="grid grid-cols-2 gap-4">
       <div>
-       <label className="block text-xs font-black text-black uppercase tracking-wider mb-1.5 ml-1">Link tài liệu</label>
+       <label className="block text-xs font-black text-black uppercase tracking-wider mb-1.5 ml-1">{t('admin.products.docLink')}</label>
        <input type="url" value={form.related_url} onChange={(e) => setForm({...form, related_url: e.target.value})} placeholder="https://..." 
         className="w-full px-4 py-3 rounded-xl border border-outline bg-surface-container-low font-label-md text-on-surface placeholder:text-on-surface-variant/60 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all" />
       </div>
       <div>
-       <label className="block text-xs font-black text-black uppercase tracking-wider mb-1.5 ml-1">Link sản phẩm</label>
+       <label className="block text-xs font-black text-black uppercase tracking-wider mb-1.5 ml-1">{t('admin.products.productLink')}</label>
        <input type="url" value={form.product_link} onChange={(e) => setForm({...form, product_link: e.target.value})} placeholder="https://..." 
         className="w-full px-4 py-3 rounded-xl border border-outline bg-surface-container-low font-label-md text-on-surface placeholder:text-on-surface-variant/60 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all" />
       </div>
@@ -119,10 +121,10 @@ function CategoryModal({ category, onSave, onClose }: {
     </div>
 
     <div className="flex justify-end gap-3 p-4 border-t-2 border-black bg-slate-100">
-     <button onClick={onClose} className="px-5 py-2.5 rounded-xl border-2 border-black font-bold text-black bg-white shadow-[1px_1px_0px_0px_#000]  transition-all">Hủy</button>
+     <button onClick={onClose} className="px-5 py-2.5 rounded-xl border-2 border-black font-bold text-black bg-white shadow-[1px_1px_0px_0px_#000]  transition-all">{t('admin.common.cancel')}</button>
      <button onClick={handleSave} disabled={saving} className="px-5 py-2.5 rounded-xl bg-black text-white border-2 border-black font-bold shadow-[1px_1px_0px_0px_#000]  flex items-center gap-2 transition-all disabled:opacity-50">
       {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-      {saving ? 'Đang lưu...' : 'Lưu'}
+      {saving ? t('admin.products.saving') : t('admin.common.save')}
      </button>
     </div>
    </div>
@@ -138,6 +140,7 @@ function ProductModal({ product, categories, defaultCategory, onSave, onClose }:
  onSave: (data: Partial<Product>) => Promise<void>;
  onClose: () => void;
 }) {
+ const { t: tp } = useTranslation();
  const [form, setForm] = useState({
   title: product?.title || '', title_en: product?.title_en || '',
   description: product?.description || '', description_en: product?.description_en || '',
@@ -150,29 +153,29 @@ function ProductModal({ product, categories, defaultCategory, onSave, onClose }:
   status: product?.status || 'draft', featured: product?.featured || false,
   sort_order: product?.sort_order || 0, language: product?.language || 'vi',
  });
- const [saving, setSaving] = useState(false);
- const [error, setError] = useState('');
- const [importing, setImporting] = useState(false);
- const [importError, setImportError] = useState('');
- const [importSuccess, setImportSuccess] = useState(false);
- const [importMeta, setImportMeta] = useState<{title: string; description: string; image: string; siteName: string} | null>(null);
+const [saving, setSaving] = useState(false);
+const [error, setError] = useState('');
+const [importing, setImporting] = useState(false);
+const [importError, setImportError] = useState('');
+const [importSuccess, setImportSuccess] = useState(false);
+const [importMeta, setImportMeta] = useState<{title: string; description: string; image: string; siteName: string} | null>(null);
 
- const handleSave = async () => {
-   if (!form.title.trim()) { setError('Vui lòng nhập tên sản phẩm'); return; }
-   if (!form.category) { setError('Vui lòng chọn danh mục'); return; }
+const handleSave = async () => {
+  if (!form.title.trim()) { setError(tp('admin.products.pleaseEnterName')); return; }
+  if (!form.category) { setError(tp('admin.products.chooseCategory')); return; }
   setSaving(true); setError('');
   try {
    const iso_codes = form.iso_codes.split(',').map(s => s.trim()).filter(Boolean);
    await onSave({ ...form, iso_codes: iso_codes as any, featured: !!form.featured });
-  } catch (e) { setError((e as Error)?.message || 'Lỗi không xác định'); } finally { setSaving(false); }
+  } catch (e) { setError((e as Error)?.message || tp('admin.common.error')); } finally { setSaving(false); }
  };
 
 // ============== URL IMPORT ==============
 const handleImportFromUrl = async () => {
   const url = (form.source_url || form.product_url || '').trim();
-  if (!url) { setImportError('Nhập URL vào ô Link Nguồn hoặc Link mua hàng trước'); return; }
+  if (!url) { setImportError(tp('admin.products.pleaseEnterUrl')); return; }
   if (!/^https?:\/\//i.test(url)) {
-    setImportError('URL phải bắt đầu bằng http:// hoặc https://');
+    setImportError(tp('admin.products.urlMustStartWithHttp'));
     return;
   }
   setImporting(true); setImportError(''); setImportSuccess(false);
@@ -189,10 +192,10 @@ const handleImportFromUrl = async () => {
       setImportMeta(meta);
       setImportSuccess(true);
     } else {
-      setImportError(res.error || 'Không lấy được metadata từ URL này');
+      setImportError(res.error || tp('admin.products.fetchFailed'));
     }
   } catch (e) {
-    setImportError((e as Error)?.message || 'Lỗi không xác định');
+    setImportError((e as Error)?.message || tp('admin.common.error'));
   } finally {
     setImporting(false);
   }
@@ -205,8 +208,8 @@ const handleImportFromUrl = async () => {
    <div className="relative w-full max-w-3xl max-h-[90vh] flex flex-col rounded-xl overflow-hidden bg-white border border-slate-200 shadow-xl">
     <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 bg-slate-50">
      <div>
-      <h2 className="text-base font-semibold text-black">{product ? 'Sửa Sản phẩm' : 'Thêm Sản phẩm mới'}</h2>
-      <p className="text-xs text-slate-500 mt-0.5">{product ? 'Cập nhật thông tin' : 'Thêm sản phẩm vào danh mục'}</p>
+      <h2 className="text-base font-semibold text-black">{product ? tp('admin.common.edit') + ' ' + tp('admin.products.tabProducts') : tp('admin.products.addProduct')}</h2>
+      <p className="text-xs text-slate-500 mt-0.5">{product ? tp('admin.products.categoryUpdateHint') : tp('admin.products.empty')}</p>
      </div>
      <button onClick={onClose} className="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-100 transition-colors">
       <span className="material-symbols-outlined text-base">close</span>
@@ -218,44 +221,44 @@ const handleImportFromUrl = async () => {
      <section className="p-4 rounded-lg bg-white border border-slate-200">
       <h3 className="text-sm font-semibold text-black mb-3 flex items-center gap-2">
        <span className="material-symbols-outlined text-base text-slate-400">info</span>
-       Thông tin cơ bản
-       <span className="ml-auto text-[10px] font-medium text-slate-400 bg-slate-100 px-2 py-0.5 rounded">Bắt buộc</span>
+       {tp('admin.products.basicInfo')}
+       <span className="ml-auto text-[10px] font-medium text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{tp('admin.products.required')}</span>
       </h3>
       <div className="grid grid-cols-2 gap-3">
        <div className="col-span-2">
-        <label className="block text-xs font-medium text-slate-600 mb-1">Danh mục <span className="text-red-500">*</span></label>
+        <label className="block text-xs font-medium text-slate-600 mb-1">{tp('admin.products.productCategory')} <span className="text-red-500">*</span></label>
         <select value={form.category} onChange={(e) => setForm({...form, category: e.target.value})}
          className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm text-black focus:outline-none focus:border-primary transition-colors">
-         <option value="">Chọn danh mục</option>
+         <option value="">{tp('admin.products.chooseCategory')}</option>
          {categories.map((c) => (<option key={c.id} value={c.id}>{c.icon} {c.name_vi}</option>))}
         </select>
        </div>
 
        <div className="col-span-2">
-        <label className="block text-xs font-medium text-slate-600 mb-1">Tên sản phẩm (VI) <span className="text-red-500">*</span></label>
+        <label className="block text-xs font-medium text-slate-600 mb-1">{tp('admin.products.productNameVi')} <span className="text-red-500">*</span></label>
         <input type="text" value={form.title} onChange={(e) => setForm({...form, title: e.target.value})}
-         placeholder="Nhập tên sản phẩm"
+         placeholder={tp('admin.products.pleaseEnterName')}
          className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm text-black placeholder:text-slate-400 focus:outline-none focus:border-primary transition-colors" />
        </div>
 
        <div>
-        <label className="block text-xs font-medium text-slate-600 mb-1">Tên (EN)</label>
+        <label className="block text-xs font-medium text-slate-600 mb-1">{tp('admin.products.productNameEn')}</label>
         <input type="text" value={form.title_en} onChange={(e) => setForm({...form, title_en: e.target.value})}
-         placeholder="English name"
+         placeholder={tp('admin.products.englishNamePlaceholder')}
          className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm text-black placeholder:text-slate-400 focus:outline-none focus:border-primary transition-colors" />
        </div>
 
        <div>
-        <label className="block text-xs font-medium text-slate-600 mb-1">Thương hiệu</label>
+        <label className="block text-xs font-medium text-slate-600 mb-1">{tp('admin.products.brand')}</label>
         <input type="text" value={form.brand} onChange={(e) => setForm({...form, brand: e.target.value})}
          placeholder="Apple, Microsoft..."
          className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm text-black placeholder:text-slate-400 focus:outline-none focus:border-primary transition-colors" />
        </div>
 
        <div>
-        <label className="block text-xs font-medium text-slate-600 mb-1">Khoảng giá</label>
+        <label className="block text-xs font-medium text-slate-600 mb-1">{tp('admin.products.priceRange')}</label>
         <input type="text" value={form.price_range} onChange={(e) => setForm({...form, price_range: e.target.value})}
-         placeholder="VNĐ / USD"
+         placeholder={tp('admin.products.pricePlaceholder')}
          className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm text-black placeholder:text-slate-400 focus:outline-none focus:border-primary transition-colors" />
        </div>
       </div>
@@ -265,17 +268,17 @@ const handleImportFromUrl = async () => {
      <section className="p-4 rounded-lg bg-white border border-slate-200">
       <h3 className="text-sm font-semibold text-black mb-3 flex items-center gap-2">
        <span className="material-symbols-outlined text-base text-slate-400">description</span>
-       Mô tả
+       {tp('admin.products.descSection')}
       </h3>
       <div className="space-y-3">
        <div>
-        <label className="block text-xs font-medium text-slate-600 mb-1">Mô tả ngắn (VI)</label>
+        <label className="block text-xs font-medium text-slate-600 mb-1">{tp('admin.products.descShortVi')}</label>
         <textarea value={form.description} onChange={(e) => setForm({...form, description: e.target.value})}
          rows={2} placeholder="Tóm tắt ngắn gọn"
          className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm text-black placeholder:text-slate-400 focus:outline-none focus:border-primary transition-colors resize-none" />
        </div>
        <div>
-        <label className="block text-xs font-medium text-slate-600 mb-1">Mô tả ngắn (EN)</label>
+        <label className="block text-xs font-medium text-slate-600 mb-1">{tp('admin.products.descShortEn')}</label>
         <textarea value={form.description_en} onChange={(e) => setForm({...form, description_en: e.target.value})}
          rows={2} placeholder="Short summary"
          className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm text-black placeholder:text-slate-400 focus:outline-none focus:border-primary transition-colors resize-none" />
@@ -288,13 +291,13 @@ const handleImportFromUrl = async () => {
       <div className="flex items-center justify-between mb-3">
        <h3 className="text-sm font-semibold text-black flex items-center gap-2">
         <span className="material-symbols-outlined text-base text-slate-400">link</span>
-        Liên kết & Kỹ thuật
+        {tp('admin.products.linksTech')}
        </h3>
        {!product && (
          <button type="button" onClick={handleImportFromUrl} disabled={importing}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-white text-xs font-medium hover:bg-primary/90 transition-colors disabled:opacity-50">
           {importing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <span className="material-symbols-outlined text-sm">download</span>}
-          Import URL
+          {tp('admin.products.importUrl')}
          </button>
        )}
       </div>
@@ -306,15 +309,15 @@ const handleImportFromUrl = async () => {
         <div className="flex items-start gap-3">
          <span className="material-symbols-outlined text-green-600 text-lg mt-0.5" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
          <div className="flex-1">
-          <p className="text-sm font-medium text-green-800 mb-1">Đã lấy metadata!</p>
+          <p className="text-sm font-medium text-green-800 mb-1">{tp('admin.products.metadataFetched')}</p>
           <div className="flex gap-2">
 <button type="button" onClick={() => window.open(`${window.location.origin}/chat`, '_blank')}
             className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-green-600 text-white text-xs font-medium hover:bg-green-700">
-            <span className="material-symbols-outlined text-sm">chat</span> Mở Chat
+            <span className="material-symbols-outlined text-sm">chat</span> {tp('admin.products.openChat')}
           </button>
            <button type="button" onClick={() => { setImportSuccess(false); setImportMeta(null); }}
             className="px-3 py-1.5 rounded-lg bg-white border border-green-300 text-green-700 text-xs font-medium hover:bg-green-50">
-            Tiếp tục sửa
+            {tp('admin.products.continueEditing')}
            </button>
           </div>
          </div>
@@ -323,19 +326,19 @@ const handleImportFromUrl = async () => {
       )}
       <div className="grid grid-cols-3 gap-3">
        <div>
-        <label className="block text-xs font-medium text-slate-600 mb-1">Link Nguồn</label>
+        <label className="block text-xs font-medium text-slate-600 mb-1">{tp('admin.products.sourceLink')}</label>
         <input type="url" value={form.source_url} onChange={(e) => setForm({...form, source_url: e.target.value})}
          placeholder="https://"
          className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm text-black placeholder:text-slate-400 focus:outline-none focus:border-primary transition-colors" />
        </div>
        <div>
-        <label className="block text-xs font-medium text-slate-600 mb-1">Link mua hàng</label>
+        <label className="block text-xs font-medium text-slate-600 mb-1">{tp('admin.products.buyLink')}</label>
         <input type="url" value={form.product_url} onChange={(e) => setForm({...form, product_url: e.target.value})}
          placeholder="https://"
          className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm text-black placeholder:text-slate-400 focus:outline-none focus:border-primary transition-colors" />
        </div>
        <div>
-        <label className="block text-xs font-medium text-slate-600 mb-1">Link hình ảnh</label>
+        <label className="block text-xs font-medium text-slate-600 mb-1">{tp('admin.products.imageLink')}</label>
         <input type="url" value={form.image_url} onChange={(e) => setForm({...form, image_url: e.target.value})}
          placeholder="https://"
          className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm text-black placeholder:text-slate-400 focus:outline-none focus:border-primary transition-colors" />
@@ -347,30 +350,32 @@ const handleImportFromUrl = async () => {
       </div>
       <div className="grid grid-cols-3 gap-3">
        <div>
-        <label className="block text-xs font-medium text-slate-600 mb-1">Mã ISO</label>
+        <label className="block text-xs font-medium text-slate-600 mb-1">{tp('admin.products.isoCode')}</label>
         <input type="text" value={form.iso_codes} onChange={(e) => setForm({...form, iso_codes: e.target.value})}
          placeholder="ISO 9999..."
          className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm text-black placeholder:text-slate-400 focus:outline-none focus:border-primary transition-colors" />
        </div>
        <div>
-        <label className="block text-xs font-medium text-slate-600 mb-1">Mức WCAG</label>
+        <label className="block text-xs font-medium text-slate-600 mb-1">{tp('admin.products.wcagLevel')}</label>
         <select value={form.wcag_level} onChange={(e) => setForm({...form, wcag_level: e.target.value})}
          className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm text-black focus:outline-none focus:border-primary transition-colors">
-         <option value="">Không</option>
-         <option value="A">Level A</option>
-         <option value="AA">Level AA</option>
-         <option value="AAA">Level AAA</option>
+         <option value="">{tp('admin.products.none')}</option>
+         <option value="A">{tp('admin.products.wcagA')}</option>
+         <option value="AA">{tp('admin.products.wcagAA')}</option>
+         <option value="AAA">{tp('admin.products.wcagAAA')}</option>
         </select>
        </div>
        <div>
-        <label className="block text-xs font-medium text-slate-600 mb-1">WHO GATE Area</label>
+        <label className="block text-xs font-medium text-slate-600 mb-1">{tp('admin.products.whoGateArea')}</label>
         <select value={form.who_gate_area} onChange={(e) => setForm({...form, who_gate_area: e.target.value})}
          className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm text-black focus:outline-none focus:border-primary transition-colors">
-         <option value="">Chọn</option>
-         <option value="vision">Vision</option>
-         <option value="hearing">Hearing</option>
-         <option value="mobility">Mobility</option>
-         <option value="cognition">Cognition</option>
+         <option value="">{tp('admin.products.choose')}</option>
+         <option value="vision">{tp('admin.products.vision')}</option>
+         <option value="hearing">{tp('admin.products.hearing')}</option>
+         <option value="mobility">{tp('admin.products.mobility')}</option>
+         <option value="cognition">{tp('admin.products.cognition')}</option>
+         <option value="communication">{tp('admin.products.communication')}</option>
+         <option value="self_care">{tp('admin.products.selfCare')}</option>
         </select>
        </div>
       </div>
@@ -380,37 +385,37 @@ const handleImportFromUrl = async () => {
      <section className="p-4 rounded-lg bg-white border border-slate-200">
       <h3 className="text-sm font-semibold text-black mb-3 flex items-center gap-2">
        <span className="material-symbols-outlined text-base text-slate-400">tune</span>
-       Cấu hình
+       {tp('admin.products.config')}
       </h3>
       <div className="grid grid-cols-3 gap-3">
        <div>
-        <label className="block text-xs font-medium text-slate-600 mb-2">Trạng thái</label>
+        <label className="block text-xs font-medium text-slate-600 mb-2">{tp('admin.products.productStatus')}</label>
         <div className="flex gap-1">
          {(['draft', 'published', 'archived'] as const).map((s) => (
           <button key={s} type="button" onClick={() => setForm({...form, status: s})}
            className={clsx('flex-1 py-1.5 rounded-lg text-xs font-medium border transition-colors',
             form.status === s ? 'bg-black text-white border-black' : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50')}>
-           {s === 'draft' ? 'Nháp' : s === 'published' ? 'Xuất bản' : 'Lưu trữ'}
+           {s === 'draft' ? tp('admin.products.draft') : s === 'published' ? tp('admin.products.published') : tp('admin.products.archived')}
           </button>
          ))}
         </div>
        </div>
 
        <div>
-        <label className="block text-xs font-medium text-slate-600 mb-2">Ngôn ngữ</label>
+        <label className="block text-xs font-medium text-slate-600 mb-2">{tp('admin.products.lang')}</label>
         <select value={form.language} onChange={(e) => setForm({...form, language: e.target.value})}
          className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm text-black focus:outline-none focus:border-primary">
-         <option value="vi">Tiếng Việt</option>
-         <option value="en">English</option>
+         <option value="vi">{tp('admin.products.langVi')}</option>
+         <option value="en">{tp('admin.products.langEn')}</option>
         </select>
        </div>
 
        <div>
-        <label className="block text-xs font-medium text-slate-600 mb-2">Nổi bật</label>
+        <label className="block text-xs font-medium text-slate-600 mb-2">{tp('admin.products.featured')}</label>
         <button type="button" onClick={() => setForm({...form, featured: !form.featured})}
          className={clsx('w-full py-2 rounded-lg text-xs font-medium border transition-colors',
           form.featured ? 'bg-amber-400 text-black border-amber-400' : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50')}>
-         {form.featured ? '★ Nổi bật' : '○ Bình thường'}
+         {form.featured ? tp('admin.products.featuredYes') : tp('admin.products.featuredNo')}
         </button>
        </div>
       </div>
@@ -425,11 +430,11 @@ const handleImportFromUrl = async () => {
     </div>
 
     <div className="flex items-center justify-end gap-3 px-5 py-4 border-t border-slate-200 bg-slate-50">
-     <button onClick={onClose} className="px-4 py-2 rounded-lg border border-slate-300 text-slate-600 text-sm font-medium hover:bg-slate-100 transition-colors">Hủy</button>
+     <button onClick={onClose} className="px-4 py-2 rounded-lg border border-slate-300 text-slate-600 text-sm font-medium hover:bg-slate-100 transition-colors">{tp('admin.common.cancel')}</button>
      <button onClick={handleSave} disabled={saving}
       className="px-5 py-2 rounded-lg bg-primary text-white text-sm font-medium flex items-center gap-2 hover:bg-primary/90 transition-colors disabled:opacity-50">
       {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-      {saving ? 'Đang lưu...' : 'Lưu'}
+      {saving ? tp('admin.products.saving') : tp('admin.common.save')}
      </button>
     </div>
    </div>
@@ -442,6 +447,7 @@ function ProductCard({ product, categoryName, onEdit, onDelete, onTogglePublish 
  product: Product; categoryName: string;
  onEdit: (p: Product) => void; onDelete: (p: Product) => void; onTogglePublish: (p: Product) => void;
 }) {
+ const { t } = useTranslation();
  const isPublished = product.status === 'published';
  const catColors: Record<string, { bg: string; text: string }> = {
   vision: { bg: 'bg-blue-100', text: 'text-blue-700' },
@@ -481,7 +487,7 @@ function ProductCard({ product, categoryName, onEdit, onDelete, onTogglePublish 
      )}
      {!isPublished && (
       <span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-slate-500 text-white border border-black/20">
-       Nháp
+       {t('admin.products.draft')}
       </span>
      )}
     </div>
@@ -490,12 +496,12 @@ function ProductCard({ product, categoryName, onEdit, onDelete, onTogglePublish 
     <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
      <button onClick={(e) => { e.stopPropagation(); onEdit(product); }}
       className="w-7 h-7 rounded bg-white/90 border border-slate-300 flex items-center justify-center text-slate-600 hover:bg-blue-100 hover:text-blue-600 transition-colors"
-      title="Sửa">
+      title={t('admin.common.edit')}>
       <span className="material-symbols-outlined text-sm">edit</span>
      </button>
      <button onClick={(e) => { e.stopPropagation(); onDelete(product); }}
       className="w-7 h-7 rounded bg-white/90 border border-slate-300 flex items-center justify-center text-slate-600 hover:bg-red-100 hover:text-red-500 transition-colors"
-      title="Xóa">
+      title={t('admin.common.delete')}>
       <span className="material-symbols-outlined text-sm">delete</span>
      </button>
     </div>
@@ -522,7 +528,7 @@ function ProductCard({ product, categoryName, onEdit, onDelete, onTogglePublish 
         : 'bg-white text-slate-600 border-slate-300 hover:bg-blue-100 hover:text-blue-600'
       )}
      >
-      {isPublished ? '✓ Live' : 'Đăng'}
+      {isPublished ? '✓ ' + t('admin.products.published') : t('admin.products.draft')}
      </button>
     </div>
    </div>
@@ -534,6 +540,7 @@ function ProductCard({ product, categoryName, onEdit, onDelete, onTogglePublish 
 function CategoryCard({ category, productCount, onEdit, onAddProduct }: {
  category: Category; productCount: number; onEdit: (c: Category) => void; onAddProduct: (c: Category) => void;
 }) {
+ const { t } = useTranslation();
  const catColors: Record<string, { bg: string; text: string; icon: string }> = {
   vision: { bg: 'bg-blue-100 text-blue-600', text: 'text-blue-700', icon: 'visibility' },
   hearing: { bg: 'bg-amber-100 text-amber-600', text: 'text-amber-700', icon: 'hearing' },
@@ -567,11 +574,11 @@ function CategoryCard({ category, productCount, onEdit, onAddProduct }: {
     <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-100">
      <button onClick={() => onEdit(category)}
       className="flex-1 py-2 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors text-xs font-medium">
-      Sửa
+      {t('admin.common.edit')}
      </button>
      <button onClick={() => onAddProduct(category)}
       className="flex-1 py-2 rounded-lg bg-primary text-white hover:bg-primary/90 transition-colors text-xs font-medium">
-      + Thêm SP
+      + {t('admin.common.add')}
      </button>
     </div>
    </div>
@@ -654,12 +661,12 @@ export function AdminProducts() {
   await loadProducts();
  };
 
- const handleDeleteProduct = async (prod: Product) => {
-  if (!confirm(`Xóa "${prod.title}"?`)) return;
+const handleDeleteProduct = async (prod: Product) => {
+  if (!confirm(t('admin.products.confirmDelete'))) return;
   const res = await adminApi.deleteProduct(prod.id);
   if (!res.success) alert(res.error);
   else await loadProducts();
- };
+};
 
 const handleTogglePublish = async (prod: Product) => {
   const newStatus = prod.status === 'published' ? 'draft' : 'published';
@@ -668,10 +675,10 @@ const handleTogglePublish = async (prod: Product) => {
 };
 
 const handlePublishAll = async () => {
-  if (!confirm('Đăng tất cả sản phẩm để user có thể tìm kiếm?')) return;
+  if (!confirm(t('admin.products.publishAll'))) return;
   const unpublished = products.filter(p => p.status !== 'published');
   if (unpublished.length === 0) {
-    alert('Không có sản phẩm nào cần đăng!');
+    alert(t('admin.products.noUnpublished'));
     return;
   }
   try {
@@ -686,29 +693,29 @@ const handlePublishAll = async () => {
 
 const handleBulkPublish = async () => {
   if (selectedProducts.size === 0) return;
-  if (!confirm(`Đăng ${selectedProducts.size} sản phẩm đã chọn?`)) return;
+  if (!confirm(t('admin.products.publishSelected'))) return;
   try {
     const result = await adminApi.bulkPublish({ ids: Array.from(selectedProducts), scope: 'selected' });
-    const msg = result?.message || `Đã đăng ${selectedProducts.size} sản phẩm`;
-    alert(`✅ ${msg}`);
+    const msg = result?.message || `${t('admin.common.success')}: ${selectedProducts.size} ${t('admin.products.count')}`;
+    alert(msg);
     setSelectedProducts(new Set());
     await loadProducts();
   } catch (e) {
-    alert(`❌ Lỗi: ${(e as Error)?.message || 'Không thể đăng hàng loạt'}`);
+    alert(`${t('admin.common.error')}: ${(e as Error)?.message || t('admin.products.bulkPublishFailed')}`);
   }
 };
 
 const handleBulkUnpublish = async () => {
   if (selectedProducts.size === 0) return;
-  if (!confirm(`Bỏ đăng ${selectedProducts.size} sản phẩm đã chọn?`)) return;
+  if (!confirm(t('admin.products.unpublishSelected'))) return;
   try {
     const result = await adminApi.bulkUnpublish({ ids: Array.from(selectedProducts), scope: 'selected' });
-    const msg = result?.message || `Đã bỏ đăng ${selectedProducts.size} sản phẩm`;
-    alert(`✅ ${msg}`);
+    const msg = result?.message || `${t('admin.common.success')}: ${selectedProducts.size} ${t('admin.products.count')}`;
+    alert(msg);
     setSelectedProducts(new Set());
     await loadProducts();
   } catch (e) {
-    alert(`❌ Lỗi: ${(e as Error)?.message || 'Không thể bỏ đăng hàng loạt'}`);
+    alert(`${t('admin.common.error')}: ${(e as Error)?.message || t('admin.products.bulkUnpublishFailed')}`);
   }
 };
 
@@ -723,10 +730,18 @@ const totalPages = Math.ceil(totalProducts / pageSize);
   setShowProductModal(true);
  };
 
+  const { t } = useTranslation();
+
   return (
    <AdminLayout
-    title="Quản lý Sản phẩm"
-    subtitle="Hệ thống điều hành trung tâm cho kho tri thức MADA AI."
+    title={t('admin.topBar.products')}
+    titleEn="Product Management"
+    titleAr="إدارة المنتجات"
+    titleFr="Gestion des produits"
+    subtitle={t('admin.topBar.productsSub')}
+    subtitleEn="Central operating system for the MADA AI knowledge base."
+    subtitleAr="نظام التشغيل المركزي لقاعدة معرفة MADA AI."
+    subtitleFr="Système d'exploitation central pour la base de connaissances MADA AI."
     showFab={false}
     showLayoutTitle={false}
    >
@@ -737,10 +752,10 @@ const totalPages = Math.ceil(totalProducts / pageSize);
      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-primary/10 via-transparent to-transparent rounded-3xl"></div>
      <div className="max-w-2xl relative z-10 py-6 px-6">
       <h2 className="text-3xl font-black text-on-surface mb-3 tracking-tight">
-       Quản lý Sản phẩm & Danh mục
+       {t('admin.products.title2')}
       </h2>
       <p className="text-base font-medium text-on-surface-variant border-l-4 border-primary pl-5 py-2 bg-white/40 backdrop-blur-sm rounded-r-xl">
-       Quản lý kho tri thức sản phẩm hỗ trợ người khuyết tật.
+       {t('admin.products.subtitle2')}
       </p>
      </div>
     </div>
@@ -753,7 +768,7 @@ const totalPages = Math.ceil(totalProducts / pageSize);
       <span className="material-symbols-outlined text-lg text-primary" style={{ fontVariationSettings: "'FILL' 1" }}>inventory_2</span>
      </div>
      <div>
-      <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">SẢN PHẨM</p>
+      <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">{t('admin.products.statProducts')}</p>
       {loading ? (
        <div className="w-16 h-6 bg-gray-200 rounded animate-pulse"></div>
       ) : (
@@ -767,7 +782,7 @@ const totalPages = Math.ceil(totalProducts / pageSize);
       <span className="material-symbols-outlined text-lg text-amber-600" style={{ fontVariationSettings: "'FILL' 1" }}>category</span>
      </div>
      <div>
-      <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">DANH MỤC</p>
+      <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">{t('admin.products.statCategories')}</p>
       {loading ? (
        <div className="w-10 h-6 bg-gray-200 rounded animate-pulse"></div>
       ) : (
@@ -781,13 +796,13 @@ const totalPages = Math.ceil(totalProducts / pageSize);
       <span className="material-symbols-outlined text-lg text-emerald-600" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
      </div>
      <div>
-      <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">ĐÃ XUẤT BẢN</p>
+      <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">{t('admin.products.statPublished')}</p>
       {loading ? (
        <div className="w-10 h-6 bg-gray-200 rounded animate-pulse"></div>
       ) : (
        <h3 className="text-xl font-black text-on-surface">{products.filter(p => p.status === 'published').length}</h3>
       )}
-      <p className="text-[10px] text-on-surface-variant mt-0.5">sản phẩm</p>
+      <p className="text-[10px] text-on-surface-variant mt-0.5">{t('admin.products.count')}</p>
      </div>
     </div>
    </section>
@@ -797,8 +812,8 @@ const totalPages = Math.ceil(totalProducts / pageSize);
     <div className="mb-6 p-4 bg-red-50 border-2 border-red-300 rounded-xl flex items-center gap-3">
      <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
      <div>
-      <p className="font-semibold text-red-700">Không thể tải danh mục</p>
-      <p className="text-sm text-red-600">Vui lòng kiểm tra server và thử refresh trang</p>
+      <p className="font-semibold text-red-700">{t('admin.products.loadCatFail')}</p>
+      <p className="text-sm text-red-600">{t('admin.products.loadCatHint')}</p>
      </div>
      <button onClick={() => { loadCategories(); loadProducts(); }}
       className="ml-auto px-3 py-1 bg-red-500 text-white text-sm rounded-lg hover:bg-red-600">
@@ -813,14 +828,14 @@ const totalPages = Math.ceil(totalProducts / pageSize);
    {/* Header với tabs */}
    <div className="flex items-center justify-between mb-6">
      <div>
-      <h1 className="text-2xl font-black text-black">Quản lý Sản phẩm</h1>
-      <p className="text-sm text-slate-500 mt-0.5">{totalProducts} sản phẩm · {categories.length} danh mục</p>
+      <h1 className="text-2xl font-black text-black">{t('admin.products.title2')}</h1>
+      <p className="text-sm text-slate-500 mt-0.5">{totalProducts} {t('admin.products.count')} · {categories.length} {t('admin.products.tabCategories')}</p>
      </div>
      <div className="flex items-center gap-2">
       {products.some(p => p.status !== 'published') && (
        <button onClick={handlePublishAll}
         className="px-4 py-2 rounded-lg bg-emerald-500 text-white font-bold text-sm border-2 border-black hover:bg-emerald-600 transition-all flex items-center gap-2 shadow-[2px_2px_0px_0px_#000]">
-        <CheckCircle2 className="w-4 h-4" /> Đăng tất cả
+        <CheckCircle2 className="w-4 h-4" /> {t('admin.products.publishAll')}
        </button>
       )}
       <button onClick={() => setViewMode('products')} 
@@ -828,18 +843,18 @@ const totalPages = Math.ceil(totalProducts / pageSize);
         viewMode === 'products' 
          ? 'bg-black text-white' 
          : 'bg-white text-black hover:bg-slate-50')}>
-       Sản phẩm
+       {t('admin.products.tabProducts')}
       </button>
       <button onClick={() => setViewMode('categories')} 
        className={clsx('px-4 py-2 rounded-lg font-bold text-sm transition-all border-2 border-black',
         viewMode === 'categories' 
          ? 'bg-black text-white' 
          : 'bg-white text-black hover:bg-slate-50')}>
-       Danh mục
+       {t('admin.products.tabCategories')}
       </button>
       <button onClick={() => handleOpenAddProduct()}
        className="px-4 py-2 rounded-lg bg-primary text-white font-bold text-sm border-2 border-black hover:bg-primary/90 transition-all flex items-center gap-2">
-       <Plus className="w-4 h-4" /> Thêm SP
+       <Plus className="w-4 h-4" /> {t('admin.common.add')}
       </button>
      </div>
     </div>
@@ -853,7 +868,7 @@ const totalPages = Math.ceil(totalProducts / pageSize);
        <button onClick={() => setFilterCategory('')}
         className={clsx('px-3 py-1.5 rounded-lg font-bold text-xs transition-all border border-slate-300',
          !filterCategory ? 'bg-black text-white' : 'bg-white text-slate-600 hover:bg-slate-50')}>
-        Tất cả
+        {t('admin.common.all')}
        </button>
        {categories.map((cat) => {
         const isActive = filterCategory === cat.id;
@@ -927,11 +942,11 @@ const totalPages = Math.ceil(totalProducts / pageSize);
        <div className="w-16 h-16 rounded-xl border-[3px] border-black shadow-[1px_1px_0px_0px_#000] bg-white flex items-center justify-center mb-4">
         <span className="material-symbols-outlined text-3xl text-black">inventory_2</span>
        </div>
-       <h3 className="text-title-md font-black text-black mb-1">Chưa có sản phẩm nào</h3>
-       <p className="text-body-md text-slate-600 mb-4">Thêm sản phẩm đầu tiên để AI có thể tư vấn.</p>
+       <h3 className="text-title-md font-black text-black mb-1">{t('admin.products.emptyTitle')}</h3>
+       <p className="text-body-md text-slate-600 mb-4">{t('admin.products.emptyHint')}</p>
        <button onClick={() => handleOpenAddProduct()}
         className="px-6 py-3 bg-black text-white rounded-xl font-bold border-[3px] border-black shadow-[1px_1px_0px_0px_#000]  transition-all flex items-center gap-2">
-        <Plus className="w-5 h-5" /> Thêm sản phẩm
+        <Plus className="w-5 h-5" /> {t('admin.products.addProduct')}
        </button>
       </div>
      ) : (
@@ -948,21 +963,21 @@ const totalPages = Math.ceil(totalProducts / pageSize);
           }}
           className="w-5 h-5 rounded border-2 border-black text-indigo-600 focus:ring-indigo-500"
          />
-         <label htmlFor="select-all" className="font-bold text-sm text-black cursor-pointer">Chọn tất cả ({products.length})</label>
+         <label htmlFor="select-all" className="font-bold text-sm text-black cursor-pointer">{t('admin.common.selectAll')} ({products.length})</label>
          {selectedProducts.size > 0 && (
           <div className="flex items-center gap-2 ml-auto">
-           <span className="text-sm font-bold text-slate-600">{selectedProducts.size} đã chọn</span>
+           <span className="text-sm font-bold text-slate-600">{selectedProducts.size} {t('admin.common.selected')}</span>
            <button onClick={handleBulkPublish}
             className="px-3 py-1.5 rounded-lg bg-emerald-500 text-white font-bold text-xs border-2 border-black hover:bg-emerald-600 transition-all">
-            ✓ Đăng ({selectedProducts.size})
+            ✓ {t('admin.products.publishSelected')}
            </button>
            <button onClick={handleBulkUnpublish}
             className="px-3 py-1.5 rounded-lg bg-amber-500 text-white font-bold text-xs border-2 border-black hover:bg-amber-600 transition-all">
-            ✗ Bỏ đăng ({selectedProducts.size})
+            ✗ {t('admin.products.unpublishSelected')}
            </button>
            <button onClick={() => setSelectedProducts(new Set())}
             className="px-3 py-1.5 rounded-lg bg-slate-200 text-black font-bold text-xs border-2 border-black hover:bg-slate-300 transition-all">
-            Bỏ chọn
+            {t('admin.common.deselect')}
            </button>
           </div>
          )}
@@ -992,15 +1007,15 @@ const totalPages = Math.ceil(totalProducts / pageSize);
 
        {totalPages > 1 && (
         <div className="flex items-center justify-center gap-3 mt-8">
-         <button onClick={() => setPage(Math.max(0, page - 1))} disabled={page === 0}
-          className="px-5 py-2.5 rounded-xl border-2 border-black bg-white text-black font-bold shadow-[1px_1px_0px_0px_#000]  transition-all disabled:opacity-30 disabled:shadow-none disabled:translate-x-0 disabled:translate-y-0">
-          ← Trước
-         </button>
-         <span className="px-5 py-2.5 rounded-xl border-2 border-black bg-white text-black font-bold shadow-[1px_1px_0px_0px_#000]">Trang {page + 1} / {totalPages}</span>
-         <button onClick={() => setPage(Math.min(totalPages - 1, page + 1))} disabled={page >= totalPages - 1}
-          className="px-5 py-2.5 rounded-xl border-2 border-black bg-white text-black font-bold shadow-[1px_1px_0px_0px_#000]  transition-all disabled:opacity-30 disabled:shadow-none disabled:translate-x-0 disabled:translate-y-0">
-          Sau →
-         </button>
+<button onClick={() => setPage(Math.max(0, page - 1))} disabled={page === 0}
+         className="px-5 py-2.5 rounded-xl border-2 border-black bg-white text-black font-bold shadow-[1px_1px_0px_0px_#000]  transition-all disabled:opacity-30 disabled:shadow-none disabled:translate-x-0 disabled:translate-y-0">
+         ← {t('admin.common.previous')}
+        </button>
+        <span className="px-5 py-2.5 rounded-xl border-2 border-black bg-white text-black font-bold shadow-[1px_1px_0px_0px_#000]">{t('admin.common.page')} {page + 1} / {totalPages}</span>
+        <button onClick={() => setPage(Math.min(totalPages - 1, page + 1))} disabled={page >= totalPages - 1}
+         className="px-5 py-2.5 rounded-xl border-2 border-black bg-white text-black font-bold shadow-[1px_1px_0px_0px_#000]  transition-all disabled:opacity-30 disabled:shadow-none disabled:translate-x-0 disabled:translate-y-0">
+         {t('admin.common.next')} →
+        </button>
         </div>
        )}
       </>

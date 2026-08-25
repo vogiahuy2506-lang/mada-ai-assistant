@@ -1,13 +1,14 @@
 // Content Detector - AI-powered content analysis and classification
 
-import { GoogleGenerativeAI, type FunctionDeclaration } from '@google/generative-ai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 // ============ SCHEMA DEFINITIONS ============
 
 /**
  * Structured output schema for CONTENT DETECTION (Task 5)
  */
-const CONTENT_DETECTION_SCHEMA: FunctionDeclaration = {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const CONTENT_DETECTION_SCHEMA: any = {
   name: 'content_detection',
   description: 'Phân tích và phân loại nội dung AT',
   parameters: {
@@ -171,9 +172,8 @@ class ContentDetector {
     return this.fallbackDetection(content, title);
   }
 
-  private fallbackDetection(content: string, title?: string): DetectionResult {
+  private fallbackDetection(content: string, _title?: string): DetectionResult {
     const contentLower = content.toLowerCase();
-    const titleLower = (title || '').toLowerCase();
 
     // Detect content type
     let type: DetectionResult['contentType']['type'] = 'unknown';
@@ -230,7 +230,7 @@ class ContentDetector {
     return {
       contentType: { type, confidence },
       metadata: {
-        title,
+        title: _title,
         isoCodes,
         wcagLevel,
         whoGateCategory,

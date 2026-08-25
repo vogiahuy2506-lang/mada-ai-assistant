@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { AdminLayout } from './AdminLayout';
 import { adminApi, AdminLog } from './adminApi';
+import { useTranslation } from '@/lib/translations';
 import clsx from 'clsx';
 
 type LogLevel = AdminLog['level'] | 'critical';
@@ -14,15 +15,9 @@ const LEVEL_BADGE: Record<LogLevel, { bg: string; text: string; icon: string }> 
   success: { bg: 'bg-secondary/10', text: 'text-secondary', icon: 'check_circle' },
 };
 
-const LEVEL_LABELS: Record<LogLevel, string> = {
-  critical: 'Critical',
-  error: 'Error',
-  warn: 'Warning',
-  info: 'Info',
-  success: 'Success',
-};
-
 const DISPLAY_LEVELS: LogLevel[] = ['critical', 'error', 'warn', 'info', 'success'];
+
+// Note: LEVEL_LABELS is built inside the AdminLogs component using t()
 
 function formatTime(iso: string): string {
   const d = new Date(iso);
@@ -164,6 +159,14 @@ const ACTION_LABELS: Record<string, string> = {
 };
 
 export function AdminLogs() {
+  const { t } = useTranslation();
+  const LEVEL_LABELS: Record<LogLevel, string> = {
+    critical: t('admin.logs.levelCritical'),
+    error: t('admin.logs.levelError'),
+    warn: t('admin.logs.levelWarn'),
+    info: t('admin.logs.levelInfo'),
+    success: t('admin.logs.levelInfo'),
+  };
   const [logs, setLogs] = useState<AdminLog[]>([]);
   const [sources, setSources] = useState<string[]>([]);
   const [levelFilter, setLevelFilter] = useState<DisplayLevel>('all');
@@ -229,8 +232,14 @@ export function AdminLogs() {
 
   return (
     <AdminLayout
-      title="Nhật ký Hệ thống"
-      subtitle="Theo dõi real-time các sự kiện, lỗi và cảnh báo từ toàn bộ microservices của MADA AI."
+      title={t('admin.logs.title')}
+      titleEn="System Logs"
+      titleAr="سجلات النظام"
+      titleFr="Journaux système"
+      subtitle={t('admin.logs.subtitle')}
+      subtitleEn="Real-time monitoring of events, errors and alerts from all MADA AI microservices."
+      subtitleAr="مراقبة في الوقت الفعلي للأحداث والأخطاء والتنبيهات."
+      subtitleFr="Surveillance en temps réel des événements, erreurs et alertes."
       showLayoutTitle={false}
     >
       {/* Hero Banner Section */}

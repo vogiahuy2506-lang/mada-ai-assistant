@@ -1,7 +1,8 @@
 import { useEffect, useState, useCallback } from 'react';
 import { AdminLayout } from './AdminLayout';
 import { adminApi } from './adminApi';
-import { useLanguageStore } from '@/stores';
+import { useAuthStore, useLanguageStore } from '@/stores';
+import { getAccessToken } from '@/lib/api';
 import clsx from 'clsx';
 import { RefreshCw, Search, User as UserIcon, Clock, Download as FileDownload, Filter } from 'lucide-react';
 
@@ -42,6 +43,8 @@ function badgeClass(action: string): string {
 export function AdminAudit() {
   const { language } = useLanguageStore();
   const isEn = language === 'en';
+  const user = useAuthStore((s) => s.user);
+  const isAdmin = user?.role === 'admin';
 
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [total, setTotal] = useState(0);
@@ -52,6 +55,11 @@ export function AdminAudit() {
   const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
+    // ⭐ Chỉ fetch khi đã là admin và có token — tránh 401 spam trên console
+    if (!isAdmin) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const [logsRes] = await Promise.all([
@@ -62,17 +70,19 @@ export function AdminAudit() {
         }),
       ]);
 
-      try {
-        const actRes = await fetch('/api/admin/audit/actions', {
-          headers: { Authorization: `Bearer ${localStorage.getItem('mada-auth') ? JSON.parse(localStorage.getItem('mada-auth')!).accessToken || '' : ''}` },
-        });
-        if (actRes.status === 401 || actRes.status === 403) {
-          // Auth required or forbidden — silently skip action filter
-        } else if (actRes.ok) {
-          const j = await actRes.json();
-          if (j.success && Array.isArray(j.data)) setActions(j.data);
-        }
-      } catch { /* ignore network/server errors */ }
+      const token = getAccessToken();
+      if (token) {
+        try {
+          const actRes = await fetch('/api/admin/audit/actions', {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (actRes.ok) {
+            const j = await actRes.json();
+            if (j.success && Array.isArray(j.data)) setActions(j.data);
+          }
+          // Nếu 401/403/network → silently skip, không retry
+        } catch { /* ignore */ }
+      }
 
       if (logsRes.data) {
         setLogs(Array.isArray(logsRes.data.data) ? logsRes.data.data : []);
@@ -83,7 +93,7 @@ export function AdminAudit() {
     } finally {
       setLoading(false);
     }
-  }, [filterAction, filterUser]);
+  }, [filterAction, filterUser, isAdmin]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -122,10 +132,20 @@ export function AdminAudit() {
 
   return (
     <AdminLayout
-      title={isEn ? 'Activity Logs' : 'Nhật ký Hoạt động'}
+      title={language === 'en' ? 'Activity Logs' : language === 'ar' ? 'سجل النشاط' : language === 'fr' ? "Journal d'activité" : 'Nhật ký Hoạt động'}
       titleEn="Activity Logs"
-      subtitle={isEn ? 'Track every user & admin action across the MADA AI system.' : 'Truy vết mọi hành vi của người dùng & admin trong hệ thống MADA AI.'}
+      titleAr="سجل النشاط"
+      titleFr="Journal d'activité"
+      subtitle={language === 'en'
+        ? 'Track every user & admin action across the MADA AI system.'
+        : language === 'ar'
+        ? 'تتبع كل إجراء للمستخدم والمشرف في نظام MADA AI.'
+        : language === 'fr'
+        ? "Tracer chaque action utilisateur & admin dans le système MADA AI."
+        : 'Truy vết mọi hành vi của người dùng & admin trong hệ thống MADA AI.'}
       subtitleEn="Track every user & admin action across the MADA AI system."
+      subtitleAr="تتبع كل إجراء للمستخدم والمشرف في نظام MADA AI."
+      subtitleFr="Tracer chaque action utilisateur & admin dans le système MADA AI."
       showLayoutTitle={false}
     >
       {/* Hero Banner */}

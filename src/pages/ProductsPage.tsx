@@ -4,7 +4,7 @@
  */
 import { useState, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { Search, Filter, X, ChevronDown, Package, Star, ArrowRight } from 'lucide-react';
+import { Search, Filter, X, Package, ArrowRight } from 'lucide-react';
 import { PublicLayout } from '@/components/PublicLayout';
 import { useLanguageStore } from '@/stores';
 import { formatPrice } from '@/lib/formatPrice';
@@ -362,7 +362,6 @@ export function ProductsPage() {
 
 function ProductCardItem({ product, language, viewText }: { product: Product; language: string; viewText: string }) {
   const ti = language === 'en' && product.title_en ? product.title_en : product.title;
-  const desc = language === 'en' && product.description_en ? product.description_en : product.description;
   return (
     <article
       className="bg-white border-2 border-outline rounded-2xl overflow-hidden hover:border-primary hover:shadow-lg transition-all"

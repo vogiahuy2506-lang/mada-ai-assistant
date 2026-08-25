@@ -1,5 +1,8 @@
 import { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
 import db from '../lib/db';
 import { syncProductToKnowledge, syncAllPublishedProducts } from '../lib/syncKbProducts';
 import { syncItemToVector } from '../lib/syncItemToVector';
@@ -28,7 +31,7 @@ function requireAdmin(req: any, res: any, next: any) {
 // ============== CATEGORIES ==============
 
 // GET /api/admin/categories
-router.get('/categories', (req, res) => {
+router.get('/categories', (_req, res) => {
   try {
     const categories = db.prepare('SELECT * FROM kb_categories ORDER BY sort_order ASC').all();
     res.json({ success: true, data: categories });
@@ -235,7 +238,7 @@ router.post('/products', requireAdmin, (req, res) => {
       featured ? 1 : 0,
       sort_order || 0,
       language || 'vi',
-      req.user?.id || null,
+      (req as any).user?.id || null,
       now,
       now
     );
@@ -458,16 +461,22 @@ router.post('/products/bulk-unpublish', requireAdmin, (req, res) => {
 // ============== ADMIN AGENTS ==============
 
 // GET /api/admin/agents
-router.get('/agents', (req, res) => {
+router.get('/agents', (_req, res) => {
   try {
-    const agents = db.prepare('SELECT * FROM admin_agents ORDER BY created_at DESC').all();
-    const parsed = agents.map((a: any) => ({
-      ...a,
-      capabilities: JSON.parse(a.capabilities || '[]'),
-      isActive: a.is_active === 1,
-    }));
+    const rows = db.prepare('SELECT * FROM admin_agents ORDER BY created_at DESC').all() as any[];
+    const parsed = rows.map((a: any) => {
+      let caps: any[] = [];
+      try { caps = JSON.parse(a.capabilities || '[]'); } catch { caps = []; }
+      return {
+        ...a,
+        capabilities: caps,
+        isActive: a.is_active === 1,
+        promptId: a.prompt_id || null,
+      };
+    });
     res.json({ success: true, data: parsed });
   } catch (error: any) {
+    console.error('[GET /admin/agents] error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -475,18 +484,27 @@ router.get('/agents', (req, res) => {
 // POST /api/admin/agents
 router.post('/agents', requireAdmin, (req, res) => {
   try {
-    const { id, name, description, avatar, system_prompt, capabilities, is_active, mada_category, bot_id } = req.body;
-    
+    const {
+      id, name, description, avatar, system_prompt, capabilities,
+      is_active, mada_category, bot_id, prompt_id,
+      avatar_url, knowledge_url, product_url,
+    } = req.body;
+
     if (!name || !system_prompt) {
       return res.status(400).json({ success: false, error: 'Name and system_prompt are required' });
     }
-    
+
     const now = new Date().toISOString();
     const agentId = id || `agent-${uuidv4()}`;
-    
+
     db.prepare(`
-      INSERT INTO admin_agents (id, name, description, avatar, system_prompt, capabilities, is_active, created_by, mada_category, bot_id, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO admin_agents (
+        id, name, description, avatar, system_prompt, capabilities, is_active,
+        created_by, mada_category, bot_id, prompt_id,
+        avatar_url, knowledge_url, product_url,
+        created_at, updated_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       agentId,
       name,
@@ -495,17 +513,21 @@ router.post('/agents', requireAdmin, (req, res) => {
       system_prompt,
       JSON.stringify(Array.isArray(capabilities) ? capabilities : []),
       is_active !== false ? 1 : 0,
-      req.user?.id || null,
+      (req as any).user?.id || null,
       mada_category || null,
       bot_id || null,
+      prompt_id || null,
+      avatar_url || null,
+      knowledge_url || null,
+      product_url || null,
       now,
       now
     );
-    
+
     const agent = db.prepare('SELECT * FROM admin_agents WHERE id = ?').get(agentId) as any;
-    res.status(201).json({ 
-      success: true, 
-      data: { ...agent, capabilities: JSON.parse(agent.capabilities), isActive: agent.is_active === 1 } 
+    res.status(201).json({
+      success: true,
+      data: { ...agent, capabilities: JSON.parse(agent.capabilities), isActive: agent.is_active === 1 },
     });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
@@ -517,9 +539,13 @@ router.patch('/agents/:id', requireAdmin, (req, res) => {
   try {
     const updates: string[] = [];
     const params: any[] = [];
-    
-    const fields = ['name', 'description', 'avatar', 'system_prompt', 'capabilities', 'is_active', 'mada_category'];
-    
+
+    const fields = [
+      'name', 'description', 'avatar', 'system_prompt', 'capabilities',
+      'is_active', 'mada_category', 'prompt_id',
+      'avatar_url', 'knowledge_url', 'product_url',
+    ];
+
     for (const field of fields) {
       if (req.body[field] !== undefined) {
         updates.push(`${field} = ?`);
@@ -533,24 +559,24 @@ router.patch('/agents/:id', requireAdmin, (req, res) => {
         params.push(value);
       }
     }
-    
+
     if (updates.length === 0) {
       return res.status(400).json({ success: false, error: 'No updates provided' });
     }
-    
+
     updates.push('updated_at = ?');
     params.push(new Date().toISOString());
     params.push(req.params.id);
-    
+
     db.prepare(`UPDATE admin_agents SET ${updates.join(', ')} WHERE id = ?`).run(...params);
-    
+
     const agent = db.prepare('SELECT * FROM admin_agents WHERE id = ?').get(req.params.id) as any;
     if (!agent) {
       return res.status(404).json({ success: false, error: 'Agent not found' });
     }
-    res.json({ 
-      success: true, 
-      data: { ...agent, capabilities: JSON.parse(agent.capabilities), isActive: agent.is_active === 1 } 
+    res.json({
+      success: true,
+      data: { ...agent, capabilities: JSON.parse(agent.capabilities), isActive: agent.is_active === 1 },
     });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
@@ -563,6 +589,349 @@ router.delete('/agents/:id', requireAdmin, (req, res) => {
     db.prepare('DELETE FROM admin_agents WHERE id = ?').run(req.params.id);
     res.json({ success: true, message: 'Agent deleted successfully' });
   } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ============== ADMIN SYSTEM PROMPTS CRUD (admin_prompts table) ==============
+
+// GET /api/admin/system-prompts — list all prompts (public for agent store)
+router.get('/system-prompts', (req, res) => {
+  try {
+    const { active, category, language } = req.query;
+    let query = 'SELECT * FROM admin_prompts WHERE 1=1';
+    const params: any[] = [];
+    if (active !== undefined) { query += ' AND is_active = ?'; params.push(active === 'true' ? 1 : 0); }
+    if (category) { query += ' AND category = ?'; params.push(category); }
+    if (language) { query += ' AND language = ?'; params.push(language); }
+    query += ' ORDER BY is_system DESC, name ASC';
+    const prompts = db.prepare(query).all(...params) as any[];
+    const parsed = prompts.map((p: any) => ({
+      id: p.id, name: p.name, description: p.description, prompt: p.prompt,
+      category: p.category, language: p.language, isActive: p.is_active === 1,
+      isSystem: p.is_system === 1, createdAt: p.created_at, updatedAt: p.updated_at,
+    }));
+    res.json({ success: true, data: parsed });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// POST /api/admin/system-prompts — create prompt
+router.post('/system-prompts', requireAdmin, (req, res) => {
+  try {
+    const { id, name, description, prompt, category, language, is_active } = req.body;
+    if (!id || !name || !prompt) {
+      return res.status(400).json({ success: false, error: 'id, name, and prompt are required' });
+    }
+    const now = new Date().toISOString();
+    db.prepare(`
+      INSERT INTO admin_prompts (id, name, description, prompt, category, language, is_active, is_system, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
+    `).run(id, name, description || '', prompt, category || 'general', language || 'vi', is_active !== false ? 1 : 0, now, now);
+    res.status(201).json({
+      success: true,
+      data: { id, name, description: description || '', prompt, category: category || 'general', language: language || 'vi', isActive: is_active !== false, isSystem: false, createdAt: now, updatedAt: now },
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// GET /api/admin/system-prompts/:id — get single prompt
+router.get('/system-prompts/:id', (req, res) => {
+  try {
+    const p = db.prepare('SELECT * FROM admin_prompts WHERE id = ?').get(req.params.id) as any;
+    if (!p) return res.status(404).json({ success: false, error: 'Prompt not found' });
+    res.json({
+      success: true,
+      data: { id: p.id, name: p.name, description: p.description, prompt: p.prompt, category: p.category, language: p.language, isActive: p.is_active === 1, isSystem: p.is_system === 1, createdAt: p.created_at, updatedAt: p.updated_at },
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// PATCH /api/admin/system-prompts/:id — update prompt
+router.patch('/system-prompts/:id', requireAdmin, (req, res) => {
+  try {
+    const fields = ['name', 'description', 'prompt', 'category', 'language', 'is_active'];
+    const updates: string[] = [];
+    const params: any[] = [];
+    for (const field of fields) {
+      if (req.body[field] !== undefined) {
+        updates.push(`${field} = ?`);
+        let value = req.body[field];
+        if (field === 'is_active') value = value ? 1 : 0;
+        params.push(value);
+      }
+    }
+    if (updates.length === 0) return res.status(400).json({ success: false, error: 'No updates provided' });
+    updates.push('updated_at = ?');
+    params.push(new Date().toISOString());
+    params.push(req.params.id);
+    db.prepare(`UPDATE admin_prompts SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+    const p = db.prepare('SELECT * FROM admin_prompts WHERE id = ?').get(req.params.id) as any;
+    if (!p) return res.status(404).json({ success: false, error: 'Prompt not found' });
+    res.json({
+      success: true,
+      data: { id: p.id, name: p.name, description: p.description, prompt: p.prompt, category: p.category, language: p.language, isActive: p.is_active === 1, isSystem: p.is_system === 1, createdAt: p.created_at, updatedAt: p.updated_at },
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// DELETE /api/admin/system-prompts/:id — delete prompt (warn if agents use it)
+router.delete('/system-prompts/:id', requireAdmin, (req, res) => {
+  try {
+    const p = db.prepare('SELECT * FROM admin_prompts WHERE id = ?').get(req.params.id) as any;
+    if (!p) return res.status(404).json({ success: false, error: 'Prompt not found' });
+    if (p.is_system === 1) {
+      return res.status(403).json({ success: false, error: 'Cannot delete system prompt' });
+    }
+    const usingAgents = db.prepare("SELECT id, name FROM admin_agents WHERE prompt_id = ? AND is_active = 1").all(req.params.id) as any[];
+    if (usingAgents.length > 0) {
+      return res.status(409).json({
+        success: false,
+        error: `Prompt is being used by ${usingAgents.length} active agent(s)`,
+        usingAgents: usingAgents.map((a: any) => ({ id: a.id, name: a.name })),
+        warning: 'Please reassign or deactivate these agents before deleting this prompt.',
+      });
+    }
+    db.prepare('DELETE FROM admin_prompts WHERE id = ?').run(req.params.id);
+    res.json({ success: true, message: 'Prompt deleted successfully' });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ============== POST /api/admin/agents/upload-avatar ==============
+// Multipart upload file ảnh icon, lưu vào /data/uploads/agent-avatars/
+// Trả về URL tương đối (/api/admin/agents/avatars/:filename) để frontend lưu vào avatar_url.
+
+const AVATAR_DIR = path.join(process.cwd(), 'data', 'uploads', 'agent-avatars');
+if (!fs.existsSync(AVATAR_DIR)) {
+  fs.mkdirSync(AVATAR_DIR, { recursive: true });
+}
+
+const avatarUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, AVATAR_DIR),
+    filename: (_req, file, cb) => {
+      const ext = path.extname(file.originalname).toLowerCase() || '.png';
+      cb(null, `agent-${uuidv4()}${ext}`);
+    },
+  }),
+  limits: { fileSize: 2 * 1024 * 1024 }, // 2MB
+  fileFilter: (_req, file, cb) => {
+    const allowed = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/svg+xml', 'image/gif'];
+    if (!allowed.includes(file.mimetype)) {
+      return cb(new Error('Chỉ chấp nhận file ảnh (PNG, JPG, WEBP, SVG, GIF)'));
+    }
+    cb(null, true);
+  },
+});
+
+router.post('/agents/upload-avatar', requireAdmin, avatarUpload.single('avatar'), (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: 'Không có file nào được upload' });
+    }
+    const url = `/api/admin/agents/avatars/${req.file.filename}`;
+    res.json({
+      success: true,
+      data: {
+        url,
+        filename: req.file.filename,
+        size: req.file.size,
+        mimetype: req.file.mimetype,
+      },
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// GET /api/admin/agents/avatars/:filename — serve static avatar (public)
+router.get('/agents/avatars/:filename', (req, res) => {
+  const safeName = path.basename(req.params.filename); // chống path traversal
+  const filePath = path.join(AVATAR_DIR, safeName);
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({ success: false, error: 'Avatar not found' });
+  }
+  res.sendFile(filePath);
+});
+
+// GET /api/admin/agents/:id/documents — liệt kê documents trong KB của agent
+router.get('/agents/:id/documents', requireAdmin, async (req, res) => {
+  try {
+    const agent = db.prepare('SELECT id, name FROM admin_agents WHERE id = ?').get(req.params.id) as any;
+    if (!agent) return res.status(404).json({ success: false, error: 'Agent không tồn tại' });
+
+    const limit = Math.min(parseInt(String(req.query.limit || '50'), 10) || 50, 200);
+    const { vectorStore } = await import('../lib/rag/vectorStore');
+    const docs = await vectorStore.listByAgent(agent.id, { limit });
+    const count = await vectorStore.countByAgent(agent.id);
+
+    res.json({
+      success: true,
+      data: {
+        agentId: agent.id,
+        agentName: agent.name,
+        totalCount: count,
+        documents: docs,
+      },
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// PATCH /api/admin/agents/:id/documents/:docId — cập nhật metadata (title) của 1 document
+router.patch('/agents/:id/documents/:docId', requireAdmin, async (req, res) => {
+  try {
+    const agent = db.prepare('SELECT id FROM admin_agents WHERE id = ?').get(req.params.id) as any;
+    if (!agent) return res.status(404).json({ success: false, error: 'Agent không tồn tại' });
+
+    const { docId } = req.params;
+    const { title } = req.body || {};
+    if (typeof title !== 'string' || !title.trim()) {
+      return res.status(400).json({ success: false, error: 'title không hợp lệ' });
+    }
+
+    const { vectorStore } = await import('../lib/rag/vectorStore');
+    const ok = await vectorStore.updateDocument(docId, { title: title.trim() });
+    if (!ok) {
+      return res.status(404).json({ success: false, error: 'Document không tồn tại trong KB' });
+    }
+
+    res.json({ success: true, data: { id: docId, title: title.trim() } });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ============== POST /api/admin/agents/:id/crawl-sources ==============
+// Cào ngay 2 URL (knowledge_url tổng quát + product_url) → ingest vào KB gắn với agent.
+// Trả về jobId + số doc đã ingest + status.
+router.post('/agents/:id/crawl-sources', requireAdmin, async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const agent = db.prepare('SELECT * FROM admin_agents WHERE id = ?').get(id) as any;
+    if (!agent) {
+      return res.status(404).json({ success: false, error: 'Agent không tồn tại' });
+    }
+
+    const { knowledge_url, product_url, crawl_follow_links, crawl_max_depth, crawl_max_pages } = req.body || {};
+    const sources: Array<{ url: string; kind: 'knowledge' | 'product' }> = [];
+    if (knowledge_url && /^https?:\/\//i.test(knowledge_url)) {
+      sources.push({ url: knowledge_url, kind: 'knowledge' });
+    }
+    if (product_url && /^https?:\/\//i.test(product_url)) {
+      sources.push({ url: product_url, kind: 'product' });
+    }
+
+    if (sources.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Cần ít nhất 1 URL hợp lệ (http/https) để cào',
+      });
+    }
+
+    // Lưu URL vào DB trước (ngay cả khi crawl fail sau đó)
+    db.prepare(`
+      UPDATE admin_agents
+      SET knowledge_url = COALESCE(?, knowledge_url),
+          product_url = COALESCE(?, product_url),
+          last_crawl_status = 'running',
+          updated_at = ?
+      WHERE id = ?
+    `).run(knowledge_url || null, product_url || null, new Date().toISOString(), id);
+
+    // ⭐ Detect botId + madaCategory từ agent để RAG filter chính xác khi user chat.
+    // Ưu tiên: agent.bot_id/mada_category (lưu trong DB) → fallback tên MADA chuẩn theo `AGENT_TO_MADA`.
+    const MADA_BOT_HINTS: Record<string, { botId: string; madaCategory: string }> = {
+      'bot-hearing':    { botId: 'bot-hearing',    madaCategory: 'sensory-hearing' },
+      'bot-vision':     { botId: 'bot-vision',     madaCategory: 'sensory-vision' },
+      'bot-speech':     { botId: 'bot-speech',     madaCategory: 'voice-and-speech' },
+      'bot-cognitive':  { botId: 'bot-cognitive',  madaCategory: 'mental-cognitive' },
+      'bot-neuro':      { botId: 'bot-neuro',      madaCategory: 'neuromusculoskeletal-movement' },
+      'bot-mobility':   { botId: 'bot-mobility',   madaCategory: 'mobility-and-transportation' },
+      'bot-regulatory': { botId: 'bot-regulatory', madaCategory: 'regulatory-standards' },
+    };
+    const inferred = agent.bot_id ? MADA_BOT_HINTS[agent.bot_id] : null;
+    const botId = agent.bot_id || inferred?.botId || null;
+    const madaCategory = agent.mada_category || inferred?.madaCategory || null;
+
+    // Dynamic import để tránh circular dep
+    const { dataIngestion } = await import('../lib/rag/dataIngestion');
+
+    let totalDocs = 0;
+    const results: Array<{ url: string; kind: string; ok: boolean; docs: number; error?: string }> = [];
+
+    for (const src of sources) {
+      try {
+        const result = await dataIngestion.ingestData({
+          type: 'web',
+          content: src.url, // ingestData tự scrape nếu content < 100 chars
+          source: src.url,
+          title: `${agent.name} - ${src.kind === 'product' ? 'Sản phẩm' : 'Kiến thức'}`,
+          language: 'vi',
+          metadata: {
+            agentId: agent.id,
+            agentName: agent.name,
+            sourceKind: src.kind,
+            crawledAt: new Date().toISOString(),
+            botId,
+            madaCategory,
+          },
+          scrapeOptions: {
+            followLinks: !!crawl_follow_links,
+            maxDepth: Number(crawl_max_depth) || 1,
+            maxPages: Number(crawl_max_pages) || 5,
+          },
+        });
+        if (result.success) {
+          totalDocs += result.documentsAdded || 0;
+          results.push({ url: src.url, kind: src.kind, ok: true, docs: result.documentsAdded || 0 });
+        } else {
+          results.push({
+            url: src.url,
+            kind: src.kind,
+            ok: false,
+            docs: 0,
+            error: result.message || 'unknown error',
+          });
+        }
+      } catch (err: any) {
+        results.push({ url: src.url, kind: src.kind, ok: false, docs: 0, error: err.message });
+      }
+    }
+
+    const status = results.every(r => r.ok) ? 'completed' : 'partial';
+    db.prepare(`
+      UPDATE admin_agents
+      SET last_crawl_at = ?, last_crawl_status = ?, last_crawl_count = ?
+      WHERE id = ?
+    `).run(new Date().toISOString(), status, totalDocs, id);
+
+    res.json({
+      success: true,
+      data: {
+        agentId: id,
+        totalDocs,
+        status,
+        results,
+      },
+    });
+  } catch (error: any) {
+    try {
+      db.prepare(`
+        UPDATE admin_agents SET last_crawl_status = ?, updated_at = ? WHERE id = ?
+      `).run(`failed: ${error.message}`, new Date().toISOString(), id);
+    } catch { /* ignore */ }
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -597,7 +966,7 @@ router.get('/logs', requireAdmin, (req, res) => {
 });
 
 // DELETE /api/admin/logs
-router.delete('/logs', requireAdmin, (req, res) => {
+router.delete('/logs', requireAdmin, (_req, res) => {
   try {
     db.prepare('DELETE FROM admin_system_logs').run();
     res.json({ success: true, message: 'Logs cleared successfully' });
@@ -609,7 +978,7 @@ router.delete('/logs', requireAdmin, (req, res) => {
 // ============== ANALYTICS ==============
 
 // GET /api/admin/analytics
-router.get('/analytics', requireAdmin, (req, res) => {
+router.get('/analytics', requireAdmin, (_req, res) => {
   try {
     // Get KB stats
     const kbStats = {
@@ -674,9 +1043,9 @@ router.get('/analytics', requireAdmin, (req, res) => {
 });
 
 // GET /api/admin/analytics/chat-metrics
-router.get('/analytics/chat-metrics', requireAdmin, (req, res) => {
+router.get('/analytics/chat-metrics', requireAdmin, (_req, res) => {
   try {
-    const { range = '7d' } = req.query;
+    const { range: _range = '7d' } = _req.query;
     
     // Get metrics from the metrics table or generate mock data
     const metrics = db.prepare('SELECT * FROM chat_metrics ORDER BY date DESC LIMIT 7').all();
@@ -722,7 +1091,7 @@ router.get('/analytics/chat-metrics', requireAdmin, (req, res) => {
 // ============== USER STATS ==============
 
 // GET /api/admin/user-stats
-router.get('/user-stats', (req, res) => {
+router.get('/user-stats', (_req, res) => {
   try {
     const stats = {
       total: db.prepare('SELECT COUNT(*) as count FROM users').get() as { count: number },
@@ -799,7 +1168,7 @@ router.get('/knowledge-stats', (req, res) => {
 // ============== SYSTEM SETTINGS ==============
 
 // GET /api/admin/settings
-router.get('/settings', requireAdmin, (req, res) => {
+router.get('/settings', requireAdmin, (_req, res) => {
   try {
     const settings = db.prepare('SELECT * FROM system_settings').all() as any[];
 
@@ -884,7 +1253,7 @@ router.patch('/settings', requireAdmin, (req, res) => {
 
 // POST /api/admin/products/sync-all
 // Bulk sync tất cả kb_products → knowledge_items để AI/RAG biết đến
-router.post('/products/sync-all', requireAdmin, (req, res) => {
+router.post('/products/sync-all', requireAdmin, (_req, res) => {
   try {
     const result = syncAllPublishedProducts();
     console.log(
@@ -1011,15 +1380,15 @@ router.post('/agents/test', requireAdmin, async (req, res) => {
 
     const start = Date.now();
     // Proxy tới /api/chat nội bộ
-    const chatRes = await fetch(`http://127.0.0.1:${process.env.PORT || 5001}/api/chat`, {
+    const chatRes = await fetch(`http://127.0.0.1:${process.env.PORT || 3001}/api/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         message,
         agentId,
+        agentPrompt: agent.system_prompt,
         language: 'vi',
         userMode: 'endUser',
-        // stream: false để lấy nguyên văn
       }),
     });
 
@@ -1047,7 +1416,7 @@ router.post('/agents/test', requireAdmin, async (req, res) => {
 // ============== USERS MANAGEMENT ==============
 
 // GET /api/admin/users - Get all users
-router.get('/users', requireAdmin, (req, res) => {
+router.get('/users', requireAdmin, (_req, res) => {
   try {
     const users = db.prepare(`
       SELECT id, email, name, role, plan, status, provider, quota_used, quota_limit, 
@@ -1179,7 +1548,7 @@ router.post('/users/:id/reset-password', requireAdmin, (req, res) => {
       success: true,
       data: {
         id,
-        email: user.email,
+        email: (user as any).email,
         tempPassword,
         message: 'Đã reset mật khẩu. Nhân viên nên đổi MK khi đăng nhập lần đầu.',
       },
@@ -1235,7 +1604,7 @@ router.post('/users', requireAdmin, (req, res) => {
     res.status(201).json({
       success: true,
       data: {
-        ...user,
+        ...(user as any),
         tempPassword,
         passwordGenerated: isGenerated,
         message: isGenerated

@@ -10,30 +10,43 @@ import { PaywallModal } from '@/components/auth/PaywallModal';
 // Lazy load all page components for code splitting.
 // Some pages export only `function X()` (named), others have both named + default.
 // Resolve helper picks whichever exists so we don't depend on default-export policy.
-type MaybeDefault<T> = { default?: T } & Record<string, unknown>;
-const lazyNamed = <T,>(name: keyof T & string, loader: () => Promise<MaybeDefault<T>>) =>
-  lazy(() => loader().then((m) => ({ default: (m.default ?? (m[name] as T[keyof T])) as React.ComponentType })));
+const Fallback = () => (
+  <div className="flex items-center justify-center min-h-screen bg-background">
+    <Loader2 className="w-8 h-8 animate-spin text-primary" />
+  </div>
+);
+const lazyNamed = (name: string, loader: () => Promise<any>) =>
+  lazy(() =>
+    loader().then((m) => {
+      const Component = m.default ?? m[name];
+      if (!Component) {
+        console.error(`[lazyNamed] Could not find component "${name}" in module`, Object.keys(m));
+        return { default: Fallback };
+      }
+      return { default: Component };
+    })
+  );
 
-const ChatPage = lazyNamed<{ ChatPage: typeof import('@/pages/ChatPage').ChatPage }>('ChatPage', () => import('@/pages/ChatPage'));
-const AdminOverview = lazyNamed<{ AdminOverview: typeof import('@/pages/admin/AdminOverview').AdminOverview }>('AdminOverview', () => import('@/pages/admin/AdminOverview'));
-const AdminUsers = lazyNamed<{ AdminUsers: typeof import('@/pages/admin/AdminUsers').AdminUsers }>('AdminUsers', () => import('@/pages/admin/AdminUsers'));
-const AdminAnalytics = lazyNamed<{ AdminAnalytics: typeof import('@/pages/admin/AdminAnalytics').AdminAnalytics }>('AdminAnalytics', () => import('@/pages/admin/AdminAnalytics'));
-const AdminSettings = lazyNamed<{ AdminSettings: typeof import('@/pages/admin/AdminSettings').AdminSettings }>('AdminSettings', () => import('@/pages/admin/AdminSettings'));
-const AdminAgents = lazyNamed<{ AdminAgents: typeof import('@/pages/admin/AdminAgents').AdminAgents }>('AdminAgents', () => import('@/pages/admin/AdminAgents'));
-const AdminPrompts = lazyNamed<{ AdminPrompts: typeof import('@/pages/admin/AdminPrompts').AdminPrompts }>('AdminPrompts', () => import('@/pages/admin/AdminPrompts'));
-const AdminConsultations = lazyNamed<{ AdminConsultations: typeof import('@/pages/admin/AdminConsultations').AdminConsultations }>('AdminConsultations', () => import('@/pages/admin/AdminConsultations'));
-const AdminProducts = lazyNamed<{ AdminProducts: typeof import('@/pages/admin/AdminProducts').AdminProducts }>('AdminProducts', () => import('@/pages/admin/AdminProducts'));
-const AdminScraper = lazyNamed<{ AdminScraper: typeof import('@/pages/admin/AdminScraper').AdminScraper }>('AdminScraper', () => import('@/pages/admin/AdminScraper'));
-const AdminAudit = lazyNamed<{ AdminAudit: typeof import('@/pages/admin/AdminAudit').AdminAudit }>('AdminAudit', () => import('@/pages/admin/AdminAudit'));
-const DataManagerPage = lazyNamed<{ DataManagerPage: typeof import('@/pages/DataManagerPage').DataManagerPage }>('DataManagerPage', () => import('@/pages/DataManagerPage'));
-const ExpertPage = lazyNamed<{ ExpertPage: typeof import('@/pages/ExpertPage').ExpertPage }>('ExpertPage', () => import('@/pages/ExpertPage'));
-const ProfilePage = lazyNamed<{ ProfilePage: typeof import('@/pages/ProfilePage').ProfilePage }>('ProfilePage', () => import('@/pages/ProfilePage'));
-const PricingPage = lazyNamed<{ PricingPage: typeof import('@/pages/PricingPage').PricingPage }>('PricingPage', () => import('@/pages/PricingPage'));
-const ProductsPage = lazyNamed<{ ProductsPage: typeof import('@/pages/ProductsPage').ProductsPage }>('ProductsPage', () => import('@/pages/ProductsPage'));
-const ProductDetailPage = lazyNamed<{ ProductDetailPage: typeof import('@/pages/ProductDetailPage').ProductDetailPage }>('ProductDetailPage', () => import('@/pages/ProductDetailPage'));
-const CategoryPage = lazyNamed<{ CategoryPage: typeof import('@/pages/CategoryPage').CategoryPage }>('CategoryPage', () => import('@/pages/CategoryPage'));
-const SearchPage = lazyNamed<{ SearchPage: typeof import('@/pages/SearchPage').SearchPage }>('SearchPage', () => import('@/pages/SearchPage'));
-const ComparePage = lazyNamed<{ ComparePage: typeof import('@/pages/ComparePage').ComparePage }>('ComparePage', () => import('@/pages/ComparePage'));
+const ChatPage = lazyNamed('ChatPage', () => import('@/pages/ChatPage'));
+const AdminOverview = lazyNamed('AdminOverview', () => import('@/pages/admin/AdminOverview'));
+const AdminUsers = lazyNamed('AdminUsers', () => import('@/pages/admin/AdminUsers'));
+const AdminAnalytics = lazyNamed('AdminAnalytics', () => import('@/pages/admin/AdminAnalytics'));
+const AdminSettings = lazyNamed('AdminSettings', () => import('@/pages/admin/AdminSettings'));
+const AdminAgents = lazyNamed('AdminAgents', () => import('@/pages/admin/AdminAgents'));
+const AdminPrompts = lazyNamed('AdminPrompts', () => import('@/pages/admin/AdminPrompts'));
+const AdminConsultations = lazyNamed('AdminConsultations', () => import('@/pages/admin/AdminConsultations'));
+const AdminProducts = lazyNamed('AdminProducts', () => import('@/pages/admin/AdminProducts'));
+const AdminScraper = lazyNamed('AdminScraper', () => import('@/pages/admin/AdminScraper'));
+const AdminAudit = lazyNamed('AdminAudit', () => import('@/pages/admin/AdminAudit'));
+const DataManagerPage = lazyNamed('DataManagerPage', () => import('@/pages/DataManagerPage'));
+const ExpertPage = lazyNamed('ExpertPage', () => import('@/pages/ExpertPage'));
+const ProfilePage = lazyNamed('ProfilePage', () => import('@/pages/ProfilePage'));
+const PricingPage = lazyNamed('PricingPage', () => import('@/pages/PricingPage'));
+const ProductsPage = lazyNamed('ProductsPage', () => import('@/pages/ProductsPage'));
+const ProductDetailPage = lazyNamed('ProductDetailPage', () => import('@/pages/ProductDetailPage'));
+const CategoryPage = lazyNamed('CategoryPage', () => import('@/pages/CategoryPage'));
+const SearchPage = lazyNamed('SearchPage', () => import('@/pages/SearchPage'));
+const ComparePage = lazyNamed('ComparePage', () => import('@/pages/ComparePage'));
 
 // Loading fallback component
 function PageLoader() {

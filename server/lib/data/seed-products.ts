@@ -20,7 +20,9 @@ export type MadaCategory =
   | 'mobility'
   | 'communication'
   | 'cognition'
-  | 'daily_living';
+  | 'daily_living'
+  | 'web_accessibility'
+  | 'general';
 
 export interface ProductName {
   vi: string;
@@ -45,6 +47,13 @@ export interface Product {
   isoCodes: string[];
   sourceUrl: string;
   priceRange?: ProductName;
+  /** Optional fields populated when source is database (kb_products table). */
+  brand?: string;
+  model?: string;
+  imageUrl?: string;
+  wcagLevel?: string;
+  whoGateArea?: string;
+  language?: string;
 }
 
 /**

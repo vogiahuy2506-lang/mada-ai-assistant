@@ -3,8 +3,8 @@
  * WCAG 2.2 AA compliant
  */
 import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { X, Package, GitCompare, Plus, Check, ArrowLeft } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { X, Package, GitCompare, Plus, ArrowLeft } from 'lucide-react';
 import { PublicLayout } from '@/components/PublicLayout';
 import { useLanguageStore } from '@/stores';
 import { formatPrice } from '@/lib/formatPrice';
@@ -33,7 +33,6 @@ const MAX_COMPARE = 3;
 
 export function ComparePage() {
   const { language } = useLanguageStore();
-  const navigate = useNavigate();
   const [ids, setIds] = useState<string[]>([]);
   const [products, setProducts] = useState<CompareProduct[]>([]);
   const [loading, setLoading] = useState(true);

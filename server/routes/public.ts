@@ -302,4 +302,63 @@ router.post('/track', (_req, res) => {
   res.json({ success: true });
 });
 
+// ============== AGENTS (active only, no auth) ==============
+// GET /api/public/agents - List active agents for chat UI / AgentCustomizer
+// NOTE: Only returns agents with is_active=1 so anonymous users see the
+// published catalogue. Admin CRUD still goes through /api/admin/agents.
+router.get('/agents', (_req, res) => {
+  try {
+    const tableCheck = db
+      .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='admin_agents'")
+      .get();
+    if (!tableCheck) {
+      return res.json({ success: true, data: [] });
+    }
+
+    const rows = db
+      .prepare(
+        'SELECT * FROM admin_agents WHERE is_active = 1 ORDER BY created_at DESC'
+      )
+      .all() as any[];
+
+    const parsed = rows.map((a) => ({
+      id: a.id,
+      name: a.name,
+      description: a.description || '',
+      avatar: a.avatar || '🤖',
+      system_prompt: a.system_prompt || '',
+      systemPrompt: a.system_prompt || '',
+      capabilities: (() => {
+        try {
+          return JSON.parse(a.capabilities || '[]');
+        } catch {
+          return [];
+        }
+      })(),
+      isActive: a.is_active === 1,
+      is_active: a.is_active === 1,
+      madaCategory: a.mada_category || a.madaCategory || null,
+      mada_category: a.mada_category || null,
+      botId: a.bot_id || a.botId || null,
+      bot_id: a.bot_id || null,
+      promptId: a.prompt_id || a.promptId || null,
+      prompt_id: a.prompt_id || null,
+      avatarUrl: a.avatar_url || a.avatarUrl || null,
+      avatar_url: a.avatar_url || null,
+      knowledgeUrl: a.knowledge_url || a.knowledgeUrl || null,
+      knowledge_url: a.knowledge_url || null,
+      productUrl: a.product_url || a.productUrl || null,
+      product_url: a.product_url || null,
+      createdAt: a.created_at,
+      created_at: a.created_at,
+      updatedAt: a.updated_at,
+      updated_at: a.updated_at,
+    }));
+
+    res.json({ success: true, data: parsed });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 export default router;

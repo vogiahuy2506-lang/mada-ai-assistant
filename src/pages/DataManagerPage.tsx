@@ -57,7 +57,6 @@ export function DataManagerPage() {
   const [suggestions, setSuggestions] = useState<AISuggestion | null>(null);
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
   const [lastCollectedTitle, setLastCollectedTitle] = useState('');
-  const [lastCollectedCategory, setLastCollectedCategory] = useState('');
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -67,7 +66,7 @@ export function DataManagerPage() {
   }, []);
 
   // Fetch suggestions for a knowledge item
-  const fetchSuggestions = async (itemId: string, title: string, category?: string) => {
+  const fetchSuggestions = async (itemId: string) => {
     setIsLoadingSuggestions(true);
     setShowSuggestions(true);
     setSuggestions(null);
@@ -94,7 +93,6 @@ export function DataManagerPage() {
         if (suggestData.success) {
           setSuggestions(suggestData.data.suggestions);
           setLastCollectedTitle(itemData.data.title);
-          setLastCollectedCategory(itemData.data.category);
         }
       }
     } catch (error) {
@@ -166,7 +164,6 @@ export function DataManagerPage() {
         if (data.data.suggestions) {
           setSuggestions(data.data.suggestions);
           setLastCollectedTitle(data.data.title || new URL(websiteUrl).hostname);
-          setLastCollectedCategory(data.data.category);
           setShowSuggestions(true);
         }
         
@@ -724,7 +721,7 @@ export function DataManagerPage() {
                               onClick={() => {
                                 const itemStatus = item.status === 'completed';
                                 if (itemStatus) {
-                                  fetchSuggestions(item.id, item.title, item.category);
+                                  fetchSuggestions(item.id);
                                 }
                               }}
                             >

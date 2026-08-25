@@ -4,15 +4,14 @@ import { useChatStore, useChatHistoryStore, useLanguageStore, useAuthStore, useA
 import madaLogo from '@/assets/mada-logo.png';
 import { QuotaIndicator } from '@/components/auth/QuotaIndicator';
 import { ProductCard } from '@/components/ProductCard';
-import { AgentCustomizer } from '@/components/chat/AgentCustomizer';
 import {
-  Send, Plus, User, History, Mic,
-  Trash2, Volume2, ChevronDown, Check, Copy, ThumbsUp, ThumbsDown,
+  Send, Plus, User, Mic,
+  Volume2, ChevronDown, Check, Copy, ThumbsUp, ThumbsDown,
   Speaker, BookOpen, Bot as BotIcon, ChevronRight,
   FileText, Video, Mic2, ImageIcon, File, X,
   MessageCircle,
   LogOut, Sparkles,
-  Search, Pin, MessageSquare, PinOff, Loader2,
+  Search, MessageSquare, Loader2,
   Settings, Smartphone, Brain, Eye, Accessibility,
   Users, MoreHorizontal, Gift, Wallet, CreditCard,
   PiggyBank, Handshake, ZoomIn, PlusCircle, Monitor,
@@ -287,32 +286,6 @@ function generateFollowUpQuestions(userQuestion: string, _aiResponse: string, la
     'Quelle est la période de garantie?',
   ].slice(0, 4);
 }
-
-// Agent name & description translations
-const AGENT_TRANSLATIONS: Record<string, Record<Language, { name: string; description: string }>> = {
-  default: {
-    vi: { name: 'MADA Assistant', description: 'Trợ lý ảo chính của MADA, hỗ trợ người khuyết tật tiếp cận công nghệ.' },
-    en: { name: 'MADA Assistant', description: 'The main AI assistant of MADA, helping people with disabilities access technology.' },
-    ar: { name: 'مساعد MADA', description: 'المساعد الذكي الرئيسي لـ MADA، يساعد الأشخاص ذوي الإعاقة على الوصول إلى التكنولوجيا.' },
-    fr: { name: 'Assistant MADA', description: 'L\'assistant IA principal de MADA, aidant les personnes handicapées à accéder à la technologie.' },
-  },
-  expert: {
-    vi: { name: 'Chuyên gia AT', description: 'Chuyên gia về công nghệ hỗ trợ người khuyết tật.' },
-    en: { name: 'AT Specialist', description: 'Expert in assistive technology for people with disabilities.' },
-    ar: { name: 'خبير AT', description: 'خبير في تقنية المساعدة للأشخاص ذوي الإعاقة.' },
-    fr: { name: 'Spécialiste AT', description: 'Expert en technologie d\'assistance pour les personnes handicapées.' },
-  },
-};
-
-function getAgentDisplayInfo(agentId: string, lang: Language): { name: string; description: string } {
-  const t = AGENT_TRANSLATIONS[agentId]?.[lang];
-  if (t) return t;
-  // Fallback to English
-  return AGENT_TRANSLATIONS[agentId]?.['en'] || { name: 'Agent', description: '' };
-}
-
-
-
 
 // Detect category từ câu hỏi
 function detectCategoryFromQuery(query: string): string {
@@ -851,8 +824,6 @@ export function ChatPage() {
   const [showLanguageMenu, setShowLanguageMenu] = useState(false);
   const [showAttachmentMenu, setShowAttachmentMenu] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
-  const [showAgentMenu, setShowAgentMenu] = useState(false);
-  const [showAgentCustomizer, setShowAgentCustomizer] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<{ fileId: string; name: string; type: string; size: number; content?: string; originalFile?: File; isLoading?: boolean; isCancelling?: boolean }[]>([]);
    
   const [_cancellingFiles, setCancellingFiles] = useState<Set<string>>(new Set());
@@ -872,6 +843,15 @@ export function ChatPage() {
   useEffect(() => {
     fetchFileQuota();
   }, [fetchFileQuota]);
+
+  // ⭐ Sync agents from backend on mount + when window regains focus
+  const loadAgents = useAgentStore((s) => s.loadAgents);
+  useEffect(() => {
+    loadAgents();
+    const onFocus = () => loadAgents();
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [loadAgents]);
 
   const fileQuotaExhausted = !!fileQuota && fileQuota.limit !== -1 && fileQuota.remaining <= 0;
   const [activeCategory, setActiveCategory] = useState<ATCategory | null>(null);
@@ -959,15 +939,13 @@ export function ChatPage() {
 
   // Agent state
   const activeAgents = useAgentStore((s) => s.getActiveAgents());
-  const { selectedAgentId, setSelectedAgentId } = useSelectedAgentStore();
+  const { selectedAgentId } = useSelectedAgentStore();
   const selectedAgent = activeAgents.find(a => a.id === selectedAgentId) || activeAgents[0];
 
   // Chat history from persisted store
   const historyConversations = useChatHistoryStore((s) => s.conversations);
   const addOrUpdateConversation = useChatHistoryStore((s) => s.addOrUpdateConversation);
   const touchConversation = useChatHistoryStore((s) => s.touchConversation);
-  const pinConversation = useChatHistoryStore((s) => s.pinConversation);
-  const removeFromHistory = useChatHistoryStore((s) => s.removeConversation);
   const setHistorySearchQuery = useChatHistoryStore((s) => s.setSearchQuery);
   const historySearch = useChatHistoryStore((s) => s.searchQuery);
   const filteredConversations = useChatHistoryStore((s) => s.filteredConversations);
@@ -1854,20 +1832,6 @@ export function ChatPage() {
     // Note: removed textarea.focus() to prevent viewport jump on mobile
   };
 
-  // Send với text cho trước (dùng cho suggested questions)
-  // Sửa: truyền text trực tiếp vào handleSend để tránh flash input
-  const handleSendWithText = async (text: string) => {
-    if (!text.trim() || isLoading) return;
-    // Set input value rồi gọi handleSend
-    setInputValue(text);
-    // Đợi 1 tick để React re-render với inputValue mới
-    await new Promise(resolve => setTimeout(resolve, 0));
-    await handleSend();
-    // Sau khi gửi, đảm bảo input + files đã clear
-    setInputValue('');
-    setSelectedFiles([]);
-  };
-
   const handleSelectConversation = (id: string) => {
     window.speechSynthesis?.cancel();
     setSpeakingId(null);
@@ -1893,20 +1857,6 @@ export function ChatPage() {
     if (window.innerWidth < 768) {
       setSidebarOpen(false);
     }
-  };
-
-  const handleDeleteConversation = (e: React.MouseEvent, id: string) => {
-    e.stopPropagation();
-    removeFromHistory(id);
-    if (activeConversationId === id) {
-      setActiveConversationId(null);
-      clearMessages();
-    }
-  };
-
-  const handlePinConversation = (e: React.MouseEvent, id: string) => {
-    e.stopPropagation();
-    pinConversation(id);
   };
 
   const handleLogout = () => {
@@ -2664,73 +2614,6 @@ export function ChatPage() {
             {/* Quota Indicator */}
             <QuotaIndicator />
 
-            {/* Agent Selector */}
-            <div className="relative" ref={languageMenuRef}>
-              <button
-                onClick={() => setShowAgentMenu(!showAgentMenu)}
-                className="group flex items-center gap-2 bg-white/60 px-4 py-2 rounded-full border border-white/80 hover:bg-white/80 transition-colors"
-                title={language === 'vi' ? 'Chọn chế độ trợ lý AI khác' : language === 'en' ? 'Switch AI assistant mode' : language === 'ar' ? 'تغيير وضع المساعد الذكي' : 'Changer le mode assistant'}
-              >
-                <span className="text-lg">{selectedAgent?.avatar || '🤖'}</span>
-                <span className="text-sm font-semibold text-on-background hidden xl:inline max-w-[100px] truncate">
-                  {getAgentDisplayInfo(selectedAgent?.id || 'default', language).name}
-                </span>
-                <ChevronDown className={clsx('w-4 h-4 text-on-surface-variant transition-transform', showAgentMenu && 'rotate-180')} />
-                {/* Tooltip */}
-                <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 px-3 py-2 bg-slate-900 text-white text-xs rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all whitespace-nowrap z-50 pointer-events-none">
-                  {language === 'vi' ? '🔄 Đổi chế độ AI' : language === 'en' ? '🔄 Switch AI mode' : language === 'ar' ? '🔄 تغيير وضع الذكاء' : '🔄 Changer le mode IA'}
-                  <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-slate-900"></div>
-                </div>
-              </button>
-
-              {showAgentMenu && (
-                <div className="absolute right-0 top-full mt-2 w-72 bg-white border border-white/80 backdrop-blur-xl rounded-2xl shadow-[4px_4px_0_0_rgba(25,27,35,1)] z-50 overflow-hidden">
-                  <div className="p-3 border-b border-outline-variant/50 bg-surface-container-low">
-                    <p className="text-sm font-semibold text-on-background">{language === 'vi' ? 'Chọn Agent' : language === 'en' ? 'Select Agent' : language === 'ar' ? 'اختر الوكيل' : 'Sélectionner Agent'}</p>
-                  </div>
-                  {activeAgents.map((agent) => {
-                    const info = getAgentDisplayInfo(agent.id, language);
-                    return (
-                    <button
-                      key={agent.id}
-                      onClick={() => {
-                        setSelectedAgentId(agent.id);
-                        setShowAgentMenu(false);
-                      }}
-                      className={clsx(
-                        'w-full flex items-start gap-3 p-3 hover:bg-surface-container-low transition-colors text-left',
-                        selectedAgentId === agent.id && 'bg-primary-fixed/30'
-                      )}
-                    >
-                      <span className="text-2xl">{agent.avatar}</span>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-semibold text-on-background">{info.name}</span>
-                          {selectedAgentId === agent.id && (
-                            <Check className="w-4 h-4 text-primary" />
-                          )}
-                        </div>
-                        <p className="text-sm text-on-surface-variant line-clamp-2 mt-0.5">{info.description}</p>
-                      </div>
-                    </button>
-                    );
-                  })}
-                  <div className="p-2 border-t border-outline-variant/50">
-                    <button
-                      onClick={() => {
-                        setShowAgentMenu(false);
-                        setShowAgentCustomizer(true);
-                      }}
-                      className="w-full flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm font-medium text-slate-700 transition-colors"
-                    >
-                      <Edit2 className="w-4 h-4" />
-                      {language === 'vi' ? 'Tùy chỉnh Agents...' : language === 'en' ? 'Customize Agents...' : 'تخصيص الوكلاء...'}
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-
             {/* Divider */}
             <div className="w-px h-6 bg-outline-variant/50"></div>
             
@@ -3395,10 +3278,6 @@ export function ChatPage() {
           </div>
         </div>
       </main>
-      {/* Agent Customizer Modal */}
-      {showAgentCustomizer && (
-        <AgentCustomizer onClose={() => setShowAgentCustomizer(false)} />
-      )}
     </div>
   );
 }
@@ -3426,7 +3305,7 @@ function MessageBubble({
   const confidence = message.confidence || 85;
 
   // ⭐ Edit message state from store
-  const { editingMessageId, editingMessageText, setEditingMessage, setMessages, setLoading } = useChatStore();
+  const { editingMessageId, setEditingMessage, setMessages, setLoading } = useChatStore();
   const [localEditText, setLocalEditText] = useState('');
   const currentEditingId = editingMessageId;
   

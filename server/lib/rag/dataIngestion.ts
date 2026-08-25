@@ -28,6 +28,15 @@ export interface DataSource {
   title?: string;
   language?: string;
   metadata?: Record<string, any>;
+  /** Web scrape options (chỉ dùng khi type = 'web') */
+  scrapeOptions?: {
+    /** Follow cùng domain để lấy sub-pages (mặc định: false) */
+    followLinks?: boolean;
+    /** Độ sâu tối đa khi followLinks=true (mặc định: 1) */
+    maxDepth?: number;
+    /** Số trang tối đa khi followLinks=true (mặc định: 5) */
+    maxPages?: number;
+  };
 }
 
 interface ProgressReporter {
@@ -113,11 +122,11 @@ class DataIngestionService {
           onProgress?.('scraping', 20, 'Đang tải và phân tích trang web');
           // Nếu caller đã cung cấp sẵn content (vd MADA scraper), dùng luôn.
           // Tránh re-fetch gây block bởi Cloudflare/WAF khi UA bị reject.
-          if (source.content && source.content.trim().length > 100) {
+          if (source.content && source.content.trim().length > 100 && !source.scrapeOptions?.followLinks) {
             console.log(`📋 Using pre-scraped content for ${source.source} (${source.content.length} chars)`);
             content = source.content;
           } else {
-            content = await this.scrapeWebContent(source.source);
+            content = await this.scrapeWebContent(source.source, source.scrapeOptions || {});
           }
           break;
 
@@ -284,34 +293,140 @@ class DataIngestionService {
   /**
    * Web scraper dùng cheerio — bỏ menu, footer, ads, comments
    * Giữ lại: heading, paragraph, list, table, article
+   *
+   * Đặc biệt:
+   * - Google Sheets public (docs.google.com/spreadsheets/...): tự động đổi sang export ?format=csv&gid=...
+   * - Hỗ trợ follow sub-links khi `options.followLinks = true` (depth giới hạn)
    */
-  private async scrapeWebContent(url: string): Promise<string> {
-    let html: string;
-    try {
-      const response = await fetch(url, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; MADA-AI-Bot/1.0; +https://mada.digiso.vn)',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-          'Accept-Language': 'vi-VN,vi;q=0.9,en-US;q=0.8,en;q=0.7',
-        },
-        redirect: 'follow',
-      });
+  private async scrapeWebContent(url: string, options: { followLinks?: boolean; maxDepth?: number; maxPages?: number } = {}): Promise<string> {
+    const { followLinks = false, maxDepth = 1, maxPages = 5 } = options;
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status} ${response.statusText}`);
-      }
-
-      const contentType = response.headers.get('content-type') || '';
-      if (!contentType.includes('text/html') && !contentType.includes('xml')) {
-        throw new Error(`Unsupported content-type: ${contentType}`);
-      }
-
-      html = await response.text();
-    } catch (error: any) {
-      throw new Error(`Không thể tải URL: ${error.message}`);
+    // ⭐ Google Sheets: chuyển sang CSV export để parse được bảng (HTML của Google Sheet không có table)
+    const sheetsCsv = googleSheetsToCsvUrl(url);
+    if (sheetsCsv) {
+      console.log(`📊 [scrape] Google Sheets detected → CSV export: ${sheetsCsv}`);
+      return this.fetchAndFormatCsv(sheetsCsv, url);
     }
 
-    return this.extractMainContent(html, url);
+    if (!followLinks) {
+      const html = await this.fetchHtml(url);
+      return this.extractMainContent(html, url);
+    }
+
+    // Recursive crawl (opt-in)
+    const visited = new Set<string>();
+    const queue: Array<{ url: string; depth: number }> = [{ url, depth: 0 }];
+    const pages: Array<{ url: string; content: string }> = [];
+
+    while (queue.length > 0 && pages.length < maxPages) {
+      const { url: curUrl, depth } = queue.shift()!;
+      if (visited.has(curUrl)) continue;
+      visited.add(curUrl);
+      try {
+        const html = await this.fetchHtml(curUrl);
+        const content = this.extractMainContent(html, curUrl);
+        pages.push({ url: curUrl, content });
+
+        if (depth < maxDepth) {
+          const links = this.extractSameDomainLinks(html, curUrl);
+          for (const link of links) {
+            if (!visited.has(link)) queue.push({ url: link, depth: depth + 1 });
+          }
+        }
+      } catch (err: any) {
+        console.warn(`⚠️ [scrape] Failed to crawl ${curUrl}: ${err.message}`);
+      }
+    }
+
+    console.log(`🕷️ [scrape] Recursive: ${pages.length}/${maxPages} pages from ${url}`);
+    return pages.map(p => `\n\n=== ${p.url} ===\n${p.content}`).join('\n');
+  }
+
+  private async fetchHtml(url: string): Promise<string> {
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; MADA-AI-Bot/1.0; +https://mada.digiso.vn)',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'vi-VN,vi;q=0.9,en-US;q=0.8,en;q=0.7',
+      },
+      redirect: 'follow',
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status} ${response.statusText}`);
+    const ct = response.headers.get('content-type') || '';
+    if (!ct.includes('text/html') && !ct.includes('xml')) {
+      throw new Error(`Unsupported content-type: ${ct}`);
+    }
+    return response.text();
+  }
+
+  private extractSameDomainLinks(html: string, baseUrl: string): string[] {
+    const $ = cheerio.load(html);
+    const base = new URL(baseUrl);
+    const links = new Set<string>();
+    $('a[href]').each((_, el) => {
+      try {
+        const href = $(el).attr('href') || '';
+        if (!href || href.startsWith('#') || href.startsWith('mailto:') || href.startsWith('javascript:')) return;
+        const u = new URL(href, base);
+        if (u.hostname !== base.hostname) return;
+        if (u.pathname.match(/\.(png|jpg|jpeg|gif|pdf|zip|css|js)$/i)) return;
+        u.hash = '';
+        links.add(u.toString());
+      } catch { /* ignore malformed href */ }
+    });
+    return Array.from(links).slice(0, 30);
+  }
+
+  /**
+   * Google Sheets public: chuyển URL xem sang URL export CSV.
+   * Hỗ trợ cả 2 dạng:
+   *   https://docs.google.com/spreadsheets/d/{ID}/edit?usp=sharing
+   *   https://docs.google.com/spreadsheets/d/{ID}/edit#gid={GID}
+   * → https://docs.google.com/spreadsheets/d/{ID}/export?format=csv&gid={GID}
+   */
+  private async fetchAndFormatCsv(csvUrl: string, sourceUrl: string): Promise<string> {
+    const res = await fetch(csvUrl, { redirect: 'follow' });
+    if (!res.ok) throw new Error(`HTTP ${res.status} khi tải CSV Google Sheets`);
+    const csv = await res.text();
+    return this.csvToReadableText(csv, sourceUrl);
+  }
+
+  private csvToReadableText(csv: string, sourceUrl: string): string {
+    // Parse CSV đơn giản (không quote phức tạp, đủ dùng cho Google Sheets xuất)
+    const rows: string[][] = csv
+      .replace(/\r\n?/g, '\n')
+      .split('\n')
+      .filter(l => l.length > 0)
+      .map(line => {
+        const out: string[] = [];
+        let cur = '';
+        let inQuote = false;
+        for (let i = 0; i < line.length; i++) {
+          const ch = line[i];
+          if (ch === '"') {
+            if (inQuote && line[i + 1] === '"') { cur += '"'; i++; }
+            else inQuote = !inQuote;
+          } else if (ch === ',' && !inQuote) {
+            out.push(cur); cur = '';
+          } else cur += ch;
+        }
+        out.push(cur);
+        return out;
+      });
+
+    if (rows.length === 0) return '';
+
+    // Dòng đầu là header → dùng làm key cho từng row
+    const header = rows[0].map(h => h.trim());
+    const dataRows = rows.slice(1);
+
+    // Format mỗi row thành "key: value; key: value" để embedding dễ khớp câu hỏi
+    const lines = dataRows.map(row => {
+      const pairs = header.map((h, i) => `${h}: ${(row[i] || '').trim()}`).filter(p => !p.endsWith(': '));
+      return pairs.join(' | ');
+    });
+
+    return `=== Google Sheets: ${sourceUrl} ===\nCó ${dataRows.length} dòng, ${header.length} cột.\nCột: ${header.join(', ')}\n\n` + lines.join('\n');
   }
 
   private extractMainContent(html: string, url: string): string {
@@ -423,3 +538,38 @@ class DataIngestionService {
 }
 
 export const dataIngestion = new DataIngestionService();
+
+/**
+ * Nếu `url` là Google Sheets public (chế độ xem /edit hoặc /htmlview), trả về URL export CSV tương ứng.
+ * Ngược lại trả về null để scrape HTML bình thường.
+ *
+ * Hỗ trợ dạng:
+ *   https://docs.google.com/spreadsheets/d/{ID}/edit?usp=sharing
+ *   https://docs.google.com/spreadsheets/d/{ID}/edit#gid=1234567890
+ *   https://docs.google.com/spreadsheets/d/{ID}/htmlview
+ * → https://docs.google.com/spreadsheets/d/{ID}/export?format=csv&gid={GID}
+ */
+export function googleSheetsToCsvUrl(url: string): string | null {
+  try {
+    const u = new URL(url);
+    if (!/(^|\.)docs\.google\.com$/i.test(u.hostname)) return null;
+    if (!u.pathname.includes('/spreadsheets/')) return null;
+
+    // Lấy gid từ hash (#gid=...) hoặc query (?gid=...)
+    let gid = u.searchParams.get('gid') || '';
+    if (!gid && u.hash) {
+      const m = u.hash.match(/gid=(\d+)/);
+      if (m) gid = m[1];
+    }
+    if (!gid) gid = '0'; // gid mặc định = sheet đầu tiên
+
+    // Tìm {ID} giữa /d/ và /edit|/htmlview|/view
+    const idMatch = u.pathname.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+    if (!idMatch) return null;
+    const sheetId = idMatch[1];
+
+    return `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${gid}`;
+  } catch {
+    return null;
+  }
+}

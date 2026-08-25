@@ -404,6 +404,66 @@ class VectorStore {
     this.saveMetadataToDisk();
   }
 
+  /** Liệt kê documents của 1 agent (dựa trên metadata.agentId). Trả về metadata + content preview, không bao gồm embedding. */
+  async listByAgent(agentId: string, options: { limit?: number } = {}): Promise<Array<{ id: string; title: string; content: string; source: string; metadata: any }>> {
+    const limit = options.limit || 100;
+    const docs: Array<{ id: string; title: string; content: string; source: string; metadata: any }> = [];
+    for (const [id, doc] of this.inMemoryStore) {
+      if (doc?.metadata?.agentId === agentId) {
+        docs.push({
+          id,
+          title: doc.title || '',
+          content: (doc.content || '').slice(0, 500),
+          source: doc.source || doc.metadata?.source || '',
+          metadata: doc.metadata || {},
+        });
+      }
+    }
+    // Sort mới nhất trước (theo crawledAt nếu có)
+    docs.sort((a, b) => (b.metadata?.crawledAt || '').localeCompare(a.metadata?.crawledAt || ''));
+    return docs.slice(0, limit);
+  }
+
+  /** Đếm documents của 1 agent. */
+  async countByAgent(agentId: string): Promise<number> {
+    let n = 0;
+    for (const [, doc] of this.inMemoryStore) {
+      if (doc?.metadata?.agentId === agentId) n++;
+    }
+    return n;
+  }
+
+  /** Cập nhật metadata (title) của 1 document trong KB. Trả về true nếu tìm thấy. */
+  async updateDocument(id: string, updates: { title?: string }): Promise<boolean> {
+    const doc = this.inMemoryStore.get(id);
+    if (!doc) return false;
+
+    const updated = { ...doc };
+    if (updates.title !== undefined) {
+      updated.title = updates.title;
+      if (updated.metadata && typeof updated.metadata === 'object') {
+        updated.metadata = { ...updated.metadata, customTitle: true };
+      }
+    }
+    this.inMemoryStore.set(id, updated);
+
+    // Sync to Pinecone metadata (không re-embed)
+    if (this.activeDbProvider === 'pinecone' && this.pineconeIndex) {
+      try {
+        await this.pineconeIndex.update({
+          id,
+          metadata: { ...(updated.metadata || {}), title: updated.title },
+        });
+      } catch (e) {
+        console.warn('⚠️ Pinecone metadata update failed:', (e as Error).message);
+      }
+    }
+
+    // Persist to disk
+    this.saveMetadataToDisk();
+    return true;
+  }
+
   async getStats(): Promise<any> {
     const provider = getEmbeddingProvider();
 

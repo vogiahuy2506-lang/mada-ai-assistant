@@ -630,3 +630,7 @@ export const useSystemSettingsStore = create<SystemSettingsState>()(
 // Re-export agent stores
 export { useAgentStore, useSelectedAgentStore } from './agentStore';
 export type { Agent } from './agentStore';
+
+// Re-export prompt store (shared between /admin/prompts and /admin/agents)
+export { usePromptStore } from './promptStore';
+export type { SystemPromptRow } from './promptStore';

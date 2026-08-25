@@ -1,6 +1,7 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { AdminLayout } from './AdminLayout';
 import { getAccessToken, getRefreshToken } from '../../lib/api';
+import { useTranslation } from '@/lib/translations';
 import clsx from 'clsx';
 import {
   Users, Search, Shield, ShieldOff, Trash2,
@@ -109,11 +110,6 @@ export default function AdminUsers() {
   const [resetTarget, setResetTarget] = useState<User | null>(null);
   const [resetResult, setResetResult] = useState<{ email: string; tempPassword: string } | null>(null);
   const [resetLoading, setResetLoading] = useState(false);
-
-  const authHeader = () => ({
-    'Content-Type': 'application/json',
-    Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
-  });
 
   const loadUsers = useCallback(async () => {
     setLoading(true);
@@ -297,10 +293,14 @@ export default function AdminUsers() {
       pending: 'bg-amber-100 text-amber-700 border-amber-300',
       suspended: 'bg-red-100 text-red-700 border-red-300',
     };
-    const labels = { active: 'Hoạt động', pending: 'Chờ duyệt', suspended: 'Bị khóa' };
+    const labelKeys = {
+      active: t('admin.users.activeUsers'),
+      pending: t('admin.users.pending'),
+      suspended: t('admin.users.locked'),
+    };
     return (
       <span className={clsx('px-2 py-0.5 rounded-full text-xs font-bold border', styles[status])}>
-        {labels[status]}
+        {labelKeys[status]}
       </span>
     );
   };
@@ -312,7 +312,7 @@ export default function AdminUsers() {
         ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white'
         : 'bg-slate-100 text-slate-600'
     )}>
-      {role === 'admin' ? '👑 Admin' : '👤 User'}
+      {role === 'admin' ? `👑 ${t('admin.users.admin')}` : `👤 ${t('admin.users.staff')}`}
     </span>
   );
 
@@ -336,10 +336,18 @@ export default function AdminUsers() {
     });
   };
 
+  const { t } = useTranslation();
+
   return (
     <AdminLayout
-      title="Quản lý Người dùng"
-      subtitle="Xem, khóa, xóa và tạo tài khoản nhân viên trong hệ thống."
+      title={t('admin.users.title')}
+      titleEn="User Management"
+      titleAr="إدارة المستخدمين"
+      titleFr="Gestion des utilisateurs"
+      subtitle={t('admin.users.subtitle')}
+      subtitleEn="View, lock, delete and create staff accounts in the system."
+      subtitleAr="عرض وقفل وحذف وإنشاء حسابات الموظفين في النظام."
+      subtitleFr="Voir, verrouiller, supprimer et créer des comptes du personnel."
       showFab={false}
       showLayoutTitle={false}
     >

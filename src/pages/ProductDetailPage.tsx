@@ -4,7 +4,7 @@
  */
 import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Package, ExternalLink, Share2, Check, MapPin, Star } from 'lucide-react';
+import { ArrowLeft, Package, ExternalLink, Share2, Check } from 'lucide-react';
 import { PublicLayout } from '@/components/PublicLayout';
 import { useLanguageStore } from '@/stores';
 import { useAuthStore } from '@/stores';
@@ -87,7 +87,6 @@ export function ProductDetailPage() {
   const categoryText = language === 'en' ? 'Category' : 'Danh mục';
   const brandText = language === 'en' ? 'Brand' : 'Thương hiệu';
   const modelText = language === 'en' ? 'Model' : 'Mẫu';
-  const whoGateText = language === 'en' ? 'WHO GATE Area' : 'Khu vực WHO GATE';
   const relatedText = language === 'en' ? 'Related Products' : 'Sản phẩm liên quan';
   const notFoundText = language === 'en' ? 'Product not found' : 'Không tìm thấy sản phẩm';
 

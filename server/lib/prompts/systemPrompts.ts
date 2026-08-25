@@ -376,7 +376,52 @@ export const CATEGORY_LABELS: Record<MadaCategory, { vi: string; en: string }> =
 // ============== COMBINE ALL ==============
 
 /**
+ * Load prompt từ DB (admin_prompts) — nếu có, ưu tiên dùng trước hardcoded.
+ * Fallback về hardcoded constants từ systemPrompts.ts.
+ */
+let _dbPromptsCache: Map<string, string> | null = null;
+let _dbPromptsCacheAt = 0;
+const DB_PROMPTS_TTL_MS = 60_000; // 1 phút cache
+
+function loadDbPrompts(): Map<string, string> {
+  const now = Date.now();
+  if (_dbPromptsCache && (now - _dbPromptsCacheAt) < DB_PROMPTS_TTL_MS) {
+    return _dbPromptsCache;
+  }
+  try {
+    // Lazy import tránh circular dependency (db.ts → systemPrompts.ts)
+    const Database = require('better-sqlite3');
+    const path = require('path');
+    const fs = require('fs');
+    const DATA_DIR = path.join(process.cwd(), 'data');
+    const DB_PATH = path.join(DATA_DIR, 'mada.db');
+    if (!fs.existsSync(DB_PATH)) return new Map();
+    const sqlite = new Database(DB_PATH, { readonly: true });
+    const rows = sqlite.prepare("SELECT id, prompt FROM admin_prompts WHERE is_active = 1").all() as { id: string; prompt: string }[];
+    sqlite.close();
+    const map = new Map<string, string>();
+    for (const r of rows) map.set(r.id, r.prompt);
+    _dbPromptsCache = map;
+    _dbPromptsCacheAt = now;
+    return map;
+  } catch (e) {
+    // Fallback silently nếu DB chưa sẵn sàng
+    return new Map();
+  }
+}
+
+export function invalidatePromptCache() {
+  _dbPromptsCache = null;
+  _dbPromptsCacheAt = 0;
+}
+
+/**
  * Build complete system prompt từ các module
+ *
+ * Thứ tự ưu tiên (cao → thấp):
+ *  1. DB prompts (admin_prompts) — nếu có
+ *  2. Hardcoded modules (CORE_IDENTITY, LANGUAGE_RULES, ...) — fallback
+ *  3. agentPrompt (hướng dẫn bổ sung từ Agent)
  */
 export function buildSystemPrompt(
   lang: string,
@@ -384,15 +429,20 @@ export function buildSystemPrompt(
   agentPrompt?: string
 ): string {
   const langCode = (['vi', 'en', 'ar', 'fr'].includes(lang) ? lang : 'vi') as 'vi' | 'en' | 'ar' | 'fr';
+  const dbPrompts = loadDbPrompts();
+
+  const getPrompt = (dbKey: string, hardcoded: string) => {
+    return dbPrompts.get(dbKey) || hardcoded;
+  };
 
   const parts = [
-    CORE_IDENTITY[langCode],
-    LANGUAGE_RULES[langCode],
+    getPrompt('mada-default-' + langCode, CORE_IDENTITY[langCode]),
+    getPrompt('mada-default-' + langCode === 'vi' ? 'mada-default-vi' : 'mada-default-' + langCode, LANGUAGE_RULES[langCode]),
     PERSONA_MODES[langCode]?.[userMode] || PERSONA_MODES.vi.endUser,
     RESPONSE_FORMAT[langCode] || RESPONSE_FORMAT.en,
-    CONTENT_GUIDELINES[langCode] || CONTENT_GUIDELINES.en,
-    SAFETY_RULES[langCode] || SAFETY_RULES.en,
-    PRODUCT_KNOWLEDGE[langCode] || PRODUCT_KNOWLEDGE.en,
+    CONTENT_GUIDELINES[langCode as keyof typeof CONTENT_GUIDELINES] || CONTENT_GUIDELINES.en,
+    SAFETY_RULES[langCode as keyof typeof SAFETY_RULES] || SAFETY_RULES.en,
+    PRODUCT_KNOWLEDGE[langCode as keyof typeof PRODUCT_KNOWLEDGE] || PRODUCT_KNOWLEDGE.en,
   ];
 
   if (agentPrompt) {

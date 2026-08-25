@@ -1,8 +1,77 @@
-import { ReactNode } from 'react';
+import { ReactNode, useState, useRef, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { useAuthStore, useThemeStore, useLanguageStore } from '@/stores';
+import { useAuthStore, useLanguageStore } from '@/stores';
 import clsx from 'clsx';
 import madaLogo from '@/assets/mada-logo.png';
+
+// ============== LANGUAGE SWITCHER (top bar) ==============
+const LANGUAGES: Array<{ code: 'vi' | 'en' | 'ar' | 'fr'; label: string; flag: string }> = [
+  { code: 'vi', label: 'Tiếng Việt', flag: '🇻🇳' },
+  { code: 'en', label: 'English', flag: '🇬🇧' },
+  { code: 'ar', label: 'العربية', flag: '🇸🇦' },
+  { code: 'fr', label: 'Français', flag: '🇫🇷' },
+];
+
+function LanguageSwitcher() {
+  const { language, setLanguage } = useLanguageStore();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const current = LANGUAGES.find((l) => l.code === language) || LANGUAGES[0];
+
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onClick);
+    return () => document.removeEventListener('mousedown', onClick);
+  }, []);
+
+  // Apply RTL for Arabic globally on the admin root
+  useEffect(() => {
+    const root = document.documentElement;
+    if (language === 'ar') root.setAttribute('dir', 'rtl');
+    else root.setAttribute('dir', 'ltr');
+  }, [language]);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center gap-2 px-3 py-2 rounded-xl border border-outline-variant/40 bg-white/60 hover:bg-white/90 transition-all shadow-sm"
+        title="Switch language"
+      >
+        <span className="text-base leading-none">{current.flag}</span>
+        <span className="font-label-sm font-semibold text-on-surface">{current.code.toUpperCase()}</span>
+        <span className="material-symbols-outlined text-[18px] text-on-surface-variant">expand_more</span>
+      </button>
+      {open && (
+        <div className="absolute right-0 mt-2 w-48 rounded-xl bg-white shadow-xl border border-outline-variant/30 overflow-hidden z-[60]">
+          {LANGUAGES.map((l) => (
+            <button
+              key={l.code}
+              type="button"
+              onClick={() => {
+                setLanguage(l.code);
+                setOpen(false);
+              }}
+              className={clsx(
+                'w-full flex items-center gap-3 px-4 py-2.5 text-left text-sm hover:bg-primary/5 transition-colors',
+                language === l.code && 'bg-primary/10 text-primary font-semibold'
+              )}
+            >
+              <span className="text-base leading-none">{l.flag}</span>
+              <span className="font-label-md">{l.label}</span>
+              {language === l.code && (
+                <span className="material-symbols-outlined text-[18px] ml-auto text-primary">check</span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface NavItem {
   label: string;
@@ -56,8 +125,8 @@ export function AdminLayout({
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuthStore();
-  const { isDark } = useThemeStore();
   const { language } = useLanguageStore();
+  const isRtl = language === 'ar';
 
   const getNavLabel = (item: NavItem) => {
     if (language === 'en') return item.labelEn;
@@ -66,13 +135,29 @@ export function AdminLayout({
     return item.label;
   };
 
+  // Pick title/subtitle theo ngôn ngữ hiện tại
+  const currentTitle =
+    language === 'en' ? (titleEn || title) :
+    language === 'ar' ? (titleAr || title) :
+    language === 'fr' ? (titleFr || title) :
+    title;
+  const currentSubtitle =
+    language === 'en' ? (subtitleEn || subtitle) :
+    language === 'ar' ? (subtitleAr || subtitle) :
+    language === 'fr' ? (subtitleFr || subtitle) :
+    subtitle;
+
   const handleLogout = () => {
     logout();
     navigate('/');
   };
 
   return (
-    <div className="font-body-md antialiased bg-background text-on-background min-h-screen" style={{ overflowX: 'hidden' }}>
+    <div
+      dir={isRtl ? 'rtl' : 'ltr'}
+      className="font-body-md antialiased bg-background text-on-background min-h-screen"
+      style={{ overflowX: 'hidden' }}
+    >
       {/* Material Symbols font */}
       <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" />
       <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Manrope:wght@600;700;800&display=swap" />
@@ -156,6 +241,27 @@ export function AdminLayout({
 
       {/* MAIN CONTENT */}
       <main className="ml-64 min-h-screen">
+        {/* TOP BAR */}
+        <div className="sticky top-0 z-40 backdrop-blur-xl bg-white/70 border-b border-outline-variant/30 px-8 py-3 flex items-center gap-4">
+          <div className="flex-1 min-w-0">
+            {showLayoutTitle && (
+              <div>
+                <h1 className="font-display-lg text-xl font-bold text-on-surface truncate">{currentTitle}</h1>
+                {currentSubtitle && (
+                  <p className="text-xs text-on-surface-variant truncate mt-0.5">{currentSubtitle}</p>
+                )}
+              </div>
+            )}
+          </div>
+          <div className="flex items-center gap-3">
+            <LanguageSwitcher />
+            <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-primary/5 border border-primary/20">
+              <span className="material-symbols-outlined text-[18px] text-primary">account_circle</span>
+              <span className="font-label-sm font-semibold text-primary">{user?.email || user?.name || 'Admin'}</span>
+            </div>
+          </div>
+        </div>
+
         {/* PAGE BODY */}
         <div className="p-8 max-w-[1600px] mx-auto space-y-8">
           {children}

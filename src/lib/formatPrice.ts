@@ -31,7 +31,6 @@ export function formatPrice(input: string | number | null | undefined): string {
   }
 
   // Detect currency
-  const isVND = /\b(VND|VNĐ)\b|đ|₫/i.test(raw);
   const isUSD = /\$|USD/i.test(raw);
   const isEUR = /€|EUR/i.test(raw);
 
@@ -41,7 +40,6 @@ export function formatPrice(input: string | number | null | undefined): string {
   // "2399k" → nghìn (k); "4.5tr" → triệu (tr); "3.5 triệu" → triệu
   const trailingK = /(k|nghìn|nghin|ngàn|ngan)$/i.test(trimmedLower);
   const trailingTr = /(tr|triệu|trieu|million|mil)$/i.test(trimmedLower);
-  const trailingMultiplier = trailingK || trailingTr;
 
   // Phân biệt triệu vs nghìn
   const isMillion = /\b(triệu|trieu|million|mil)\b/i.test(lower)

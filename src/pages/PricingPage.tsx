@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Check, Sparkles, Building2, Loader2, Crown, ArrowRight, Zap, Plus, ShieldCheck, Clock, ChevronDown, Mail, Phone, Globe2 } from 'lucide-react';
+import { Check, Sparkles, Building2, Loader2, Crown, ArrowRight, Zap, Plus, ShieldCheck, Clock, Mail, Phone, Globe2 } from 'lucide-react';
 import { Header } from '@/components/Header';
 import { Footer } from '@/components/Footer';
 import { useAuthStore, useAuthModalStore, usePaywallModalStore } from '@/stores';

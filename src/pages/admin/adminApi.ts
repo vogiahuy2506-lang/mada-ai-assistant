@@ -209,7 +209,32 @@ export const adminApi = {
 
   // ============== AGENTS ==============
   async getAgents() {
-    return request<any[]>('/admin/agents');
+    return request<{
+      success: boolean;
+      data: Array<{
+        id: string;
+        name: string;
+        description: string;
+        avatar: string;
+        system_prompt: string;
+        capabilities: string[];
+        is_active: number;
+        isActive: boolean;
+        created_by: string;
+        mada_category: string | null;
+        bot_id: string | null;
+        avatar_url: string | null;
+        knowledge_url: string | null;
+        product_url: string | null;
+        prompt_id: string | null;
+        promptId: string | null;
+        last_crawl_at: string | null;
+        last_crawl_status: string | null;
+        last_crawl_count: number;
+        created_at: string;
+        updated_at: string;
+      }>;
+    }>('/admin/agents');
   },
   async createAgent(data: any) {
     return request<any>('/admin/agents', { method: 'POST', body: JSON.stringify(data) });
@@ -219,6 +244,57 @@ export const adminApi = {
   },
   async deleteAgent(id: string) {
     return request<{ success: boolean }>(`/admin/agents/${id}`, { method: 'DELETE' });
+  },
+  async uploadAgentAvatar(file: File) {
+    const form = new FormData();
+    form.append('avatar', file);
+    const token = getAccessToken();
+    const res = await fetch(`${API_BASE}/admin/agents/upload-avatar`, {
+      method: 'POST',
+      body: form,
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) return { success: false as const, error: json.error || res.statusText };
+    return json as { success: boolean; data: { url: string; filename: string; size: number; mimetype: string } };
+  },
+  async crawlAgentSources(
+    id: string,
+    payload: {
+      knowledge_url?: string;
+      product_url?: string;
+      crawl_follow_links?: 0 | 1;
+      crawl_max_depth?: number;
+      crawl_max_pages?: number;
+    }
+  ) {
+    return request<{
+      agentId: string;
+      totalDocs: number;
+      status: string;
+      results: Array<{ url: string; kind: string; ok: boolean; docs: number; error?: string }>;
+    }>(`/admin/agents/${id}/crawl-sources`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  /** Liệt kê documents trong KB của 1 agent. */
+  async getAgentDocuments(id: string, limit = 50) {
+    return request<{
+      agentId: string;
+      agentName: string;
+      totalCount: number;
+      documents: Array<{ id: string; title: string; content: string; source: string; metadata: any }>;
+    }>(`/admin/agents/${id}/documents?limit=${limit}`);
+  },
+
+  /** Cập nhật title của 1 document trong KB. */
+  async updateAgentDocumentTitle(agentId: string, docId: string, title: string) {
+    return request<{ id: string; title: string }>(`/admin/agents/${agentId}/documents/${docId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ title }),
+    });
   },
 
   // ============== LOGS ==============
@@ -351,28 +427,94 @@ export const adminApi = {
     );
   },
 
-  // ============== SYSTEM PROMPTS ==============
-  async getPrompts() {
-    return request<{
-      data: Array<{
-        key: string;
-        name: string;
-        description: string;
-        defaultValue: string;
-        currentValue: string;
-      }>;
-    }>('/admin/prompts');
+  // ============== SYSTEM PROMPTS (admin_prompts table) ==============
+  async getPrompts(params?: { active?: boolean; category?: string; language?: string }) {
+    const p = new URLSearchParams();
+    if (params?.active !== undefined) p.set('active', String(params.active));
+    if (params?.category) p.set('category', params.category);
+    if (params?.language) p.set('language', params.language);
+    const qs = p.toString();
+    return request<Array<{
+      id: string;
+      name: string;
+      description: string;
+      prompt: string;
+      category: string;
+      language: string;
+      isActive: boolean;
+      isSystem: boolean;
+      createdAt: string;
+      updatedAt: string;
+    }>>(`/admin/system-prompts${qs ? `?${qs}` : ''}`);
   },
-  async updatePrompt(key: string, value: string) {
-    return request<{ success: boolean }>(`/admin/prompts/${key}`, {
-      method: 'PUT',
-      body: JSON.stringify({ value }),
+  async getPrompt(id: string) {
+    return request<{
+      id: string;
+      name: string;
+      description: string;
+      prompt: string;
+      category: string;
+      language: string;
+      isActive: boolean;
+      isSystem: boolean;
+      createdAt: string;
+      updatedAt: string;
+    }>(`/admin/system-prompts/${id}`);
+  },
+  async createPrompt(data: {
+    id: string;
+    name: string;
+    description?: string;
+    prompt: string;
+    category?: string;
+    language?: string;
+    is_active?: boolean;
+  }) {
+    return request<{
+      id: string;
+      name: string;
+      description: string;
+      prompt: string;
+      category: string;
+      language: string;
+      isActive: boolean;
+      isSystem: boolean;
+      createdAt: string;
+      updatedAt: string;
+    }>('/admin/system-prompts', {
+      method: 'POST',
+      body: JSON.stringify(data),
     });
   },
-  async resetPrompt(key: string) {
-    return request<{ success: boolean }>(`/admin/prompts/${key}`, { method: 'DELETE' });
+  async updatePrompt(id: string, data: {
+    name?: string;
+    description?: string;
+    prompt?: string;
+    category?: string;
+    language?: string;
+    is_active?: boolean;
+  }) {
+    return request<{
+      id: string;
+      name: string;
+      description: string;
+      prompt: string;
+      category: string;
+      language: string;
+      isActive: boolean;
+      isSystem: boolean;
+      createdAt: string;
+      updatedAt: string;
+    }>(`/admin/system-prompts/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
   },
-  async resetAllPrompts() {
-    return request<{ success: boolean }>('/admin/prompts', { method: 'DELETE' });
+  async deletePrompt(id: string) {
+    return request<{
+      success: boolean;
+      usingAgents?: Array<{ id: string; name: string }>;
+      warning?: string;
+    }>(`/admin/system-prompts/${id}`, { method: 'DELETE' });
   },
 };

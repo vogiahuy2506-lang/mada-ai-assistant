@@ -3,6 +3,13 @@ import type { Database as BetterSQLiteDatabase } from 'better-sqlite3';
 import bcrypt from 'bcryptjs';
 import path from 'path';
 import fs from 'fs';
+import {
+  CORE_IDENTITY,
+  LANGUAGE_RULES,
+  PERSONA_MODES,
+  SAFETY_RULES,
+  RESPONSE_FORMAT,
+} from './prompts/systemPrompts';
 
 const DATA_DIR = path.join(process.cwd(), 'data');
 if (!fs.existsSync(DATA_DIR)) {
@@ -328,12 +335,179 @@ db.exec(`
     created_by TEXT,
     mada_category TEXT,
     bot_id TEXT,
+    avatar_url TEXT,
+    knowledge_url TEXT,
+    product_url TEXT,
+    last_crawl_at TEXT,
+    last_crawl_status TEXT,
+    last_crawl_count INTEGER DEFAULT 0,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
   );
 
   CREATE INDEX IF NOT EXISTS idx_agents_active ON admin_agents(is_active);
 `);
+
+// Migration: thêm cột mới nếu DB cũ chưa có (SQLite không hỗ trợ IF NOT EXISTS cho ADD COLUMN,
+// nên kiểm tra pragma table_info trước)
+function addColumnIfMissing(table: string, column: string, ddl: string) {
+  const cols = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+  if (!cols.some(c => c.name === column)) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${ddl}`);
+    console.log(`🛠  Migrated: added column ${table}.${column}`);
+  }
+}
+
+addColumnIfMissing('admin_agents', 'avatar_url', 'avatar_url TEXT');
+addColumnIfMissing('admin_agents', 'knowledge_url', 'knowledge_url TEXT');
+addColumnIfMissing('admin_agents', 'product_url', 'product_url TEXT');
+addColumnIfMissing('admin_agents', 'last_crawl_at', 'last_crawl_at TEXT');
+addColumnIfMissing('admin_agents', 'last_crawl_status', 'last_crawl_status TEXT');
+addColumnIfMissing('admin_agents', 'last_crawl_count', 'last_crawl_count INTEGER DEFAULT 0');
+addColumnIfMissing('admin_agents', 'prompt_id', 'prompt_id TEXT');
+addColumnIfMissing('admin_agents', 'crawl_follow_links', 'crawl_follow_links INTEGER NOT NULL DEFAULT 0');
+addColumnIfMissing('admin_agents', 'crawl_max_depth', 'crawl_max_depth INTEGER NOT NULL DEFAULT 1');
+addColumnIfMissing('admin_agents', 'crawl_max_pages', 'crawl_max_pages INTEGER NOT NULL DEFAULT 5');
+
+// ============== ADMIN PROMPTS SCHEMA ==============
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS admin_prompts (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    description TEXT,
+    prompt TEXT NOT NULL,
+    category TEXT NOT NULL DEFAULT 'general',
+    language TEXT NOT NULL DEFAULT 'vi',
+    is_active INTEGER NOT NULL DEFAULT 1,
+    is_system INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_prompts_active ON admin_prompts(is_active);
+  CREATE INDEX IF NOT EXISTS idx_prompts_category ON admin_prompts(category);
+  CREATE INDEX IF NOT EXISTS idx_prompts_language ON admin_prompts(language);
+`);
+
+// Add prompt_id column if missing (after addColumnIfMissing runs above)
+addColumnIfMissing('admin_agents', 'prompt_id', 'prompt_id TEXT');
+
+// ============== SEED ADMIN PROMPTS ==============
+
+function seedAdminPrompts() {
+  const now = new Date().toISOString();
+  const existing = db.prepare('SELECT COUNT(*) as count FROM admin_prompts').get() as { count: number };
+  if (existing.count > 0) {
+    console.log(`📋 admin_prompts already has ${existing.count} rows — skipping seed`);
+    return;
+  }
+
+  const prompts = [
+    {
+      id: 'mada-default-vi',
+      name: 'MADA Default - Tiếng Việt',
+      description: 'Prompt mặc định cho MADA Assistant với ngôn ngữ tiếng Việt',
+      category: 'general',
+      language: 'vi',
+      is_system: 1,
+      prompt: CORE_IDENTITY.vi + '\n\n' + LANGUAGE_RULES.vi,
+    },
+    {
+      id: 'mada-default-en',
+      name: 'MADA Default - English',
+      description: 'Default prompt for MADA Assistant with English language',
+      category: 'general',
+      language: 'en',
+      is_system: 1,
+      prompt: CORE_IDENTITY.en + '\n\n' + LANGUAGE_RULES.en,
+    },
+    {
+      id: 'mada-default-ar',
+      name: 'MADA Default - العربية',
+      description: 'Prompt default untuk MADA Assistant dengan bahasa Arab',
+      category: 'general',
+      language: 'ar',
+      is_system: 1,
+      prompt: CORE_IDENTITY.ar + '\n\n' + LANGUAGE_RULES.ar,
+    },
+    {
+      id: 'mada-default-fr',
+      name: 'MADA Default - Français',
+      description: 'Prompt par défaut pour MADA Assistant avec langue française',
+      category: 'general',
+      language: 'fr',
+      is_system: 1,
+      prompt: CORE_IDENTITY.fr + '\n\n' + LANGUAGE_RULES.fr,
+    },
+    {
+      id: 'mada-expert-vi',
+      name: 'MADA Chuyên Gia - Tiếng Việt',
+      description: 'Prompt chế độ chuyên gia AT với thuật ngữ kỹ thuật (tiếng Việt)',
+      category: 'technical',
+      language: 'vi',
+      is_system: 1,
+      prompt: CORE_IDENTITY.vi + '\n\n' + LANGUAGE_RULES.vi + '\n\n' + PERSONA_MODES.vi.specialist,
+    },
+    {
+      id: 'mada-expert-en',
+      name: 'MADA Expert - English',
+      description: 'AT Specialist mode prompt with technical terminology (English)',
+      category: 'technical',
+      language: 'en',
+      is_system: 1,
+      prompt: CORE_IDENTITY.en + '\n\n' + LANGUAGE_RULES.en + '\n\n' + PERSONA_MODES.en.specialist,
+    },
+    {
+      id: 'mada-enduser-vi',
+      name: 'MADA End-User - Tiếng Việt',
+      description: 'Prompt chế độ người dùng cuối, thân thiện (tiếng Việt)',
+      category: 'general',
+      language: 'vi',
+      is_system: 1,
+      prompt: CORE_IDENTITY.vi + '\n\n' + LANGUAGE_RULES.vi + '\n\n' + PERSONA_MODES.vi.endUser,
+    },
+    {
+      id: 'mada-enduser-en',
+      name: 'MADA End-User - English',
+      description: 'End-user mode prompt, friendly and simple (English)',
+      category: 'general',
+      language: 'en',
+      is_system: 1,
+      prompt: CORE_IDENTITY.en + '\n\n' + LANGUAGE_RULES.en + '\n\n' + PERSONA_MODES.en.endUser,
+    },
+    {
+      id: 'safety-rules',
+      name: 'Safety Rules - Tiếng Việt',
+      description: 'Quy tắc an toàn khi trả lời câu hỏi y tế/pháp lý',
+      category: 'medical',
+      language: 'vi',
+      is_system: 1,
+      prompt: SAFETY_RULES.vi || SAFETY_RULES.en,
+    },
+    {
+      id: 'response-format',
+      name: 'Response Format',
+      description: 'Hướng dẫn format câu trả lời (markdown, bullet points)',
+      category: 'general',
+      language: 'vi',
+      is_system: 1,
+      prompt: RESPONSE_FORMAT.vi || RESPONSE_FORMAT.en,
+    },
+  ];
+
+  const stmt = db.prepare(`
+    INSERT INTO admin_prompts (id, name, description, category, language, is_active, is_system, prompt, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?, ?)
+  `);
+
+  for (const p of prompts) {
+    stmt.run(p.id, p.name, p.description, p.category, p.language, p.is_system, p.prompt, now, now);
+  }
+
+  console.log(`🌱 Seeded ${prompts.length} admin prompts`);
+}
+seedAdminPrompts();
 
 // ============== ADMIN LOGS SCHEMA ==============
 

@@ -4,8 +4,8 @@
  * API endpoints cho admin quản lý user approvals
  */
 
-import { Router, Response } from 'express';
-import { authenticate, requireRole, AuthRequest } from '../lib/auth';
+import { Router } from 'express';
+import { authenticate, requireRole } from '../lib/auth';
 import { 
   approveUser, 
   rejectUser, 
@@ -16,11 +16,12 @@ import {
 const router = Router();
 
 // All routes require admin role
-router.use(authenticate, requireRole('admin'));
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+router.use(authenticate as any, requireRole('admin') as any);
 
 // ============== GET /api/admin/approvals/pending =============
 
-router.get('/pending', (req: AuthRequest, res: Response) => {
+router.get('/pending', (_req, res) => {
   try {
     const pendingUsers = getPendingUsers();
     
@@ -46,7 +47,7 @@ router.get('/pending', (req: AuthRequest, res: Response) => {
 
 // ============== GET /api/admin/approvals/stats =============
 
-router.get('/stats', (req: AuthRequest, res: Response) => {
+router.get('/stats', (_req, res) => {
   try {
     const pendingCount = getPendingUsersCount();
     
@@ -78,7 +79,7 @@ router.get('/stats', (req: AuthRequest, res: Response) => {
 
 // ============== POST /api/admin/approvals/:userId/approve =============
 
-router.post('/:userId/approve', async (req: AuthRequest, res: Response) => {
+router.post('/:userId/approve', async (req, res) => {
   try {
     const { userId } = req.params;
     const adminId = req.user!.id;
@@ -101,7 +102,7 @@ router.post('/:userId/approve', async (req: AuthRequest, res: Response) => {
 
 // ============== POST /api/admin/approvals/:userId/reject =============
 
-router.post('/:userId/reject', async (req: AuthRequest, res: Response) => {
+router.post('/:userId/reject', async (req, res) => {
   try {
     const { userId } = req.params;
     const { reason } = req.body;
@@ -125,7 +126,7 @@ router.post('/:userId/reject', async (req: AuthRequest, res: Response) => {
 
 // ============== POST /api/admin/approvals/bulk-approve =============
 
-router.post('/bulk-approve', async (req: AuthRequest, res: Response) => {
+router.post('/bulk-approve', async (req, res) => {
   try {
     const { userIds } = req.body;
     const adminId = req.user!.id;

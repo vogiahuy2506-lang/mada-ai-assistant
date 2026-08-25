@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { AdminLayout } from './AdminLayout';
 import { adminApi, UserStats, KnowledgeStats } from './adminApi';
 import { getAccessToken } from '@/lib/api';
+import { useTranslation } from '@/lib/translations';
 import clsx from 'clsx';
 
 type TimeRange = '24h' | '7d' | '30d' | '90d';
@@ -132,10 +133,18 @@ export function AdminAnalytics() {
   ];
   const maxLog = Math.max(...logLevelBars.map((l) => l.count), 1);
 
+  const { t } = useTranslation();
+  const rangeLabel = (r: TimeRange) => t(`admin.analytics.range.${r}`);
   return (
     <AdminLayout
-      title="Phân tích Hệ thống"
-      subtitle="Báo cáo chi tiết về lưu lượng, hành vi người dùng và hiệu suất của MADA AI."
+      title={t('admin.topBar.analytics')}
+      titleEn="System Analytics"
+      titleAr="تحليلات النظام"
+      titleFr="Analytique système"
+      subtitle={t('admin.topBar.analyticsSub')}
+      subtitleEn="Detailed reports on traffic, user behavior and MADA AI performance."
+      subtitleAr="تقارير مفصلة عن حركة المرور وسلوك المستخدمين وأداء MADA AI."
+      subtitleFr="Rapports détaillés sur le trafic, le comportement et les performances."
       showLayoutTitle={false}
     >
       {/* Hero Banner Section */}
@@ -145,10 +154,10 @@ export function AdminAnalytics() {
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-primary/10 via-transparent to-transparent rounded-3xl"></div>
           <div className="max-w-2xl relative z-10 py-8 px-6">
             <h2 className="text-4xl font-black text-on-surface mb-4 tracking-tight">
-              Phân tích Hệ thống
+              {t('admin.analytics.title')}
             </h2>
             <p className="text-lg font-medium text-on-surface-variant border-l-4 border-primary pl-6 py-2 bg-white/40 backdrop-blur-sm rounded-r-xl">
-              Báo cáo chi tiết về lưu lượng, hành vi người dùng và hiệu suất của MADA AI.
+              {t('admin.analytics.subtitle')}
             </p>
           </div>
         </div>
@@ -167,7 +176,7 @@ export function AdminAnalytics() {
                 : 'bg-transparent text-on-surface-variant hover:bg-white/80 border-transparent hover:border-black'
             )}
           >
-            {r === '24h' ? '24 giờ' : r === '7d' ? '7 ngày' : r === '30d' ? '30 ngày' : '90 ngày'}
+            {rangeLabel(r)}
           </button>
         ))}
       </div>
@@ -204,16 +213,16 @@ export function AdminAnalytics() {
 
         {/* Total Users */}
         <div className="bg-gradient-to-br from-primary/10 to-primary/5 rounded-2xl p-3 border-2 border-primary/20">
-          <p className="text-[10px] font-bold text-primary uppercase">Tổng user</p>
+          <p className="text-[10px] font-bold text-primary uppercase">{t('admin.analytics.totalUsers')}</p>
           <p className="text-xl font-black text-primary">{userStats?.total ?? '—'}</p>
-          <p className="text-[10px] text-primary/70">Người dùng</p>
+          <p className="text-[10px] text-primary/70">{t('admin.analytics.users')}</p>
         </div>
 
         {/* KB Documents */}
         <div className="bg-gradient-to-br from-secondary/10 to-secondary/5 rounded-2xl p-3 border-2 border-secondary/20">
-          <p className="text-[10px] font-bold text-secondary uppercase">Tài liệu KB</p>
+          <p className="text-[10px] font-bold text-secondary uppercase">{t('admin.analytics.documents')}</p>
           <p className="text-xl font-black text-secondary">{kb?.totalDocuments ?? '—'}</p>
-          <p className="text-[10px] text-secondary/70">Documents</p>
+          <p className="text-[10px] text-secondary/70">{t('admin.analytics.documents')}</p>
         </div>
       </section>
 

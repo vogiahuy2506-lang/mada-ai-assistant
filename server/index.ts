@@ -359,11 +359,16 @@ app.use('/api/admin/products', productsRoutes);
 
 // ============== MADA IMAGE PROXY ==============
 // Proxy requests to MADA images to avoid hotlink protection
+// Returns actual image bytes or a fallback 1x1 transparent PNG
 app.get('/api/mada-image', async (req, res) => {
   const { url } = req.query;
 
   if (!url || typeof url !== 'string') {
-    return res.status(400).json({ error: 'Missing url parameter' });
+    // Return fallback image (1x1 transparent PNG)
+    return res.status(200)
+      .setHeader('Content-Type', 'image/png')
+      .setHeader('Cache-Control', 'no-store')
+      .send(Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64'));
   }
 
   // Validate URL is allowed
@@ -385,10 +390,11 @@ app.get('/api/mada-image', async (req, res) => {
   ];
   const isAllowed = allowedHosts.some((host) => url.includes(host));
   if (!isAllowed) {
-    return res.status(400).json({
-      error: 'URL không được phép',
-      detail: `Chỉ chấp nhận: ${allowedHosts.join(', ')}`,
-    });
+    // Return fallback image instead of JSON error
+    return res.status(200)
+      .setHeader('Content-Type', 'image/png')
+      .setHeader('Cache-Control', 'no-store')
+      .send(Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64'));
   }
 
   try {
@@ -404,7 +410,11 @@ app.get('/api/mada-image', async (req, res) => {
 
     if (!response.ok) {
       console.warn(`[mada-image] upstream ${response.status}: ${url}`);
-      return res.status(404).json({ error: 'Image not found at upstream', upstream: response.status });
+      // Return fallback image instead of JSON error
+      return res.status(200)
+        .setHeader('Content-Type', 'image/png')
+        .setHeader('Cache-Control', 'no-store')
+        .send(Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64'));
     }
 
     const buffer = await response.arrayBuffer();
@@ -418,10 +428,11 @@ app.get('/api/mada-image', async (req, res) => {
     res.send(Buffer.from(buffer));
   } catch (err: any) {
     console.error(`[mada-image] proxy error: ${url}`, err.message);
-    if (err.name === 'TimeoutError') {
-      return res.status(504).json({ error: 'Upstream timeout' });
-    }
-    return res.status(502).json({ error: 'Proxy failed', detail: err.message });
+    // Return fallback image instead of JSON error
+    return res.status(200)
+      .setHeader('Content-Type', 'image/png')
+      .setHeader('Cache-Control', 'no-store')
+      .send(Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64'));
   }
 });
 

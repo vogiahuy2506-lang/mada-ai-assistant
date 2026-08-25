@@ -149,7 +149,6 @@ async function extractPDFTextWithOCR(buffer: Buffer, filename: string): Promise<
   const tmpDir = '/tmp/pdf-ocr';
 
   try {
-    // Ensure temp directory exists
     if (!fs.existsSync(tmpDir)) {
       fs.mkdirSync(tmpDir, { recursive: true });
     }
@@ -162,79 +161,72 @@ async function extractPDFTextWithOCR(buffer: Buffer, filename: string): Promise<
     }).promise;
 
     const texts: string[] = [];
-    const pageCount = Math.min(pdf.numPages, 30); // Limit pages for performance
+    const pageCount = Math.min(pdf.numPages, 30);
 
     console.log(`📄 OCR processing ${pageCount} pages of ${filename}`);
 
-    // Try to use pdftoppm (from poppler-utils) first for faster rendering
-    const { execSync } = await import('child_process');
-    const pdfFilePath = `${tmpDir}/${Date.now()}_${pathModule.basename(filename)}`;
-    fs.writeFileSync(pdfFilePath, buffer);
-
+    // Check if pdftoppm is available (Linux/Windows with poppler)
+    let pdftoppmAvailable = false;
     try {
-      // Use pdftoppm to convert PDF pages to images
-      const outputPrefix = `${tmpDir}/${Date.now()}_page`;
-      execSync(`pdftoppm -r 200 -png "${pdfFilePath}" "${outputPrefix}"`, { stdio: 'pipe' });
+      const { execSync } = await import('child_process');
+      execSync('pdftoppm -v 2>&1', { stdio: 'pipe' });
+      pdftoppmAvailable = true;
+    } catch {}
 
-      // Find generated image files
-      const imageFiles = fs.readdirSync(tmpDir)
-        .filter(f => f.startsWith(pathModule.basename(outputPrefix)) && f.endsWith('.png'))
-        .sort();
+    if (pdftoppmAvailable) {
+      console.log('📄 Using pdftoppm for PDF rendering...');
+      const { execSync } = await import('child_process');
+      const pdfFilePath = `${tmpDir}/${Date.now()}_${pathModule.basename(filename)}`;
+      fs.writeFileSync(pdfFilePath, buffer);
 
-      console.log(`📄 Generated ${imageFiles.length} page images for OCR`);
+      try {
+        const outputPrefix = `${tmpDir}/${Date.now()}_page`;
+        execSync(`pdftoppm -r 200 -png "${pdfFilePath}" "${outputPrefix}"`, { stdio: 'pipe' });
 
-      for (const imgFile of imageFiles) {
-        const imgPath = `${tmpDir}/${imgFile}`;
-        try {
-          const { data } = await tess.recognize(imgPath, 'vie+eng', {
-            logger: false,
-          });
+        const imageFiles = fs.readdirSync(tmpDir)
+          .filter(f => f.startsWith(pathModule.basename(outputPrefix)) && f.endsWith('.png'))
+          .sort();
 
-          if (data.text.trim()) {
-            texts.push(data.text.trim());
-            console.log(`📄 OCR page ${imgFile}: ${data.text.length} chars (confidence: ${data.confidence.toFixed(1)}%)`);
+        for (const imgFile of imageFiles) {
+          const imgPath = `${tmpDir}/${imgFile}`;
+          try {
+            const { data } = await tess.recognize(imgPath, 'vie+eng', { logger: false });
+            if (data.text.trim()) {
+              texts.push(data.text.trim());
+            }
+          } catch (pageErr) {
+            console.warn(`OCR failed for ${imgFile}`);
           }
-        } catch (pageErr) {
-          console.warn(`⚠️ OCR failed for ${imgFile}:`, pageErr);
         }
+      } finally {
+        // Cleanup
+        try {
+          const files = fs.readdirSync(tmpDir);
+          for (const f of files) {
+            if (f.includes(Date.now().toString())) {
+              fs.unlinkSync(`${tmpDir}/${f}`);
+            }
+          }
+        } catch {}
       }
-    } catch (execErr) {
-      console.warn('pdftoppm not available, trying pdfjs canvas rendering...');
-      // Fallback: use pdfjs with canvas if pdftoppm fails
+    } else {
+      // Fallback: use pdfjs-dist text extraction only
+      console.log('📄 pdftoppm not available, falling back to text extraction only');
       for (let pageNum = 1; pageNum <= pageCount; pageNum++) {
         const page = await pdf.getPage(pageNum);
-        const viewport = page.getViewport({ scale: 2.0 });
-
-        // Try to render using CommonJS canvas
-        try {
-          // Use a simpler approach - just get any available text
-          const textContent = await page.getTextContent();
-          const pageText = textContent.items
-            .map((item: any) => item.str)
-            .filter(Boolean)
-            .join(' ');
-
-          if (pageText.trim()) {
-            texts.push(pageText);
-          }
-        } catch (renderErr) {
-          // Skip this page
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items
+          .map((item: any) => item.str)
+          .filter(Boolean)
+          .join(' ');
+        if (pageText.trim()) {
+          texts.push(pageText);
         }
       }
-    } finally {
-      // Cleanup temp files
-      try {
-        const files = fs.readdirSync(tmpDir);
-        for (const f of files) {
-          if (f.includes(pathModule.basename(filename, '.pdf')) || f.includes('page')) {
-            fs.unlinkSync(`${tmpDir}/${f}`);
-          }
-        }
-      } catch {}
     }
 
     const result = texts.join('\n\n');
-    console.log(`📄 OCR extracted ${result.length} chars from ${filename}`);
+    console.log(`📄 OCR/extraction: ${result.length} chars from ${filename}`);
     return result;
   } catch (err) {
     console.warn('OCR fallback failed:', err);

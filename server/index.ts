@@ -816,6 +816,10 @@ async function bootstrap(): Promise<void> {
 
 bootstrap();
 
+// ============== IN-MEMORY STORAGE ==============
+const consultations: any[] = [];
+const chatHistory: Map<string, any[]> = new Map();
+
 // ============== HTTP SERVER ==============
 // PORT already defined at line ~94
 const HOST = '0.0.0.0';
@@ -4863,16 +4867,5 @@ if (fs.existsSync(clientDistPath)) {
   });
   console.log(`📦 Serving frontend from ${clientDistPath}`);
 }
-
-// Start server
-app.listen(PORT, () => {
-  console.log(`🚀 MADA AI Server running on http://localhost:${PORT}`);
-  console.log(`📚 API Documentation: http://localhost:${PORT}/api/health`);
-  console.log(`🌐 Frontend: http://localhost:${PORT}/`);
-  console.log(`⚡ RAG Enabled: ${ragInitialized}`);
-  console.log(`🤖 Gemini Configured: ${!!process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'your_gemini_api_key_here'}`);
-  console.log(`🛡️  Guardrails: Active`);
-  console.log(`🔐 Auth: SQLite + bcrypt + JWT (admin: ${process.env.ADMIN_EMAIL || 'admin@mada.vn'})`);
-});
 
 export default app;

@@ -817,7 +817,7 @@ async function bootstrap(): Promise<void> {
 bootstrap();
 
 // ============== HTTP SERVER ==============
-const PORT = parseInt(process.env.PORT || '3000', 10);
+// PORT already defined at line ~94
 const HOST = '0.0.0.0';
 
 const server = app.listen(PORT, HOST, () => {

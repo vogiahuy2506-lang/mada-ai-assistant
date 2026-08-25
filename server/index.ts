@@ -799,6 +799,21 @@ async function initializeServices() {
 }
 
 /**
+ * Wait for RAG engine to be ready (wait for initialization if server just started)
+ */
+async function waitForRagReady(timeoutMs: number = 15000): Promise<boolean> {
+  const startTime = Date.now();
+  while (!ragInitialized) {
+    if (Date.now() - startTime > timeoutMs) {
+      console.warn('⚠️ RAG engine not ready after', timeoutMs, 'ms');
+      return false;
+    }
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+  return true;
+}
+
+/**
  * Initialize all services synchronously before server starts.
  * This ensures RAG is ready before handling requests.
  */

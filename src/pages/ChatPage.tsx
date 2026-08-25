@@ -1630,6 +1630,34 @@ export function ChatPage() {
 
       // Check if response is OK
       if (!response.ok) {
+        // ⭐ Handle 429 — Rate limit exceeded
+        if (response.status === 429) {
+          const retryAfter = response.headers.get('X-RateLimit-Reset');
+          const resetTime = retryAfter ? new Date(parseInt(retryAfter)).toLocaleTimeString() : 'một phút';
+          addMessage({
+            role: 'assistant',
+            content: language === 'vi'
+              ? `⚠️ Bạn đã gửi quá nhiều yêu cầu. Vui lòng chờ khoảng ${resetTime} rồi thử lại.`
+              : `⚠️ Too many requests. Please wait until ${resetTime} and try again.`,
+          });
+          setLoading(false);
+          setIsGeneratingResponse(false);
+          return;
+        }
+
+        // ⭐ Handle 401 — Token expired
+        if (response.status === 401) {
+          addMessage({
+            role: 'assistant',
+            content: language === 'vi'
+              ? '⚠️ Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.'
+              : '⚠️ Session expired. Please log in again.',
+          });
+          setLoading(false);
+          setIsGeneratingResponse(false);
+          return;
+        }
+
         // ⭐ Handle 402 — File upload quota exceeded
         if (response.status === 402) {
           try {
@@ -1641,9 +1669,26 @@ export function ChatPage() {
             }
           } catch { /* ignore */ }
         }
-        const errorText = await response.text();
-        console.error('API Error:', response.status, errorText);
-        throw new Error(`Server error: ${response.status}`);
+
+        // For other errors, don't spam console
+        if (response.status >= 500) {
+          addMessage({
+            role: 'assistant',
+            content: language === 'vi'
+              ? '⚠️ Máy chủ đang bận. Vui lòng thử lại sau vài giây.'
+              : '⚠️ Server is busy. Please try again in a few seconds.',
+          });
+        } else {
+          addMessage({
+            role: 'assistant',
+            content: language === 'vi'
+              ? '⚠️ Đã xảy ra lỗi. Vui lòng thử lại.'
+              : '⚠️ An error occurred. Please try again.',
+          });
+        }
+        setLoading(false);
+        setIsGeneratingResponse(false);
+        return;
       }
 
       // Try to parse JSON, handle errors gracefully

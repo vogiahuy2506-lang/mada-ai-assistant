@@ -112,7 +112,7 @@ app.use('/api/admin/scraper', (req, _res, next) => next());
 // Rate limit chặt hơn cho các endpoint đắt tài nguyên (chat, recommend, rag)
 const heavyApiRateLimiter = createRateLimiter({
   windowMs: 60 * 1000,
-  max: 20, // 20 requests / phút / IP cho AI endpoints
+  max: 30, // 30 requests / phút / IP cho AI endpoints (tăng từ 20)
 });
 app.use('/api/recommend', heavyApiRateLimiter);
 app.use('/api/chat', heavyApiRateLimiter);

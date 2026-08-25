@@ -8,6 +8,7 @@ import {
   X, Link, BookOpen, RefreshCw, Trash, FileCheck, Lightbulb, MessageCircle, Package
 } from 'lucide-react';
 import clsx from 'clsx';
+import { useTranslation } from '@/lib/translations';
 
 interface KnowledgeItem {
   id: string;
@@ -35,6 +36,8 @@ interface KnowledgeStats {
 
 export function DataManagerPage() {
   const navigate = useNavigate();
+  const { t, language } = useTranslation();
+  const locale = language === 'vi' ? 'vi-VN' : language === 'fr' ? 'fr-FR' : language === 'ar' ? 'ar-EG' : 'en-US';
   const [knowledgeItems, setKnowledgeItems] = useState<KnowledgeItem[]>([]);
   const [stats, setStats] = useState<KnowledgeStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -123,7 +126,7 @@ export function DataManagerPage() {
           type: log.type || 'text',
           status: 'completed' as const,
           documentsAdded: log.documentsAdded,
-          date: new Date(log.timestamp).toLocaleDateString('vi-VN'),
+          date: new Date(log.timestamp).toLocaleDateString(locale),
         }));
         setKnowledgeItems(items);
       }
@@ -155,7 +158,7 @@ export function DataManagerPage() {
           type: 'web',
           status: 'completed',
           documentsAdded: data.data.documentsAdded,
-          date: new Date().toLocaleDateString('vi-VN'),
+          date: new Date().toLocaleDateString(locale),
           category: data.data.category,
         };
         setKnowledgeItems(prev => [newItem, ...prev]);
@@ -201,7 +204,7 @@ export function DataManagerPage() {
           type: 'text',
           status: 'completed',
           documentsAdded: data.data.documentsAdded,
-          date: new Date().toLocaleDateString('vi-VN'),
+          date: new Date().toLocaleDateString(locale),
         };
         setKnowledgeItems(prev => [newItem, ...prev]);
         setManualContent('');
@@ -225,7 +228,7 @@ export function DataManagerPage() {
 
       if (data.success) {
         await fetchKnowledgeBase();
-        alert(`Đã thêm ${data.data.documentsAdded} tài liệu mẫu vào cơ sở tri thức!`);
+        alert(t('dataManager.alertSampleAdded').replace('{{count}}', String(data.data.documentsAdded)));
       }
     } catch (error) {
       console.error('Load sample failed:', error);
@@ -243,7 +246,7 @@ export function DataManagerPage() {
 
       if (data.success) {
         await fetchKnowledgeBase();
-        alert(`Đã thêm ${data.data.topicsAdded} chủ đề kiến thức!`);
+        alert(t('dataManager.alertTopicsAdded').replace('{{count}}', String(data.data.topicsAdded)));
       }
     } catch (error) {
       console.error('Load seed failed:', error);
@@ -285,7 +288,7 @@ export function DataManagerPage() {
       const data = await response.json();
 
       if (data.success) {
-        setUploadSuccess(`Đã thêm ${data.data.documentsAdded} tài liệu từ ${selectedFile.name}`);
+        setUploadSuccess(t('dataManager.alertFileAdded').replace('{{count}}', String(data.data.documentsAdded)).replace('{{filename}}', selectedFile.name));
         
         // Add to list
         const newItem: KnowledgeItem = {
@@ -295,7 +298,7 @@ export function DataManagerPage() {
           type: selectedFile.name.endsWith('.pdf') ? 'pdf' : 'text',
           status: 'completed',
           documentsAdded: data.data.documentsAdded,
-          date: new Date().toLocaleDateString('vi-VN'),
+          date: new Date().toLocaleDateString(locale),
         };
         setKnowledgeItems(prev => [newItem, ...prev]);
         
@@ -309,17 +312,17 @@ export function DataManagerPage() {
           fetchKnowledgeBase();
         }, 1500);
       } else {
-        setUploadError(data.error || 'Upload failed');
+        setUploadError(data.error || t('dataManager.uploadFailed'));
       }
     } catch (error: any) {
-      setUploadError(error.message || 'Upload failed');
+      setUploadError(error.message || t('dataManager.uploadFailed'));
     } finally {
       setIsUploading(false);
     }
   }, [selectedFile, fetchKnowledgeBase]);
 
   const handleClearKnowledge = async () => {
-    if (!confirm('Bạn có chắc muốn xóa toàn bộ cơ sở tri thức? Hành động này không thể hoàn tác.')) {
+    if (!confirm(t('dataManager.confirmClearKb'))) {
       return;
     }
 
@@ -338,10 +341,10 @@ export function DataManagerPage() {
   );
 
   const statusConfig = {
-    pending: { label: 'Đang chờ', color: 'bg-yellow-100 text-yellow-800', icon: Clock },
-    processing: { label: 'Đang xử lý', color: 'bg-blue-100 text-blue-800', icon: Loader2 },
-    completed: { label: 'Hoàn thành', color: 'bg-green-100 text-green-800', icon: CheckCircle },
-    failed: { label: 'Thất bại', color: 'bg-red-100 text-red-800', icon: AlertCircle },
+    pending: { label: t('dataManager.statusPending'), color: 'bg-yellow-100 text-yellow-800', icon: Clock },
+    processing: { label: t('dataManager.statusProcessing'), color: 'bg-blue-100 text-blue-800', icon: Loader2 },
+    completed: { label: t('dataManager.statusCompleted'), color: 'bg-green-100 text-green-800', icon: CheckCircle },
+    failed: { label: t('dataManager.statusFailed'), color: 'bg-red-100 text-red-800', icon: AlertCircle },
   };
 
   return (
@@ -353,9 +356,9 @@ export function DataManagerPage() {
           {/* Header */}
           <div className="mb-8 flex items-center justify-between">
             <div>
-              <h1 className="text-headline-md font-bold mb-2">Quản lý dữ liệu</h1>
+              <h1 className="text-headline-md font-bold mb-2">{t('dataManager.pageTitle')}</h1>
               <p className="text-body-md text-on-surface-variant">
-                Thu thập, làm sạch và quản lý kho tri thức AI
+                {t('dataManager.pageSubtitle')}
               </p>
             </div>
             <div className="flex items-center gap-3">
@@ -364,14 +367,14 @@ export function DataManagerPage() {
                 className="flex items-center gap-2 px-4 py-2 rounded-xl border-2 border-outline hover:bg-surface-container transition-colors"
               >
                 <RefreshCw className={clsx('w-4 h-4', isLoading && 'animate-spin')} />
-                Làm mới
+                {t('dataManager.refresh')}
               </button>
               <button
                 onClick={() => setShowAddModal(true)}
                 className="flex items-center gap-2 px-6 py-3 rounded-full bg-primary text-on-primary border-2 border-on-background neo-brutalist-shadow-sm hover:-translate-y-0.5 hover:-translate-x-0.5 transition-all"
               >
                 <Plus className="w-5 h-5" />
-                Thêm dữ liệu
+                {t('dataManager.addData')}
               </button>
             </div>
           </div>
@@ -381,23 +384,23 @@ export function DataManagerPage() {
             <div className="p-6 bg-surface dark:bg-on-background border-2 border-on-background dark:border-surface neo-brutalist-shadow-sm">
               <div className="flex items-center gap-3 mb-2">
                 <Database className="w-8 h-8 text-primary" />
-                <span className="text-on-surface-variant text-label-md">Tổng tài liệu</span>
+                <span className="text-on-surface-variant text-label-md">{t('dataManager.totalDocs')}</span>
               </div>
               <p className="text-headline-lg font-bold">{stats?.totalDocuments || 0}</p>
             </div>
             <div className="p-6 bg-surface dark:bg-on-background border-2 border-on-background dark:border-surface neo-brutalist-shadow-sm">
               <div className="flex items-center gap-3 mb-2">
                 <Brain className="w-8 h-8 text-blue-500" />
-                <span className="text-on-surface-variant text-label-md">Knowledge Base</span>
+                <span className="text-on-surface-variant text-label-md">{t('dataManager.knowledgeBase')}</span>
               </div>
               <p className="text-headline-lg font-bold">
                 {stats?.isInitialized ? (
                   <span className="text-green-600 flex items-center gap-2">
-                    <CheckCircle className="w-6 h-6" /> Ready
+                    <CheckCircle className="w-6 h-6" /> {t('dataManager.ready')}
                   </span>
                 ) : (
                   <span className="text-yellow-600 flex items-center gap-2">
-                    <Clock className="w-6 h-6" /> Initializing
+                    <Clock className="w-6 h-6" /> {t('dataManager.initializing')}
                   </span>
                 )}
               </p>
@@ -405,14 +408,14 @@ export function DataManagerPage() {
             <div className="p-6 bg-surface dark:bg-on-background border-2 border-on-background dark:border-surface neo-brutalist-shadow-sm">
               <div className="flex items-center gap-3 mb-2">
                 <BookOpen className="w-8 h-8 text-purple-500" />
-                <span className="text-on-surface-variant text-label-md">Chủ đề</span>
+                <span className="text-on-surface-variant text-label-md">{t('dataManager.topics')}</span>
               </div>
               <p className="text-headline-lg font-bold">{knowledgeItems.length}</p>
             </div>
             <div className="p-6 bg-surface dark:bg-on-background border-2 border-on-background dark:border-surface neo-brutalist-shadow-sm">
               <div className="flex items-center gap-3 mb-2">
                 <Sparkles className="w-8 h-8 text-amber-500" />
-                <span className="text-on-surface-variant text-label-md">Quick Actions</span>
+                <span className="text-on-surface-variant text-label-md">{t('dataManager.quickActions')}</span>
               </div>
               <div className="flex gap-2">
                 <button
@@ -420,14 +423,14 @@ export function DataManagerPage() {
                   disabled={isAddingSeed}
                   className="px-3 py-1.5 text-xs bg-blue-100 text-blue-800 rounded-lg hover:bg-blue-200 transition-colors disabled:opacity-50"
                 >
-                  {isAddingSeed ? 'Đang thêm...' : 'Load Sample'}
+                  {isAddingSeed ? t('dataManager.loading') : t('dataManager.loadSample')}
                 </button>
                 <button
                   onClick={handleLoadSeed}
                   disabled={isAddingSeed}
                   className="px-3 py-1.5 text-xs bg-purple-100 text-purple-800 rounded-lg hover:bg-purple-200 transition-colors disabled:opacity-50"
                 >
-                  Load Knowledge
+                  {t('dataManager.loadKnowledge')}
                 </button>
               </div>
             </div>
@@ -437,7 +440,7 @@ export function DataManagerPage() {
           <div className="mb-8 p-6 bg-surface dark:bg-on-background border-2 border-on-background dark:border-surface neo-brutalist-shadow-sm">
             <h2 className="font-bold text-headline-sm mb-4 flex items-center gap-2">
               <Globe className="w-6 h-6" />
-              Thu thập từ Website
+              {t('dataManager.collectFromWebsite')}
             </h2>
 
             <div className="flex gap-4">
@@ -463,12 +466,12 @@ export function DataManagerPage() {
                 {isCollecting ? (
                   <>
                     <Loader2 className="w-5 h-5 animate-spin" />
-                    Đang thu thập...
+                    {t('dataManager.collecting')}
                   </>
                 ) : (
                   <>
                     <CloudUpload className="w-5 h-5" />
-                    Bắt đầu thu thập
+                    {t('dataManager.startCollect')}
                   </>
                 )}
               </button>
@@ -479,7 +482,7 @@ export function DataManagerPage() {
               <div className="mt-4 p-4 bg-surface-container dark:bg-surface-container-high rounded-xl">
                 <div className="flex items-center gap-4 mb-2">
                   <Loader2 className="w-5 h-5 animate-spin text-primary" />
-                  <span className="text-body-md">Đang thu thập và phân tích nội dung...</span>
+                  <span className="text-body-md">{t('dataManager.collectingAnalyzing')}</span>
                 </div>
                 <div className="h-2 bg-outline rounded-full overflow-hidden">
                   <div className="h-full bg-primary animate-pulse" style={{ width: '60%' }} />
@@ -496,9 +499,9 @@ export function DataManagerPage() {
                       <Sparkles className="w-5 h-5 text-white" />
                     </div>
                     <div>
-                      <h3 className="font-bold text-lg">AI Đã phân tích xong!</h3>
+                      <h3 className="font-bold text-lg">{t('dataManager.aiDone')}</h3>
                       <p className="text-sm text-on-surface-variant">
-                        {lastCollectedTitle && `Chủ đề: ${lastCollectedTitle}`}
+                        {lastCollectedTitle && `${t('dataManager.topicLabel')}: ${lastCollectedTitle}`}
                       </p>
                     </div>
                   </div>
@@ -513,7 +516,7 @@ export function DataManagerPage() {
                 {isLoadingSuggestions ? (
                   <div className="flex items-center gap-3 py-4">
                     <Loader2 className="w-6 h-6 animate-spin text-violet-600" />
-                    <span>AI đang phân tích và tạo đề xuất...</span>
+                    <span>{t('dataManager.aiAnalyzing')}</span>
                   </div>
                 ) : suggestions && (
                   <div className="space-y-6">
@@ -522,7 +525,7 @@ export function DataManagerPage() {
                       <div>
                         <h4 className="flex items-center gap-2 font-bold mb-3 text-violet-700 dark:text-violet-300">
                           <MessageCircle className="w-5 h-5" />
-                          Câu hỏi gợi ý
+                          {t('dataManager.suggestedQuestions')}
                         </h4>
                         <div className="space-y-2">
                           {suggestions.questions.slice(0, 3).map((q, idx) => (
@@ -538,7 +541,7 @@ export function DataManagerPage() {
                                 {idx + 1}
                               </span>
                               <span className="flex-1 text-sm">{q}</span>
-                              <span className="text-xs text-on-surface-variant">Click để copy</span>
+                              <span className="text-xs text-on-surface-variant">{t('dataManager.clickToCopy')}</span>
                             </div>
                           ))}
                         </div>
@@ -550,7 +553,7 @@ export function DataManagerPage() {
                       <div>
                         <h4 className="flex items-center gap-2 font-bold mb-3 text-indigo-700 dark:text-indigo-300">
                           <Lightbulb className="w-5 h-5" />
-                          Chủ đề liên quan
+                          {t('dataManager.relatedTopics')}
                         </h4>
                         <div className="flex flex-wrap gap-2">
                           {suggestions.topics.slice(0, 4).map((topic, idx) => (
@@ -570,7 +573,7 @@ export function DataManagerPage() {
                       <div>
                         <h4 className="flex items-center gap-2 font-bold mb-3 text-purple-700 dark:text-purple-300">
                           <Package className="w-5 h-5" />
-                          Sản phẩm đề xuất
+                          {t('dataManager.suggestedProducts')}
                         </h4>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                           {suggestions.products.slice(0, 4).map((product, idx) => (
@@ -594,13 +597,13 @@ export function DataManagerPage() {
                         onClick={() => setShowSuggestions(false)}
                         className="flex-1 py-2 px-4 border-2 border-violet-300 dark:border-violet-600 text-violet-600 dark:text-violet-300 rounded-xl font-medium hover:bg-violet-50 dark:hover:bg-violet-900/30 transition-colors"
                       >
-                        Đóng
+                        {t('dataManager.close')}
                       </button>
                       <button
                         onClick={() => navigate('/chat')}
                         className="flex-1 py-2 px-4 bg-gradient-to-r from-violet-500 to-indigo-600 text-white rounded-xl font-bold hover:shadow-lg transition-all"
                       >
-                        Hỏi MADA về chủ đề này
+                        {t('dataManager.askMadaAbout')}
                       </button>
                     </div>
                   </div>
@@ -616,21 +619,21 @@ export function DataManagerPage() {
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Tìm kiếm dữ liệu..."
+                placeholder={t('dataManager.searchPlaceholder')}
                 className="w-full px-4 py-3 pl-12 rounded-xl border-2 border-outline bg-transparent focus:border-primary focus:outline-none"
               />
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-on-surface-variant" />
             </div>
             <button className="flex items-center gap-2 px-4 py-3 rounded-xl border-2 border-outline hover:bg-surface-container transition-colors">
               <Filter className="w-5 h-5" />
-              Bộ lọc
+              {t('dataManager.filter')}
             </button>
             <button
               onClick={handleClearKnowledge}
               className="flex items-center gap-2 px-4 py-3 rounded-xl border-2 border-red-300 text-red-600 hover:bg-red-50 transition-colors"
             >
               <Trash className="w-5 h-5" />
-              Xóa KB
+              {t('dataManager.clearKb')}
             </button>
           </div>
 
@@ -644,7 +647,7 @@ export function DataManagerPage() {
               <div className="flex flex-col items-center justify-center p-12">
                 <Database className="w-16 h-16 text-on-surface-variant mb-4" />
                 <p className="text-on-surface-variant text-lg mb-4">
-                  {searchTerm ? 'Không tìm thấy kết quả phù hợp' : 'Chưa có dữ liệu trong cơ sở tri thức'}
+                  {searchTerm ? t('dataManager.emptyNoResults') : t('dataManager.emptyNoData')}
                 </p>
                 {!searchTerm && (
                   <div className="flex gap-3">
@@ -653,13 +656,13 @@ export function DataManagerPage() {
                       disabled={isAddingSeed}
                       className="px-4 py-2 bg-primary text-on-primary rounded-xl hover:bg-primary/90 transition-colors disabled:opacity-50"
                     >
-                      Thêm dữ liệu mẫu
+                      {t('dataManager.addSampleData')}
                     </button>
                     <button
                       onClick={() => setShowAddModal(true)}
                       className="px-4 py-2 border-2 border-outline rounded-xl hover:bg-surface-container transition-colors"
                     >
-                      Nhập dữ liệu
+                      {t('dataManager.importData')}
                     </button>
                   </div>
                 )}
@@ -668,12 +671,12 @@ export function DataManagerPage() {
               <table className="w-full">
                 <thead className="bg-surface-container dark:bg-surface-container-high border-b-2 border-on-background dark:border-surface">
                   <tr>
-                    <th className="text-left p-4 font-bold">Tiêu đề</th>
-                    <th className="text-left p-4 font-bold">Nguồn</th>
-                    <th className="text-left p-4 font-bold">Loại</th>
-                    <th className="text-left p-4 font-bold">Trạng thái</th>
-                    <th className="text-left p-4 font-bold">Ngày</th>
-                    <th className="text-right p-4 font-bold">Hành động</th>
+                    <th className="text-left p-4 font-bold">{t('dataManager.colTitle')}</th>
+                    <th className="text-left p-4 font-bold">{t('dataManager.colSource')}</th>
+                    <th className="text-left p-4 font-bold">{t('dataManager.colType')}</th>
+                    <th className="text-left p-4 font-bold">{t('dataManager.colStatus')}</th>
+                    <th className="text-left p-4 font-bold">{t('dataManager.colDate')}</th>
+                    <th className="text-right p-4 font-bold">{t('dataManager.colActions')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -715,9 +718,9 @@ export function DataManagerPage() {
                         <td className="p-4 text-on-surface-variant">{item.date}</td>
                         <td className="p-4 text-right">
                           <div className="flex items-center justify-end gap-2">
-                            <button 
-                              className="p-2 rounded-lg hover:bg-violet-100 dark:hover:bg-violet-900/30 text-violet-600 transition-colors" 
-                              title="Xem đề xuất từ AI"
+                            <button
+                              className="p-2 rounded-lg hover:bg-violet-100 dark:hover:bg-violet-900/30 text-violet-600 transition-colors"
+                              title={t('dataManager.tipViewAi')}
                               onClick={() => {
                                 const itemStatus = item.status === 'completed';
                                 if (itemStatus) {
@@ -727,10 +730,10 @@ export function DataManagerPage() {
                             >
                               <Sparkles className="w-5 h-5" />
                             </button>
-                            <button className="p-2 rounded-lg hover:bg-surface-container transition-colors" title="Xem chi tiết">
+                            <button className="p-2 rounded-lg hover:bg-surface-container transition-colors" title={t('dataManager.tipViewDetail')}>
                               <Eye className="w-5 h-5" />
                             </button>
-                            <button className="p-2 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/20 text-red-600 transition-colors" title="Xóa">
+                            <button className="p-2 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/20 text-red-600 transition-colors" title={t('dataManager.tipDelete')}>
                               <Trash2 className="w-5 h-5" />
                             </button>
                           </div>
@@ -751,7 +754,7 @@ export function DataManagerPage() {
           <div className="bg-white dark:bg-[#2e3038] rounded-2xl border-2 border-[#191b23] w-full max-w-2xl max-h-[80vh] overflow-hidden">
             {/* Modal Header */}
             <div className="p-4 border-b-2 border-[#191b23] flex items-center justify-between">
-              <h2 className="text-lg font-bold">Thêm dữ liệu vào cơ sở tri thức</h2>
+              <h2 className="text-lg font-bold">{t('dataManager.modalTitle')}</h2>
               <button
                 onClick={() => setShowAddModal(false)}
                 className="p-2 rounded-lg hover:bg-surface-container transition-colors"
@@ -772,7 +775,7 @@ export function DataManagerPage() {
                   )}
                 >
                   <FilePlus className="w-4 h-4" />
-                  Nhập văn bản
+                  {t('dataManager.tabText')}
                 </button>
                 <button
                   onClick={() => setAddMode('url')}
@@ -782,7 +785,7 @@ export function DataManagerPage() {
                   )}
                 >
                   <Link className="w-4 h-4" />
-                  Từ URL
+                  {t('dataManager.tabUrl')}
                 </button>
                 <button
                   onClick={() => setAddMode('file')}
@@ -792,7 +795,7 @@ export function DataManagerPage() {
                   )}
                 >
                   <Upload className="w-4 h-4" />
-                  Upload file
+                  {t('dataManager.tabFile')}
                 </button>
               </div>
 
@@ -800,21 +803,21 @@ export function DataManagerPage() {
               {addMode === 'text' && (
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium mb-2">Tiêu đề (tùy chọn)</label>
+                    <label className="block text-sm font-medium mb-2">{t('dataManager.labelTitleOptional')}</label>
                     <input
                       type="text"
                       value={manualTitle}
                       onChange={(e) => setManualTitle(e.target.value)}
-                      placeholder="Nhập tiêu đề cho dữ liệu này"
+                      placeholder={t('dataManager.placeholderTitle')}
                       className="w-full px-4 py-3 rounded-xl border-2 border-outline bg-transparent focus:border-primary focus:outline-none"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium mb-2">Nội dung</label>
+                    <label className="block text-sm font-medium mb-2">{t('dataManager.labelContent')}</label>
                     <textarea
                       value={manualContent}
                       onChange={(e) => setManualContent(e.target.value)}
-                      placeholder="Dán nội dung văn bản vào đây..."
+                      placeholder={t('dataManager.placeholderContent')}
                       rows={10}
                       className="w-full px-4 py-3 rounded-xl border-2 border-outline bg-transparent focus:border-primary focus:outline-none resize-none"
                     />
@@ -836,7 +839,7 @@ export function DataManagerPage() {
                     />
                   </div>
                   <p className="text-sm text-on-surface-variant">
-                    Hệ thống sẽ tự động thu thập nội dung từ trang web và thêm vào cơ sở tri thức.
+                    {t('dataManager.urlHelp')}
                   </p>
                 </div>
               )}
@@ -859,9 +862,9 @@ export function DataManagerPage() {
                       className="border-2 border-dashed border-outline rounded-xl p-12 text-center cursor-pointer hover:border-primary hover:bg-surface-container transition-colors"
                     >
                       <Upload className="w-12 h-12 mx-auto mb-4 text-on-surface-variant" />
-                      <p className="font-medium">Click để upload file</p>
+                      <p className="font-medium">{t('dataManager.clickToUploadFile')}</p>
                       <p className="text-sm text-on-surface-variant mt-2">
-                        Hỗ trợ: TXT, MD, PDF, DOCX, CSV, JPG, PNG, WEBP
+                        {t('dataManager.supportedFormats')} TXT, MD, PDF, DOCX, CSV, JPG, PNG, WEBP
                       </p>
                     </div>
                   ) : (
@@ -894,7 +897,7 @@ export function DataManagerPage() {
                           <div className="flex items-center justify-between text-sm">
                             <span className="flex items-center gap-2">
                               <Loader2 className="w-4 h-4 animate-spin" />
-                              Đang upload và xử lý...
+                              {t('dataManager.uploading')}
                             </span>
                             <span>{uploadProgress}%</span>
                           </div>
@@ -937,12 +940,12 @@ export function DataManagerPage() {
                         {isUploading ? (
                           <>
                             <Loader2 className="w-5 h-5 animate-spin" />
-                            Đang xử lý...
+                            {t('dataManager.processing')}
                           </>
                         ) : (
                           <>
                             <CloudUpload className="w-5 h-5" />
-                            Upload và thêm vào Knowledge Base
+                            {t('dataManager.uploadToKb')}
                           </>
                         )}
                       </button>
@@ -958,14 +961,14 @@ export function DataManagerPage() {
                 onClick={() => setShowAddModal(false)}
                 className="px-6 py-2 rounded-xl border-2 border-outline hover:bg-surface-container transition-colors"
               >
-                Hủy
+                {t('dataManager.cancel')}
               </button>
               <button
                 onClick={addMode === 'url' ? handleCollect : handleAddManual}
                 disabled={isCollecting || (addMode === 'text' && !manualContent.trim())}
                 className="px-6 py-2 rounded-xl bg-primary text-on-primary hover:bg-primary/90 transition-colors disabled:opacity-50"
               >
-                {isCollecting ? 'Đang xử lý...' : 'Thêm vào cơ sở tri thức'}
+                {isCollecting ? t('dataManager.processing') : t('dataManager.confirmAdd')}
               </button>
             </div>
           </div>

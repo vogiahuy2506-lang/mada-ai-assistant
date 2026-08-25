@@ -168,15 +168,24 @@ jobs:
               HAS_EXISTING_ENV=true
             fi
 
-            echo "Removing old deployment..."
-            if [ -d "$APP_DIR" ]; then
-              sudo rm -rf $APP_DIR
+            # Create app directory if not exists
+            if [ ! -d "$APP_DIR" ]; then
+              echo "Creating app directory..."
+              sudo mkdir -p $APP_DIR
             fi
-            # Reset working dir (in case APP_DIR was deleted above)
             cd /tmp
 
-            echo "Cloning repository..."
-            sudo git clone https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/vogiahuy2506-lang/mada-ai-assistant.git $APP_DIR
+            echo "Deploying via git pull..."
+            cd $APP_DIR
+            if [ -d ".git" ]; then
+              echo "Git repo exists, pulling latest..."
+              sudo git pull origin main
+            else
+              echo "Cloning fresh repository..."
+              sudo rm -rf $APP_DIR
+              sudo git clone https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/vogiahuy2506-lang/mada-ai-assistant.git $APP_DIR
+              cd $APP_DIR
+            fi
 
             cd $APP_DIR
 
@@ -189,6 +198,10 @@ jobs:
               echo "JWT_SECRET=${{ secrets.JWT_SECRET }}"
               echo "ADMIN_EMAIL=${{ secrets.ADMIN_EMAIL }}"
               echo "ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}"
+              echo "VECTOR_DB_PROVIDER=pinecone"
+              echo "PINECONE_ENVIRONMENT=us-east-1"
+              echo "NODE_ENV=production"
+              echo "PORT=3000"
             } | sudo tee $APP_DIR/.env > /dev/null
 
             # Restore any additional env vars that were in old .env (e.g. custom overrides)

@@ -66,11 +66,13 @@ export function AdminAudit() {
         const actRes = await fetch('/api/admin/audit/actions', {
           headers: { Authorization: `Bearer ${localStorage.getItem('mada-auth') ? JSON.parse(localStorage.getItem('mada-auth')!).accessToken || '' : ''}` },
         });
-        if (actRes.ok) {
+        if (actRes.status === 401 || actRes.status === 403) {
+          // Auth required or forbidden — silently skip action filter
+        } else if (actRes.ok) {
           const j = await actRes.json();
           if (j.success && Array.isArray(j.data)) setActions(j.data);
         }
-      } catch { /* ignore */ }
+      } catch { /* ignore network/server errors */ }
 
       if (logsRes.data) {
         setLogs(Array.isArray(logsRes.data.data) ? logsRes.data.data : []);

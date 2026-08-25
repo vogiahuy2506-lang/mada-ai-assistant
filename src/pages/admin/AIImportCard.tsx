@@ -148,7 +148,21 @@ export function AIImportCard({ categories, onImportSuccess }: AIImportCardProps)
         );
       }
     } catch (err: any) {
-      setError(err.message || 'Lỗi không xác định');
+      // Distinguish network errors from server errors
+      const msg = err?.message || 'Lỗi không xác định';
+      let displayMsg = msg;
+      if (
+        msg.includes('Failed to fetch') ||
+        msg.includes('Network request failed') ||
+        msg.includes('NetworkError') ||
+        msg.includes('fetch') ||
+        !navigator.onLine
+      ) {
+        displayMsg = '❌ Không thể kết nối server. Kiểm tra mạng hoặc server có đang chạy không.';
+      } else if (msg.includes('timeout') || msg.includes('Timeout')) {
+        displayMsg = '⏱️ Hết thời gian chờ (timeout). URL có thể chặn scraper hoặc server quá chậm.';
+      }
+      setError(displayMsg);
     } finally {
       setLoading(false);
       setProgressMessage(null);
@@ -185,7 +199,12 @@ export function AIImportCard({ categories, onImportSuccess }: AIImportCardProps)
       setOpen(false);
       onImportSuccess?.();
     } catch (err: any) {
-      setError(err.message || 'Lỗi không xác định');
+      const msg = err?.message || 'Lỗi không xác định';
+      let displayMsg = msg;
+      if (msg.includes('Failed to fetch') || msg.includes('Network request failed') || msg.includes('NetworkError') || !navigator.onLine) {
+        displayMsg = '❌ Không thể kết nối server. Kiểm tra mạng hoặc server có đang chạy không.';
+      }
+      setError(displayMsg);
     } finally {
       setSaving(false);
     }

@@ -223,7 +223,11 @@ export const fileQuotaApi = {
         headers: { Authorization: `Bearer ${token}` },
       });
       const json = await res.json().catch(() => ({}));
-      if (!res.ok || !json.success) {
+      if (!res.ok) {
+        // 401 = not logged in / token expired — treat as "no quota", no error message
+        if (res.status === 401 || res.status === 403) {
+          return { success: false as const, error: null };
+        }
         return { success: false as const, error: json.error || 'Failed' };
       }
       return { success: true as const, data: json.data as FileUploadQuota };

@@ -18,6 +18,7 @@ import {
   type ExtractionResult,
 } from '../lib/scraping/productExtractor';
 import { syncProductToKnowledge } from '../lib/syncKbProducts';
+import { scrapeProductMetadata } from '../lib/scrapeProductMetadata';
 
 const router = express.Router();
 
@@ -620,8 +621,6 @@ router.post('/import-url/save', async (req, res) => {
 export default router;
 
 // ============== GET /import-url/metadata (SCRAPE META TAGS) ==============
-// Thêm sau vì cần import scrapeProductMetadata
-import { scrapeProductMetadata } from '../lib/scrapeProductMetadata';
 
 /**
  * GET /api/scraper/import-url/metadata?url=<url>

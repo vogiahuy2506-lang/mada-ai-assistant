@@ -829,6 +829,10 @@ const server = app.listen(PORT, HOST, () => {
   console.log(`🛡️  Guardrails: Active`);
   console.log(`🔐 Auth: SQLite + bcrypt + JWT (admin: ${process.env.ADMIN_EMAIL || 'admin@mada.vn'})`);
 });
+
+// ============== MAPPING AGENT TO MADA ==============
+
+const AGENT_TO_MADA: Record<string, { botId: string; madaCategory: string }> = {
   'bot-hearing':    { botId: 'bot-hearing',    madaCategory: 'sensory-hearing' },
   'bot-vision':     { botId: 'bot-vision',     madaCategory: 'sensory-vision' },
   'bot-speech':     { botId: 'bot-speech',     madaCategory: 'voice-and-speech' },

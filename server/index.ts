@@ -2786,42 +2786,58 @@ app.post('/api/chat-with-file', async (req, res) => {
           } catch (e) {
             console.log('Failed to fetch URL:', att.url);
           }
-        } else if ((att.type === 'pdf' || att.type === 'application/pdf' || att.name?.endsWith('.pdf')) && att.base64) {
-          // PDF - decode base64 and parse
-          console.log('🔵✅ MATCHED PDF CONDITION');
-          console.log('📎 Processing as PDF...');
-          try {
-            const buffer = Buffer.from(att.base64, 'base64');
-            console.log('📎 Buffer size:', buffer.length);
-            const tempPath = `/tmp/${Date.now()}_${att.name || 'file.pdf'}`;
-            fs.writeFileSync(tempPath, buffer);
-            console.log('📎 Temp file written:', tempPath);
-            
-            const { parsePDFFile } = await import('./lib/rag/fileParsers');
-            const text = await parsePDFFile(tempPath);
-            fs.unlinkSync(tempPath);
-            console.log('📎 PDF parsed, text length:', text.length);
-            
-            fileContext += `\n\n=== FILE: ${att.name || 'Document.pdf'} ===\n${text}\n`;
-          } catch (e) {
-            console.error('📎 PDF parse error:', e);
-            fileContext += `\n\n=== FILE: ${att.name || 'Document.pdf'} ===\n[Không thể đọc nội dung PDF]\n`;
+        } else if ((att.type === 'pdf' || att.type === 'application/pdf' || att.name?.endsWith('.pdf'))) {
+          // PDF - check if content is already provided
+          if (att.content && !att.base64) {
+            // Content already extracted
+            fileContext += `\n\n=== FILE: ${att.name || 'Document.pdf'} ===\n${att.content}\n`;
+          } else if (att.base64) {
+            // PDF - decode base64 and parse
+            console.log('🔵✅ MATCHED PDF CONDITION');
+            console.log('📎 Processing as PDF...');
+            try {
+              const buffer = Buffer.from(att.base64, 'base64');
+              console.log('📎 Buffer size:', buffer.length);
+              const tempPath = `/tmp/${Date.now()}_${att.name || 'file.pdf'}`;
+              fs.writeFileSync(tempPath, buffer);
+              console.log('📎 Temp file written:', tempPath);
+              
+              const { parsePDFFile } = await import('./lib/rag/fileParsers');
+              const text = await parsePDFFile(tempPath);
+              fs.unlinkSync(tempPath);
+              console.log('📎 PDF parsed, text length:', text.length);
+              
+              fileContext += `\n\n=== FILE: ${att.name || 'Document.pdf'} ===\n${text}\n`;
+            } catch (e) {
+              console.error('📎 PDF parse error:', e);
+              fileContext += `\n\n=== FILE: ${att.name || 'Document.pdf'} ===\n[Không thể đọc nội dung PDF]\n`;
+            }
+          } else {
+            fileContext += `\n\n=== FILE: ${att.name || 'Document.pdf'} ===\n[Không có nội dung file]\n`;
           }
-        } else if ((att.type === 'docx' || att.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || att.name?.endsWith('.docx')) && att.base64) {
-          // DOCX - decode base64 and parse
-          try {
-            const buffer = Buffer.from(att.base64, 'base64');
-            const tempPath = `/tmp/${Date.now()}_${att.name || 'file.docx'}`;
-            fs.writeFileSync(tempPath, buffer);
+        } else if ((att.type === 'docx' || att.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || att.name?.endsWith('.docx'))) {
+          // DOCX - check if content is already provided (from frontend mammoth parsing)
+          if (att.content && !att.base64) {
+            // Content already extracted by frontend
+            fileContext += `\n\n=== FILE: ${att.name || 'Document.docx'} ===\n${att.content}\n`;
+          } else if (att.base64) {
+            // DOCX - decode base64 and parse
+            try {
+              const buffer = Buffer.from(att.base64, 'base64');
+              const tempPath = `/tmp/${Date.now()}_${att.name || 'file.docx'}`;
+              fs.writeFileSync(tempPath, buffer);
 
-            const { parseDocxFile } = await import('./lib/rag/fileParsers');
-            const text = await parseDocxFile(tempPath);
-            fs.unlinkSync(tempPath);
+              const { parseDocxFile } = await import('./lib/rag/fileParsers');
+              const text = await parseDocxFile(tempPath);
+              fs.unlinkSync(tempPath);
 
-            fileContext += `\n\n=== FILE: ${att.name || 'Document.docx'} ===\n${text}\n`;
-          } catch (e) {
-            console.error('DOCX parse error:', e);
-            fileContext += `\n\n=== FILE: ${att.name || 'Document.docx'} ===\n[Không thể đọc nội dung DOCX]\n`;
+              fileContext += `\n\n=== FILE: ${att.name || 'Document.docx'} ===\n${text}\n`;
+            } catch (e) {
+              console.error('DOCX parse error:', e);
+              fileContext += `\n\n=== FILE: ${att.name || 'Document.docx'} ===\n[Không thể đọc nội dung DOCX]\n`;
+            }
+          } else {
+            fileContext += `\n\n=== FILE: ${att.name || 'Document.docx'} ===\n[Không có nội dung file]\n`;
           }
         } else if (
           (att.type === 'xlsx' || 

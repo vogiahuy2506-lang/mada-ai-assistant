@@ -1437,8 +1437,18 @@ export function ChatPage() {
         });
         
         // Chuẩn bị attachments để gửi lên server (có base64/content)
-        // Nếu có originalFile (PDF, DOCX, hoặc file nhị phân) - gửi base64
-        if (f.originalFile) {
+        // Ưu tiên content đã parse (từ mammoth/pdf.js) thay vì gửi raw base64
+        if (f.content && !f.content.includes('đang chờ parse')) {
+          // Đã có nội dung parse sẵn (từ mammoth/pdf.js frontend) - dùng luôn
+          attachmentsForApi.push({
+            name: f.name,
+            type: f.type,
+            content: f.content,
+          });
+          console.log('[DEBUG] Sent as parsed content:', f.name, '| type:', f.type, '| length:', f.content.length);
+        }
+        // Nếu không có content nhưng có originalFile - gửi base64 để server parse
+        else if (f.originalFile) {
           try {
             const arrayBuffer = await f.originalFile.arrayBuffer();
             const binary = new Uint8Array(arrayBuffer);
@@ -1457,15 +1467,6 @@ export function ChatPage() {
           } catch (e) {
             console.error('[DEBUG] Failed to read file:', f.name, e);
           }
-        } 
-        // Nếu có content (text, image đã đọc) - gửi text
-        else if (f.content && !f.content.includes('đang chờ parse')) {
-          attachmentsForApi.push({
-            name: f.name,
-            type: f.type,
-            content: f.content,
-          });
-          console.log('[DEBUG] Sent as text:', f.name);
         }
       }
       

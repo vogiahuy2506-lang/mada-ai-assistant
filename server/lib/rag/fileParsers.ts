@@ -4,9 +4,20 @@
 
 import fs from 'fs';
 import path from 'path';
-import { createRequire } from 'module';
 
-const require = createRequire(import.meta.url);
+// PDF.js for PDF parsing
+let pdfjsLib: any = null;
+
+async function loadPdfjs() {
+  if (pdfjsLib) return pdfjsLib;
+  try {
+    pdfjsLib = await import('pdfjs-dist');
+    return pdfjsLib;
+  } catch (err) {
+    console.error('Failed to load pdfjs-dist:', err);
+    throw new Error('Không thể load pdfjs-dist');
+  }
+}
 
 // Mammoth for DOCX parsing
 let mammoth: any = null;
@@ -28,10 +39,8 @@ async function loadMammoth() {
 async function loadXLSX() {
   if (XLSX) return XLSX;
   try {
-    // Try different import methods
     const mod = await import('xlsx');
     XLSX = mod.default || mod;
-    // If still not ready, try to access readFile directly
     if (typeof XLSX.readFile !== 'function') {
       XLSX = mod;
     }
@@ -43,7 +52,7 @@ async function loadXLSX() {
 }
 
 /**
- * Parse PDF using pdf-parse
+ * Parse PDF using pdfjs-dist
  */
 export async function parsePDFFile(filePath: string): Promise<string> {
   if (!fs.existsSync(filePath)) {
@@ -53,14 +62,33 @@ export async function parsePDFFile(filePath: string): Promise<string> {
   const buffer = fs.readFileSync(filePath);
 
   try {
-    const pdfParse = require('pdf-parse');
-    const parseFn = typeof pdfParse === 'function' ? pdfParse : (pdfParse.default || pdfParse);
+    const pdfjs = await loadPdfjs();
     
-    const data = await parseFn(buffer, { max: 0 });
-    let text = data.text || '';
+    // Load PDF document
+    const loadingTask = pdfjs.getDocument({
+      data: new Uint8Array(buffer),
+      useWorkerFetch: false,
+      isEvalSupported: false,
+      useSystemFonts: true,
+    });
+    
+    const pdf = await loadingTask.promise;
+    let allText = '';
+
+    // Extract text from each page
+    for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+      const page = await pdf.getPage(pageNum);
+      const textContent = await page.getTextContent();
+      
+      const pageText = textContent.items
+        .map((item: any) => item.str)
+        .join(' ');
+      
+      allText += pageText + '\n\n';
+    }
 
     // Cleanup
-    text = text
+    let text = allText
       .replace(/[ \t]+/g, ' ')
       .replace(/\n[ \t]+/g, '\n')
       .replace(/[ \t]+\n/g, '\n')

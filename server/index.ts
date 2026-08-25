@@ -2296,7 +2296,6 @@ Violation = erreur critique.`,
  * Được inject vào system prompt để AI điều chỉnh giọng điệu và mức độ kỹ thuật.
  * Không lâm sàng/y tế — tập trung vào Công nghệ Hỗ trợ (AT).
  */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const _MODE_PERSONA_INSTRUCTIONS: Record<string, Record<'endUser' | 'specialist', string>> = {
   vi: {
     endUser: `🎭 CHẾ ĐỘ NGƯỜI DÙNG (End-User Mode):

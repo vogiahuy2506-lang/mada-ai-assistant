@@ -6,20 +6,7 @@ import { getAccessToken } from '@/lib/api';
 import { usePromptStore, type SystemPromptRow } from '@/stores';
 import { useTranslation } from '@/lib/translations';
 
-interface SystemPrompt extends SystemPromptRow {}
-
-interface SystemPrompt {
-  id: string;
-  name: string;
-  description: string;
-  prompt: string;
-  category: string;
-  language: string;
-  isActive: boolean;
-  isSystem: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
+type SystemPrompt = SystemPromptRow;
 
 const CATEGORIES = ['general', 'medical', 'legal', 'finance', 'support', 'sales', 'technical'];
 const LANGUAGES = [

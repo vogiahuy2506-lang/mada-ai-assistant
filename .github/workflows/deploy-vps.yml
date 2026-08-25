@@ -167,6 +167,17 @@ jobs:
               cd /tmp
             fi
 
+            # Force remove any lingering containers with same name
+            echo "Force removing old containers..."
+            sudo docker rm -f mada-app 2>/dev/null || true
+            sudo docker rm -f mada-nginx 2>/dev/null || true
+            sudo docker rm -f mada-ai-assistant-app-1 2>/dev/null || true
+            sudo docker rm -f mada-ai-assistant-nginx-1 2>/dev/null || true
+
+            # Clean up dangling networks/volumes
+            echo "Cleaning up networks..."
+            sudo docker network rm mada-ai-assistant_default 2>/dev/null || true
+
             # Clean up temp dir from previous deploys
             echo "Cleaning up temp directory..."
             sudo rm -rf $TEMP_DIR
@@ -217,8 +228,9 @@ jobs:
             cd $APP_DIR
             sudo docker compose pull app
 
-            echo "Starting containers..."
-            sudo docker compose up -d --remove-orphans
+            echo "Starting containers (force recreate)..."
+            cd $APP_DIR
+            sudo docker compose up -d --force-recreate --remove-orphans
 
             echo "Pruning old images..."
             sudo docker image prune -f 2>/dev/null || true

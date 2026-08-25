@@ -654,8 +654,8 @@ export default function AdminUsers() {
                     onChange={(e) => setCreateForm({ ...createForm, role: e.target.value as any })}
                     className="w-full px-3 py-2.5 rounded-lg border-2 border-black font-medium text-sm bg-white"
                   >
-                    <option value="user">👤 User (Nhân viên)</option>
-                    <option value="admin">👑 Admin</option>
+                    <option value="user">👤 {t('admin.users.staff')}</option>
+                    <option value="admin">👑 {t('admin.users.admin')}</option>
                   </select>
                 </div>
                 <div>
@@ -667,9 +667,9 @@ export default function AdminUsers() {
                     onChange={(e) => setCreateForm({ ...createForm, plan: e.target.value as any })}
                     className="w-full px-3 py-2.5 rounded-lg border-2 border-black font-medium text-sm bg-white"
                   >
-                    <option value="free">Free (10 lượt)</option>
-                    <option value="pro">Pro (1000 lượt)</option>
-                    <option value="enterprise">Enterprise (Không giới hạn)</option>
+                    <option value="free">� {t('admin.users.free')} ({t('admin.users.freeQuota')})</option>
+                    <option value="pro">⭐ {t('admin.users.pro')} ({t('admin.users.proQuota')})</option>
+                    <option value="enterprise">🏢 {t('admin.users.enterprise')} ({t('admin.users.enterpriseQuota')})</option>
                   </select>
                 </div>
               </div>

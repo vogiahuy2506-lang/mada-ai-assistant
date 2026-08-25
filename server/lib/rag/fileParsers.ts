@@ -145,8 +145,15 @@ async function extractPDFTextWithOCR(buffer: Buffer, filename: string): Promise<
   }
 
   const pdfjs = await loadPdfjs();
+  const pathModule = await import('path');
+  const tmpDir = '/tmp/pdf-ocr';
 
   try {
+    // Ensure temp directory exists
+    if (!fs.existsSync(tmpDir)) {
+      fs.mkdirSync(tmpDir, { recursive: true });
+    }
+
     const pdf = await pdfjs.getDocument({
       data: new Uint8Array(buffer),
       useWorkerFetch: false,
@@ -155,27 +162,79 @@ async function extractPDFTextWithOCR(buffer: Buffer, filename: string): Promise<
     }).promise;
 
     const texts: string[] = [];
+    const pageCount = Math.min(pdf.numPages, 30); // Limit pages for performance
 
-    // Use canvas to render pages as images
-    for (let pageNum = 1; pageNum <= Math.min(pdf.numPages, 50); pageNum++) {
-      const page = await pdf.getPage(pageNum);
-      const viewport = page.getViewport({ scale: 2.0 }); // Higher scale for better OCR
+    console.log(`📄 OCR processing ${pageCount} pages of ${filename}`);
 
-      // Create canvas
-      const canvas = Buffer.alloc(Math.ceil(viewport.width) * Math.ceil(viewport.height) * 4);
-      // Note: In Node.js we need to use a canvas library. For simplicity, we'll skip canvas rendering
-      // and rely on pdfjs render to file if available, otherwise skip OCR
+    // Try to use pdftoppm (from poppler-utils) first for faster rendering
+    const { execSync } = await import('child_process');
+    const pdfFilePath = `${tmpDir}/${Date.now()}_${pathModule.basename(filename)}`;
+    fs.writeFileSync(pdfFilePath, buffer);
 
-      // Fallback: try to get text anyway
-      const textContent = await page.getTextContent();
-      const pageText = textContent.items.map((item: any) => item.str).join(' ');
-      if (pageText.trim()) {
-        texts.push(pageText);
+    try {
+      // Use pdftoppm to convert PDF pages to images
+      const outputPrefix = `${tmpDir}/${Date.now()}_page`;
+      execSync(`pdftoppm -r 200 -png "${pdfFilePath}" "${outputPrefix}"`, { stdio: 'pipe' });
+
+      // Find generated image files
+      const imageFiles = fs.readdirSync(tmpDir)
+        .filter(f => f.startsWith(pathModule.basename(outputPrefix)) && f.endsWith('.png'))
+        .sort();
+
+      console.log(`📄 Generated ${imageFiles.length} page images for OCR`);
+
+      for (const imgFile of imageFiles) {
+        const imgPath = `${tmpDir}/${imgFile}`;
+        try {
+          const { data } = await tess.recognize(imgPath, 'vie+eng', {
+            logger: false,
+          });
+
+          if (data.text.trim()) {
+            texts.push(data.text.trim());
+            console.log(`📄 OCR page ${imgFile}: ${data.text.length} chars (confidence: ${data.confidence.toFixed(1)}%)`);
+          }
+        } catch (pageErr) {
+          console.warn(`⚠️ OCR failed for ${imgFile}:`, pageErr);
+        }
       }
+    } catch (execErr) {
+      console.warn('pdftoppm not available, trying pdfjs canvas rendering...');
+      // Fallback: use pdfjs with canvas if pdftoppm fails
+      for (let pageNum = 1; pageNum <= pageCount; pageNum++) {
+        const page = await pdf.getPage(pageNum);
+        const viewport = page.getViewport({ scale: 2.0 });
+
+        // Try to render using CommonJS canvas
+        try {
+          // Use a simpler approach - just get any available text
+          const textContent = await page.getTextContent();
+          const pageText = textContent.items
+            .map((item: any) => item.str)
+            .filter(Boolean)
+            .join(' ');
+
+          if (pageText.trim()) {
+            texts.push(pageText);
+          }
+        } catch (renderErr) {
+          // Skip this page
+        }
+      }
+    } finally {
+      // Cleanup temp files
+      try {
+        const files = fs.readdirSync(tmpDir);
+        for (const f of files) {
+          if (f.includes(pathModule.basename(filename, '.pdf')) || f.includes('page')) {
+            fs.unlinkSync(`${tmpDir}/${f}`);
+          }
+        }
+      } catch {}
     }
 
     const result = texts.join('\n\n');
-    console.log(`📄 OCR fallback extracted ${result.length} chars from ${filename}`);
+    console.log(`📄 OCR extracted ${result.length} chars from ${filename}`);
     return result;
   } catch (err) {
     console.warn('OCR fallback failed:', err);

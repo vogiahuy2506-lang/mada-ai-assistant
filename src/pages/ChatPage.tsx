@@ -3263,16 +3263,11 @@ export function ChatPage() {
             <p className="text-center text-[11px] text-on-surface-variant/70 mt-6 uppercase tracking-wider font-medium">
               {language === 'vi' ? 'MADA AI - HỖ TRỢ TƯ VẤN CHUYÊN GIA AT' : language === 'en' ? 'MADA AI - SUPPORTING AT EXPERTS' : language === 'ar' ? '.MADA AI - دعم خبراء AT' : 'MADA AI - SOUTIEN AUX EXPERTS AT'}
             </p>
-            {/* Powered by Multi-modal AI & RAG Framework */}
+            {/* Powered by */}
             <p className="text-center text-[10px] text-on-surface-variant/60 mt-2 tracking-wider font-mono flex items-center justify-center gap-1.5 flex-wrap">
               <span className="inline-flex items-center gap-1">
                 <span className="material-symbols-outlined text-[12px] leading-none animate-pulse">auto_awesome</span>
                 {t('poweredBy', language)}
-              </span>
-              <span className="opacity-50">•</span>
-              <span className="inline-flex items-center gap-1">
-                <span className="material-symbols-outlined text-[12px] leading-none">psychology</span>
-                <span className="lowercase">gemini 2.5 flash</span>
               </span>
             </p>
           </div>

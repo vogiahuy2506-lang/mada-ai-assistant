@@ -155,7 +155,7 @@ export const translations = {
     
     // Footer
     'disclaimer': 'MADA AI - HỖ TRỢ TƯ VẤN CHUYÊN GIA AT',
-    'poweredBy': 'Được hỗ trợ bởi Multi-modal AI & RAG Framework',
+    'poweredBy': 'Developed by DIGISO Digital Solutions Co., Ltd. - digiso.vn',
     
     // Top nav
     'nav.models': 'Mô hình',
@@ -893,7 +893,7 @@ export const translations = {
     
     // Disclaimer
     'disclaimer': 'MADA AI CAN MAKE MISTAKES. VERIFY IMPORTANT INFO.',
-    'poweredBy': 'Powered by Multi-modal AI & RAG Framework',
+    'poweredBy': 'Developed by DIGISO Digital Solutions Co., Ltd. - digiso.vn',
     
     // Top nav
     'nav.models': 'Models',
@@ -1616,7 +1616,7 @@ export const translations = {
     
     // Disclaimer
     'disclaimer': 'MADA AI CAN MAKE MISTAKES. VERIFY IMPORTANT INFO.',
-    'poweredBy': 'مدعوم من Multi-modal AI و RAG Framework',
+    'poweredBy': 'Developed by DIGISO Digital Solutions Co., Ltd. - digiso.vn',
     
     // Top nav
     'nav.models': 'النماذج',
@@ -2339,7 +2339,7 @@ export const translations = {
     
     // Disclaimer
     'disclaimer': 'MADA AI CAN MAKE MISTAKES. VERIFY IMPORTANT INFO.',
-    'poweredBy': 'Alimenté par Multi-modal AI & RAG Framework',
+    'poweredBy': 'Developed by DIGISO Digital Solutions Co., Ltd. - digiso.vn',
     
     // Top nav
     'nav.models': 'Modèles',

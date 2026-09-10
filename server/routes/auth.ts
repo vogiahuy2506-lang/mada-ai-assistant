@@ -274,6 +274,54 @@ router.put('/password', authenticate as any, (req: Request, res: Response) => {
   }
 });
 
+// ============== POST /api/auth/reset-admin (EMERGENCY ONLY) ==============
+
+router.post('/reset-admin', async (req, res) => {
+  const SECRET_KEY = process.env.ADMIN_RESET_SECRET || 'mada-emergency-reset-2024';
+  
+  try {
+    const { secret, email, password } = req.body;
+    
+    // Verify secret key
+    if (secret !== SECRET_KEY) {
+      return res.status(403).json({ success: false, error: 'Invalid secret key' });
+    }
+    
+    const targetEmail = email || 'superadmin@mada.vn';
+    const newPassword = password || 'SuperAdmin@123';
+    
+    // Find user
+    const user = db.prepare('SELECT * FROM users WHERE email = ? AND role IN (?, ?)').get(targetEmail, 'super_admin', 'admin') as UserRow;
+    
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'Admin user not found' });
+    }
+    
+    // Hash and update password
+    const hash = hashPassword(newPassword);
+    const now = new Date().toISOString();
+    db.prepare('UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?').run(hash, now, user.id);
+    
+    // Delete all sessions
+    deleteAllUserSessions(user.id);
+    
+    auditLog(user.id, 'admin_password_reset', req as any, { resetBy: 'emergency-api' });
+    logActivity('warn', `Admin password reset for ${targetEmail}`, 'Auth Service');
+    
+    res.json({ 
+      success: true, 
+      message: 'Password reset successfully',
+      credentials: {
+        email: targetEmail,
+        password: newPassword
+      }
+    });
+  } catch (err) {
+    console.error('Admin reset error:', err);
+    res.status(500).json({ success: false, error: 'Lỗi server' });
+  }
+});
+
 // ============== GET /auth/google/url ==============
 
 router.get('/google/url', (_req, res) => {

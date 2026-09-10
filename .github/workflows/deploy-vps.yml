@@ -7,13 +7,17 @@
 #   3. SSH vào VPS, pull image mới, restart containers
 #
 # GitHub Secrets cần thiết (Settings → Secrets and variables → Actions):
-#   - VPS_HOST       : IP public của VM
-#   - VPS_USER       : User SSH
-#   - VPS_SSH_KEY    : Private SSH key
-#   - GHCR_TOKEN     : GitHub PAT có scope read:packages (optional, dùng GITHUB_TOKEN nếu đủ)
-#   - GEMINI_API_KEY : API key cho Gemini
-#   - PINECONE_API_KEY : API key Pinecone
-#   - JWT_SECRET     : JWT secret cho production
+#   - VPS_HOST          : IP public của VM
+#   - VPS_USER          : User SSH
+#   - VPS_SSH_KEY       : Private SSH key
+#   - GHCR_TOKEN        : GitHub PAT có scope read:packages (optional, dùng GITHUB_TOKEN nếu đủ)
+#   - GEMINI_API_KEY    : API key cho Gemini
+#   - PINECONE_API_KEY  : API key Pinecone
+#   - JWT_SECRET        : JWT secret cho production
+#   - ADMIN_EMAIL       : Email tài khoản admin
+#   - ADMIN_PASSWORD    : Password tài khoản admin
+#   - SUPER_ADMIN_EMAIL : Email tài khoản superadmin (optional, default: superadmin@mada.vn)
+#   - SUPER_ADMIN_PASSWORD : Password tài khoản superadmin (optional, default: SuperAdmin@123)
 # ===========================================
 
 name: Deploy to VPS (Compute Engine)
@@ -205,6 +209,8 @@ jobs:
               echo "JWT_SECRET=${{ secrets.JWT_SECRET }}"
               echo "ADMIN_EMAIL=${{ secrets.ADMIN_EMAIL }}"
               echo "ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}"
+              echo "SUPER_ADMIN_EMAIL=${{ secrets.SUPER_ADMIN_EMAIL }}"
+              echo "SUPER_ADMIN_PASSWORD=${{ secrets.SUPER_ADMIN_PASSWORD }}"
               echo "VECTOR_DB_PROVIDER=pinecone"
               echo "PINECONE_ENVIRONMENT=us-east-1"
               echo "NODE_ENV=production"
@@ -214,7 +220,7 @@ jobs:
             # Restore additional env vars from backup
             if [ "$HAS_EXISTING_ENV" = "true" ]; then
               echo "Merging backup env vars..."
-              grep -v -E '^(GEMINI_API_KEY|PINECONE_API_KEY|PINECONE_INDEX_NAME|JWT_SECRET|ADMIN_EMAIL|ADMIN_PASSWORD)=' /tmp/mada-env-backup.env | sudo tee -a $APP_DIR/.env > /dev/null
+              grep -v -E '^(GEMINI_API_KEY|PINECONE_API_KEY|PINECONE_INDEX_NAME|JWT_SECRET|ADMIN_EMAIL|ADMIN_PASSWORD|SUPER_ADMIN_EMAIL|SUPER_ADMIN_PASSWORD)=' /tmp/mada-env-backup.env | sudo tee -a $APP_DIR/.env > /dev/null
             fi
 
             # Set proper permissions

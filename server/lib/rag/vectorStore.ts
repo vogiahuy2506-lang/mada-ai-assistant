@@ -58,7 +58,7 @@ class GeminiEmbeddingProvider implements EmbeddingProvider {
   }
 }
 
-export function getEmbeddingProvider(): EmbeddingProvider {
+export function getEmbeddingProvider(): EmbeddingProvider | null {
   if (activeProvider) return activeProvider;
 
   const apiKey = process.env.GEMINI_API_KEY;
@@ -69,12 +69,12 @@ export function getEmbeddingProvider(): EmbeddingProvider {
   const isValidGeminiKey = !!apiKey && apiKey.length >= 30 && apiKey !== 'YOUR_KEY_HERE';
   if (!isValidGeminiKey) {
     if (apiKey) {
-      console.error('❌ GEMINI_API_KEY có vẻ không hợp lệ (length=' + apiKey.length + ')');
+      console.warn('⚠️ GEMINI_API_KEY có vẻ không hợp lệ (length=' + apiKey.length + ') - RAG sẽ bị vô hiệu hóa');
     } else {
-      console.error('❌ GEMINI_API_KEY chưa được set trong .env');
+      console.warn('⚠️ GEMINI_API_KEY chưa được set trong .env - RAG sẽ bị vô hiệu hóa');
     }
-    console.error('   Lấy key mới tại: https://aistudio.google.com/apikey');
-    throw new Error('GEMINI_API_KEY is missing or invalid. Set it in .env to enable embeddings.');
+    console.warn('   Lấy key mới tại: https://aistudio.google.com/apikey');
+    return null; // Return null instead of throwing - RAG will be disabled
   }
   console.log('✅ Using Gemini embeddings: ' + apiKey.substring(0, 10) + '...');
   activeProvider = new GeminiEmbeddingProvider(apiKey!);
@@ -196,7 +196,16 @@ class VectorStore {
       fs.mkdirSync(this.dataDir, { recursive: true });
 
       // Load in-memory data từ disk (cũng dùng làm mirror cho Pinecone)
+      // This now handles null provider gracefully
       await this.loadInMemoryData();
+
+      // Check if embedding provider is available
+      const provider = getEmbeddingProvider();
+      if (!provider) {
+        console.warn('⚠️  Embedding provider unavailable — RAG will be limited');
+        this.isInitialized = true;
+        return;
+      }
 
       // Thử initialize Pinecone; nếu fail thì fallback in-memory
       try {
@@ -211,7 +220,8 @@ class VectorStore {
 
     } catch (error) {
       console.error('Failed to initialize vector store:', error);
-      throw error;
+      // Don't throw - let app start anyway
+      this.isInitialized = true;
     }
   }
 
@@ -235,6 +245,9 @@ class VectorStore {
         const provider = getEmbeddingProvider();
         for (const doc of data) {
           if (!doc.embedding) {
+            if (!provider) {
+              continue; // Skip embedding if provider unavailable
+            }
             try {
               doc.embedding = await provider.embed(doc.content);
             } catch (e) {
@@ -264,12 +277,21 @@ class VectorStore {
 
     // Always update in-memory store
     for (const doc of documents) {
-      const embedding = await provider.embed(doc.content);
-      this.inMemoryStore.set(doc.id, { ...doc, embedding });
+      if (!provider) {
+        this.inMemoryStore.set(doc.id, { ...doc, embedding: [] }); // Store without embedding
+        continue;
+      }
+      try {
+        const embedding = await provider.embed(doc.content);
+        this.inMemoryStore.set(doc.id, { ...doc, embedding });
+      } catch (e) {
+        console.warn(`⚠️ Failed to embed doc ${doc.id}:`, (e as Error).message);
+        this.inMemoryStore.set(doc.id, { ...doc, embedding: [] }); // Store without embedding
+      }
     }
 
     // Sync to Pinecone if using
-    if (this.activeDbProvider === 'pinecone' && this.pineconeIndex) {
+    if (this.activeDbProvider === 'pinecone' && this.pineconeIndex && provider) {
       try {
         const embeddings = await provider.embedBatch(documents.map(d => d.content));
         const vectors = documents.map((doc, i) => ({
@@ -304,9 +326,20 @@ class VectorStore {
     const filter = opts.filter;
 
     const provider = getEmbeddingProvider();
+    if (!provider) {
+      console.warn('⚠️ Embedding provider not available - returning empty results');
+      return [];
+    }
+
     const cachedVec = this.getCachedEmbedding(query);
-    const queryEmbedding = cachedVec || await provider.embed(query);
-    if (!cachedVec) this.setCachedEmbedding(query, queryEmbedding);
+    let queryEmbedding: number[];
+    try {
+      queryEmbedding = cachedVec || await provider.embed(query);
+      if (!cachedVec) this.setCachedEmbedding(query, queryEmbedding);
+    } catch (e) {
+      console.error('⚠️ Failed to embed query:', (e as Error).message);
+      return [];
+    }
 
     // Search Pinecone if using
     if (this.activeDbProvider === 'pinecone' && this.pineconeIndex) {
@@ -378,6 +411,10 @@ class VectorStore {
 
   async reindexAll(): Promise<{ count: number; provider: string }> {
     const provider = getEmbeddingProvider();
+    if (!provider) {
+      console.warn('⚠️ Embedding provider not available - skipping reindex');
+      return { count: 0, provider: 'none' };
+    }
     console.log(`🔄 Re-indexing ${this.inMemoryStore.size} documents...`);
 
     for (const [id, doc] of this.inMemoryStore) {
@@ -472,8 +509,9 @@ class VectorStore {
       indexName: pineconeConfig.indexName,
       isInitialized: this.isInitialized,
       provider: this.activeDbProvider,
-      dimension: provider.dimension,
+      dimension: provider?.dimension || 0,
       storage: this.activeDbProvider,
+      embeddingAvailable: !!provider,
     };
   }
 

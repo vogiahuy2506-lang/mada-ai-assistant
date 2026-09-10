@@ -904,14 +904,19 @@ const chatHistory: Map<string, any[]> = new Map();
 const HOST = '0.0.0.0';
 
 // @ts-ignore - Express listen overload conflict (kept as Server for graceful shutdown)
-const _server = app.listen(PORT, HOST, () => {
-  console.log(`🚀 MADA AI Server running on http://${HOST}:${PORT}`);
-  console.log(`📚 API Documentation: http://localhost:${PORT}/api/health`);
-  console.log(`🌐 Frontend: http://localhost:${PORT}/`);
-  console.log(`⚡ RAG Enabled: ${ragInitialized}`);
-  console.log(`🤖 Gemini Configured: ${!!process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'your_gemini_api_key_here'}`);
-  console.log(`🛡️  Guardrails: Active`);
-  console.log(`🔐 Auth: SQLite + bcrypt + JWT (admin: ${process.env.ADMIN_EMAIL || 'admin@mada.vn'})`);
+// Defer listen() so ALL routes are registered before server starts accepting connections.
+// Without this, routes registered after this line would be unreachable because the
+// HTTP server starts before those route registration calls execute.
+setImmediate(() => {
+  const _server = app.listen(PORT, HOST, () => {
+    console.log(`🚀 MADA AI Server running on http://${HOST}:${PORT}`);
+    console.log(`📚 API Documentation: http://localhost:${PORT}/api/health`);
+    console.log(`🌐 Frontend: http://localhost:${PORT}/`);
+    console.log(`⚡ RAG Enabled: ${ragInitialized}`);
+    console.log(`🤖 Gemini Configured: ${!!process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'your_gemini_api_key_here'}`);
+    console.log(`🛡️  Guardrails: Active`);
+    console.log(`🔐 Auth: SQLite + bcrypt + JWT (admin: ${process.env.ADMIN_EMAIL || 'admin@mada.vn'})`);
+  });
 });
 
 // ============== MAPPING AGENT TO MADA ==============

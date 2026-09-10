@@ -38,11 +38,11 @@ services:
       - mada-uploads:/app/uploads
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- --timeout=5 --tries=2 http://localhost:3000/api/health >/dev/null 2>&1 && exit 0 || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- --timeout=10 --tries=1 http://localhost:3000/api/health >/dev/null 2>&1"]
       interval: 15s
       timeout: 10s
-      retries: 4
-      start_period: 120s
+      retries: 3
+      start_period: 180s
     logging:
       driver: json-file
       options:
@@ -50,6 +50,10 @@ services:
         max-file: "3"
 
   # Nginx Reverse Proxy
+  # NOTE: nginx starts immediately (no health condition) to avoid
+  # "dependency failed" errors. Nginx returns 502/504 until app is ready,
+  # then proxies correctly. The CI/CD script polls /api/health directly
+  # on port 3000 to verify app readiness.
   nginx:
     image: nginx:alpine
     container_name: mada-nginx
@@ -64,7 +68,7 @@ services:
       - mada-nginx-logs:/var/log/nginx
     depends_on:
       app:
-        condition: service_healthy
+        condition: service_started
     restart: unless-stopped
     logging:
       driver: json-file

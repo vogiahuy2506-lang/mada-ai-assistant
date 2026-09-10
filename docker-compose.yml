@@ -64,7 +64,7 @@ services:
       - mada-nginx-logs:/var/log/nginx
     depends_on:
       app:
-        condition: service_healthy
+        condition: service_started
     restart: unless-stopped
     logging:
       driver: json-file

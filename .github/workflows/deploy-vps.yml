@@ -234,19 +234,20 @@ jobs:
             cd $APP_DIR
             sudo docker compose pull app
 
-            echo "Starting containers (force recreate)..."
+            # Step 1: Start only app container first, without nginx dependency
+            echo "Starting app container (without nginx dependency)..."
             cd $APP_DIR
-            sudo docker compose up -d --force-recreate --remove-orphans
+            sudo docker compose up -d app --no-deps
 
             echo "Pruning old images..."
             sudo docker image prune -f 2>/dev/null || true
 
-            echo "Waiting for app container to start (60s start period)..."
-            sleep 60
+            echo "Waiting for app container to start (90s start period)..."
+            sleep 90
 
             echo "Checking app container health..."
             APP_HEALTHY=false
-            for i in $(seq 1 10); do
+            for i in $(seq 1 15); do
               APP_STATUS=$(sudo docker inspect --format='{{.State.Health.Status}}' mada-app 2>/dev/null || echo "missing")
               if [ "$APP_STATUS" = "healthy" ]; then
                 echo "App container is healthy (after ${i} checks)"
@@ -258,29 +259,34 @@ jobs:
             done
 
             # Phase 2: Direct app probe (more important than healthcheck)
-            sleep 2
-            DIRECT_CODE=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/api/health || echo "000")
+            echo "Running direct app probe..."
+            DIRECT_CODE=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/api/health 2>/dev/null || echo "000")
             if [ "$DIRECT_CODE" = "200" ]; then
-              echo "Direct app probe OK (HTTP $DIRECT_CODE) - App is running!"
+              echo "✅ Direct app probe OK (HTTP $DIRECT_CODE) - App is running!"
             else
               echo "Direct app probe: HTTP $DIRECT_CODE"
-              echo "Checking container logs..."
-              sudo docker compose logs --tail=100 app
-              echo "--- Container status ---"
-              sudo docker compose ps
-              echo "--- Container inspect ---"
-              sudo docker inspect mada-app | head -50
+              echo "=== Container logs ==="
+              sudo docker compose logs --tail=200 app
+              echo "=== Container status ==="
+              sudo docker compose ps -a
+              echo "=== Container inspect (first 100 lines) ==="
+              sudo docker inspect mada-app 2>/dev/null | head -100 || echo "Could not inspect container"
               # Try to restart once more
               echo "Attempting container restart..."
-              sudo docker restart mada-app
-              sleep 30
-              DIRECT_CODE=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/api/health || echo "000")
+              sudo docker restart mada-app 2>/dev/null || echo "Restart failed"
+              sleep 45
+              DIRECT_CODE=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/api/health 2>/dev/null || echo "000")
               if [ "$DIRECT_CODE" = "200" ]; then
-                echo "App recovered after restart (HTTP $DIRECT_CODE)"
+                echo "✅ App recovered after restart (HTTP $DIRECT_CODE)"
               else
                 echo "WARNING: App not responding but may still be initializing"
               fi
             fi
+
+            # Step 2: Start nginx after app is ready
+            echo "Starting nginx..."
+            cd $APP_DIR
+            sudo docker compose up -d nginx || echo "Nginx start failed (non-fatal)"
 
             # Phase 3: Nginx HTTPS probe (non-fatal)
             sleep 3

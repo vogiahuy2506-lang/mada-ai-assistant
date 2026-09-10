@@ -1320,7 +1320,37 @@ function seedDemoUsers() {
   }
 }
 
+// ============== SEED SUPER ADMIN ==============
+
+function seedSuperAdmin() {
+  const superAdminEmail = process.env.SUPER_ADMIN_EMAIL || 'superadmin@mada.vn';
+  const superAdminPassword = process.env.SUPER_ADMIN_PASSWORD || 'SuperAdmin@123';
+
+  // Check if super_admin already exists
+  const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(superAdminEmail);
+  if (existing) {
+    // Ensure password is correct (in case it was changed)
+    const hash = bcrypt.hashSync(superAdminPassword, 12);
+    db.prepare('UPDATE users SET password_hash = ?, role = ?, updated_at = ? WHERE email = ?')
+      .run(hash, 'super_admin', new Date().toISOString(), superAdminEmail);
+    console.log(`🔑 SuperAdmin password verified: ${superAdminEmail}`);
+    return;
+  }
+
+  const hash = bcrypt.hashSync(superAdminPassword, 12);
+  const now = new Date().toISOString();
+  const id = `superadmin-${Date.now()}`;
+
+  db.prepare(`
+    INSERT INTO users (id, email, name, password_hash, role, plan, status, provider, quota_used, quota_limit, last_login_at, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(id, superAdminEmail, 'Super Administrator', hash, 'super_admin', 'enterprise', 'active', 'email', 0, -1, now, now, now);
+
+  console.log(`🌱 Seeded SuperAdmin: ${superAdminEmail} / ${superAdminPassword}`);
+}
+
 seedAdmin();
+seedSuperAdmin();
 seedDemoUsers();
 
 export default db;

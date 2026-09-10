@@ -1320,6 +1320,69 @@ function seedDemoUsers() {
   }
 }
 
+// ============== MIGRATION: Add super_admin role to existing DB ==============
+// SQLite doesn't support ALTER TABLE to change CHECK constraints.
+// This function rebuilds the users table with the new schema if needed.
+// Called BEFORE seed functions to ensure schema is correct.
+function migrateUsersTable() {
+  try {
+    // Try inserting super_admin - if CHECK constraint fails, the schema is old
+    const testHash = bcrypt.hashSync('__test__', 1);
+    const rollback = db.transaction(() => {
+      db.prepare('DELETE FROM users WHERE email = ?').run('__mada_migration_test__@internal');
+    });
+    try {
+      db.prepare(`
+        INSERT INTO users (id, email, name, password_hash, role, plan, status, provider, quota_used, quota_limit, last_login_at, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run('__mig_test__', '__mada_migration_test__@internal', 'Test', testHash, 'super_admin', 'free', 'active', 'email', 0, 10, new Date().toISOString(), new Date().toISOString(), new Date().toISOString());
+      // Success - schema is new, clean up test row
+      db.prepare('DELETE FROM users WHERE email = ?').run('__mada_migration_test__@internal');
+      console.log('✅ Users table schema is up-to-date');
+      return; // No migration needed
+    } catch (err: any) {
+      rollback();
+      if (err.code !== 'SQLITE_CONSTRAINT_CHECK') throw err;
+      // Schema is old - need to rebuild table
+      console.log('🔧 Migrating users table schema (adding super_admin role)...');
+    }
+
+    // Rebuild table with new schema
+    db.transaction(() => {
+      // Create new table with correct schema
+      db.exec(`
+        CREATE TABLE users_new (
+          id TEXT PRIMARY KEY,
+          email TEXT UNIQUE NOT NULL,
+          name TEXT NOT NULL,
+          password_hash TEXT NOT NULL,
+          role TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('admin', 'super_admin', 'data_manager', 'expert', 'user')),
+          plan TEXT NOT NULL DEFAULT 'free' CHECK (plan IN ('free', 'pro', 'enterprise')),
+          status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'suspended', 'pending')),
+          provider TEXT NOT NULL DEFAULT 'email',
+          avatar TEXT,
+          quota_used INTEGER NOT NULL DEFAULT 0,
+          quota_limit INTEGER NOT NULL DEFAULT 10,
+          last_login_at TEXT,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        );
+      `);
+      // Migrate existing data
+      db.exec(`
+        INSERT INTO users_new SELECT * FROM users;
+        DROP TABLE users;
+        ALTER TABLE users_new RENAME TO users;
+      `);
+      console.log('✅ Users table migrated successfully');
+    })();
+  } catch (err) {
+    console.error('⚠️  Users table migration failed:', err);
+  }
+}
+
+migrateUsersTable();
+
 // ============== SEED SUPER ADMIN ==============
 
 function seedSuperAdmin() {

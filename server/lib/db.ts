@@ -1349,7 +1349,7 @@ function migrateUsersTable() {
 
     // Rebuild table with new schema
     db.transaction(() => {
-      // Create new table with correct schema
+      // Create new table with correct schema (must include must_reset_password from existing DB)
       db.exec(`
         CREATE TABLE users_new (
           id TEXT PRIMARY KEY,
@@ -1365,12 +1365,14 @@ function migrateUsersTable() {
           quota_limit INTEGER NOT NULL DEFAULT 10,
           last_login_at TEXT,
           created_at TEXT NOT NULL,
-          updated_at TEXT NOT NULL
+          updated_at TEXT NOT NULL,
+          must_reset_password INTEGER NOT NULL DEFAULT 0
         );
       `);
-      // Migrate existing data
+      // Migrate existing data - use explicit column list to avoid issues with extra columns
       db.exec(`
-        INSERT INTO users_new SELECT * FROM users;
+        INSERT INTO users_new (id, email, name, password_hash, role, plan, status, provider, avatar, quota_used, quota_limit, last_login_at, created_at, updated_at, must_reset_password)
+        SELECT id, email, name, password_hash, role, plan, status, provider, avatar, quota_used, quota_limit, last_login_at, created_at, updated_at, COALESCE(must_reset_password, 0) FROM users;
         DROP TABLE users;
         ALTER TABLE users_new RENAME TO users;
       `);

@@ -31,6 +31,8 @@ services:
       - JWT_SECRET=${JWT_SECRET:-change-me-in-production}
       - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@mada.vn}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-Admin@123}
+      - SUPER_ADMIN_EMAIL=${SUPER_ADMIN_EMAIL:-superadmin@mada.vn}
+      - SUPER_ADMIN_PASSWORD=${SUPER_ADMIN_PASSWORD:-SuperAdmin@123}
     volumes:
       - mada-data:/app/data
       - mada-uploads:/app/uploads

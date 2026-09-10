@@ -252,11 +252,11 @@ jobs:
             echo "Pruning old images..."
             sudo docker image prune -f 2>/dev/null || true
 
-            # Wait for health check to pass (max 3 minutes)
-            echo "Waiting for app to be healthy (max 180s)..."
+            # Wait for health check to pass (max 5 minutes - must cover start_period 120s + retries)
+            echo "Waiting for app to be healthy (max 300s)..."
             COUNTER=0
             HEALTHY=false
-            while [ $COUNTER -lt 36 ]; do
+            while [ $COUNTER -lt 60 ]; do
               COUNTER=$((COUNTER + 1))
               sleep 5
               HEALTH_CODE=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/api/health 2>/dev/null || echo "000")
@@ -265,13 +265,16 @@ jobs:
                 HEALTHY=true
                 break
               fi
-              echo "  Waiting... (${COUNTER}/36) HTTP $HEALTH_CODE"
+              # Only log every 6 iterations (every 30s) to reduce noise
+              if [ $((COUNTER % 6)) -eq 0 ]; then
+                echo "  Waiting... (${COUNTER}/60) HTTP $HEALTH_CODE"
+              fi
             done
 
             if [ "$HEALTHY" = "false" ]; then
-              echo "❌ App did not become healthy within 180s"
+              echo "❌ App did not become healthy within 300s"
               echo "=== Container logs ==="
-              sudo docker compose logs --tail=100 app 2>/dev/null || true
+              sudo docker compose logs --tail=200 app 2>/dev/null || true
               echo "=== Container status ==="
               sudo docker compose ps -a 2>/dev/null || true
               echo "=== Nginx logs ==="

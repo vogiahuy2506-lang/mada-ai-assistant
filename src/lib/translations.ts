@@ -2924,7 +2924,7 @@ export function t(key: TranslationKey, language: Language = 'vi'): string {
 import { useLanguageStore } from '@/stores';
 
 export function useTranslation() {
-  const language = useLanguageStore((state) => state.language) as Language;
+  const language = useLanguageStore((state) => state.language ?? 'vi') as Language;
   
   return {
     t: (key: TranslationKey) => t(key, language),

@@ -420,8 +420,10 @@ export function invalidatePromptCache() {
  *
  * Thứ tự ưu tiên (cao → thấp):
  *  1. DB prompts (admin_prompts) — nếu có
- *  2. Hardcoded modules (CORE_IDENTITY, LANGUAGE_RULES, ...) — fallback
- *  3. agentPrompt (hướng dẫn bổ sung từ Agent)
+ *  2. AI Instructions từ system_settings (ai_instruction_*) — nếu có
+ *  3. Emotion Settings từ system_settings (emotion_*) — nếu có
+ *  4. Hardcoded modules (CORE_IDENTITY, LANGUAGE_RULES, ...) — fallback
+ *  5. agentPrompt (hướng dẫn bổ sung từ Agent)
  */
 export function buildSystemPrompt(
   lang: string,
@@ -431,25 +433,316 @@ export function buildSystemPrompt(
   const langCode = (['vi', 'en', 'ar', 'fr'].includes(lang) ? lang : 'vi') as 'vi' | 'en' | 'ar' | 'fr';
   const dbPrompts = loadDbPrompts();
 
+  // ⭐ Load AI Instructions từ system_settings table
+  const aiInstructions = loadAiInstructions();
+
+  // ⭐ Load Emotion Settings từ system_settings table
+  const emotionSettings = loadEmotionSettings();
+
+  // ⭐ Generate emotion instructions based on settings
+  const getEmotionInstructions = (): string => {
+    const parts: string[] = [];
+
+    // Preset-based instructions
+    const presetInstructions: Record<string, Record<string, string>> = {
+      vi: {
+        friendly: '🎭 PHONG CÁCH: THÂN THIỆN - Giao tiếp ấm áp, gần gũi như đang nói chuyện với người bạn. Sử dụng "mình" thay vì "tôi".',
+        professional: '🎭 PHONG CÁCH: CHUYÊN NGHIỆP - Giao tiếp nghiêm túc, chính xác, sử dụng thuật ngữ đúng. Tránh ngôn ngữ thân mật.',
+        empathetic: '🎭 PHONG CÁCH: ĐỒNG CẢM - Thể hiện sự thấu hiểu và quan tâm. Sử dụng câu trả lời nhẹ nhàng, an ủi khi cần.',
+        playful: '🎭 PHONG CÁCH: VUI VẺ - Giao tiếp năng động, có thể dùng humor nhẹ nhàng. Tạo không khí tích cực và vui vẻ.',
+        calm: '🎭 PHONG CÁCH: BÌNH TĨNH - Giao tiếp từ tốn, điềm đạm. Không vội vàng, giải thích kỹ từng bước.',
+        enthusiastic: '🎭 PHONG CÁCH: NHIỆT HUYẾT - Thể hiện sự quan tâm và hào hứng. Động viên, khuyến khích người dùng.',
+      },
+      en: {
+        friendly: '🎭 STYLE: FRIENDLY - Warm, approachable communication as if talking with a friend. Use "I" casually.',
+        professional: '🎭 STYLE: PROFESSIONAL - Serious, accurate communication with proper terminology. Avoid casual language.',
+        empathetic: '🎭 STYLE: EMPATHETIC - Show understanding and care. Use gentle, comforting responses when needed.',
+        playful: '🎭 STYLE: PLAYFUL - Energetic communication with light humor. Create a positive and fun atmosphere.',
+        calm: '🎭 STYLE: CALM - Patient, composed communication. Not rushed, explain each step carefully.',
+        enthusiastic: '🎭 STYLE: ENTHUSIASTIC - Show interest and excitement. Encourage and motivate users.',
+      },
+    };
+
+    const preset = emotionSettings.preset || 'friendly';
+    const presetLang = presetInstructions[langCode] || presetInstructions.vi;
+    parts.push(presetLang[preset] || presetLang.friendly);
+
+    // Intensity instructions
+    const intensityInstructions: Record<string, Record<string, string>> = {
+      vi: {
+        low: '• Cường độ cảm xúc: NHẸ NHÀNG - Biểu lộ cảm xúc một cách tinh tế, ít dùng emoji.',
+        medium: '• Cường độ cảm xúc: CÂN BẰNG - Biểu lộ cảm xúc vừa phải, phù hợp với hoàn cảnh.',
+        high: '• Cường độ cảm xúc: MẠNH MẼ - Biểu lộ cảm xúc rõ ràng, nhiệt tình trong giao tiếp.',
+      },
+      en: {
+        low: '• Emotion intensity: SUBTLE - Express emotions subtly, use fewer emojis.',
+        medium: '• Emotion intensity: BALANCED - Express emotions moderately, appropriate to context.',
+        high: '• Emotion intensity: STRONG - Express emotions clearly, be enthusiastic in communication.',
+      },
+    };
+
+    const intensity = emotionSettings.intensity || 'medium';
+    const intensityLang = intensityInstructions[langCode] || intensityInstructions.vi;
+    parts.push(intensityLang[intensity] || intensityLang.medium);
+
+    // Individual emotion settings
+    const warmth = emotionSettings.warmth ?? 50;
+    const enthusiasm = emotionSettings.enthusiasm ?? 50;
+    const formality = emotionSettings.formality ?? 30;
+    const empathy = emotionSettings.empathy ?? 50;
+
+    const emotionDescriptions: Record<string, string> = {
+      vi: `• Mức độ ấm áp: ${warmth >= 70 ? 'CAO' : warmth >= 40 ? 'TRUNG BÌNH' : 'THẤP'}
+• Mức độ nhiệt huyết: ${enthusiasm >= 70 ? 'CAO' : enthusiasm >= 40 ? 'TRUNG BÌNH' : 'THẤP'}
+• Mức độ trang trọng: ${formality >= 70 ? 'CAO' : formality >= 40 ? 'TRUNG BÌNH' : 'THẤP'}
+• Mức độ đồng cảm: ${empathy >= 70 ? 'CAO' : empathy >= 40 ? 'TRUNG BÌNH' : 'THẤP'}`,
+      en: `• Warmth level: ${warmth >= 70 ? 'HIGH' : warmth >= 40 ? 'MEDIUM' : 'LOW'}
+• Enthusiasm level: ${enthusiasm >= 70 ? 'HIGH' : enthusiasm >= 40 ? 'MEDIUM' : 'LOW'}
+• Formality level: ${formality >= 70 ? 'HIGH' : formality >= 40 ? 'MEDIUM' : 'LOW'}
+• Empathy level: ${empathy >= 70 ? 'HIGH' : empathy >= 40 ? 'MEDIUM' : 'LOW'}`,
+    };
+
+    parts.push(emotionDescriptions[langCode] || emotionDescriptions.vi);
+
+    // Response style settings
+    const useBulletPoints = emotionSettings.useBulletPoints ?? true;
+    const useEmojis = emotionSettings.useEmojis ?? true;
+    const maxLength = emotionSettings.maxResponseLength || 'medium';
+
+    const styleInstructions: Record<string, string> = {
+      vi: `• Bullet points: ${useBulletPoints ? 'BẬT - Sử dụng danh sách khi có nhiều mục' : 'TẮT - Sử dụng đoạn văn'}
+• Emojis: ${useEmojis ? 'BẬT - Sử dụng emoji phù hợp để tăng tính thân thiện' : 'TẮT - Không sử dụng emoji'}
+• Độ dài câu trả lời: ${maxLength === 'short' ? 'NGẮN - 1-2 đoạn, đi thẳng vào vấn đề' : maxLength === 'long' ? 'DÀI - Nhiều đoạn với đầy đủ thông tin' : 'VỪA PHẢI - 3-4 đoạn với giải thích cơ bản'}`,
+      en: `• Bullet points: ${useBulletPoints ? 'ON - Use lists for multiple items' : 'OFF - Use paragraphs'}
+• Emojis: ${useEmojis ? 'ON - Use appropriate emojis for friendliness' : 'OFF - No emojis'}
+• Response length: ${maxLength === 'short' ? 'SHORT - 1-2 paragraphs, straight to the point' : maxLength === 'long' ? 'LONG - Multiple paragraphs with full information' : 'MEDIUM - 3-4 paragraphs with basic explanations'}`,
+    };
+
+    parts.push(styleInstructions[langCode] || styleInstructions.vi);
+
+    // Custom instructions
+    const customInstructions = emotionSettings.customInstructions;
+    if (customInstructions && customInstructions.trim()) {
+      const customLabel: Record<string, string> = {
+        vi: '• Hướng dẫn tùy chỉnh:',
+        en: '• Custom instructions:',
+      };
+      parts.push(`${customLabel[langCode] || customLabel.vi}\n${customInstructions.trim()}`);
+    }
+
+    return parts.join('\n');
+  };
+
   const getPrompt = (dbKey: string, hardcoded: string) => {
     return dbPrompts.get(dbKey) || hardcoded;
   };
 
   const parts = [
-    getPrompt('mada-default-' + langCode, CORE_IDENTITY[langCode]),
+    // 1. Core Identity — ưu tiên AI instruction custom, fallback hardcoded
+    aiInstructions.coreIdentity || getPrompt('mada-default-' + langCode, CORE_IDENTITY[langCode]),
+    // 2. Language Rules
     getPrompt('mada-default-' + langCode === 'vi' ? 'mada-default-vi' : 'mada-default-' + langCode, LANGUAGE_RULES[langCode]),
+    // 3. Persona Mode
     PERSONA_MODES[langCode]?.[userMode] || PERSONA_MODES.vi.endUser,
-    RESPONSE_FORMAT[langCode] || RESPONSE_FORMAT.en,
+    // 4. Response Format — ưu tiên AI instruction custom
+    aiInstructions.responseFormat || RESPONSE_FORMAT[langCode] || RESPONSE_FORMAT.en,
+    // 5. Content Guidelines
     CONTENT_GUIDELINES[langCode as keyof typeof CONTENT_GUIDELINES] || CONTENT_GUIDELINES.en,
+    // 6. Safety Rules
     SAFETY_RULES[langCode as keyof typeof SAFETY_RULES] || SAFETY_RULES.en,
+    // 7. Product Knowledge
     PRODUCT_KNOWLEDGE[langCode as keyof typeof PRODUCT_KNOWLEDGE] || PRODUCT_KNOWLEDGE.en,
-  ];
+    // 8. ⭐ Emotion Settings Instructions
+    `🎨 CÀI ĐẶT CẢM XÚC VÀ PHONG CÁCH:\n${getEmotionInstructions()}`,
+    // 9. Behavior Rules từ AI Instructions (nếu có)
+    aiInstructions.behaviorRules ? `📋 QUY TẮC ỨNG XỬ BỔ SUNG:\n${aiInstructions.behaviorRules}` : null,
+    // 10. Tone of Voice từ AI Instructions (nếu có)
+    aiInstructions.tone ? `🎭 GIỌNG VĂN BỔ SUNG:\n${aiInstructions.tone}` : null,
+  ].filter(Boolean);
 
   if (agentPrompt) {
     parts.push(`\n\n📝 HƯỚNG DẪN BỔ SUNG TỪ AGENT:\n${agentPrompt}`);
   }
 
   return parts.join('\n\n');
+}
+
+// ⭐ Load AI Instructions từ system_settings table
+interface AIInstructionsData {
+  coreIdentity: string | null;
+  responseFormat: string | null;
+  behaviorRules: string | null;
+  tone: string | null;
+}
+
+let _aiInstructionsCache: AIInstructionsData | null = null;
+let _aiInstructionsCacheAt = 0;
+const AI_INSTRUCTIONS_TTL_MS = 30_000; // 30 giây cache
+
+function loadAiInstructions(): AIInstructionsData {
+  const now = Date.now();
+  if (_aiInstructionsCache && (now - _aiInstructionsCacheAt) < AI_INSTRUCTIONS_TTL_MS) {
+    return _aiInstructionsCache;
+  }
+  
+  try {
+    const Database = require('better-sqlite3');
+    const path = require('path');
+    const fs = require('fs');
+    const DATA_DIR = path.join(process.cwd(), 'data');
+    const DB_PATH = path.join(DATA_DIR, 'mada.db');
+    if (!fs.existsSync(DB_PATH)) {
+      _aiInstructionsCache = { coreIdentity: null, responseFormat: null, behaviorRules: null, tone: null };
+      _aiInstructionsCacheAt = now;
+      return _aiInstructionsCache;
+    }
+    
+    const sqlite = new Database(DB_PATH, { readonly: true });
+    const rows = sqlite.prepare("SELECT `key`, value FROM system_settings WHERE `key` LIKE 'ai_instruction_%'").all() as { key: string; value: string }[];
+    sqlite.close();
+    
+    const result: AIInstructionsData = {
+      coreIdentity: null,
+      responseFormat: null,
+      behaviorRules: null,
+      tone: null,
+    };
+    
+    for (const row of rows) {
+      switch (row.key) {
+        case 'ai_instruction_core_identity':
+          result.coreIdentity = row.value || null;
+          break;
+        case 'ai_instruction_response_format':
+          result.responseFormat = row.value || null;
+          break;
+        case 'ai_instruction_behavior_rules':
+          result.behaviorRules = row.value || null;
+          break;
+        case 'ai_instruction_tone':
+          result.tone = row.value || null;
+          break;
+      }
+    }
+    
+    _aiInstructionsCache = result;
+    _aiInstructionsCacheAt = now;
+    return result;
+  } catch (e) {
+    console.error('[systemPrompts] Failed to load AI instructions:', e);
+    _aiInstructionsCache = { coreIdentity: null, responseFormat: null, behaviorRules: null, tone: null };
+    _aiInstructionsCacheAt = now;
+    return _aiInstructionsCache;
+  }
+}
+
+export function invalidateAiInstructionsCache() {
+  _aiInstructionsCache = null;
+  _aiInstructionsCacheAt = 0;
+}
+
+// ⭐ Load Emotion Settings từ system_settings table
+interface EmotionSettingsData {
+  preset: string | null;
+  intensity: string | null;
+  warmth: number | null;
+  enthusiasm: number | null;
+  formality: number | null;
+  empathy: number | null;
+  useBulletPoints: boolean | null;
+  useEmojis: boolean | null;
+  maxResponseLength: string | null;
+  customInstructions: string | null;
+}
+
+let _emotionSettingsCache: EmotionSettingsData | null = null;
+let _emotionSettingsCacheAt = 0;
+const EMOTION_SETTINGS_TTL_MS = 30_000; // 30 giây cache
+
+function loadEmotionSettings(): EmotionSettingsData {
+  const now = Date.now();
+  if (_emotionSettingsCache && (now - _emotionSettingsCacheAt) < EMOTION_SETTINGS_TTL_MS) {
+    return _emotionSettingsCache;
+  }
+
+  try {
+    const Database = require('better-sqlite3');
+    const path = require('path');
+    const fs = require('fs');
+    const DATA_DIR = path.join(process.cwd(), 'data');
+    const DB_PATH = path.join(DATA_DIR, 'mada.db');
+    if (!fs.existsSync(DB_PATH)) {
+      _emotionSettingsCache = { preset: null, intensity: null, warmth: null, enthusiasm: null, formality: null, empathy: null, useBulletPoints: null, useEmojis: null, maxResponseLength: null, customInstructions: null };
+      _emotionSettingsCacheAt = now;
+      return _emotionSettingsCache;
+    }
+
+    const sqlite = new Database(DB_PATH, { readonly: true });
+    const rows = sqlite.prepare("SELECT `key`, value, type FROM system_settings WHERE `key` LIKE 'emotion_%'").all() as { key: string; value: string; type: string }[];
+    sqlite.close();
+
+    const result: EmotionSettingsData = {
+      preset: null,
+      intensity: null,
+      warmth: null,
+      enthusiasm: null,
+      formality: null,
+      empathy: null,
+      useBulletPoints: null,
+      useEmojis: null,
+      maxResponseLength: null,
+      customInstructions: null,
+    };
+
+    for (const row of rows) {
+      switch (row.key) {
+        case 'emotion_preset':
+          result.preset = row.value;
+          break;
+        case 'emotion_intensity':
+          result.intensity = row.value;
+          break;
+        case 'emotion_warmth':
+          result.warmth = row.type === 'number' ? parseInt(row.value) : parseInt(row.value);
+          break;
+        case 'emotion_enthusiasm':
+          result.enthusiasm = row.type === 'number' ? parseInt(row.value) : parseInt(row.value);
+          break;
+        case 'emotion_formality':
+          result.formality = row.type === 'number' ? parseInt(row.value) : parseInt(row.value);
+          break;
+        case 'emotion_empathy':
+          result.empathy = row.type === 'number' ? parseInt(row.value) : parseInt(row.value);
+          break;
+        case 'emotion_use_bullet_points':
+          result.useBulletPoints = row.value === 'true';
+          break;
+        case 'emotion_use_emojis':
+          result.useEmojis = row.value === 'true';
+          break;
+        case 'emotion_max_response_length':
+          result.maxResponseLength = row.value;
+          break;
+        case 'emotion_custom_instructions':
+          result.customInstructions = row.value;
+          break;
+      }
+    }
+
+    _emotionSettingsCache = result;
+    _emotionSettingsCacheAt = now;
+    return result;
+  } catch (e) {
+    console.error('[systemPrompts] Failed to load emotion settings:', e);
+    _emotionSettingsCache = { preset: null, intensity: null, warmth: null, enthusiasm: null, formality: null, empathy: null, useBulletPoints: null, useEmojis: null, maxResponseLength: null, customInstructions: null };
+    _emotionSettingsCacheAt = now;
+    return _emotionSettingsCache;
+  }
+}
+
+export function invalidateEmotionSettingsCache() {
+  _emotionSettingsCache = null;
+  _emotionSettingsCacheAt = 0;
 }
 
 // ============== EXAMPLE RESPONSES ==============

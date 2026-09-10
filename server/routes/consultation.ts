@@ -13,7 +13,7 @@ function requireAdmin(req: any, res: any, next: any) {
   try {
     const token = auth.split(' ')[1];
     const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
-    if (payload.role !== 'admin') {
+    if (payload.role !== 'admin' && payload.role !== 'super_admin') {
       return res.status(403).json({ success: false, error: 'Admin access required' });
     }
     req.user = payload;
@@ -153,8 +153,8 @@ router.patch('/:id', requireAdmin, (req, res) => {
     `).run(
       uuidv4(),
       `Consultation ${req.params.id} updated to ${status}`,
-      JSON.stringify({ status, updatedBy: req.user?.email }),
-      req.user?.id || 'unknown',
+      JSON.stringify({ status, updatedBy: (req as any).user?.email }),
+      (req as any).user?.id || 'unknown',
       new Date().toISOString()
     );
     
@@ -183,7 +183,7 @@ router.delete('/:id', requireAdmin, (req, res) => {
 });
 
 // GET /api/consultation/stats/summary - Get consultation stats
-router.get('/stats/summary', requireAdmin, (req, res) => {
+router.get('/stats/summary', requireAdmin, (_req, res) => {
   try {
     const stats = {
       total: db.prepare('SELECT COUNT(*) as count FROM consultations').get() as { count: number },

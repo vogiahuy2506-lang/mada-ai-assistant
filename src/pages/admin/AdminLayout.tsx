@@ -80,10 +80,13 @@ interface NavItem {
   labelFr: string;
   href: string;
   icon: string;
+  superAdminOnly?: boolean; // Chỉ Super Admin mới thấy
+  adminOnly?: boolean; // Chỉ Admin trở lên mới thấy
 }
 
 const NAV_ITEMS: NavItem[] = [
   { label: 'Tổng quan', labelEn: 'Overview', labelAr: 'نظرة عامة', labelFr: 'Aperçu', href: '/admin', icon: 'dashboard' },
+  { label: 'AI chatbox', labelEn: 'AI chatbox', labelAr: 'مربع الدردشة', labelFr: 'Chatbot IA', href: '/admin/widget', icon: 'smart_toy' },
   { label: 'Người dùng', labelEn: 'Users', labelAr: 'المستخدمين', labelFr: 'Utilisateurs', href: '/admin/users', icon: 'group' },
   { label: 'Sản phẩm', labelEn: 'Products', labelAr: 'المنتجات', labelFr: 'Produits', href: '/admin/products', icon: 'inventory_2' },
   { label: 'Scraper & KB', labelEn: 'Scraper & KB', labelAr: 'الكاشطة', labelFr: 'Scraper', href: '/admin/scraper', icon: 'cloud_download' },
@@ -92,7 +95,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Agents', labelEn: 'Agents', labelAr: 'الوكلاء', labelFr: 'Agents', href: '/admin/agents', icon: 'smart_toy' },
   { label: 'System Prompts', labelEn: 'System Prompts', labelAr: 'التعليمات', labelFr: 'Prompts Système', href: '/admin/prompts', icon: 'edit_note' },
   { label: 'Tư vấn', labelEn: 'Consultations', labelAr: 'الاستشارات', labelFr: 'Consultations', href: '/admin/consultations', icon: 'support_agent' },
-  { label: 'Cấu hình', labelEn: 'Settings', labelAr: 'الإعدادات', labelFr: 'Paramètres', href: '/admin/settings', icon: 'settings_suggest' },
+  { label: 'Cấu hình', labelEn: 'Settings', labelAr: 'الإعدادات', labelFr: 'Paramètres', href: '/admin/settings', icon: 'settings_suggest', superAdminOnly: true },
 ];
 
 interface AdminLayoutProps {
@@ -124,9 +127,11 @@ export function AdminLayout({
 }: AdminLayoutProps) {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, logout } = useAuthStore();
+  const { user, logout, isSuperAdmin, isAdmin } = useAuthStore();
   const { language } = useLanguageStore();
   const isRtl = language === 'ar';
+  const isUserSuperAdmin = isSuperAdmin();
+  const isUserAdmin = isAdmin();
 
   const getNavLabel = (item: NavItem) => {
     if (language === 'en') return item.labelEn;
@@ -194,7 +199,13 @@ export function AdminLayout({
         </div>
 
         <nav className="flex-1 space-y-1 overflow-y-auto">
-          {NAV_ITEMS.map((item) => {
+          {NAV_ITEMS
+            .filter((item) => {
+              // Lọc menu theo role
+              if (item.superAdminOnly && !isUserSuperAdmin) return false;
+              return true;
+            })
+            .map((item) => {
             const isActive = location.pathname === item.href ||
               (item.href !== '/admin' && location.pathname.startsWith(item.href));
             return (
@@ -210,23 +221,34 @@ export function AdminLayout({
               >
                 <span className="material-symbols-outlined">{item.icon}</span>
                 <span className="font-label-md">{getNavLabel(item)}</span>
+                {item.superAdminOnly && (
+                  <span className="material-symbols-outlined text-xs text-warning ml-auto" title={language === 'vi' ? 'Chỉ Super Admin' : 'Super Admin Only'}>lock</span>
+                )}
               </Link>
             );
           })}
+
         </nav>
 
         <div className="mt-auto pt-6 border-t border-outline-variant/20 flex flex-col gap-1">
-          <div className="px-4 py-3 mb-4 bg-primary/5 rounded-2xl border border-primary/10">
-            <p className="font-label-sm text-primary font-bold">
-              Plan: {user?.plan === 'enterprise' ? 'Enterprise' : user?.plan === 'pro' ? 'Pro Edition' : 'Free'}
-            </p>
-            <div className="w-full bg-surface-variant h-1 rounded-full mt-2 overflow-hidden">
-              <div className={clsx(
-                'h-full transition-all',
-                user?.plan === 'enterprise' ? 'w-full bg-gradient-to-r from-primary to-tertiary' :
-                user?.plan === 'pro' ? 'w-3/4 bg-primary' : 'w-1/3 bg-outline'
-              )} />
+          {/* User Role Badge */}
+          <div className="px-4 py-3 mb-4 rounded-2xl border border-primary/10 bg-primary/5">
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-primary">account_circle</span>
+              <span className="font-label-sm font-bold text-primary truncate flex-1">{user?.name || user?.email || 'Admin'}</span>
+              {isUserSuperAdmin ? (
+                <span className="px-2 py-0.5 rounded-full bg-gradient-to-r from-amber-400 to-orange-500 text-white text-[10px] font-bold shadow-sm">
+                  SUPER
+                </span>
+              ) : (
+                <span className="px-2 py-0.5 rounded-full bg-primary/20 text-primary text-[10px] font-bold">
+                  ADMIN
+                </span>
+              )}
             </div>
+            <p className="font-label-sm text-primary/70 mt-1">
+              Plan: {user?.plan === 'enterprise' ? 'Enterprise' : user?.plan === 'pro' ? 'Pro' : 'Free'}
+            </p>
           </div>
 
           <button
@@ -258,6 +280,11 @@ export function AdminLayout({
             <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-primary/5 border border-primary/20">
               <span className="material-symbols-outlined text-[18px] text-primary">account_circle</span>
               <span className="font-label-sm font-semibold text-primary">{user?.email || user?.name || 'Admin'}</span>
+              {isUserSuperAdmin && (
+                <span className="px-1.5 py-0.5 rounded bg-gradient-to-r from-amber-400 to-orange-500 text-white text-[10px] font-bold shadow-sm">
+                  SUPER
+                </span>
+              )}
             </div>
           </div>
         </div>

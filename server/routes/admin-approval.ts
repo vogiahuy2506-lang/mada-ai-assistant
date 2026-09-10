@@ -4,7 +4,7 @@
  * API endpoints cho admin quản lý user approvals
  */
 
-import { Router } from 'express';
+import { Router, Request, Response } from 'express';
 import { authenticate, requireRole } from '../lib/auth';
 import { 
   approveUser, 
@@ -21,7 +21,7 @@ router.use(authenticate as any, requireRole('admin') as any);
 
 // ============== GET /api/admin/approvals/pending =============
 
-router.get('/pending', (_req, res) => {
+router.get('/pending', (_req: Request, res: Response) => {
   try {
     const pendingUsers = getPendingUsers();
     
@@ -47,7 +47,7 @@ router.get('/pending', (_req, res) => {
 
 // ============== GET /api/admin/approvals/stats =============
 
-router.get('/stats', (_req, res) => {
+router.get('/stats', (_req: Request, res: Response) => {
   try {
     const pendingCount = getPendingUsersCount();
     
@@ -79,10 +79,11 @@ router.get('/stats', (_req, res) => {
 
 // ============== POST /api/admin/approvals/:userId/approve =============
 
-router.post('/:userId/approve', async (req, res) => {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+router.post('/:userId/approve', async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
-    const adminId = req.user!.id;
+    const adminId = (req as any).user?.id;
     
     const result = await approveUser(userId, adminId);
     
@@ -102,11 +103,12 @@ router.post('/:userId/approve', async (req, res) => {
 
 // ============== POST /api/admin/approvals/:userId/reject =============
 
-router.post('/:userId/reject', async (req, res) => {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+router.post('/:userId/reject', async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
     const { reason } = req.body;
-    const adminId = req.user!.id;
+    const adminId = (req as any).user?.id;
     
     const result = await rejectUser(userId, adminId, reason);
     
@@ -126,10 +128,11 @@ router.post('/:userId/reject', async (req, res) => {
 
 // ============== POST /api/admin/approvals/bulk-approve =============
 
-router.post('/bulk-approve', async (req, res) => {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+router.post('/bulk-approve', async (req: Request, res: Response) => {
   try {
     const { userIds } = req.body;
-    const adminId = req.user!.id;
+    const adminId = (req as any).user?.id;
     
     if (!Array.isArray(userIds) || userIds.length === 0) {
       return res.status(400).json({ 

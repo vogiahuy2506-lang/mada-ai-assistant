@@ -1,6 +1,6 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useChatStore, useChatHistoryStore, useLanguageStore, useAuthStore, useAnonQuotaStore, usePaywallModalStore, useAuthModalStore, useAgentStore, useSelectedAgentStore, useSystemSettingsStore, useViewModeStore } from '@/stores';
+import { useChatStore, useChatHistoryStore, useLanguageStore, useAuthStore, useAnonQuotaStore, usePaywallModalStore, useAuthModalStore, useAgentStore, useSelectedAgentStore, useSystemSettingsStore, useViewModeStore, useChatSettingsStore } from '@/stores';
 import madaLogo from '@/assets/mada-logo.png';
 import { QuotaIndicator } from '@/components/auth/QuotaIndicator';
 import { ProductCard } from '@/components/ProductCard';
@@ -818,6 +818,9 @@ export function ChatPage() {
   const logout = useAuthStore((s) => s.logout);
   const authModal = useAuthModalStore();
 
+  // Chat settings from admin
+  const { greeting, description, suggestedPrompts, fileAttachmentEnabled, loadFromBackend: loadChatSettings } = useChatSettingsStore();
+
   const [inputValue, setInputValue] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isRecording, setIsRecording] = useState(false);
@@ -852,6 +855,11 @@ export function ChatPage() {
     window.addEventListener('focus', onFocus);
     return () => window.removeEventListener('focus', onFocus);
   }, [loadAgents]);
+
+  // Load chat settings from backend on mount
+  useEffect(() => {
+    loadChatSettings();
+  }, [loadChatSettings]);
 
   const fileQuotaExhausted = !!fileQuota && fileQuota.limit !== -1 && fileQuota.remaining <= 0;
   const [activeCategory, setActiveCategory] = useState<ATCategory | null>(null);
@@ -2312,6 +2320,19 @@ export function ChatPage() {
           </button>
         </div>
 
+        {/* Sử dụng WIDGET Button - Chỉ hiển thị cho Admin/Super Admin */}
+        {(user?.role === 'admin' || user?.role === 'super_admin') && (
+          <div className="px-4 mb-3 shrink-0">
+            <button
+              onClick={() => navigate('/guest-widget')}
+              className="w-full flex items-center justify-center gap-1.5 py-2 px-3 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-semibold text-xs shadow-sm hover:shadow-md transition-all active:scale-[0.98] border border-amber-500/30"
+            >
+              <span className="material-symbols-outlined text-base">widgets</span>
+              <span>Sử dụng WIDGET</span>
+            </button>
+          </div>
+        )}
+
         {/* All Scrollable Content */}
         <div className="flex-1 min-h-0 overflow-y-auto">
           
@@ -2572,7 +2593,7 @@ export function ChatPage() {
                       {language === 'vi' ? 'Hồ sơ' : language === 'en' ? 'Profile' : language === 'ar' ? 'الملف الشخصي' : 'Profil'}
                     </button>
                     <button
-                      onClick={() => { setShowProfileMenu(false); navigate('/pricing'); }}
+                      onClick={() => { setShowProfileMenu(false); navigate('/profile'); }}
                       className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-slate-50 text-sm transition-colors"
                     >
                       <Sparkles className="w-4 h-4" />
@@ -2678,22 +2699,21 @@ export function ChatPage() {
                   
                   {/* Welcome Typography */}
                   <h2 className="text-2xl font-bold text-on-background mb-2">
-                    {language === 'vi' ? 'Xin chào! Mình là MADA AI.' : language === 'en' ? 'Hello! I am MADA AI.' : language === 'ar' ? 'مرحباً! أنا MADA AI.' : 'Bonjour! Je suis MADA AI.'}
+                    {greeting[language] || greeting.vi}
                   </h2>
                   <p className="text-sm text-on-surface-variant">
-                    {language === 'vi' ? 'Mình có thể giúp bạn phân tích tài liệu, xử lý dữ liệu từ các tệp hoặc trả lời các câu hỏi chuyên sâu. Bạn muốn bắt đầu với việc gì hôm nay?' : language === 'en' ? 'I can help you analyze documents, process data from files, or answer detailed questions. What would you like to start with today?' : language === 'ar' ? 'يمكنني مساعدتك في تحليل المستندات ومعالجة البيانات من الملفات أو الإجابة على الأسئلة التفصيلية. ماذا تريد أن تبدأ اليوم؟' : 'Je peux vous aider à analyser des documents, traiter des données de fichiers ou répondre à des questions détaillées. Par quoi souhaitez-vous commencer aujourd\'hui?'}
+                    {description[language] || description.vi}
                   </p>
                 </div>
 
                 {/* Prompt Cards Grid - Material Design 3 Style */}
                 <div className="w-full max-w-3xl">
                   <div className="grid grid-cols-2 gap-3">
-                    {(activeCategory ? currentQuestions : [
-                      { text: language === 'vi' ? 'Phân tích văn bản dài' : language === 'en' ? 'Analyze long documents' : language === 'ar' ? 'تحليل المستندات الطويلة' : 'Analyser les longs documents', desc: language === 'vi' ? 'Tóm tắt nội dung chính và các điểm quan trọng từ tài liệu của bạn...' : language === 'en' ? 'Summarize main content and key points from your documents...' : language === 'ar' ? 'تلخيص المحتوى الرئيسي والنقاط المهمة من مستنداتك...' : 'Résumer le contenu principal et les points clés de vos documents...', icon: 'description' },
-                      { text: language === 'vi' ? 'Kiểm tra khả năng tiếp cận' : language === 'en' ? 'Accessibility check' : language === 'ar' ? 'فحص إمكانية الوصول' : 'Vérifier l\'accessibilité', desc: language === 'vi' ? 'Đánh giá mức độ phù hợp WCAG cho website hoặc tài liệu...' : language === 'en' ? 'Evaluate WCAG compliance for websites or documents...' : language === 'ar' ? 'تقييم التوافق مع WCAG للمواقع أو المستندات...' : 'Évaluer la conformité WCAG pour les sites ou documents...', icon: 'accessibility' },
-                      { text: language === 'vi' ? 'Dịch thuật chuyên ngành' : language === 'en' ? 'Professional translation' : language === 'ar' ? 'الترجمة المتخصصة' : 'Traduction professionnelle', desc: language === 'vi' ? 'Dịch thuật ngữ y khoa, công nghệ hỗ trợ với độ chính xác cao...' : language === 'en' ? 'Translate medical terms, assistive technology with high accuracy...' : language === 'ar' ? 'ترجمة المصطلحات الطبية والتكنولوجيا المساعدة بدقة عالية...' : 'Traduire les termes médicaux, la technologie d\'assistance avec une grande précision...', icon: 'translate' },
-                      { text: language === 'vi' ? 'Gợi ý giải pháp hỗ trợ' : language === 'en' ? 'Suggest support solutions' : language === 'ar' ? 'اقتراح حلول الدعم' : 'Suggérer des solutions d\'assistance', desc: language === 'vi' ? 'Tìm kiếm các thiết bị, phần mềm phù hợp với từng dạng khuyết tật...' : language === 'en' ? 'Find devices and software suitable for each type of disability...' : language === 'ar' ? 'البحث عن الأجهزة والبرمجيات المناسبة لكل نوع من أنواع الإعاقة...' : 'Trouver des appareils et logiciels adaptés à chaque type de handicap...', icon: 'lightbulb' },
-                    ]).map((item, index) => (
+                    {(activeCategory ? currentQuestions : suggestedPrompts.map(prompt => ({
+                      text: language === 'vi' ? prompt.text : prompt.textEn,
+                      desc: language === 'vi' ? prompt.desc : prompt.descEn,
+                      icon: prompt.icon,
+                    }))).map((item, index) => (
                       <button
                         key={index}
                         onClick={() => {
@@ -2951,6 +2971,7 @@ export function ChatPage() {
               
               <div className="bg-white border-[3px] border-on-background rounded-full p-1.5 flex items-center gap-2 relative z-10">
                 {/* Left Icons - Attachment Button */}
+                {fileAttachmentEnabled && (
                 <div className="flex items-center gap-1 pl-1 relative" ref={attachmentMenuRef}>
                   <button
                     onClick={handleFileAttach}
@@ -3071,6 +3092,7 @@ export function ChatPage() {
                     </div>
                   )}
                 </div>
+                )}
 
                 {/* Voice Recording Bubble - Hiển thị real-time transcript với waveform */}
                 {(isRecording || isListening || transcript) && (

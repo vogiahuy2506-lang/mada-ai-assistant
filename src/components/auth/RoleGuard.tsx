@@ -5,7 +5,7 @@ import { Loader2 } from 'lucide-react';
 
 interface RoleGuardProps {
   children: ReactNode;
-  requiredRole: 'admin' | 'data_manager' | 'expert';
+  requiredRole: 'admin' | 'super_admin' | 'data_manager' | 'expert';
 }
 
 export function RoleGuard({ children, requiredRole }: RoleGuardProps) {
@@ -66,7 +66,7 @@ export function RoleGuard({ children, requiredRole }: RoleGuardProps) {
     return <Navigate to="/" replace />;
   }
 
-  if (user.role !== requiredRole && user.role !== 'admin') {
+  if (user.role !== requiredRole && user.role !== 'admin' && user.role !== 'super_admin') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-8">
         <div className="backdrop-blur-xl bg-white/70 border border-white/40 p-12 rounded-3xl text-center max-w-md shadow-[0_4px_12px_rgba(0,0,0,0.03)]">

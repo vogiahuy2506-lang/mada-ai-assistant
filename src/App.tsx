@@ -1,52 +1,33 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useEffect, lazy, Suspense } from 'react';
-import { useThemeStore } from '@/stores';
+import { useThemeStore, useAuthStore } from '@/stores';
 import { RoleGuard } from '@/components/auth/RoleGuard';
 import { RoleLanding } from '@/components/RoleLanding';
 import { Loader2 } from 'lucide-react';
 import { AuthModal } from '@/components/auth/AuthModal';
 import { PaywallModal } from '@/components/auth/PaywallModal';
 
-// Lazy load all page components for code splitting.
-// Some pages export only `function X()` (named), others have both named + default.
-// Resolve helper picks whichever exists so we don't depend on default-export policy.
-const Fallback = () => (
-  <div className="flex items-center justify-center min-h-screen bg-background">
-    <Loader2 className="w-8 h-8 animate-spin text-primary" />
-  </div>
-);
-const lazyNamed = (name: string, loader: () => Promise<any>) =>
-  lazy(() =>
-    loader().then((m) => {
-      const Component = m.default ?? m[name];
-      if (!Component) {
-        console.error(`[lazyNamed] Could not find component "${name}" in module`, Object.keys(m));
-        return { default: Fallback };
-      }
-      return { default: Component };
-    })
-  );
-
-const ChatPage = lazyNamed('ChatPage', () => import('@/pages/ChatPage'));
-const AdminOverview = lazyNamed('AdminOverview', () => import('@/pages/admin/AdminOverview'));
-const AdminUsers = lazyNamed('AdminUsers', () => import('@/pages/admin/AdminUsers'));
-const AdminAnalytics = lazyNamed('AdminAnalytics', () => import('@/pages/admin/AdminAnalytics'));
-const AdminSettings = lazyNamed('AdminSettings', () => import('@/pages/admin/AdminSettings'));
-const AdminAgents = lazyNamed('AdminAgents', () => import('@/pages/admin/AdminAgents'));
-const AdminPrompts = lazyNamed('AdminPrompts', () => import('@/pages/admin/AdminPrompts'));
-const AdminConsultations = lazyNamed('AdminConsultations', () => import('@/pages/admin/AdminConsultations'));
-const AdminProducts = lazyNamed('AdminProducts', () => import('@/pages/admin/AdminProducts'));
-const AdminScraper = lazyNamed('AdminScraper', () => import('@/pages/admin/AdminScraper'));
-const AdminAudit = lazyNamed('AdminAudit', () => import('@/pages/admin/AdminAudit'));
-const DataManagerPage = lazyNamed('DataManagerPage', () => import('@/pages/DataManagerPage'));
-const ExpertPage = lazyNamed('ExpertPage', () => import('@/pages/ExpertPage'));
-const ProfilePage = lazyNamed('ProfilePage', () => import('@/pages/ProfilePage'));
-const PricingPage = lazyNamed('PricingPage', () => import('@/pages/PricingPage'));
-const ProductsPage = lazyNamed('ProductsPage', () => import('@/pages/ProductsPage'));
-const ProductDetailPage = lazyNamed('ProductDetailPage', () => import('@/pages/ProductDetailPage'));
-const CategoryPage = lazyNamed('CategoryPage', () => import('@/pages/CategoryPage'));
-const SearchPage = lazyNamed('SearchPage', () => import('@/pages/SearchPage'));
-const ComparePage = lazyNamed('ComparePage', () => import('@/pages/ComparePage'));
+// Import ChatPage directly to avoid lazy loading issues
+import { ChatPage } from '@/pages/ChatPage';
+import { WidgetPage } from '@/pages/WidgetPage';
+import { GuestWidgetPage } from '@/pages/GuestWidgetPage';
+import { IntegrationGuidePage } from '@/pages/IntegrationGuidePage';
+const AdminOverview = lazy(() => import('@/pages/admin/AdminOverview'));
+const AdminUsers = lazy(() => import('@/pages/admin/AdminUsers'));
+const AdminAnalytics = lazy(() => import('@/pages/admin/AdminAnalytics'));
+const AdminSettings = lazy(() => import('@/pages/admin/AdminSettings'));
+const AdminAgents = lazy(() => import('@/pages/admin/AdminAgents'));
+const AdminPrompts = lazy(() => import('@/pages/admin/AdminPrompts'));
+const AdminConsultations = lazy(() => import('@/pages/admin/AdminConsultations'));
+const AdminProducts = lazy(() => import('@/pages/admin/AdminProducts'));
+const AdminScraper = lazy(() => import('@/pages/admin/AdminScraper'));
+const AdminAudit = lazy(() => import('@/pages/admin/AdminAudit'));
+const WidgetCustomization = lazy(() => import('@/pages/admin/WidgetCustomization'));
+const DataManagerPage = lazy(() => import('@/pages/DataManagerPage'));
+const ProfilePage = lazy(() => import('@/pages/ProfilePage'));
+const ProductsPage = lazy(() => import('@/pages/ProductsPage'));
+const ProductDetailPage = lazy(() => import('@/pages/ProductDetailPage'));
+const CategoryPage = lazy(() => import('@/pages/CategoryPage'));
 
 // Loading fallback component
 function PageLoader() {
@@ -62,6 +43,26 @@ function PageLoader() {
 
 function App() {
   const { isDark } = useThemeStore();
+  const refreshUser = useAuthStore((s) => s.refreshUser);
+  const user = useAuthStore((s) => s.user);
+
+  // Refresh user data from server on mount to ensure role is correct
+  useEffect(() => {
+    // Only refresh if we have a token (isAuthenticated) but user might be stale
+    const token = localStorage.getItem('mada-access-token');
+    if (token && !user) {
+      refreshUser().catch(console.error);
+    }
+    // Also refresh if user has old invalid role 'superadmin' (should be 'super_admin')
+    if (user?.role === 'superadmin') {
+      refreshUser().catch(() => {
+        // If refresh fails, clear tokens and force re-login
+        localStorage.removeItem('mada-access-token');
+        localStorage.removeItem('mada-refresh-token');
+        window.location.reload();
+      });
+    }
+  }, []);
 
   useEffect(() => {
     if (isDark) {
@@ -79,7 +80,10 @@ function App() {
           <Route path="/" element={<RoleLanding />} />
           <Route path="/home" element={<Navigate to="/" replace />} />
           <Route path="/chat" element={<ChatPage />} />
-          <Route path="/pricing" element={<PricingPage />} />
+          <Route path="/embed" element={<WidgetPage />} />
+          <Route path="/widget" element={<GuestWidgetPage />} />
+          <Route path="/guest-widget" element={<GuestWidgetPage />} />
+          <Route path="/integration-guide" element={<IntegrationGuidePage />} />
           <Route path="/history" element={<ProfilePage />} />
           <Route path="/favorites" element={<ProfilePage />} />
           <Route path="/profile" element={<ProfilePage />} />
@@ -89,14 +93,6 @@ function App() {
           <Route path="/products" element={<ProductsPage />} />
           <Route path="/products/:id" element={<ProductDetailPage />} />
           <Route path="/category/:slug" element={<CategoryPage />} />
-          <Route path="/search" element={<SearchPage />} />
-          <Route path="/compare" element={<ComparePage />} />
-
-          {/* Expert Routes */}
-          <Route path="/expert" element={<ExpertPage />} />
-          <Route path="/expert/requests" element={<ExpertPage />} />
-          <Route path="/expert/history" element={<ExpertPage />} />
-          <Route path="/expert/stats" element={<ExpertPage />} />
 
           {/* Data Manager Routes */}
           <Route path="/data" element={<DataManagerPage />} />
@@ -183,6 +179,14 @@ function App() {
             element={
               <RoleGuard requiredRole="admin">
                 <AdminScraper />
+              </RoleGuard>
+            }
+          />
+          <Route
+            path="/admin/widget"
+            element={
+              <RoleGuard requiredRole="admin">
+                <WidgetCustomization />
               </RoleGuard>
             }
           />

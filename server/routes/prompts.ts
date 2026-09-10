@@ -5,8 +5,6 @@
 
 import { Router } from 'express';
 import db from '../lib/db';
-import fs from 'fs';
-import path from 'path';
 
 const router = Router();
 
@@ -19,7 +17,7 @@ function requireAdmin(req: any, res: any, next: any) {
   try {
     const token = auth.split(' ')[1];
     const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
-    if (payload.role !== 'admin') {
+    if (payload.role !== 'admin' && payload.role !== 'super_admin') {
       return res.status(403).json({ success: false, error: 'Admin access required' });
     }
     req.user = payload;
@@ -157,7 +155,7 @@ Violation = critical error.`
 
 // ============== GET ALL PROMPTS ==============
 
-router.get('/', requireAdmin, (req, res) => {
+router.get('/', requireAdmin, (_req, res) => {
   try {
     // Load current values from system_settings table
     const rows = db.prepare("SELECT key, value FROM system_settings WHERE key LIKE 'prompt_%'").all() as { key: string; value: string }[];
@@ -215,7 +213,7 @@ router.put('/:key', requireAdmin, (req, res) => {
       db.prepare(`
         INSERT INTO admin_audit_log (admin_id, action, target_type, target_id, details, created_at)
         VALUES (?, 'update', 'prompt', ?, ?, ?)
-      `).run(req.user.id, key, JSON.stringify({ length: value.length }), now);
+      `).run((req as any).user?.id, key, JSON.stringify({ length: value.length }), now);
     } catch { /* ignore audit log errors */ }
 
     res.json({ success: true, data: { key, value: value.slice(0, 100) + '...' } });
@@ -248,7 +246,7 @@ router.delete('/:key', requireAdmin, (req, res) => {
 
 // ============== RESET ALL PROMPTS ==============
 
-router.delete('/', requireAdmin, (req, res) => {
+router.delete('/', requireAdmin, (_req, res) => {
   try {
     // Delete all prompt_* settings
     db.prepare("DELETE FROM system_settings WHERE `key` LIKE 'prompt_%'").run();
@@ -261,7 +259,7 @@ router.delete('/', requireAdmin, (req, res) => {
 
 // ============== GET ACTIVE PROMPT (for AI) ==============
 
-router.get('/active', (req, res) => {
+router.get('/active', (_req, res) => {
   try {
     // This endpoint is public (used by AI engine)
     // Load current values

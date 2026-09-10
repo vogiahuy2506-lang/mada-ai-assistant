@@ -17,7 +17,7 @@
  *  5. Return null → caller phải install puppeteer full
  */
 
-import puppeteer, { Browser, Page, LaunchOptions } from 'puppeteer-core';
+import puppeteer, { Browser, Page } from 'puppeteer-core';
 
 class BrowserPool {
   private browser: Browser | null = null;

@@ -250,22 +250,6 @@ class ProductExtractorService {
     }
   }
 
-  /**
-   * Fetch HTML thông qua BrowserFetcher (smart SPA detection + proxy + stealth)
-   */
-  private async fetchHtml(url: string, log: ExtractorLogger): Promise<string> {
-    const { browserFetcher } = await import('./browserFetcher');
-    const result = await browserFetcher.fetch(url, {
-      timeoutMs: 30000,
-      useProxy: true,
-      retries: 2,
-    });
-    log.info?.(
-      `[ProductExtractor] Fetched via ${result.method} (${result.durationMs}ms, status=${result.statusCode})`
-    );
-    return result.html;
-  }
-
   // ============================================================
   // LAYER 1: JSON-LD (Schema.org Product)
   // ============================================================
@@ -494,6 +478,7 @@ class ProductExtractorService {
         // Card structure:
         //   <div class="..."><a class="relative flex...">IMG</a><div class="cardInfo"><a>tên</a><p>giá</p></div></div>
         let searchEl: any = $el;
+        const isInsideCardInfo = $el.closest('.cardInfo').length > 0 || $el.parent()?.closest('.cardInfo').length > 0;
         if (isFPTSelector && !$cardInfo) {
           // Tìm cardInfo: sibling của <a> NGOÀI, hoặc parent của <a> TRONG
           if (isInsideCardInfo) {
@@ -562,8 +547,8 @@ class ProductExtractorService {
           if (priceMatches) {
             // Lấy giá NHỎ NHẤT (vì old-price thường cao hơn current price)
             const prices = priceMatches
-              .map(m => this.parsePrice(m).price)
-              .filter(p => p >= 100000); // Bỏ qua số < 100K (có thể là % nhỏ)
+              .map((m: string) => this.parsePrice(m).price)
+              .filter((p: number) => p >= 100000); // Bỏ qua số < 100K (có thể là % nhỏ)
             if (prices.length > 0) {
               price = Math.min(...prices);
               currency = 'VND';

@@ -88,7 +88,7 @@ export interface Document {
   content: string;
   metadata: {
     source: string;
-    type: 'pdf' | 'web' | 'text' | 'manual' | 'image' | 'docx';
+    type: 'pdf' | 'web' | 'text' | 'manual' | 'image' | 'docx' | 'xlsx' | 'csv';
     title?: string;
     createdAt: string;
     itemId?: string;

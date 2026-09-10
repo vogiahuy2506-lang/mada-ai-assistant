@@ -119,7 +119,11 @@ export function requireRole(...roles: UserRow['role'][]) {
     if (!req.user) {
       return res.status(401).json({ success: false, error: 'Auth required' });
     }
-    if (!roles.includes(req.user.role) && req.user.role !== 'admin') {
+    // super_admin và admin có quyền truy cập tất cả các role
+    if (req.user.role === 'super_admin' || req.user.role === 'admin') {
+      return next();
+    }
+    if (!roles.includes(req.user.role)) {
       return res.status(403).json({
         success: false,
         error: `Requires role: ${roles.join(' or ')}, you are: ${req.user.role}`,

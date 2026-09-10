@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { AdminLayout } from './AdminLayout';
 import { adminApi } from './adminApi';
 import { MADA_BOTS } from '@/lib/madaBots';
@@ -70,7 +70,7 @@ function AgentAvatar({
 // ============== MAIN COMPONENT ==============
 export function AdminAgents() {
   const { user } = useAuthStore();
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
   const loadAgentsForChat = useAgentStore((s) => s.loadAgents);
   const removeAgentForChat = useAgentStore((s) => s.removeAgent);
 
@@ -1583,3 +1583,5 @@ export function AdminAgents() {
     </AdminLayout>
   );
 }
+
+export default AdminAgents;

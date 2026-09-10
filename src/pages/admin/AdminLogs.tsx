@@ -226,7 +226,7 @@ export function AdminLogs() {
 
   const handleClear = async () => {
     if (!confirm('Xóa toàn bộ nhật ký?')) return;
-    const res = await fetch('/api/admin/logs', { method: 'DELETE', headers: { Authorization: `Bearer ${localStorage.getItem('mada-auth') ? JSON.parse(localStorage.getItem('mada-auth')!).accessToken || '' : ''}` } });
+    const res = await fetch('/api/admin/logs', { method: 'DELETE', headers: { Authorization: `Bearer ${localStorage.getItem('mada-access-token') || ''}` } });
     if (res.ok) fetchLogs();
   };
 

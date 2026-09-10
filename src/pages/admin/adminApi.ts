@@ -517,4 +517,174 @@ export const adminApi = {
       warning?: string;
     }>(`/admin/system-prompts/${id}`, { method: 'DELETE' });
   },
+
+  // ============== PROMPT TEMPLATES ==============
+  async getPromptTemplates(params?: { category?: string; language?: string; featured?: boolean; search?: string }) {
+    const p = new URLSearchParams();
+    if (params?.category && params.category !== 'all') p.set('category', params.category);
+    if (params?.language && params.language !== 'all') p.set('language', params.language);
+    if (params?.featured) p.set('featured', 'true');
+    if (params?.search) p.set('search', params.search);
+    const qs = p.toString();
+    return request<Array<{
+      id: string;
+      name: string;
+      description: string;
+      prompt: string;
+      category: string;
+      language: string;
+      tags: string[];
+      variables: string[];
+      example_questions: string[];
+      is_featured: boolean;
+      use_count: number;
+      created_at: string;
+      updated_at: string;
+    }>>(`/admin/prompt-templates${qs ? `?${qs}` : ''}`);
+  },
+  async getPromptTemplate(id: string) {
+    return request<{
+      id: string;
+      name: string;
+      description: string;
+      prompt: string;
+      category: string;
+      language: string;
+      tags: string[];
+      variables: string[];
+      example_questions: string[];
+      is_featured: boolean;
+      use_count: number;
+    }>(`/admin/prompt-templates/${id}`);
+  },
+  async createPromptTemplate(data: {
+    id: string;
+    name: string;
+    description?: string;
+    prompt: string;
+    category?: string;
+    language?: string;
+    tags?: string[];
+    variables?: string[];
+    example_questions?: string[];
+    is_featured?: boolean;
+  }) {
+    return request<{ id: string; name: string }>('/admin/prompt-templates', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+  async updatePromptTemplate(id: string, data: Partial<{
+    name: string;
+    description: string;
+    prompt: string;
+    category: string;
+    language: string;
+    tags: string[];
+    variables: string[];
+    example_questions: string[];
+    is_featured: boolean;
+  }>) {
+    return request<{ id: string; updated_at: string }>(`/admin/prompt-templates/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+  async deletePromptTemplate(id: string) {
+    return request<{ success: boolean; message: string }>(`/admin/prompt-templates/${id}`, { method: 'DELETE' });
+  },
+  async applyPromptTemplate(templateId: string, targetPromptId: string, changeSummary?: string) {
+    return request<{
+      success: boolean;
+      data: {
+        message: string;
+        prompt_id: string;
+        version: number;
+        template_id: string;
+      };
+    }>(`/admin/prompt-templates/${templateId}/apply`, {
+      method: 'POST',
+      body: JSON.stringify({ target_prompt_id: targetPromptId, change_summary: changeSummary }),
+    });
+  },
+
+  // ============== PROMPT VERSIONS ==============
+  async getPromptVersions(promptId: string) {
+    return request<Array<{
+      id: string;
+      prompt_id: string;
+      version: number;
+      prompt: string;
+      change_summary: string;
+      created_by: string;
+      created_by_name: string;
+      created_at: string;
+      is_restored: boolean;
+    }>>(`/admin/prompt-templates/versions/${promptId}`);
+  },
+  async restorePromptVersion(promptId: string, versionId: string) {
+    return request<{
+      success: boolean;
+      data: {
+        message: string;
+        restored_version: number;
+        new_version: number;
+      };
+    }>(`/admin/prompt-templates/versions/${promptId}/restore/${versionId}`, {
+      method: 'POST',
+    });
+  },
+
+  // ============== PROMPT VALIDATION & TESTING ==============
+  async validatePrompt(prompt: string) {
+    return request<{
+      success: boolean;
+      data: {
+        valid: boolean;
+        issues: Array<{
+          type: string;
+          message: string;
+          severity: 'error' | 'warning' | 'info';
+        }>;
+        stats: {
+          length: number;
+          wordCount: number;
+          lineCount: number;
+          hasPlaceholders: number;
+        };
+      };
+    }>('/admin/prompt-templates/validate', {
+      method: 'POST',
+      body: JSON.stringify({ prompt }),
+    });
+  },
+  async testPrompt(prompt: string, question?: string, language?: string) {
+    return request<{
+      success: boolean;
+      data: {
+        system_prompt: string;
+        test_question: string;
+        simulated_structure: {
+          steps: string[];
+          expected_format: {
+            greeting: string;
+            content: string;
+            closing: string;
+          };
+          language_applied: string;
+          safety_check: string;
+        };
+        validation: {
+          prompt_length: number;
+          has_language_rule: boolean;
+          has_safety_rule: boolean;
+          has_format_guide: boolean;
+          recommended_test_questions: string[];
+        };
+      };
+    }>('/admin/prompt-templates/test', {
+      method: 'POST',
+      body: JSON.stringify({ prompt, question, language }),
+    });
+  },
 };

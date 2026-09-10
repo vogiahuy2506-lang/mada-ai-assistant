@@ -5,7 +5,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { db } from '../lib/db';
+import db from '../lib/db';
 
 const OUTPUT_DIR = path.join(process.cwd(), 'public', 'mada-images');
 

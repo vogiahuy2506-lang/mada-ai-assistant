@@ -9,7 +9,7 @@
  * Save preferences to localStorage + apply to <html>
  */
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Type, Contrast, Pause, Underline, BookOpen, X, RotateCcw, Accessibility
 } from 'lucide-react';

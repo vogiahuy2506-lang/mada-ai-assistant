@@ -1,11 +1,11 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Sidebar } from '@/components';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import {
   CloudUpload, Globe, FileText,
   Loader2, CheckCircle, AlertCircle, Trash2, Eye,
   Search, Filter, Plus, Clock, Database, Brain, Upload, FilePlus, Sparkles,
-  X, Link, BookOpen, RefreshCw, Trash, FileCheck, Lightbulb, MessageCircle, Package
+  X, Link as LinkIcon, BookOpen, RefreshCw, Trash, FileCheck, Lightbulb, MessageCircle, Package,
+  Menu, X as XIcon
 } from 'lucide-react';
 import clsx from 'clsx';
 import { useTranslation } from '@/lib/translations';
@@ -347,11 +347,73 @@ export function DataManagerPage() {
     failed: { label: t('dataManager.statusFailed'), color: 'bg-red-100 text-red-800', icon: AlertCircle },
   };
 
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  
+  const navItems = [
+    { id: 'knowledge', label: t('dataManager.navKnowledge'), icon: Brain, path: '/data' },
+    { id: 'collect', label: t('dataManager.navCollect'), icon: Globe, path: '/data/collect' },
+    { id: 'documents', label: t('dataManager.navDocuments'), icon: FileText, path: '/data/documents' },
+    { id: 'categories', label: t('dataManager.navCategories'), icon: Package, path: '/data/categories' },
+  ];
+  
   return (
     <div className="flex h-screen bg-background dark:bg-on-background">
-      <Sidebar variant="data_manager" />
+      {/* Inline Sidebar for Data Manager */}
+      <aside
+        className={clsx(
+          'h-screen bg-white border-r border-slate-200 flex flex-col transition-all duration-300 shrink-0',
+          sidebarOpen ? 'w-64' : 'w-0 overflow-hidden'
+        )}
+      >
+        {/* Logo Area */}
+        <div className="p-4 border-b border-slate-100 shrink-0">
+          <div className="flex items-center justify-between">
+            <img src="https://i.imgur.com/placeholder-logo.png" alt="MADA" className="h-10" onError={(e) => e.currentTarget.style.display = 'none'} />
+            <button
+              onClick={() => setSidebarOpen(false)}
+              className="p-2 hover:bg-slate-100 rounded-lg lg:hidden"
+            >
+              <XIcon className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
 
-      <main className="flex-1 ml-64 overflow-y-auto">
+        {/* Navigation */}
+        <nav className="flex-1 overflow-y-auto p-4">
+          <div className="space-y-1">
+            {navItems.map((item) => {
+              const isActive = location.pathname === item.path || (item.id === 'knowledge' && location.pathname === '/data');
+              return (
+                <Link
+                  key={item.id}
+                  to={item.path}
+                  className={clsx(
+                    'flex items-center gap-3 px-4 py-3 rounded-xl transition-all',
+                    isActive
+                      ? 'bg-primary/10 text-primary font-semibold'
+                      : 'text-slate-600 hover:bg-slate-100'
+                  )}
+                >
+                  <item.icon className="w-5 h-5" />
+                  <span>{item.label}</span>
+                </Link>
+              );
+            })}
+          </div>
+        </nav>
+      </aside>
+
+      {/* Mobile menu button */}
+      {!sidebarOpen && (
+        <button
+          onClick={() => setSidebarOpen(true)}
+          className="fixed top-4 left-4 z-50 p-2 bg-white rounded-lg shadow-lg lg:hidden"
+        >
+          <Menu className="w-6 h-6" />
+        </button>
+      )}
+
+      <main className="flex-1 overflow-y-auto">
         <div className="p-8">
           {/* Header */}
           <div className="mb-8 flex items-center justify-between">

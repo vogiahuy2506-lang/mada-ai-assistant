@@ -1,14 +1,16 @@
 import { useState, useEffect } from 'react';
 import { AdminLayout } from './AdminLayout';
 import { adminApi, UserStats, KnowledgeStats } from './adminApi';
-import { useSystemSettingsStore } from '@/stores';
+import { useSystemSettingsStore, useAuthStore } from '@/stores';
 import { useLanguageStore } from '@/stores';
 import clsx from 'clsx';
 import { systemApi } from '@/lib/api';
-import { CheckCircle, Loader2, AlertCircle } from 'lucide-react';
+import { CheckCircle, Loader2, AlertCircle, ShieldAlert } from 'lucide-react';
 import { PromptsEditor } from './PromptsEditor';
+import { ChatCustomization } from './ChatCustomization';
+import { WidgetCustomization } from './WidgetCustomization';
 
-type Tab = 'general' | 'plans' | 'security' | 'ai' | 'integrations' | 'live' | 'system' | 'prompts';
+type Tab = 'general' | 'plans' | 'security' | 'ai' | 'integrations' | 'live' | 'system' | 'prompts' | 'chat' | 'widget';
 type Language = 'vi' | 'en' | 'ar' | 'fr';
 
 // Translation object
@@ -25,6 +27,8 @@ const t = {
       live: 'Trạng thái thật',
       system: 'System DB',
       prompts: 'System Prompts',
+      chat: 'Tùy chỉnh Chat',
+      widget: 'Chat Widget',
     },
     general: {
       sectionTitle: 'Thông tin chung',
@@ -130,6 +134,10 @@ const t = {
       ai: 'AI Models',
       integrations: 'Integrations',
       live: 'Live Status',
+      system: 'System DB',
+      prompts: 'System Prompts',
+      chat: 'Chat Settings',
+      widget: 'Chat Widget',
     },
     general: {
       sectionTitle: 'General Information',
@@ -235,6 +243,9 @@ const t = {
       ai: 'نماذج الذكاء',
       integrations: 'التكاملات',
       live: 'الحالة المباشرة',
+      system: 'قاعدة النظام',
+      prompts: 'مطالبة النظام',
+      chat: 'إعدادات المحادثة',
     },
     general: {
       sectionTitle: 'المعلومات العامة',
@@ -340,6 +351,9 @@ const t = {
       ai: 'Modèles IA',
       integrations: 'Intégrations',
       live: 'État en Direct',
+      system: 'Base de Données',
+      prompts: 'Prompts Système',
+      chat: 'Paramètres Chat',
     },
     general: {
       sectionTitle: 'Informations Générales',
@@ -449,6 +463,11 @@ export function AdminSettings() {
 
   const language = useLanguageStore((s) => s.language) as Language;
   const lang = t[language] || t.vi;
+  
+  // Get current user role
+  const user = useAuthStore((s) => s.user);
+  const isSuperAdmin = user?.role === 'superadmin' || user?.role === 'super_admin';
+  const userRole = (user?.role as 'admin' | 'superadmin' | 'super_admin' | 'user') || 'admin';
 
   const {
     anonymousLimit,
@@ -534,6 +553,20 @@ export function AdminSettings() {
               {lang.subtitle}
             </p>
           </div>
+          {/* Role Badge */}
+          <div className="relative z-10 pr-6">
+            {isSuperAdmin ? (
+              <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-amber-400 to-orange-500 text-white shadow-lg">
+                <ShieldAlert className="w-5 h-5" />
+                <span className="font-bold">Super Admin</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary/10 border border-primary/30 text-primary">
+                <span className="font-bold">Admin</span>
+                <span className="text-xs opacity-70">(Limited Access)</span>
+              </div>
+            )}
+          </div>
         </div>
       </section>
 
@@ -548,6 +581,9 @@ export function AdminSettings() {
             { id: 'integrations', label: lang.tabs.integrations, icon: 'extension' },
             { id: 'live', label: lang.tabs.live, icon: 'monitor_heart' },
             { id: 'system', label: 'System DB', icon: 'storage' },
+            { id: 'prompts', label: lang.tabs.prompts, icon: 'edit_note' },
+            { id: 'chat', label: lang.tabs.chat, icon: 'chat' },
+            { id: 'widget', label: lang.tabs.widget, icon: 'web' },
           ] as { id: Tab; label: string; icon: string }[]
         ).map((t) => (
           <button
@@ -1159,15 +1195,31 @@ export function AdminSettings() {
     {tab === 'system' && (
         <div className="relative bg-gradient-to-br from-white/80 to-white/40 backdrop-blur-xl rounded-3xl border-3 border-black p-8 md:p-12 shadow-[12px_12px_0px_0px_#000]">
           <div className="relative z-10 space-y-6">
-            <div>
-              <h3 className="text-xl font-black text-on-surface">System Settings (DB)</h3>
-              <p className="text-sm text-on-surface-variant mt-1">
-                Toàn bộ cấu hình hệ thống được lưu trong <code className="text-xs bg-slate-100 px-1.5 py-0.5 rounded">system_settings</code> table.
-                Auto-group theo prefix key (ai_*, file_upload_*, ...).
-              </p>
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-xl font-black text-on-surface">System Settings (DB)</h3>
+                <p className="text-sm text-on-surface-variant mt-1">
+                  Toàn bộ cấu hình hệ thống được lưu trong <code className="text-xs bg-slate-100 px-1.5 py-0.5 rounded">system_settings</code> table.
+                </p>
+              </div>
+              {!isSuperAdmin && (
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-100 border border-amber-300 text-amber-700">
+                  <span className="material-symbols-outlined text-sm">lock</span>
+                  <span className="text-xs font-bold">Super Admin Only</span>
+                </div>
+              )}
             </div>
 
-            {Object.keys(dbGrouped).length === 0 ? (
+            {/* Access Denied for non-Super Admin */}
+            {!isSuperAdmin ? (
+              <div className="p-12 text-center bg-amber-50 rounded-2xl border-2 border-amber-200">
+                <ShieldAlert className="w-12 h-12 mx-auto text-amber-500 mb-4" />
+                <h4 className="text-lg font-bold text-amber-800 mb-2">Truy cập bị hạn chế</h4>
+                <p className="text-sm text-amber-600">
+                  System DB chỉ dành cho Super Admin. Bạn không có quyền xem hoặc chỉnh sửa các cấu hình này.
+                </p>
+              </div>
+            ) : Object.keys(dbGrouped).length === 0 ? (
               <div className="p-8 text-center bg-white/60 rounded-2xl border-2 border-dashed border-black/20">
                 <span className="material-symbols-outlined text-3xl text-on-surface-variant">inbox</span>
                 <p className="text-sm text-on-surface-variant mt-2">Đang tải...</p>
@@ -1217,6 +1269,20 @@ export function AdminSettings() {
       {tab === 'prompts' && (
         <div className="relative bg-gradient-to-br from-white/80 to-white/40 backdrop-blur-xl rounded-3xl border-3 border-black p-8 md:p-12 shadow-[12px_12px_0px_0px_#000]">
           <PromptsEditor />
+        </div>
+      )}
+
+      {/* CHAT CUSTOMIZATION TAB */}
+      {tab === 'chat' && (
+        <div className="relative bg-gradient-to-br from-white/80 to-white/40 backdrop-blur-xl rounded-3xl border-3 border-black p-8 md:p-12 shadow-[12px_12px_0px_0px_#000]">
+          <ChatCustomization language={language} userRole={userRole} />
+        </div>
+      )}
+
+      {/* WIDGET CUSTOMIZATION TAB */}
+      {tab === 'widget' && (
+        <div className="relative bg-gradient-to-br from-white/80 to-white/40 backdrop-blur-xl rounded-3xl border-3 border-black p-8 md:p-12 shadow-[12px_12px_0px_0px_#000]">
+          <WidgetCustomization language={language} userRole={userRole} />
         </div>
       )}
     </AdminLayout>

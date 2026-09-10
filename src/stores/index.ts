@@ -39,6 +39,8 @@ interface AuthState {
   logout: () => Promise<void>;
   updateUser: (updates: Partial<User>) => void;
   hasRole: (role: UserRole) => boolean;
+  isSuperAdmin: () => boolean;
+  isAdmin: () => boolean;
   setPlan: (plan: UserPlan) => void;
   incrementQuota: () => void;
   decrementQuota: () => void;
@@ -75,7 +77,20 @@ export const useAuthStore = create<AuthState>()(
       hasRole: (role) => {
         const u = get().user;
         if (!u) return false;
-        return u.role === role || u.role === 'admin';
+        // Super Admin có quyền cao nhất - truy cập tất cả
+        if (u.role === 'super_admin') return true;
+        // Admin thường chỉ có quyền admin
+        if (u.role === 'admin' && role === 'admin') return true;
+        // Các role khác kiểm tra exact match
+        return u.role === role;
+      },
+      isSuperAdmin: () => {
+        const u = get().user;
+        return u?.role === 'super_admin';
+      },
+      isAdmin: () => {
+        const u = get().user;
+        return u?.role === 'admin' || u?.role === 'super_admin';
       },
       setPlan: (plan) => set((state) => {
         if (!state.user) return state;
@@ -179,18 +194,29 @@ export const useAuthStore = create<AuthState>()(
           : null,
         isAuthenticated: state.isAuthenticated,
       }),
-      merge: (persisted, current) => {
-        const persistedAny = persisted as Partial<{ user: Record<string, unknown> | null; isAuthenticated: boolean }> | undefined;
-        if (!persistedAny) return current;
-        const persistedUser = persistedAny.user;
+      onRehydrateStorage: () => (state) => {
+        // Ensure user dates are Date objects after hydration
+        if (state?.user?.createdAt && typeof state.user.createdAt === 'string') {
+          state.user.createdAt = new Date(state.user.createdAt);
+        }
+        if (state?.user?.lastLogin && typeof state.user.lastLogin === 'string') {
+          state.user.lastLogin = new Date(state.user.lastLogin);
+        }
+      },
+      merge: (persisted: unknown, current) => {
+        // Handle null/undefined persisted state
+        if (!persisted) return current;
+        
+        const p = persisted as { user?: Record<string, unknown> | null; isAuthenticated?: boolean };
+        
         return {
           ...current,
-          isAuthenticated: persistedAny.isAuthenticated ?? false,
-          user: persistedUser
+          isAuthenticated: p.isAuthenticated ?? false,
+          user: p.user
             ? {
-                ...persistedUser,
-                createdAt: new Date(persistedUser.createdAt as string),
-                lastLogin: persistedUser.lastLogin ? new Date(persistedUser.lastLogin as string) : undefined,
+                ...p.user,
+                createdAt: p.user.createdAt ? new Date(p.user.createdAt as string) : new Date(),
+                lastLogin: p.user.lastLogin ? new Date(p.user.lastLogin as string) : undefined,
               } as User
             : null,
         };
@@ -527,21 +553,6 @@ export const useConsultationStore = create<ConsultationState>((set) => ({
   closeModal: () => set({ isModalOpen: false }),
 }));
 
-// Sidebar Store
-interface SidebarState {
-  isCollapsed: boolean;
-  activeCategory: string | null;
-  toggleCollapse: () => void;
-  setActiveCategory: (category: string | null) => void;
-}
-
-export const useSidebarStore = create<SidebarState>((set) => ({
-  isCollapsed: false,
-  activeCategory: null,
-  toggleCollapse: () => set((state) => ({ isCollapsed: !state.isCollapsed })),
-  setActiveCategory: (activeCategory) => set({ activeCategory }),
-}));
-
 // View Mode Store - End-User vs AT Specialist Mode
 interface ViewModeState {
   viewMode: ViewMode;
@@ -634,3 +645,12 @@ export type { Agent } from './agentStore';
 // Re-export prompt store (shared between /admin/prompts and /admin/agents)
 export { usePromptStore } from './promptStore';
 export type { SystemPromptRow } from './promptStore';
+
+// Re-export ChatSettingsStore
+export { useChatSettingsStore } from './chatSettingsStore';
+export type { SuggestedPrompt, AIInstructions, EmotionSettings, EmotionPreset, EmotionIntensity, ResponseStyle } from './chatSettingsStore';
+
+// Re-export WidgetSettingsStore
+export { useWidgetSettingsStore } from './widgetStore';
+export type { WidgetConfig } from './widgetStore';
+

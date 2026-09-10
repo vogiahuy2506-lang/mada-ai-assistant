@@ -14,7 +14,6 @@
 import { browserPool } from './browserPool';
 import { proxyService } from './proxyService';
 import { userAgentPool } from './userAgentPool';
-import { Page } from 'puppeteer-core';
 
 export interface FetchOptions {
   timeoutMs?: number;
@@ -127,7 +126,6 @@ class BrowserFetcher {
   ): Promise<FetchResult> {
     const start = Date.now();
     const proxy = options.useProxy ? proxyService.getRandom() : null;
-    const proxyStartUrl = proxy ? proxyService.buildProxyUrl(proxy) : null;
 
     // Native fetch không support proxy trực tiếp
     // → dùng undici hoặc bỏ qua proxy (TODO: add https-proxy-agent)

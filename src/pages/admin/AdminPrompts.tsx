@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { AdminLayout } from './AdminLayout';
 import { Loader2, Search, Plus, Edit2, Trash2, ToggleLeft, ToggleRight, FileText, X, AlertTriangle } from 'lucide-react';
 import { adminApi } from './adminApi';
 import { getAccessToken } from '@/lib/api';
-import { usePromptStore, type SystemPromptRow } from '@/stores';
+import { usePromptStore, useAuthStore, type SystemPromptRow } from '@/stores';
 import { useTranslation } from '@/lib/translations';
+import { PromptsEditor } from './PromptsEditor';
+import { ChatCustomization } from './ChatCustomization';
 
 type SystemPrompt = SystemPromptRow;
 
@@ -61,6 +64,10 @@ export function AdminPrompts() {
   const [filterLanguage, setFilterLanguage] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [deleteWarning, setDeleteWarning] = useState<{ usingAgents: Array<{ id: string; name: string }> } | null>(null);
+
+  // Get current user role for ChatCustomization
+  const user = useAuthStore((s) => s.user);
+  const userRole = user?.role || 'admin';
 
   useEffect(() => {
     loadPrompts();
@@ -241,6 +248,9 @@ export function AdminPrompts() {
     });
   };
 
+  const navigate = useNavigate();
+  const [showPromptsEditor, setShowPromptsEditor] = useState(false);
+  const [showChatCustomization, setShowChatCustomization] = useState(false);
   const { t } = useTranslation();
 
   return (
@@ -285,7 +295,124 @@ export function AdminPrompts() {
         </div>
       )}
 
-      {/* Toolbar: search + filters — full width, sticky */}
+      {/* 3 Quick-Action Cards */}
+      <div className="grid grid-cols-3 gap-4 mb-4">
+        {/* System DB */}
+        <button
+          onClick={() => navigate('/admin/settings?tab=system')}
+          className="group flex items-center gap-4 p-4 bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md hover:border-amber-300 hover:-translate-y-0.5 transition-all text-left"
+        >
+          <div className="w-12 h-12 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center shrink-0 group-hover:bg-amber-100 transition-colors">
+            <span className="material-symbols-outlined text-2xl text-amber-500">storage</span>
+          </div>
+          <div>
+            <p className="font-bold text-sm text-slate-800">System DB</p>
+            <p className="text-xs text-slate-400 mt-0.5">Cấu hình hệ thống</p>
+          </div>
+        </button>
+
+        {/* System Prompts — clickable to toggle inline editor */}
+        <button
+          onClick={() => setShowPromptsEditor(!showPromptsEditor)}
+          className="relative group flex items-center gap-4 p-4 rounded-2xl border-2 text-left transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+          style={{
+            backgroundColor: showPromptsEditor ? 'rgba(99,102,241,0.05)' : 'white',
+            borderColor: showPromptsEditor ? 'rgba(99,102,241,0.4)' : '#e2e8f0',
+            boxShadow: showPromptsEditor ? '0 0 0 3px rgba(99,102,241,0.1)' : undefined,
+          }}
+        >
+          <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 transition-colors" style={{
+            backgroundColor: showPromptsEditor ? 'rgba(99,102,241,0.15)' : 'rgba(99,102,241,0.08)',
+            border: `1px solid ${showPromptsEditor ? 'rgba(99,102,241,0.3)' : 'rgba(99,102,241,0.2)'}`,
+          }}>
+            <span className="material-symbols-outlined text-2xl" style={{ color: '#6366f1' }}>edit_note</span>
+          </div>
+          <div>
+            <p className="font-bold text-sm" style={{ color: showPromptsEditor ? '#6366f1' : '#1e293b' }}>
+              System Prompts
+            </p>
+            <p className="text-xs mt-0.5" style={{ color: showPromptsEditor ? 'rgba(99,102,241,0.6)' : '#94a3b8' }}>
+              {showPromptsEditor ? 'Đang chỉnh sửa...' : 'Quản lý prompts'}
+            </p>
+          </div>
+          <div className="absolute top-3 right-3 w-2 h-2 rounded-full" style={{
+            backgroundColor: showPromptsEditor ? '#6366f1' : 'transparent',
+            boxShadow: showPromptsEditor ? '0 0 8px rgba(99,102,241,0.8)' : 'none',
+          }}></div>
+        </button>
+
+        {/* Tùy chỉnh Chat — clickable to toggle inline editor */}
+        <button
+          onClick={() => setShowChatCustomization(!showChatCustomization)}
+          className="relative group flex items-center gap-4 p-4 rounded-2xl border-2 text-left transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+          style={{
+            backgroundColor: showChatCustomization ? 'rgba(14,165,233,0.05)' : 'white',
+            borderColor: showChatCustomization ? 'rgba(14,165,233,0.4)' : '#e2e8f0',
+            boxShadow: showChatCustomization ? '0 0 0 3px rgba(14,165,233,0.1)' : undefined,
+          }}
+        >
+          <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 transition-colors" style={{
+            backgroundColor: showChatCustomization ? 'rgba(14,165,233,0.15)' : 'rgba(14,165,233,0.08)',
+            border: `1px solid ${showChatCustomization ? 'rgba(14,165,233,0.3)' : 'rgba(14,165,233,0.2)'}`,
+          }}>
+            <span className="material-symbols-outlined text-2xl" style={{ color: '#0ea5e9' }}>chat</span>
+          </div>
+          <div>
+            <p className="font-bold text-sm" style={{ color: showChatCustomization ? '#0ea5e9' : '#1e293b' }}>
+              Tùy chỉnh Chat
+            </p>
+            <p className="text-xs mt-0.5" style={{ color: showChatCustomization ? 'rgba(14,165,233,0.6)' : '#94a3b8' }}>
+              {showChatCustomization ? 'Đang chỉnh sửa...' : 'Giao diện & hành vi'}
+            </p>
+          </div>
+          <div className="absolute top-3 right-3 w-2 h-2 rounded-full" style={{
+            backgroundColor: showChatCustomization ? '#0ea5e9' : 'transparent',
+            boxShadow: showChatCustomization ? '0 0 8px rgba(14,165,233,0.8)' : 'none',
+          }}></div>
+        </button>
+      </div>
+
+      {showPromptsEditor ? (
+        /* Inline PromptsEditor */
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="p-5 border-b border-slate-100 flex items-center justify-between">
+            <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+              <span className="material-symbols-outlined text-xl text-primary">edit_note</span>
+              System Prompts — Chỉnh sửa nhanh
+            </h2>
+            <button
+              onClick={() => setShowPromptsEditor(false)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+            >
+              <X className="w-4 h-4" />
+              Đóng
+            </button>
+          </div>
+          <div className="p-5">
+            <PromptsEditor onClose={() => setShowPromptsEditor(false)} />
+          </div>
+        </div>
+      ) : showChatCustomization ? (
+        /* Inline ChatCustomization */
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="p-5 border-b border-slate-100 flex items-center justify-between">
+            <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+              <span className="material-symbols-outlined text-xl" style={{ color: '#0ea5e9' }}>chat</span>
+              Tùy chỉnh Chat — Giao diện &amp; hành vi
+            </h2>
+            <button
+              onClick={() => setShowChatCustomization(false)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+            >
+              <X className="w-4 h-4" />
+              Đóng
+            </button>
+          </div>
+          <div className="p-5">
+            <ChatCustomization isInline userRole={userRole} onClose={() => setShowChatCustomization(false)} />
+          </div>
+        </div>
+      ) : (
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 mb-4">
         <div className="flex items-center gap-3 mb-3">
           <h2 className="text-base font-bold text-slate-800 shrink-0">Prompts</h2>
@@ -364,13 +491,12 @@ export function AdminPrompts() {
             </button>
           ))}
         </div>
-      </div>
 
-      <div className="flex gap-5 h-[calc(100vh-220px)]">
-        {/* Left Panel - List */}
-        <div className="w-[420px] flex flex-col bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-          {/* List */}
-          <div className="flex-1 overflow-y-auto p-3">
+        <div className="flex gap-5 h-[calc(100vh-220px)]">
+          {/* Left Panel - List */}
+          <div className="w-[420px] flex flex-col bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            {/* List */}
+            <div className="flex-1 overflow-y-auto p-3">
             {loading ? (
               <div className="flex items-center justify-center h-32">
                 <Loader2 className="w-6 h-6 animate-spin text-primary" />
@@ -429,13 +555,12 @@ export function AdminPrompts() {
               </div>
             )}
           </div>
-        </div>
 
-        {/* Right Panel - Detail/Edit */}
-        <div className="flex-1 bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col overflow-hidden">
-          {showCreate ? (
-            <div className="flex-1 flex flex-col">
-              <div className="p-5 border-b border-slate-100 flex items-center justify-between">
+          {/* Right Panel - Detail/Edit */}
+          <div className="flex-1 bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col overflow-hidden">
+            {showCreate ? (
+              <div className="flex-1 flex flex-col">
+                <div className="p-5 border-b border-slate-100 flex items-center justify-between">
                 <h2 className="text-lg font-bold text-slate-800">Tạo System Prompt mới</h2>
                 <button onClick={() => setShowCreate(false)} className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors">
                   <X className="w-5 h-5 text-slate-400" />
@@ -707,8 +832,13 @@ export function AdminPrompts() {
               </div>
             </div>
           )}
+          </div>
         </div>
+          </div>
       </div>
+      )}
     </AdminLayout>
   );
 }
+
+export default AdminPrompts;

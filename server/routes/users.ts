@@ -1,17 +1,18 @@
-import { Router, Response } from 'express';
+import { Router, Request, Response } from 'express';
 import { randomUUID } from 'crypto';
 import db, { UserRow, toPublicUser } from '../lib/db';
-import { authenticate, requireRole, auditLog, hashPassword, AuthRequest } from '../lib/auth';
+import { authenticate, requireRole, auditLog, hashPassword } from '../lib/auth';
 import { logActivity } from '../index';
 
 const router = Router();
 
 // All endpoints require admin
-router.use(authenticate, requireRole('admin'));
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+router.use(authenticate as any, requireRole('admin') as any);
 
 // ============== GET /api/users ==============
 
-router.get('/', (req: AuthRequest, res: Response) => {
+router.get('/', (req: Request, res: Response) => {
   try {
     const { search, role, status, plan, limit = '100', offset = '0' } = req.query;
 
@@ -58,7 +59,7 @@ router.get('/', (req: AuthRequest, res: Response) => {
 
 // ============== GET /api/users/:id ==============
 
-router.get('/:id', (req: AuthRequest, res: Response) => {
+router.get('/:id', (req: Request, res: Response) => {
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.params.id) as UserRow | undefined;
   if (!user) {
     return res.status(404).json({ success: false, error: 'User not found' });
@@ -68,7 +69,7 @@ router.get('/:id', (req: AuthRequest, res: Response) => {
 
 // ============== POST /api/users (admin create user) ==============
 
-router.post('/', (req: AuthRequest, res: Response) => {
+router.post('/', (req: Request, res: Response) => {
   try {
     const { email, password, name, role = 'user', plan = 'free' } = req.body;
 
@@ -96,8 +97,8 @@ router.post('/', (req: AuthRequest, res: Response) => {
     `).run(id, normalizedEmail, name, hashPassword(password), role, plan, limits[plan], now, now);
 
     const user = db.prepare('SELECT * FROM users WHERE id = ?').get(id) as UserRow;
-    auditLog(req.user!.id, 'admin_create_user', req, { createdUserId: id, role, plan });
-    logActivity('success', `Admin created user: ${name} (${role}/${plan})`, 'User Management', req.user!.email);
+    auditLog((req as any).user?.id, 'admin_create_user', req, { createdUserId: id, role, plan });
+    logActivity('success', `Admin created user: ${name} (${role}/${plan})`, 'User Management', (req as any).user?.email);
 
     res.status(201).json({ success: true, data: { user: toPublicUser(user) } });
   } catch (err) {
@@ -108,7 +109,7 @@ router.post('/', (req: AuthRequest, res: Response) => {
 
 // ============== PATCH /api/users/:id (admin update role/plan/status) ==============
 
-router.patch('/:id', (req: AuthRequest, res: Response) => {
+router.patch('/:id', (req: Request, res: Response) => {
   try {
     const target = db.prepare('SELECT * FROM users WHERE id = ?').get(req.params.id) as UserRow | undefined;
     if (!target) {
@@ -139,7 +140,7 @@ router.patch('/:id', (req: AuthRequest, res: Response) => {
     if (status !== undefined) {
       const validStatuses = ['active', 'suspended', 'pending'];
       if (!validStatuses.includes(status)) return res.status(400).json({ success: false, error: 'Invalid status' });
-      if (target.id === req.user!.id && status === 'suspended') {
+      if (target.id === (req as any).user?.id && status === 'suspended') {
         return res.status(400).json({ success: false, error: 'Không thể tự khóa tài khoản admin' });
       }
       updates.push('status = ?');
@@ -167,13 +168,13 @@ router.patch('/:id', (req: AuthRequest, res: Response) => {
     db.prepare(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`).run(...values);
 
     const updated = db.prepare('SELECT * FROM users WHERE id = ?').get(target.id) as UserRow;
-    auditLog(req.user!.id, 'admin_update_user', req, { targetId: target.id, changes: req.body });
+    auditLog((req as any).user?.id, 'admin_update_user', req, { targetId: target.id, changes: req.body });
     const changes = Object.keys(req.body).filter((k) => req.body[k] !== undefined).join(', ');
     logActivity(
       status === 'suspended' ? 'warn' : 'info',
       `Admin updated ${target.email}: ${changes}`,
       'User Management',
-      req.user!.email
+      (req as any).user?.email
     );
 
     res.json({ success: true, data: { user: toPublicUser(updated) } });
@@ -185,25 +186,25 @@ router.patch('/:id', (req: AuthRequest, res: Response) => {
 
 // ============== DELETE /api/users/:id ==============
 
-router.delete('/:id', (req: AuthRequest, res: Response) => {
+router.delete('/:id', (req: Request, res: Response) => {
   const target = db.prepare('SELECT * FROM users WHERE id = ?').get(req.params.id) as UserRow | undefined;
   if (!target) {
     return res.status(404).json({ success: false, error: 'User not found' });
   }
-  if (target.id === req.user!.id) {
+  if (target.id === (req as any).user?.id) {
     return res.status(400).json({ success: false, error: 'Không thể tự xóa' });
   }
 
   db.prepare('DELETE FROM users WHERE id = ?').run(target.id);
-  auditLog(req.user!.id, 'admin_delete_user', req, { targetId: target.id, email: target.email });
-  logActivity('warn', `Admin deleted user: ${target.email}`, 'User Management', req.user!.email);
+  auditLog((req as any).user?.id, 'admin_delete_user', req, { targetId: target.id, email: target.email });
+  logActivity('warn', `Admin deleted user: ${target.email}`, 'User Management', (req as any).user?.email);
 
   res.json({ success: true });
 });
 
 // ============== GET /api/users/stats/overview ==============
 
-router.get('/stats/overview', (_req: AuthRequest, res: Response) => {
+router.get('/stats/overview', (_req: Request, res: Response) => {
   const stats = db.prepare(`
     SELECT
       COUNT(*) as total,

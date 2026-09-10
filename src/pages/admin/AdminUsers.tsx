@@ -1,6 +1,7 @@
-import { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { AdminLayout } from './AdminLayout';
 import { getAccessToken, getRefreshToken } from '../../lib/api';
+import { useAuthStore } from '@/stores';
 import { useTranslation } from '@/lib/translations';
 import clsx from 'clsx';
 import {
@@ -14,7 +15,7 @@ interface User {
   id: string;
   email: string;
   name: string;
-  role: 'admin' | 'user';
+  role: 'admin' | 'super_admin' | 'user';
   plan: 'free' | 'pro' | 'enterprise';
   status: 'active' | 'pending' | 'suspended';
   provider: 'email' | 'google';
@@ -25,7 +26,7 @@ interface User {
 }
 
 type FilterStatus = 'all' | 'active' | 'pending' | 'suspended';
-type FilterRole = 'all' | 'admin' | 'user';
+type FilterRole = 'all' | 'admin' | 'super_admin' | 'user';
 
 interface CreatedUserResult {
   user: { id: string; email: string; name: string; role: string; plan: string };
@@ -43,6 +44,10 @@ export default function AdminUsers() {
   const pageSize = 20;
   const [totalUsers, setTotalUsers] = useState(0);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+  // Check if current user is Super Admin
+  const currentUser = useAuthStore((s) => s.user);
+  const isSuperAdmin = currentUser?.role === 'super_admin';
 
   // ─── Auth helper with auto-refresh + friendly error ───
   const adminFetch = useCallback(async (path: string, init: RequestInit = {}, retry = true): Promise<any> => {
@@ -299,7 +304,7 @@ export default function AdminUsers() {
       suspended: t('admin.users.locked'),
     };
     return (
-      <span className={clsx('px-2 py-0.5 rounded-full text-xs font-bold border', styles[status])}>
+      <span className={clsx('px-2 py-0.5 rounded-full text-[10px] font-bold border whitespace-nowrap shrink-0', styles[status])}>
         {labelKeys[status]}
       </span>
     );
@@ -307,12 +312,14 @@ export default function AdminUsers() {
 
   const getRoleBadge = (role: User['role']) => (
     <span className={clsx(
-      'px-2 py-0.5 rounded-full text-xs font-black border-2 border-black',
-      role === 'admin'
+      'px-2 py-0.5 rounded-full text-[10px] font-black border-2 border-black whitespace-nowrap shrink-0',
+      role === 'super_admin'
+        ? 'bg-gradient-to-r from-yellow-400 via-orange-500 to-red-500 text-white'
+        : role === 'admin'
         ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white'
         : 'bg-slate-100 text-slate-600'
     )}>
-      {role === 'admin' ? `👑 ${t('admin.users.admin')}` : `👤 ${t('admin.users.staff')}`}
+      {role === 'super_admin' ? `⭐ Super Admin` : role === 'admin' ? `👑 ${t('admin.users.admin')}` : `👤 ${t('admin.users.staff')}`}
     </span>
   );
 
@@ -323,7 +330,7 @@ export default function AdminUsers() {
       enterprise: 'bg-gradient-to-r from-amber-400 to-orange-500 text-white',
     };
     return (
-      <span className={clsx('px-2 py-0.5 rounded-full text-xs font-bold', styles[plan])}>
+      <span className={clsx('px-2 py-0.5 rounded-full text-[10px] font-bold whitespace-nowrap shrink-0', styles[plan])}>
         {plan.toUpperCase()}
       </span>
     );
@@ -364,8 +371,21 @@ export default function AdminUsers() {
               Xem, khóa, xóa và <b>tạo tài khoản cho nhân viên</b> trong hệ thống.
             </p>
           </div>
-          {/* Primary CTA: create user */}
-          <div className="relative z-10 py-6 px-6">
+          {/* Role Badge + Create User Button */}
+          <div className="relative z-10 py-6 px-6 flex items-center gap-3">
+            {/* Role Badge */}
+            {isSuperAdmin ? (
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gradient-to-r from-amber-400 to-orange-500 text-white shadow">
+                <ShieldCheck className="w-4 h-4" />
+                <span className="font-bold text-sm">Super Admin</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-primary/10 border border-primary/30 text-primary">
+                <Shield className="w-4 h-4" />
+                <span className="font-bold text-sm">Admin</span>
+                <span className="text-xs opacity-70">(Limited)</span>
+              </div>
+            )}
             <button
               onClick={() => {
                 setCreateError('');
@@ -647,7 +667,7 @@ export default function AdminUsers() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-                    Role
+                    Role {!isSuperAdmin && <span className="text-amber-500 text-[10px]">(Super Admin only)</span>}
                   </label>
                   <select
                     value={createForm.role}
@@ -655,7 +675,11 @@ export default function AdminUsers() {
                     className="w-full px-3 py-2.5 rounded-lg border-2 border-black font-medium text-sm bg-white"
                   >
                     <option value="user">👤 {t('admin.users.staff')}</option>
-                    <option value="admin">👑 {t('admin.users.admin')}</option>
+                    {isSuperAdmin && (
+                      <>
+                        <option value="admin">👑 {t('admin.users.admin')}</option>
+                      </>
+                    )}
                   </select>
                 </div>
                 <div>

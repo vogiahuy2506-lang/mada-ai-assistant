@@ -44,8 +44,6 @@ async function initSeedData() {
           madaCategory: product.category,
           botId: getBotIdForCategory(product.category),
           itemId: product.id,
-          thumbnailUrl: product.thumbnailUrl || '',
-          galleryImages: product.galleryImages || [],
           postId: product.madaId,
           slug: product.madaId,
           brand: product.manufacturer?.vi || '',

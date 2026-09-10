@@ -50,7 +50,7 @@ function main() {
   let totalToDelete = 0;
   const toDelete: string[] = [];
 
-  for (const [key, items] of groups) {
+  for (const [_key, items] of groups) {
     if (items.length <= 1) continue;
 
     // Sort: indexed=1 trước, rồi created_at mới nhất

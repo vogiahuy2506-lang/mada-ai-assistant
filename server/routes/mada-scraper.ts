@@ -44,7 +44,7 @@ router.post('/scrape', async (req, res) => {
           maxPages: pages,
           language,
           ingest,
-          onProgress: (msg) => {
+          onProgress: (_msg) => {
             // We could push to a job-state store; for now, log
           },
         });

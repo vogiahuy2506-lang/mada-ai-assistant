@@ -7,7 +7,7 @@
  * - Các nguồn AT khác
  */
 
-import cron from 'node-cron';
+import cron, { ScheduledTask } from 'node-cron';
 import { logActivity } from '../index';
 
 interface ScrapingJob {
@@ -69,7 +69,7 @@ let schedulerConfig: SchedulerConfig = {
   isRunning: false,
 };
 
-const activeJobs: Map<string, cron.ScheduledTask> = new Map();
+const activeJobs: Map<string, ScheduledTask> = new Map();
 
 // ============== SCRAPING FUNCTIONS ==============
 
@@ -200,7 +200,6 @@ function scheduleJob(job: ScrapingJob): void {
   const task = cron.schedule(job.schedule, () => {
     runScrapingJob(job);
   }, {
-    scheduled: true,
     timezone: process.env.TIMEZONE || 'Asia/Qatar',
   });
 
@@ -369,20 +368,19 @@ export function scheduleDailySummary(): void {
   cron.schedule('0 8 * * *', () => {
     const status = getSchedulerStatus();
     const failedJobs = status.jobs.filter(j => j.lastStatus === 'failed');
-    
+
     if (failedJobs.length > 0) {
-      logActivity('warn', 
-        `Daily summary: ${failedJobs.length}/${status.jobs.length} jobs failed yesterday`, 
+      logActivity('warn',
+        `Daily summary: ${failedJobs.length}/${status.jobs.length} jobs failed yesterday`,
         'ScraperScheduler'
       );
     } else {
-      logActivity('success', 
-        `Daily summary: All ${status.jobs.length} scraping jobs completed successfully`, 
+      logActivity('success',
+        `Daily summary: All ${status.jobs.length} scraping jobs completed successfully`,
         'ScraperScheduler'
       );
     }
   }, {
-    scheduled: true,
     timezone: process.env.TIMEZONE || 'Asia/Qatar',
   });
 }

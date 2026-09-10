@@ -15,7 +15,6 @@
 import * as cheerio from 'cheerio';
 import db from '../lib/db';
 
-const BASE_URL = 'https://at.mada.org.qa';
 const USER_AGENT = 'Mozilla/5.0 (compatible; MADA-AI-Bot/1.0; +https://mada.digiso.vn)';
 
 const args = process.argv.slice(2);

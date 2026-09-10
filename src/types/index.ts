@@ -1,5 +1,5 @@
 // User Roles
-export type UserRole = 'admin' | 'data_manager' | 'expert' | 'user';
+export type UserRole = 'admin' | 'super_admin' | 'data_manager' | 'expert' | 'user';
 
 // Plan tier for paywall
 export type UserPlan = 'free' | 'pro' | 'enterprise';

@@ -1,4 +1,4 @@
-import { Router, Response } from 'express';
+import { Router, Request, Response } from 'express';
 import { randomUUID } from 'crypto';
 import db, { UserRow } from '../lib/db';
 import {
@@ -178,33 +178,36 @@ router.post('/refresh', async (req, res) => {
 
 // ============== GET /api/auth/me ==============
 
-router.get('/me', authenticate, (req: AuthRequest, res: Response) => {
+router.get('/me', authenticate as any, (req: Request, res: Response) => {
+  const authReq = req as AuthRequest;
   res.json({
     success: true,
-    data: { user: toPublicUser(req.user!) },
+    data: { user: toPublicUser(authReq.user!) },
   });
 });
 
 // ============== POST /api/auth/logout ==============
 
-router.post('/logout', authenticate, (req: AuthRequest, res: Response) => {
+router.post('/logout', authenticate as any, (req: Request, res: Response) => {
+  const authReq = req as AuthRequest;
   const { refreshToken } = req.body;
   if (refreshToken) {
     deleteSession(refreshToken);
   } else {
-    deleteAllUserSessions(req.user!.id);
+    deleteAllUserSessions(authReq.user!.id);
   }
-  auditLog(req.user!.id, 'logout', req);
-  logActivity('info', `User logged out: ${req.user!.email}`, 'Auth Service', req.user!.email);
+  auditLog(authReq.user!.id, 'logout', req);
+  logActivity('info', `User logged out: ${authReq.user!.email}`, 'Auth Service', authReq.user!.email);
   res.json({ success: true });
 });
 
 // ============== PUT /api/auth/profile ==============
 
-router.put('/profile', authenticate, (req: AuthRequest, res: Response) => {
+router.put('/profile', authenticate as any, (req: Request, res: Response) => {
+  const authReq = req as AuthRequest;
   try {
     const { name, avatar } = req.body;
-    const user = req.user!;
+    const user = authReq.user!;
 
     if (name !== undefined) {
       if (!name.trim() || name.length > 100) {
@@ -243,10 +246,11 @@ router.put('/profile', authenticate, (req: AuthRequest, res: Response) => {
 
 // ============== PUT /api/auth/password ==============
 
-router.put('/password', authenticate, (req: AuthRequest, res: Response) => {
+router.put('/password', authenticate as any, (req: Request, res: Response) => {
+  const authReq = req as AuthRequest;
   try {
     const { currentPassword, newPassword } = req.body;
-    const user = req.user!;
+    const user = authReq.user!;
 
     if (!currentPassword || !verifyPassword(currentPassword, user.password_hash)) {
       return res.status(401).json({ success: false, error: 'Mật khẩu hiện tại không đúng' });
@@ -290,7 +294,7 @@ router.get('/google/url', (_req, res) => {
 });
 
 // Alias for frontend compatibility (direct redirect)
-router.get('/google', (req, res) => {
+router.get('/google', (_req, res) => {
   if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
     return res.status(503).json({ 
       success: false, 

@@ -12,32 +12,6 @@ const router = express.Router();
 
 // ============== TYPES ==============
 
-interface ProductRow {
-  id: string;
-  title: string;
-  title_en: string;
-  description: string;
-  description_en: string;
-  content: string;
-  category: string;
-  brand: string;
-  model: string;
-  price_range: string;
-  source_url: string;
-  product_url: string;
-  image_url: string;
-  iso_codes: string;
-  wcag_level: string;
-  who_gate_area: string;
-  status: 'draft' | 'published' | 'archived';
-  featured: number;
-  sort_order: number;
-  language: string;
-  created_by: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
 interface CategoryRow {
   id: string;
   name_vi: string;

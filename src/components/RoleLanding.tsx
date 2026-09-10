@@ -70,10 +70,9 @@ export function RoleLanding() {
   }
 
   switch (user.role) {
+    case 'super_admin':
     case 'admin':
       return <Navigate to="/admin" replace />;
-    case 'expert':
-      return <Navigate to="/expert" replace />;
     case 'data_manager':
       return <Navigate to="/data" replace />;
     default:

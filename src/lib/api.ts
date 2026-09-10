@@ -5,7 +5,7 @@ export interface ApiUser {
   id: string;
   email: string;
   name: string;
-  role: 'admin' | 'data_manager' | 'expert' | 'user';
+  role: 'admin' | 'super_admin' | 'data_manager' | 'expert' | 'user';
   plan: 'free' | 'pro' | 'enterprise';
   status: 'active' | 'suspended' | 'pending';
   provider: string;

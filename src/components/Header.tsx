@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useLanguageStore, useThemeStore, useAuthStore, useAuthModalStore } from '@/stores';
 import { LANGUAGE_NAMES, type Language } from '@/types';
 import { t } from '@/lib/translations';
@@ -11,6 +11,7 @@ export function Header() {
   const { isDark, toggleTheme } = useThemeStore();
   const { user, logout } = useAuthStore();
   const authModal = useAuthModalStore();
+  const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
 
@@ -27,14 +28,12 @@ export function Header() {
   // Navigation links với translation
   const navLinks = [
     { href: '/products', label: 'Sản phẩm' },
-    { href: '/search', label: 'Tìm kiếm' },
-    { href: '/compare', label: 'So sánh' },
-    { href: '/pricing', label: t('nav.pricing', language) },
   ];
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     setIsProfileMenuOpen(false);
+    navigate('/');
   };
 
   const isAdmin = user?.role === 'admin';
@@ -97,14 +96,6 @@ export function Header() {
                       {t('menu.admin', language)}
                     </Link>
                   )}
-                  <Link
-                    to="/pricing"
-                    onClick={() => setIsProfileMenuOpen(false)}
-                    className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-surface-container text-sm transition-colors"
-                  >
-                    <Sparkles className="w-4 h-4" />
-                    {t('menu.upgrade', language)}
-                  </Link>
                   <hr className="my-1 border-outline-variant" />
                   <button
                     onClick={handleLogout}

@@ -22,7 +22,7 @@ export interface IngestionResult {
 }
 
 export interface DataSource {
-  type: 'pdf' | 'web' | 'text' | 'file' | 'image' | 'docx';
+  type: 'pdf' | 'web' | 'text' | 'file' | 'image' | 'docx' | 'xlsx' | 'csv';
   content: string;        // text content hoặc absolute file path
   source: string;         // URL hoặc tên file
   title?: string;

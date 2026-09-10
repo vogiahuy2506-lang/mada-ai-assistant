@@ -83,6 +83,7 @@ import consultationRoutes from './routes/consultation';
 import adminRoutes from './routes/admin';
 import adminScraperRoutes from './routes/admin-scraper';
 import promptsRoutes from './routes/prompts';
+import promptTemplatesRoutes from './routes/prompt-templates';
 import urlImportRoutes from './routes/urlImport';
 import publicRoutes from './routes/public';
 
@@ -91,7 +92,7 @@ dotenv.config({ path: path.resolve(__dirname, '../.env') });
 dotenv.config(); // fallback to local .env if any
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3002;
 
 // Middleware
 app.use(express.json({ limit: '50mb' })); // Support large files
@@ -467,7 +468,7 @@ export function logActivity(level: ActivityLog['level'], message: string, source
 }
 
 // Seed bootstrapping logs
-logActivity('info', 'MADA AI Server started on port ' + (process.env.PORT || 3000), 'System');
+logActivity('info', 'MADA AI Server started on port ' + (process.env.PORT || 8080), 'System');
 logActivity('info', 'Vector store initialized with 65 documents', 'RAG Engine');
 logActivity('success', 'Auth service configured (SQLite + JWT + bcrypt)', 'Auth Service');
 logActivity('info', 'CORS policy: any localhost port allowed (dev)', 'Security');
@@ -482,8 +483,13 @@ app.use('/api/consultation', consultationRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/admin/scraper', adminScraperRoutes);
 app.use('/api/admin/prompts', promptsRoutes);
+app.use('/api/admin/prompt-templates', promptTemplatesRoutes);
 // Public routes (no auth required)
 app.use('/api/public', publicRoutes);
+
+// ============== WIDGET CONFIG ROUTES ==============
+import widgetRoutes from './routes/widget';
+app.use('/api/widget', widgetRoutes);
 app.get('/api/admin/logs', async (req, res) => {
   try {
     const { level, source, limit = '100' } = req.query;
@@ -4667,7 +4673,7 @@ app.post('/api/consultation', async (req, res) => {
 });
 
 // Get all consultation requests (admin only)
-app.get('/api/consultation', async (req, res) => {
+app.get('/api/consultation', authenticate as any, requireRole('admin', 'super_admin') as any, async (req, res) => {
   try {
     const { status } = req.query;
     let filtered = [...consultationRequests];
@@ -4689,7 +4695,7 @@ app.get('/api/consultation', async (req, res) => {
 });
 
 // Update consultation status (admin only)
-app.patch('/api/consultation/:id', async (req, res) => {
+app.patch('/api/consultation/:id', authenticate as any, requireRole('admin', 'super_admin') as any, async (req, res) => {
   try {
     const { id } = req.params;
     const { status } = req.body;

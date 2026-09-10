@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Mail, Lock, User as UserIcon, X, Eye, EyeOff, Loader2 } from 'lucide-react';
 import madaLogo from '@/assets/mada-logo.png';
@@ -97,7 +97,6 @@ export function AuthModal() {
         const u = useAuthStore.getState().user;
         console.log('👤 User after login:', u);
         if (u?.role === 'admin') navigate('/admin');
-        else if (u?.role === 'expert') navigate('/expert');
         else if (u?.role === 'data_manager') navigate('/data');
         else navigate('/');
       }, 50);
@@ -113,7 +112,7 @@ export function AuthModal() {
     setLoading(true);
     setError(null);
     try {
-      window.location.href = `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/auth/google`;
+      window.location.href = `${import.meta.env.VITE_API_URL || 'http://localhost:3002'}/api/auth/google`;
     } catch (err) {
       console.error('Google auth error:', err);
       setError('Có lỗi khi đăng nhập Google. Vui lòng thử lại.');

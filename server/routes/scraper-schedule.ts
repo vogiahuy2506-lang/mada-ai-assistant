@@ -4,8 +4,8 @@
  * API endpoints để quản lý scraping schedules
  */
 
-import { Router, Response } from 'express';
-import { authenticate, requireRole, AuthRequest } from '../lib/auth';
+import { Router, Request, Response } from 'express';
+import { authenticate, requireRole } from '../lib/auth';
 import { 
   getSchedulerStatus, 
   addScrapingJob, 
@@ -21,11 +21,12 @@ import {
 const router = Router();
 
 // All routes require admin or data_manager role
-router.use(authenticate, requireRole('admin', 'data_manager'));
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+router.use(authenticate as any, requireRole('admin', 'data_manager') as any);
 
 // ============== GET /api/scraper/schedule =============
 
-router.get('/schedule', (req: AuthRequest, res: Response) => {
+router.get('/schedule', (_req: Request, res: Response) => {
   try {
     const status = getSchedulerStatus();
     res.json({
@@ -39,7 +40,7 @@ router.get('/schedule', (req: AuthRequest, res: Response) => {
 
 // ============== POST /api/scraper/schedule/jobs =============
 
-router.post('/schedule/jobs', (req: AuthRequest, res: Response) => {
+router.post('/schedule/jobs', (req: Request, res: Response) => {
   try {
     const { name, url, category, schedule, enabled = true } = req.body;
     
@@ -79,7 +80,7 @@ router.post('/schedule/jobs', (req: AuthRequest, res: Response) => {
 
 // ============== PUT /api/scraper/schedule/jobs/:jobId =============
 
-router.put('/schedule/jobs/:jobId', (req: AuthRequest, res: Response) => {
+router.put('/schedule/jobs/:jobId', (req: Request, res: Response) => {
   try {
     const { jobId } = req.params;
     const updates = req.body;
@@ -116,7 +117,7 @@ router.put('/schedule/jobs/:jobId', (req: AuthRequest, res: Response) => {
 
 // ============== DELETE /api/scraper/schedule/jobs/:jobId =============
 
-router.delete('/schedule/jobs/:jobId', (req: AuthRequest, res: Response) => {
+router.delete('/schedule/jobs/:jobId', (req: Request, res: Response) => {
   try {
     const { jobId } = req.params;
     
@@ -140,7 +141,7 @@ router.delete('/schedule/jobs/:jobId', (req: AuthRequest, res: Response) => {
 
 // ============== POST /api/scraper/schedule/jobs/:jobId/toggle =============
 
-router.post('/schedule/jobs/:jobId/toggle', (req: AuthRequest, res: Response) => {
+router.post('/schedule/jobs/:jobId/toggle', (req: Request, res: Response) => {
   try {
     const { jobId } = req.params;
     const { enabled } = req.body;
@@ -165,7 +166,7 @@ router.post('/schedule/jobs/:jobId/toggle', (req: AuthRequest, res: Response) =>
 
 // ============== POST /api/scraper/schedule/jobs/:jobId/run =============
 
-router.post('/schedule/jobs/:jobId/run', async (req: AuthRequest, res: Response) => {
+router.post('/schedule/jobs/:jobId/run', async (req: Request, res: Response) => {
   try {
     const { jobId } = req.params;
     
@@ -185,7 +186,7 @@ router.post('/schedule/jobs/:jobId/run', async (req: AuthRequest, res: Response)
 
 // ============== POST /api/scraper/schedule/run-all =============
 
-router.post('/schedule/run-all', async (req: AuthRequest, res: Response) => {
+router.post('/schedule/run-all', async (_req: Request, res: Response) => {
   try {
     // Run all jobs asynchronously
     runAllJobsNow().catch(err => {
@@ -203,7 +204,7 @@ router.post('/schedule/run-all', async (req: AuthRequest, res: Response) => {
 
 // ============== POST /api/scraper/schedule/start =============
 
-router.post('/schedule/start', (req: AuthRequest, res: Response) => {
+router.post('/schedule/start', (_req: Request, res: Response) => {
   try {
     startScheduler();
     
@@ -218,7 +219,7 @@ router.post('/schedule/start', (req: AuthRequest, res: Response) => {
 
 // ============== POST /api/scraper/schedule/stop =============
 
-router.post('/schedule/stop', (req: AuthRequest, res: Response) => {
+router.post('/schedule/stop', (_req: Request, res: Response) => {
   try {
     stopScheduler();
     

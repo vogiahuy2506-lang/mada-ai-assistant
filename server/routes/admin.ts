@@ -18,8 +18,28 @@ function requireAdmin(req: any, res: any, next: any) {
   try {
     const token = auth.split(' ')[1];
     const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
-    if (payload.role !== 'admin') {
+    // Allow both admin and super_admin to access admin routes
+    if (!['admin', 'super_admin'].includes(payload.role)) {
       return res.status(403).json({ success: false, error: 'Admin access required' });
+    }
+    req.user = payload;
+    next();
+  } catch {
+    return res.status(401).json({ success: false, error: 'Invalid token' });
+  }
+}
+
+// Middleware: require super_admin authentication (highest privilege)
+function requireSuperAdmin(req: any, res: any, next: any) {
+  const auth = req.headers.authorization;
+  if (!auth || !auth.startsWith('Bearer ')) {
+    return res.status(401).json({ success: false, error: 'Unauthorized' });
+  }
+  try {
+    const token = auth.split(' ')[1];
+    const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
+    if (payload.role !== 'super_admin') {
+      return res.status(403).json({ success: false, error: 'Super Admin access required' });
     }
     req.user = payload;
     next();
@@ -502,9 +522,10 @@ router.post('/agents', requireAdmin, (req, res) => {
         id, name, description, avatar, system_prompt, capabilities, is_active,
         created_by, mada_category, bot_id, prompt_id,
         avatar_url, knowledge_url, product_url,
+        last_crawl_at, last_crawl_status, last_crawl_count,
         created_at, updated_at
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       agentId,
       name,
@@ -520,6 +541,9 @@ router.post('/agents', requireAdmin, (req, res) => {
       avatar_url || null,
       knowledge_url || null,
       product_url || null,
+      null, // last_crawl_at
+      null, // last_crawl_status
+      0,    // last_crawl_count
       now,
       now
     );
@@ -965,9 +989,16 @@ router.get('/logs', requireAdmin, (req, res) => {
   }
 });
 
-// DELETE /api/admin/logs
-router.delete('/logs', requireAdmin, (_req, res) => {
+// DELETE /api/admin/logs - Only Super Admin can delete logs
+router.delete('/logs', requireAdmin, (req, res) => {
   try {
+    // Only super_admin can delete logs
+    if (req.user.role !== 'super_admin') {
+      return res.status(403).json({ 
+        success: false, 
+        error: 'Chỉ Super Admin mới có quyền xóa logs' 
+      });
+    }
     db.prepare('DELETE FROM admin_system_logs').run();
     res.json({ success: true, message: 'Logs cleared successfully' });
   } catch (error: any) {
@@ -1221,10 +1252,33 @@ router.patch('/settings', requireAdmin, (req, res) => {
     const updates = req.body;
     const now = new Date().toISOString();
     
+    // Define sensitive settings that only super_admin can modify
+    const sensitiveSettings = [
+      'require_2fa',
+      'allowed_ip_whitelist',
+      'audit_log_retention_days',
+      'max_users',
+      'max_agents',
+      'max_storage_per_user',
+      'allowed_email_domains',
+      'maintenance_mode', // Only super_admin can enable maintenance mode
+      'maintenance_message',
+    ];
+    
+    // Check if any sensitive settings are being updated
+    const sensitiveUpdates = Object.keys(updates).filter(key => sensitiveSettings.includes(key));
+    
+    if (sensitiveUpdates.length > 0 && req.user.role !== 'super_admin') {
+      return res.status(403).json({ 
+        success: false, 
+        error: 'Chỉ Super Admin mới có quyền thay đổi cài đặt hệ thống nhạy cảm' 
+      });
+    }
+    
     const stmt = db.prepare(`
-      INSERT INTO system_settings (key, value, type, updated_at)
-      VALUES (?, ?, ?)
-      ON CONFLICT(key) DO UPDATE SET value = ?, updated_at = ?
+      INSERT INTO system_settings (key, value, type, description, updated_at)
+      VALUES (?, ?, ?, ?, ?)
+      ON CONFLICT(key) DO UPDATE SET value = ?, type = ?, description = ?, updated_at = ?
     `);
     
     for (const [key, value] of Object.entries(updates)) {
@@ -1242,7 +1296,9 @@ router.patch('/settings', requireAdmin, (req, res) => {
         strValue = JSON.stringify(value);
       }
       
-      stmt.run(key, strValue, type, strValue, now);
+      // 5 values for INSERT: key, value, type, description, updated_at
+      // 4 values for UPDATE: value, type, description, updated_at
+      stmt.run(key, strValue, type, '', now, strValue, type, '', now);
     }
     
     res.json({ success: true, message: 'Settings updated successfully' });
@@ -1474,6 +1530,15 @@ router.put('/users/:id/status', requireAdmin, (req, res) => {
 router.put('/users/:id/role', requireAdmin, (req, res) => {
   try {
     const { role } = req.body;
+    
+    // Only super_admin can promote user to admin
+    if (role === 'admin' && req.user.role !== 'super_admin') {
+      return res.status(403).json({ 
+        success: false, 
+        error: 'Chỉ Super Admin mới có quyền thăng cấp User thành Admin' 
+      });
+    }
+    
     if (!['admin', 'user'].includes(role)) {
       return res.status(400).json({ success: false, error: 'Invalid role' });
     }
@@ -1481,6 +1546,22 @@ router.put('/users/:id/role', requireAdmin, (req, res) => {
     const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.params.id) as any;
     if (!user) {
       return res.status(404).json({ success: false, error: 'User not found' });
+    }
+    
+    // Cannot change role of another super_admin
+    if (user.role === 'super_admin') {
+      return res.status(403).json({ 
+        success: false, 
+        error: 'Không thể thay đổi role của Super Admin' 
+      });
+    }
+    
+    // Cannot demote self
+    if (req.params.id === req.user.id) {
+      return res.status(403).json({ 
+        success: false, 
+        error: 'Không thể tự thay đổi role của chính mình' 
+      });
     }
     
     db.prepare('UPDATE users SET role = ?, updated_at = ? WHERE id = ?')
@@ -1612,6 +1693,301 @@ router.post('/users', requireAdmin, (req, res) => {
           : 'Tạo tài khoản thành công.',
       },
     });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+
+// ============== CHAT CUSTOMIZATION SETTINGS ==============
+
+// GET /api/admin/chat-settings
+router.get('/chat-settings', requireAdmin, (_req, res) => {
+  try {
+    const keys = [
+      'chat_greeting_vi', 'chat_greeting_en', 'chat_greeting_ar', 'chat_greeting_fr',
+      'chat_description_vi', 'chat_description_en', 'chat_description_ar', 'chat_description_fr',
+      'feature_file_attachment_enabled',
+      'suggested_prompts'
+    ];
+    
+    const placeholders = keys.map(() => '?').join(',');
+    const settings = db.prepare(`SELECT key, value, type FROM system_settings WHERE key IN (${placeholders})`).all(...keys) as any[];
+    
+    const result: Record<string, any> = {};
+    for (const s of settings) {
+      if (s.type === 'boolean') {
+        result[s.key] = s.value === 'true';
+      } else if (s.type === 'json') {
+        result[s.key] = JSON.parse(s.value);
+      } else {
+        result[s.key] = s.value;
+      }
+    }
+    
+    res.json({ success: true, data: result });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// PUT /api/admin/chat-settings
+router.put('/chat-settings', requireAdmin, (req, res) => {
+  try {
+    const updates = req.body;
+    const now = new Date().toISOString();
+    
+    const stmt = db.prepare(`
+      INSERT INTO system_settings (key, value, type, description, updated_at)
+      VALUES (?, ?, ?, ?, ?)
+      ON CONFLICT(key) DO UPDATE SET value = ?, type = ?, description = ?, updated_at = ?
+    `);
+    
+    for (const [key, value] of Object.entries(updates)) {
+      let type = 'string';
+      let strValue = String(value);
+      
+      if (typeof value === 'number') {
+        type = 'number';
+      } else if (typeof value === 'boolean') {
+        type = 'boolean';
+        strValue = String(value);
+      } else if (typeof value === 'object') {
+        type = 'json';
+        strValue = JSON.stringify(value);
+      }
+      
+      // 5 values for INSERT: key, value, type, description, updated_at
+      // 4 values for UPDATE: value, type, description, updated_at
+      stmt.run(key, strValue, type, '', now, strValue, type, '', now);
+    }
+    
+    res.json({ success: true, message: 'Chat settings updated successfully' });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// GET /api/admin/chat-settings/public - Public endpoint for chat page
+router.get('/chat-settings/public', (_req, res) => {
+  try {
+    const keys = [
+      'chat_greeting_vi', 'chat_greeting_en', 'chat_greeting_ar', 'chat_greeting_fr',
+      'chat_description_vi', 'chat_description_en', 'chat_description_ar', 'chat_description_fr',
+      'feature_file_attachment_enabled',
+      'suggested_prompts',
+      'ai_system_instruction',
+    ];
+    
+    const placeholders = keys.map(() => '?').join(',');
+    const settings = db.prepare(`SELECT key, value, type FROM system_settings WHERE key IN (${placeholders})`).all(...keys) as any[];
+    
+    const result: Record<string, any> = {};
+    for (const s of settings) {
+      if (s.type === 'boolean') {
+        result[s.key] = s.value === 'true';
+      } else if (s.type === 'json') {
+        result[s.key] = JSON.parse(s.value);
+      } else {
+        result[s.key] = s.value;
+      }
+    }
+    
+    res.json({ success: true, data: result });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ============== AI SYSTEM INSTRUCTIONS (Super Admin only) ==============
+// GET /api/admin/ai-instructions — lấy AI system instructions
+router.get('/ai-instructions', requireAdmin, (req, res) => {
+  try {
+    const rows = db.prepare("SELECT * FROM system_settings WHERE `key` LIKE 'ai_instruction_%' ORDER BY `key` ASC").all() as any[];
+    const result: Record<string, any> = {};
+    for (const row of rows) {
+      if (row.type === 'boolean') {
+        result[row.key] = row.value === 'true';
+      } else if (row.type === 'json') {
+        result[row.key] = JSON.parse(row.value);
+      } else {
+        result[row.key] = row.value;
+      }
+    }
+    res.json({ success: true, data: result });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// PUT /api/admin/ai-instructions — cập nhật AI system instructions (super admin only)
+router.put('/ai-instructions', requireAdmin, (req, res) => {
+  try {
+    const { user } = req as any;
+    
+    // ⭐ Super admin only — kiểm tra role
+    if (user.role !== 'super_admin') {
+      return res.status(403).json({ 
+        success: false, 
+        error: 'Chỉ Super Admin mới có quyền thay đổi AI System Instructions.' 
+      });
+    }
+
+    const updates = req.body;
+    const now = new Date().toISOString();
+    
+    const stmt = db.prepare(`
+      INSERT INTO system_settings (key, value, type, description, updated_at)
+      VALUES (?, ?, ?, ?, ?)
+      ON CONFLICT(key) DO UPDATE SET value = ?, type = ?, description = ?, updated_at = ?
+    `);
+    
+    for (const [key, value] of Object.entries(updates)) {
+      if (!key.startsWith('ai_instruction_')) continue; // Chỉ cho phép ai_instruction_* keys
+      
+      let type = 'string';
+      let strValue = String(value);
+      
+      if (typeof value === 'number') {
+        type = 'number';
+      } else if (typeof value === 'boolean') {
+        type = 'boolean';
+        strValue = String(value);
+      } else if (typeof value === 'object') {
+        type = 'json';
+        strValue = JSON.stringify(value);
+      }
+      
+      // 5 values for INSERT: key, value, type, description, updated_at
+      // 4 values for UPDATE: value, type, description, updated_at
+      stmt.run(key, strValue, type, '', now, strValue, type, '', now);
+    }
+    
+    // ⭐ Invalidate AI instructions cache để thay đổi có hiệu lực ngay
+    try {
+      const { invalidateAiInstructionsCache } = require('../lib/prompts/systemPrompts');
+      invalidateAiInstructionsCache();
+    } catch (e) {
+      console.warn('[admin/ai-instructions] Failed to invalidate cache:', e);
+    }
+    
+    res.json({ success: true, message: 'AI System Instructions updated successfully' });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// GET /api/admin/ai-instructions/public — public endpoint cho chat page đọc AI instructions
+router.get('/ai-instructions/public', (_req, res) => {
+  try {
+    const rows = db.prepare("SELECT key, value, type FROM system_settings WHERE `key` LIKE 'ai_instruction_%'").all() as any[];
+    const result: Record<string, any> = {};
+    for (const row of rows) {
+      if (row.type === 'boolean') {
+        result[row.key] = row.value === 'true';
+      } else if (row.type === 'json') {
+        result[row.key] = JSON.parse(row.value);
+      } else {
+        result[row.key] = row.value;
+      }
+    }
+    res.json({ success: true, data: result });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ⭐ ============== EMOTION SETTINGS (Super Admin only) ==============
+// GET /api/admin/emotion-settings — lấy emotion settings
+router.get('/emotion-settings', requireAdmin, (req, res) => {
+  try {
+    const rows = db.prepare("SELECT * FROM system_settings WHERE `key` LIKE 'emotion_%' ORDER BY `key` ASC").all() as any[];
+    const result: Record<string, any> = {};
+    for (const row of rows) {
+      if (row.type === 'boolean') {
+        result[row.key] = row.value === 'true';
+      } else if (row.type === 'json') {
+        result[row.key] = JSON.parse(row.value);
+      } else {
+        result[row.key] = row.value;
+      }
+    }
+    res.json({ success: true, data: result });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// PUT /api/admin/emotion-settings — cập nhật emotion settings (super admin only)
+router.put('/emotion-settings', requireAdmin, (req, res) => {
+  try {
+    const { user } = req as any;
+
+    // ⭐ Super admin only — kiểm tra role
+    if (user.role !== 'super_admin') {
+      return res.status(403).json({
+        success: false,
+        error: 'Chỉ Super Admin mới có quyền thay đổi Emotion Settings.'
+      });
+    }
+
+    const updates = req.body;
+    const now = new Date().toISOString();
+
+    const stmt = db.prepare(`
+      INSERT INTO system_settings (key, value, type, description, updated_at)
+      VALUES (?, ?, ?, ?, ?)
+      ON CONFLICT(key) DO UPDATE SET value = ?, type = ?, description = ?, updated_at = ?
+    `);
+
+    for (const [key, value] of Object.entries(updates)) {
+      if (!key.startsWith('emotion_')) continue; // Chỉ cho phép emotion_* keys
+
+      let type = 'string';
+      let strValue = String(value);
+
+      if (typeof value === 'number') {
+        type = 'number';
+      } else if (typeof value === 'boolean') {
+        type = 'boolean';
+        strValue = String(value);
+      } else if (typeof value === 'object') {
+        type = 'json';
+        strValue = JSON.stringify(value);
+      }
+
+      stmt.run(key, strValue, type, '', now, strValue, type, '', now);
+    }
+
+    // ⭐ Invalidate emotion settings cache
+    try {
+      const { invalidateEmotionSettingsCache } = require('../lib/prompts/systemPrompts');
+      invalidateEmotionSettingsCache();
+    } catch (e) {
+      console.warn('[admin/emotion-settings] Failed to invalidate cache:', e);
+    }
+
+    res.json({ success: true, message: 'Emotion Settings updated successfully' });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// GET /api/admin/emotion-settings/public — public endpoint cho chat page đọc emotion settings
+router.get('/emotion-settings/public', (_req, res) => {
+  try {
+    const rows = db.prepare("SELECT key, value, type FROM system_settings WHERE `key` LIKE 'emotion_%'").all() as any[];
+    const result: Record<string, any> = {};
+    for (const row of rows) {
+      if (row.type === 'boolean') {
+        result[row.key] = row.value === 'true';
+      } else if (row.type === 'json') {
+        result[row.key] = JSON.parse(row.value);
+      } else {
+        result[row.key] = row.value;
+      }
+    }
+    res.json({ success: true, data: result });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
   }

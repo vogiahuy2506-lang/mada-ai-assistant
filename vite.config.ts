@@ -4,7 +4,11 @@ import path from 'path'
 
 export default defineConfig({
   plugins: [react()],
-  optimizeDeps: { force: true, include: ["react", "react-dom", "react-dom/client", "zustand", "zustand/middleware"] },
+  optimizeDeps: {
+    include: ['react', 'react-dom', 'react-router-dom', 'zustand'],
+    // Exclude libraries that bundle their own React - causes "Cannot read properties of null" errors
+    exclude: ['mammoth', 'pdfjs-dist'],
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
@@ -12,13 +16,14 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    strictPort: false,
     proxy: {
       '/api': {
-        target: 'http://localhost:3001',
+        target: 'http://localhost:3002',
         changeOrigin: true,
       },
       '/ws': {
-        target: 'ws://localhost:3001',
+        target: 'ws://localhost:3002',
         ws: true,
       },
     },
@@ -26,19 +31,16 @@ export default defineConfig({
   build: {
     outDir: 'dist/client',
     emptyOutDir: true,
-    // Enable rollup analyzer
     rollupOptions: {
       output: {
         manualChunks: {
-          // Vendor chunks for better caching
           'vendor-react': ['react', 'react-dom', 'react-router-dom'],
           'vendor-lucide': ['lucide-react'],
           'vendor-utils': ['clsx', 'date-fns'],
         },
       },
     },
-    // Generate report.html for bundle analysis
     reportCompressedSize: true,
-    chunkSizeWarningLimit: 500, // Warning at 500kb
+    chunkSizeWarningLimit: 500,
   },
 })

@@ -9,7 +9,6 @@
 
 import db from './db';
 import { vectorStore } from './rag/vectorStore';
-import { getEmbeddingProvider } from './rag/vectorStore';
 
 export interface SyncVectorResult {
   success: boolean;

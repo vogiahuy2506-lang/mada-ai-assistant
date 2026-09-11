@@ -2,7 +2,6 @@
  * Worker process cho scraping - chạy riêng để tránh lỗi ESM
  */
 import { spawn } from 'child_process';
-import * as path from 'path';
 
 // __dirname is available globally in CJS
 

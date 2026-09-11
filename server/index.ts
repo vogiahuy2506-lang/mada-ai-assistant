@@ -1,8 +1,6 @@
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
-import path from 'path';
-import fs from 'fs';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { v4 as uuidv4 } from 'uuid';

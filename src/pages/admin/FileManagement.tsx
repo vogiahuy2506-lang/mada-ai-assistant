@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { useTranslation } from 'react-i18next';
 import { 
   Upload, Image, FileText, Video, Music, File, 
   Save, RefreshCw, CheckCircle, XCircle, Info
@@ -34,7 +33,6 @@ interface FileSettings {
 }
 
 const FileManagement: React.FC = () => {
-  const { t } = useTranslation();
   const [settings, setSettings] = useState<FileSettings>({
     fileAttachmentEnabled: true,
     imageUploadEnabled: true,
@@ -147,8 +145,8 @@ const FileManagement: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">{t('File Upload Management', 'Quản Lý Upload File')}</h1>
-          <p className="text-gray-500 mt-1">{t('Configure file upload features and limits', 'Cấu hình tính năng và giới hạn upload file')}</p>
+          <h1 className="text-2xl font-bold">Quản Lý Upload File</h1>
+          <p className="text-gray-500 mt-1">Cấu hình tính năng và giới hạn upload file</p>
         </div>
         <button
           onClick={saveSettings}
@@ -179,8 +177,8 @@ const FileManagement: React.FC = () => {
               <Upload className="w-8 h-8 text-primary" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold">{t('File Attachment Feature', 'Tính Năng Đính Kèm File')}</h2>
-              <p className="text-gray-500 text-sm">{t('Master switch for all file upload features', 'Công tắc chính cho tất cả tính năng upload file')}</p>
+              <h2 className="text-lg font-semibold">Tính Năng Đính Kèm File</h2>
+              <p className="text-gray-500 text-sm">Công tắc chính cho tất cả tính năng upload file</p>
             </div>
           </div>
           <ToggleSwitch
@@ -194,7 +192,7 @@ const FileManagement: React.FC = () => {
       <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
         <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
           <Info className="w-5 h-5 text-primary" />
-          {t('File Type Settings', 'Cài Đặt Loại File')}
+          Cài Đặt Loại File
         </h2>
         
         <div className="space-y-4">
@@ -205,7 +203,7 @@ const FileManagement: React.FC = () => {
                 <Image className="w-6 h-6 text-blue-600" />
               </div>
               <div>
-                <h3 className="font-medium">{t('Image Uploads', 'Upload Hình Ảnh')}</h3>
+                <h3 className="font-medium">Upload Hình Ảnh</h3>
                 <p className="text-gray-500 text-sm">JPG, JPEG, PNG, WEBP, BMP, TIFF, GIF</p>
               </div>
             </div>
@@ -223,7 +221,7 @@ const FileManagement: React.FC = () => {
                 <FileText className="w-6 h-6 text-red-600" />
               </div>
               <div>
-                <h3 className="font-medium">{t('Document Uploads', 'Upload Tài Liệu')}</h3>
+                <h3 className="font-medium">Upload Tài Liệu</h3>
                 <p className="text-gray-500 text-sm">PDF, DOC, DOCX, TXT, MD</p>
               </div>
             </div>
@@ -241,7 +239,7 @@ const FileManagement: React.FC = () => {
                 <Video className="w-6 h-6 text-purple-600" />
               </div>
               <div>
-                <h3 className="font-medium">{t('Video Uploads', 'Upload Video')}</h3>
+                <h3 className="font-medium">Upload Video</h3>
                 <p className="text-gray-500 text-sm">MP4, AVI, MOV, MKV, WebM</p>
               </div>
             </div>
@@ -259,7 +257,7 @@ const FileManagement: React.FC = () => {
                 <Music className="w-6 h-6 text-green-600" />
               </div>
               <div>
-                <h3 className="font-medium">{t('Audio Uploads', 'Upload Âm Thanh')}</h3>
+                <h3 className="font-medium">Upload Âm Thanh</h3>
                 <p className="text-gray-500 text-sm">MP3, WAV, AAC, OGG, M4A</p>
               </div>
             </div>
@@ -277,7 +275,7 @@ const FileManagement: React.FC = () => {
                 <File className="w-6 h-6 text-orange-600" />
               </div>
               <div>
-                <h3 className="font-medium">{t('Other File Types', 'Các Loại File Khác')}</h3>
+                <h3 className="font-medium">Các Loại File Khác</h3>
                 <p className="text-gray-500 text-sm">ZIP, RAR, CSV, XLSX, JSON, XML</p>
               </div>
             </div>
@@ -294,13 +292,13 @@ const FileManagement: React.FC = () => {
       <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
         <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
           <Info className="w-5 h-5 text-primary" />
-          {t('File Size Limits (MB)', 'Giới Hạn Dung Lượng (MB)')}
+          Giới Hạn Dung Lượng (MB)
         </h2>
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <div className="space-y-2">
             <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
-              <Image className="w-4 h-4 text-blue-600" /> {t('Image', 'Hình Ảnh')}
+              <Image className="w-4 h-4 text-blue-600" /> Hình Ảnh
             </label>
             <input
               type="number"
@@ -315,7 +313,7 @@ const FileManagement: React.FC = () => {
 
           <div className="space-y-2">
             <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
-              <FileText className="w-4 h-4 text-red-600" /> {t('Document', 'Tài Liệu')}
+              <FileText className="w-4 h-4 text-red-600" /> Tài Liệu
             </label>
             <input
               type="number"
@@ -330,7 +328,7 @@ const FileManagement: React.FC = () => {
 
           <div className="space-y-2">
             <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
-              <Video className="w-4 h-4 text-purple-600" /> {t('Video', 'Video')}
+              <Video className="w-4 h-4 text-purple-600" /> Video
             </label>
             <input
               type="number"
@@ -345,7 +343,7 @@ const FileManagement: React.FC = () => {
 
           <div className="space-y-2">
             <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
-              <Music className="w-4 h-4 text-green-600" /> {t('Audio', 'Âm Thanh')}
+              <Music className="w-4 h-4 text-green-600" /> Âm Thanh
             </label>
             <input
               type="number"
@@ -360,7 +358,7 @@ const FileManagement: React.FC = () => {
 
           <div className="space-y-2">
             <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
-              <File className="w-4 h-4 text-orange-600" /> {t('Other Files', 'File Khác')}
+              <File className="w-4 h-4 text-orange-600" /> File Khác
             </label>
             <input
               type="number"
@@ -375,7 +373,7 @@ const FileManagement: React.FC = () => {
 
           <div className="space-y-2">
             <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
-              <Upload className="w-4 h-4 text-primary" /> {t('General Max', 'Tổng Max')}
+              <Upload className="w-4 h-4 text-primary" /> Tổng Max
             </label>
             <input
               type="number"
@@ -394,7 +392,7 @@ const FileManagement: React.FC = () => {
       <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
         <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
           <Info className="w-5 h-5 text-primary" />
-          {t('Upload Limits by Plan (Files per month)', 'Giới Hạn Upload Theo Plan (File/tháng)')}
+          Giới Hạn Upload Theo Plan (File/tháng)
         </h2>
         <p className="text-gray-500 text-sm mb-4">Set to 0 for unlimited uploads</p>
         
@@ -444,7 +442,7 @@ const FileManagement: React.FC = () => {
       <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
         <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
           <Info className="w-5 h-5 text-primary" />
-          {t('Session & Total Limits', 'Giới Hạn Phiên & Tổng')}
+          Giới Hạn Phiên & Tổng
         </h2>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -480,7 +478,7 @@ const FileManagement: React.FC = () => {
 
       {/* Quick Actions */}
       <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-        <h2 className="text-lg font-semibold mb-4">{t('Quick Actions', 'Hành Động Nhanh')}</h2>
+        <h2 className="text-lg font-semibold mb-4">Hành Động Nhanh</h2>
         <div className="flex flex-wrap gap-3">
           <button
             onClick={() => setSettings({

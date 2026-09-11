@@ -390,13 +390,13 @@ export function ChatCustomization({ language = 'vi', userRole = 'admin', isInlin
           </div>
           <button
             onClick={() => updateSettings({ fileAttachmentEnabled: !fileAttachmentEnabled })}
-            className={`relative w-12 h-7 rounded-full transition-colors shrink-0 ${
+            className={`relative w-14 h-7 rounded-full transition-colors shrink-0 ${
               fileAttachmentEnabled ? 'bg-primary' : 'bg-gray-300'
             }`}
           >
             <span
-              className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-md transition-transform ${
-                fileAttachmentEnabled ? 'left-[23px]' : 'left-0.5'
+              className={`absolute top-1.5 w-4 h-4 rounded-full bg-white shadow-md transition-transform ${
+                fileAttachmentEnabled ? 'left-[38px]' : 'left-0.5'
               }`}
             />
           </button>

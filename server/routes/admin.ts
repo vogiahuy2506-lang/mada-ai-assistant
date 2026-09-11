@@ -1993,4 +1993,146 @@ router.get('/emotion-settings/public', (_req, res) => {
   }
 });
 
+// ============== FILE UPLOAD SETTINGS (SuperAdmin only) ==============
+
+// GET /api/admin/file-settings — get file upload settings
+router.get('/file-settings', requireAdmin, (_req, res) => {
+  try {
+    const keys = [
+      'feature_file_attachment_enabled',
+      'feature_image_upload_enabled',
+      'feature_document_upload_enabled',
+      'feature_video_upload_enabled',
+      'feature_audio_upload_enabled',
+      'feature_other_file_upload_enabled',
+      'max_file_size_mb',
+      'max_image_size_mb',
+      'max_document_size_mb',
+      'max_video_size_mb',
+      'max_audio_size_mb',
+      'max_other_file_size_mb',
+      'max_files_per_session',
+      'max_files_total',
+      'file_upload_limit_free',
+      'file_upload_limit_pro',
+      'file_upload_limit_enterprise',
+    ];
+
+    const placeholders = keys.map(() => '?').join(',');
+    const settings = db.prepare(`SELECT key, value, type FROM system_settings WHERE key IN (${placeholders})`).all(...keys) as any[];
+
+    const result: Record<string, any> = {};
+    for (const s of settings) {
+      if (s.type === 'boolean') {
+        result[s.key] = s.value === 'true';
+      } else if (s.type === 'number') {
+        result[s.key] = Number(s.value);
+      } else if (s.type === 'json') {
+        result[s.key] = JSON.parse(s.value);
+      } else {
+        result[s.key] = s.value;
+      }
+    }
+
+    res.json({ success: true, data: result });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// PUT /api/admin/file-settings — update file upload settings (SuperAdmin only)
+router.put('/file-settings', requireSuperAdmin, (req, res) => {
+  try {
+    const updates = req.body;
+    const now = new Date().toISOString();
+
+    // Map frontend keys to database keys
+    const keyMapping: Record<string, string> = {
+      fileAttachmentEnabled: 'feature_file_attachment_enabled',
+      imageUploadEnabled: 'feature_image_upload_enabled',
+      documentUploadEnabled: 'feature_document_upload_enabled',
+      videoUploadEnabled: 'feature_video_upload_enabled',
+      audioUploadEnabled: 'feature_audio_upload_enabled',
+      otherFileUploadEnabled: 'feature_other_file_upload_enabled',
+      maxFileSizeMB: 'max_file_size_mb',
+      maxImageSizeMB: 'max_image_size_mb',
+      maxDocumentSizeMB: 'max_document_size_mb',
+      maxVideoSizeMB: 'max_video_size_mb',
+      maxAudioSizeMB: 'max_audio_size_mb',
+      maxOtherFileSizeMB: 'max_other_file_size_mb',
+      maxFilesPerSession: 'max_files_per_session',
+      maxFilesTotal: 'max_files_total',
+      fileUploadLimitFree: 'file_upload_limit_free',
+      fileUploadLimitPro: 'file_upload_limit_pro',
+      fileUploadLimitEnterprise: 'file_upload_limit_enterprise',
+    };
+
+    const stmt = db.prepare(`
+      INSERT INTO system_settings (key, value, type, description, updated_at)
+      VALUES (?, ?, ?, ?, ?)
+      ON CONFLICT(key) DO UPDATE SET value = ?, type = ?, description = ?, updated_at = ?
+    `);
+
+    for (const [frontendKey, value] of Object.entries(updates)) {
+      const dbKey = keyMapping[frontendKey];
+      if (!dbKey) continue;
+
+      let type = 'string';
+      let strValue = String(value);
+
+      if (typeof value === 'number') {
+        type = 'number';
+        strValue = String(value);
+      } else if (typeof value === 'boolean') {
+        type = 'boolean';
+        strValue = String(value);
+      }
+
+      stmt.run(dbKey, strValue, type, '', now, strValue, type, '', now);
+    }
+
+    res.json({ success: true, message: 'File settings updated successfully' });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// GET /api/admin/file-settings/public — public endpoint for file upload validation
+router.get('/file-settings/public', (_req, res) => {
+  try {
+    const keys = [
+      'feature_file_attachment_enabled',
+      'feature_image_upload_enabled',
+      'feature_document_upload_enabled',
+      'feature_video_upload_enabled',
+      'feature_audio_upload_enabled',
+      'feature_other_file_upload_enabled',
+      'max_file_size_mb',
+      'max_image_size_mb',
+      'max_document_size_mb',
+      'max_video_size_mb',
+      'max_audio_size_mb',
+      'max_other_file_size_mb',
+    ];
+
+    const placeholders = keys.map(() => '?').join(',');
+    const settings = db.prepare(`SELECT key, value, type FROM system_settings WHERE key IN (${placeholders})`).all(...keys) as any[];
+
+    const result: Record<string, any> = {};
+    for (const s of settings) {
+      if (s.type === 'boolean') {
+        result[s.key] = s.value === 'true';
+      } else if (s.type === 'number') {
+        result[s.key] = Number(s.value);
+      } else {
+        result[s.key] = s.value;
+      }
+    }
+
+    res.json({ success: true, data: result });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 export default router;

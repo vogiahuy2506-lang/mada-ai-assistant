@@ -95,6 +95,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Agents', labelEn: 'Agents', labelAr: 'الوكلاء', labelFr: 'Agents', href: '/admin/agents', icon: 'smart_toy' },
   { label: 'System Prompts', labelEn: 'System Prompts', labelAr: 'التعليمات', labelFr: 'Prompts Système', href: '/admin/prompts', icon: 'edit_note' },
   { label: 'Tư vấn', labelEn: 'Consultations', labelAr: 'الاستشارات', labelFr: 'Consultations', href: '/admin/consultations', icon: 'support_agent' },
+  { label: 'Upload File', labelEn: 'File Upload', labelAr: 'رفع الملفات', labelFr: 'Upload de fichiers', href: '/admin/file-management', icon: 'upload_file', superAdminOnly: true },
   { label: 'Cấu hình', labelEn: 'Settings', labelAr: 'الإعدادات', labelFr: 'Paramètres', href: '/admin/settings', icon: 'settings_suggest', superAdminOnly: true },
   { label: 'Phân quyền', labelEn: 'Permissions', labelAr: 'الأذونات', labelFr: 'Permissions', href: '/admin/permissions', icon: 'admin_panel_settings', superAdminOnly: true },
 ];

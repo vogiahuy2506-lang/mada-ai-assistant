@@ -476,19 +476,19 @@ export function WidgetCustomization({ language = 'vi', userRole = 'admin' }: Wid
                   <span className="text-sm font-medium text-slate-700">{lang.config.allowFile}</span>
                   <button
                     onClick={() => !isReadOnly && updateConfig({ allowFileUpload: !config.allowFileUpload })}
-                    className={`relative w-16 h-8 rounded-full transition-all duration-300 ${
+                    className={`relative w-20 h-8 rounded-full transition-all duration-300 ${
                       config.allowFileUpload 
                         ? 'bg-gradient-to-r from-cyan-500 to-cyan-600 shadow-lg shadow-cyan-500/40' 
                         : 'bg-gray-300'
                     }`}
                   >
-                    <span className={`absolute top-1 w-6 h-6 rounded-full bg-white shadow-lg transition-all duration-300 flex items-center justify-center ${
-                      config.allowFileUpload ? 'left-[38px]' : 'left-0.5'
+                    <span className={`absolute top-1.5 w-5 h-5 rounded-full bg-white shadow-lg transition-all duration-300 flex items-center justify-center ${
+                      config.allowFileUpload ? 'left-[58px]' : 'left-0.5'
                     }`}>
                       {config.allowFileUpload ? (
-                        <CheckCircle className="w-4 h-4 text-cyan-600" />
+                        <CheckCircle className="w-3 h-3 text-cyan-600" />
                       ) : (
-                        <X className="w-4 h-4 text-gray-400" />
+                        <X className="w-3 h-3 text-gray-400" />
                       )}
                     </span>
                     {config.allowFileUpload && (
@@ -501,19 +501,19 @@ export function WidgetCustomization({ language = 'vi', userRole = 'admin' }: Wid
                   <span className="text-sm font-medium text-slate-700">{lang.config.allowLangSwitch}</span>
                   <button
                     onClick={() => !isReadOnly && updateConfig({ allowLanguageSwitch: !config.allowLanguageSwitch })}
-                    className={`relative w-16 h-8 rounded-full transition-all duration-300 ${
+                    className={`relative w-20 h-8 rounded-full transition-all duration-300 ${
                       config.allowLanguageSwitch 
                         ? 'bg-gradient-to-r from-cyan-500 to-cyan-600 shadow-lg shadow-cyan-500/40' 
                         : 'bg-gray-300'
                     }`}
                   >
-                    <span className={`absolute top-1 w-6 h-6 rounded-full bg-white shadow-lg transition-all duration-300 flex items-center justify-center ${
-                      config.allowLanguageSwitch ? 'left-[38px]' : 'left-0.5'
+                    <span className={`absolute top-1.5 w-5 h-5 rounded-full bg-white shadow-lg transition-all duration-300 flex items-center justify-center ${
+                      config.allowLanguageSwitch ? 'left-[58px]' : 'left-0.5'
                     }`}>
                       {config.allowLanguageSwitch ? (
-                        <CheckCircle className="w-4 h-4 text-cyan-600" />
+                        <CheckCircle className="w-3 h-3 text-cyan-600" />
                       ) : (
-                        <X className="w-4 h-4 text-gray-400" />
+                        <X className="w-3 h-3 text-gray-400" />
                       )}
                     </span>
                     {config.allowLanguageSwitch && (
@@ -622,19 +622,19 @@ export function WidgetCustomization({ language = 'vi', userRole = 'admin' }: Wid
                 <span className="text-sm font-medium text-slate-700">{lang.config.chatBubble}</span>
                 <button
                   onClick={() => !isReadOnly && updateConfig({ chatBubbleEnabled: !config.chatBubbleEnabled })}
-                  className={`relative w-16 h-8 rounded-full transition-all duration-300 ${
+                  className={`relative w-20 h-8 rounded-full transition-all duration-300 ${
                     config.chatBubbleEnabled 
                       ? 'bg-gradient-to-r from-cyan-500 to-cyan-600 shadow-lg shadow-cyan-500/40' 
                       : 'bg-gray-300'
                   }`}
                 >
-                  <span className={`absolute top-1 w-6 h-6 rounded-full bg-white shadow-lg transition-all duration-300 flex items-center justify-center ${
-                    config.chatBubbleEnabled ? 'left-[38px]' : 'left-0.5'
+                  <span className={`absolute top-1.5 w-5 h-5 rounded-full bg-white shadow-lg transition-all duration-300 flex items-center justify-center ${
+                    config.chatBubbleEnabled ? 'left-[58px]' : 'left-0.5'
                   }`}>
                     {config.chatBubbleEnabled ? (
-                      <CheckCircle className="w-4 h-4 text-cyan-600" />
+                      <CheckCircle className="w-3 h-3 text-cyan-600" />
                     ) : (
-                      <X className="w-4 h-4 text-gray-400" />
+                      <X className="w-3 h-3 text-gray-400" />
                     )}
                   </span>
                   {config.chatBubbleEnabled && (
@@ -674,19 +674,19 @@ export function WidgetCustomization({ language = 'vi', userRole = 'admin' }: Wid
                   <span className="text-sm font-medium text-slate-700">{lang.config.showLabel}</span>
                   <button
                     onClick={() => !isReadOnly && updateConfig({ showLabel: !config.showLabel })}
-                    className={`relative w-16 h-8 rounded-full transition-all duration-300 ${
+                    className={`relative w-20 h-8 rounded-full transition-all duration-300 ${
                       config.showLabel 
                         ? 'bg-gradient-to-r from-cyan-500 to-cyan-600 shadow-lg shadow-cyan-500/40' 
                         : 'bg-gray-300'
                     }`}
                   >
-                    <span className={`absolute top-1 w-6 h-6 rounded-full bg-white shadow-lg transition-all duration-300 flex items-center justify-center ${
-                      config.showLabel ? 'left-[38px]' : 'left-0.5'
+                    <span className={`absolute top-1.5 w-5 h-5 rounded-full bg-white shadow-lg transition-all duration-300 flex items-center justify-center ${
+                      config.showLabel ? 'left-[58px]' : 'left-0.5'
                     }`}>
                       {config.showLabel ? (
-                        <CheckCircle className="w-4 h-4 text-cyan-600" />
+                        <CheckCircle className="w-3 h-3 text-cyan-600" />
                       ) : (
-                        <X className="w-4 h-4 text-gray-400" />
+                        <X className="w-3 h-3 text-gray-400" />
                       )}
                     </span>
                     {config.showLabel && (

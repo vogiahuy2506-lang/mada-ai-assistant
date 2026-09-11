@@ -736,9 +736,9 @@ async function main() {
   }
 }
 
-// Run if executed directly
-const isMainModule = import.meta.url === `file://${process.argv[1]}` ||
-  import.meta.url.endsWith(process.argv[1] || '');
+// Run if executed directly (CJS: use require.main, ESM: use import.meta.url)
+const isMainModule = (typeof require !== 'undefined' && require.main === module) ||
+  (typeof import.meta !== 'undefined' && (import.meta.url === `file://${process.argv[1]}` || import.meta.url.endsWith(process.argv[1] || '')));
 
 if (isMainModule) {
   main().catch(err => {

@@ -319,13 +319,13 @@ export function EmotionCustomization({ language = 'vi', userRole = 'admin', isIn
             </div>
             <button
               onClick={() => updateEmotionSettings({ useBulletPoints: !emotionSettings.useBulletPoints })}
-              className={`relative w-12 h-7 rounded-full transition-colors shrink-0 ${
+              className={`relative w-14 h-7 rounded-full transition-colors shrink-0 ${
                 emotionSettings.useBulletPoints ? 'bg-teal-500' : 'bg-slate-300'
               }`}
             >
               <span
-                className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-md transition-transform ${
-                  emotionSettings.useBulletPoints ? 'left-[23px]' : 'left-0.5'
+                className={`absolute top-1.5 w-4 h-4 rounded-full bg-white shadow-md transition-transform ${
+                  emotionSettings.useBulletPoints ? 'left-[38px]' : 'left-0.5'
                 }`}
               />
             </button>
@@ -339,13 +339,13 @@ export function EmotionCustomization({ language = 'vi', userRole = 'admin', isIn
             </div>
             <button
               onClick={() => updateEmotionSettings({ useEmojis: !emotionSettings.useEmojis })}
-              className={`relative w-12 h-7 rounded-full transition-colors shrink-0 ${
+              className={`relative w-14 h-7 rounded-full transition-colors shrink-0 ${
                 emotionSettings.useEmojis ? 'bg-teal-500' : 'bg-slate-300'
               }`}
             >
               <span
-                className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-md transition-transform ${
-                  emotionSettings.useEmojis ? 'left-[23px]' : 'left-0.5'
+                className={`absolute top-1.5 w-4 h-4 rounded-full bg-white shadow-md transition-transform ${
+                  emotionSettings.useEmojis ? 'left-[38px]' : 'left-0.5'
                 }`}
               />
             </button>

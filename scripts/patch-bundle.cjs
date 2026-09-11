@@ -5,7 +5,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const filePath = path.join(__dirname, '..', 'dist', 'server.mjs');
+const filePath = path.join(__dirname, '..', 'dist', 'server.cjs');
 const content = fs.readFileSync(filePath, 'utf8');
 
 let patched = content;

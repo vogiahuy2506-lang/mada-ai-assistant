@@ -346,29 +346,41 @@ export function WidgetCustomization({ language = 'vi', userRole = 'admin' }: Wid
               <p className="text-sm text-white/80 mt-1">{lang.subtitle}</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <button
               onClick={() => setShowLivePreview(!showLivePreview)}
-              className={`px-3 py-2 rounded-lg text-xs font-medium border transition-all ${
+              className={`px-4 py-2.5 rounded-xl text-sm font-bold border transition-all duration-300 ${
                 showLivePreview
-                  ? 'bg-white text-cyan-600 border-white'
-                  : 'bg-white/10 text-white border-white/30 hover:bg-white/20'
+                  ? 'bg-white text-purple-600 border-white shadow-lg shadow-purple-500/30'
+                  : 'bg-white/10 text-white border-white/30 hover:bg-white/20 backdrop-blur-sm'
               }`}
             >
-              {showLivePreview ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+              <span className="flex items-center gap-2">
+                {showLivePreview ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                {showLivePreview ? 'Ẩn Preview' : 'Xem Preview'}
+              </span>
             </button>
             {!isReadOnly && (
               <button
                 onClick={handleSave}
                 disabled={saving}
-                className="px-4 py-2 rounded-lg bg-white text-cyan-600 text-xs font-medium hover:bg-white/90 disabled:opacity-50 flex items-center gap-1.5"
+                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-white to-white text-cyan-600 text-sm font-bold hover:from-cyan-50 hover:to-white disabled:opacity-50 flex items-center gap-2 shadow-lg shadow-white/20 transition-all duration-300 hover:scale-105"
               >
                 {saving ? (
-                  <><Loader2 className="w-3.5 h-3.5 animate-spin" /> {lang.saving}</>
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" /> 
+                    <span>{lang.saving}</span>
+                  </>
                 ) : saveSuccess ? (
-                  <><CheckCircle className="w-3.5 h-3.5" /> {lang.saved}</>
+                  <>
+                    <CheckCircle className="w-4 h-4" /> 
+                    <span>{lang.saved}</span>
+                  </>
                 ) : (
-                  lang.save
+                  <>
+                    <Settings className="w-4 h-4" />
+                    <span>{lang.save}</span>
+                  </>
                 )}
               </button>
             )}
@@ -377,32 +389,34 @@ export function WidgetCustomization({ language = 'vi', userRole = 'admin' }: Wid
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 p-1 bg-gray-100 rounded-lg w-fit">
+      <div className="flex gap-1 p-1.5 bg-gradient-to-r from-cyan-500/10 via-blue-500/10 to-purple-500/10 rounded-2xl border border-gray-200 w-fit">
         <button
           onClick={() => setActiveTab('config')}
-          className={`px-4 py-2 rounded-md text-xs font-medium transition-all ${
+          className={`px-6 py-3 rounded-xl text-sm font-bold transition-all duration-300 flex items-center gap-2.5 shadow-md ${
             activeTab === 'config'
-              ? 'bg-white text-slate-900 shadow-sm'
-              : 'text-slate-600 hover:text-slate-900'
+              ? 'bg-gradient-to-r from-cyan-500 to-cyan-600 text-white shadow-lg shadow-cyan-500/30 scale-105'
+              : 'bg-white text-slate-600 hover:bg-gradient-to-r hover:from-cyan-50 hover:to-cyan-100 border border-gray-200 hover:border-cyan-300 hover:shadow-sm'
           }`}
         >
-          <span className="flex items-center gap-1.5">
-            <Settings className="w-3.5 h-3.5" />
-            {lang.tabs.config}
-          </span>
+          <Settings className={`w-5 h-5 ${activeTab === 'config' ? 'text-white' : 'text-cyan-500'}`} />
+          <span>{lang.tabs.config}</span>
+          {activeTab === 'config' && (
+            <span className="ml-1 px-2 py-0.5 rounded-full bg-white/20 text-xs">Active</span>
+          )}
         </button>
         <button
           onClick={() => setActiveTab('embed')}
-          className={`px-4 py-2 rounded-md text-xs font-medium transition-all ${
+          className={`px-6 py-3 rounded-xl text-sm font-bold transition-all duration-300 flex items-center gap-2.5 shadow-md ${
             activeTab === 'embed'
-              ? 'bg-white text-slate-900 shadow-sm'
-              : 'text-slate-600 hover:text-slate-900'
+              ? 'bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/30 scale-105'
+              : 'bg-white text-slate-600 hover:bg-gradient-to-r hover:from-purple-50 hover:to-purple-100 border border-gray-200 hover:border-purple-300 hover:shadow-sm'
           }`}
         >
-          <span className="flex items-center gap-1.5">
-            <Code2 className="w-3.5 h-3.5" />
-            {lang.tabs.embed}
-          </span>
+          <Code2 className={`w-5 h-5 ${activeTab === 'embed' ? 'text-white' : 'text-purple-500'}`} />
+          <span>{lang.tabs.embed}</span>
+          {activeTab === 'embed' && (
+            <span className="ml-1 px-2 py-0.5 rounded-full bg-white/20 text-xs">Active</span>
+          )}
         </button>
       </div>
 
@@ -458,31 +472,53 @@ export function WidgetCustomization({ language = 'vi', userRole = 'admin' }: Wid
 
               {/* Toggles */}
               <div className="space-y-2">
-                <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-gray-50">
-                  <span className="text-sm text-slate-700">{lang.config.allowFile}</span>
+                <div className="flex items-center justify-between py-3 px-4 rounded-xl bg-gradient-to-r from-gray-50 to-gray-100 border border-gray-200 hover:border-cyan-300 transition-colors">
+                  <span className="text-sm font-medium text-slate-700">{lang.config.allowFile}</span>
                   <button
                     onClick={() => !isReadOnly && updateConfig({ allowFileUpload: !config.allowFileUpload })}
-                    className={`w-10 h-5 rounded-full transition-colors relative ${
-                      config.allowFileUpload ? 'bg-cyan-600' : 'bg-gray-300'
+                    className={`relative w-14 h-7 rounded-full transition-all duration-300 ${
+                      config.allowFileUpload 
+                        ? 'bg-gradient-to-r from-cyan-500 to-cyan-600 shadow-lg shadow-cyan-500/40' 
+                        : 'bg-gray-300'
                     }`}
                   >
-                    <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
-                      config.allowFileUpload ? 'left-5' : 'left-0.5'
-                    }`} />
+                    <span className={`absolute top-1 w-5 h-5 rounded-full bg-white shadow-lg transition-all duration-300 flex items-center justify-center ${
+                      config.allowFileUpload ? 'left-8' : 'left-1'
+                    }`}>
+                      {config.allowFileUpload ? (
+                        <CheckCircle className="w-3 h-3 text-cyan-600" />
+                      ) : (
+                        <X className="w-3 h-3 text-gray-400" />
+                      )}
+                    </span>
+                    {config.allowFileUpload && (
+                      <span className="absolute right-2 text-[10px] text-white font-bold">ON</span>
+                    )}
                   </button>
                 </div>
 
-                <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-gray-50">
-                  <span className="text-sm text-slate-700">{lang.config.allowLangSwitch}</span>
+                <div className="flex items-center justify-between py-3 px-4 rounded-xl bg-gradient-to-r from-gray-50 to-gray-100 border border-gray-200 hover:border-cyan-300 transition-colors">
+                  <span className="text-sm font-medium text-slate-700">{lang.config.allowLangSwitch}</span>
                   <button
                     onClick={() => !isReadOnly && updateConfig({ allowLanguageSwitch: !config.allowLanguageSwitch })}
-                    className={`w-10 h-5 rounded-full transition-colors relative ${
-                      config.allowLanguageSwitch ? 'bg-cyan-600' : 'bg-gray-300'
+                    className={`relative w-14 h-7 rounded-full transition-all duration-300 ${
+                      config.allowLanguageSwitch 
+                        ? 'bg-gradient-to-r from-cyan-500 to-cyan-600 shadow-lg shadow-cyan-500/40' 
+                        : 'bg-gray-300'
                     }`}
                   >
-                    <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
-                      config.allowLanguageSwitch ? 'left-5' : 'left-0.5'
-                    }`} />
+                    <span className={`absolute top-1 w-5 h-5 rounded-full bg-white shadow-lg transition-all duration-300 flex items-center justify-center ${
+                      config.allowLanguageSwitch ? 'left-8' : 'left-1'
+                    }`}>
+                      {config.allowLanguageSwitch ? (
+                        <CheckCircle className="w-3 h-3 text-cyan-600" />
+                      ) : (
+                        <X className="w-3 h-3 text-gray-400" />
+                      )}
+                    </span>
+                    {config.allowLanguageSwitch && (
+                      <span className="absolute right-2 text-[10px] text-white font-bold">ON</span>
+                    )}
                   </button>
                 </div>
               </div>
@@ -582,17 +618,28 @@ export function WidgetCustomization({ language = 'vi', userRole = 'admin' }: Wid
               </h4>
 
               {/* Chat Bubble Toggle */}
-              <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-gray-50">
-                <span className="text-sm text-slate-700">{lang.config.chatBubble}</span>
+              <div className="flex items-center justify-between py-3 px-4 rounded-xl bg-gradient-to-r from-gray-50 to-gray-100 border border-gray-200 hover:border-cyan-300 transition-colors">
+                <span className="text-sm font-medium text-slate-700">{lang.config.chatBubble}</span>
                 <button
                   onClick={() => !isReadOnly && updateConfig({ chatBubbleEnabled: !config.chatBubbleEnabled })}
-                  className={`w-10 h-5 rounded-full transition-colors relative ${
-                    config.chatBubbleEnabled ? 'bg-cyan-600' : 'bg-gray-300'
+                  className={`relative w-14 h-7 rounded-full transition-all duration-300 ${
+                    config.chatBubbleEnabled 
+                      ? 'bg-gradient-to-r from-cyan-500 to-cyan-600 shadow-lg shadow-cyan-500/40' 
+                      : 'bg-gray-300'
                   }`}
                 >
-                  <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
-                    config.chatBubbleEnabled ? 'left-5' : 'left-0.5'
-                  }`} />
+                  <span className={`absolute top-1 w-5 h-5 rounded-full bg-white shadow-lg transition-all duration-300 flex items-center justify-center ${
+                    config.chatBubbleEnabled ? 'left-8' : 'left-1'
+                  }`}>
+                    {config.chatBubbleEnabled ? (
+                      <CheckCircle className="w-3 h-3 text-cyan-600" />
+                    ) : (
+                      <X className="w-3 h-3 text-gray-400" />
+                    )}
+                  </span>
+                  {config.chatBubbleEnabled && (
+                    <span className="absolute right-2 text-[10px] text-white font-bold">ON</span>
+                  )}
                 </button>
               </div>
 
@@ -623,17 +670,28 @@ export function WidgetCustomization({ language = 'vi', userRole = 'admin' }: Wid
                 </h4>
 
                 {/* Show Label Toggle */}
-                <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-gray-50 mb-3">
-                  <span className="text-sm text-slate-700">{lang.config.showLabel}</span>
+                <div className="flex items-center justify-between py-3 px-4 rounded-xl bg-gradient-to-r from-gray-50 to-gray-100 border border-gray-200 hover:border-cyan-300 transition-colors mb-3">
+                  <span className="text-sm font-medium text-slate-700">{lang.config.showLabel}</span>
                   <button
                     onClick={() => !isReadOnly && updateConfig({ showLabel: !config.showLabel })}
-                    className={`w-10 h-5 rounded-full transition-colors relative ${
-                      config.showLabel ? 'bg-cyan-600' : 'bg-gray-300'
+                    className={`relative w-14 h-7 rounded-full transition-all duration-300 ${
+                      config.showLabel 
+                        ? 'bg-gradient-to-r from-cyan-500 to-cyan-600 shadow-lg shadow-cyan-500/40' 
+                        : 'bg-gray-300'
                     }`}
                   >
-                    <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
-                      config.showLabel ? 'left-5' : 'left-0.5'
-                    }`} />
+                    <span className={`absolute top-1 w-5 h-5 rounded-full bg-white shadow-lg transition-all duration-300 flex items-center justify-center ${
+                      config.showLabel ? 'left-8' : 'left-1'
+                    }`}>
+                      {config.showLabel ? (
+                        <CheckCircle className="w-3 h-3 text-cyan-600" />
+                      ) : (
+                        <X className="w-3 h-3 text-gray-400" />
+                      )}
+                    </span>
+                    {config.showLabel && (
+                      <span className="absolute right-2 text-[10px] text-white font-bold">ON</span>
+                    )}
                   </button>
                 </div>
 
@@ -708,52 +766,97 @@ export function WidgetCustomization({ language = 'vi', userRole = 'admin' }: Wid
       {activeTab === 'embed' && (
         <div className="space-y-4">
           {/* Embed Options */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* iFrame */}
-            <div className="p-4 rounded-xl bg-slate-800 text-white">
-              <div className="flex items-center gap-2 mb-2">
-                <Code className="w-4 h-4 text-blue-400" />
-                <span className="text-sm font-medium">{lang.embed.iframeTab}</span>
+            <div className="relative p-5 rounded-2xl bg-gradient-to-br from-slate-800 to-slate-900 text-white overflow-hidden group hover:shadow-xl hover:shadow-blue-500/20 transition-all duration-300 cursor-pointer"
+              onClick={() => handleCopy(iframeCode, 'iframe')}>
+              <div className="absolute top-0 right-0 w-20 h-20 bg-blue-500/20 rounded-full -mr-10 -mt-10 group-hover:scale-150 transition-transform duration-500" />
+              <div className="absolute bottom-0 left-0 w-16 h-16 bg-blue-600/20 rounded-full -ml-8 -mb-8" />
+              <div className="relative flex items-center gap-3 mb-3">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/30">
+                  <Code className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <span className="text-sm font-bold">{lang.embed.iframeTab}</span>
+                  <p className="text-xs text-slate-400">Dán mã iFrame vào website</p>
+                </div>
               </div>
-              <p className="text-xs text-slate-400 mb-3">Dán mã iFrame vào website</p>
               <button
-                onClick={() => handleCopy(iframeCode, 'iframe')}
-                className="w-full py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-xs font-medium flex items-center justify-center gap-1.5"
+                className="w-full py-2.5 rounded-xl bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-400 hover:to-blue-500 text-xs font-bold flex items-center justify-center gap-2 shadow-lg shadow-blue-500/30 transition-all duration-300"
               >
-                {copiedCode === 'iframe' ? <CheckCircle className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                {copiedCode === 'iframe' ? lang.embed.copied : lang.embed.copy}
+                {copiedCode === 'iframe' ? (
+                  <>
+                    <CheckCircle className="w-4 h-4" />
+                    {lang.embed.copied}
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-4 h-4" />
+                    {lang.embed.copy}
+                  </>
+                )}
               </button>
             </div>
 
             {/* JavaScript */}
-            <div className="p-4 rounded-xl bg-slate-800 text-white">
-              <div className="flex items-center gap-2 mb-2">
-                <Code className="w-4 h-4 text-amber-400" />
-                <span className="text-sm font-medium">{lang.embed.scriptTab}</span>
+            <div className="relative p-5 rounded-2xl bg-gradient-to-br from-slate-800 to-slate-900 text-white overflow-hidden group hover:shadow-xl hover:shadow-amber-500/20 transition-all duration-300 cursor-pointer"
+              onClick={() => handleCopy(scriptCode, 'script')}>
+              <div className="absolute top-0 right-0 w-20 h-20 bg-amber-500/20 rounded-full -mr-10 -mt-10 group-hover:scale-150 transition-transform duration-500" />
+              <div className="absolute bottom-0 left-0 w-16 h-16 bg-amber-600/20 rounded-full -ml-8 -mb-8" />
+              <div className="relative flex items-center gap-3 mb-3">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center shadow-lg shadow-amber-500/30">
+                  <Code className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <span className="text-sm font-bold">{lang.embed.scriptTab}</span>
+                  <p className="text-xs text-slate-400">Dán mã JavaScript vào website</p>
+                </div>
               </div>
-              <p className="text-xs text-slate-400 mb-3">Dán mã JavaScript vào website</p>
               <button
-                onClick={() => handleCopy(scriptCode, 'script')}
-                className="w-full py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-xs font-medium flex items-center justify-center gap-1.5"
+                className="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-xs font-bold flex items-center justify-center gap-2 shadow-lg shadow-amber-500/30 transition-all duration-300"
               >
-                {copiedCode === 'script' ? <CheckCircle className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                {copiedCode === 'script' ? lang.embed.copied : lang.embed.copy}
+                {copiedCode === 'script' ? (
+                  <>
+                    <CheckCircle className="w-4 h-4" />
+                    {lang.embed.copied}
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-4 h-4" />
+                    {lang.embed.copy}
+                  </>
+                )}
               </button>
             </div>
 
             {/* Public Link */}
-            <div className="p-4 rounded-xl bg-slate-800 text-white">
-              <div className="flex items-center gap-2 mb-2">
-                <Globe className="w-4 h-4 text-green-400" />
-                <span className="text-sm font-medium">{lang.embed.publicTab}</span>
+            <div className="relative p-5 rounded-2xl bg-gradient-to-br from-slate-800 to-slate-900 text-white overflow-hidden group hover:shadow-xl hover:shadow-green-500/20 transition-all duration-300 cursor-pointer"
+              onClick={() => handleCopy(publicLink, 'public')}>
+              <div className="absolute top-0 right-0 w-20 h-20 bg-green-500/20 rounded-full -mr-10 -mt-10 group-hover:scale-150 transition-transform duration-500" />
+              <div className="absolute bottom-0 left-0 w-16 h-16 bg-green-600/20 rounded-full -ml-8 -mb-8" />
+              <div className="relative flex items-center gap-3 mb-3">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center shadow-lg shadow-green-500/30">
+                  <Globe className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <span className="text-sm font-bold">{lang.embed.publicTab}</span>
+                  <p className="text-xs text-slate-400">Chia sẻ link trực tiếp</p>
+                </div>
               </div>
-              <p className="text-xs text-slate-400 mb-3">Chia sẻ link trực tiếp</p>
               <button
-                onClick={() => handleCopy(publicLink, 'public')}
-                className="w-full py-2 rounded-lg bg-green-600 hover:bg-green-500 text-xs font-medium flex items-center justify-center gap-1.5"
+                className="w-full py-2.5 rounded-xl bg-gradient-to-r from-green-500 to-green-600 hover:from-green-400 hover:to-green-500 text-xs font-bold flex items-center justify-center gap-2 shadow-lg shadow-green-500/30 transition-all duration-300"
               >
-                {copiedCode === 'public' ? <CheckCircle className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                {copiedCode === 'public' ? lang.embed.copied : lang.embed.copy}
+                {copiedCode === 'public' ? (
+                  <>
+                    <CheckCircle className="w-4 h-4" />
+                    {lang.embed.copied}
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-4 h-4" />
+                    {lang.embed.copy}
+                  </>
+                )}
               </button>
             </div>
           </div>
@@ -772,22 +875,22 @@ export function WidgetCustomization({ language = 'vi', userRole = 'admin' }: Wid
           </div>
 
           {/* Actions */}
-          <div className="flex gap-2">
+          <div className="flex gap-3 flex-wrap">
             <a
               href={publicLink}
               target="_blank"
               rel="noopener noreferrer"
-              className="px-4 py-2 rounded-lg bg-cyan-600 text-white text-xs font-medium hover:bg-cyan-700 flex items-center gap-1.5"
+              className="group px-5 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-cyan-600 text-white text-sm font-bold hover:from-cyan-400 hover:to-cyan-500 flex items-center gap-2 shadow-lg shadow-cyan-500/30 transition-all duration-300 hover:scale-105"
             >
-              <Globe className="w-3.5 h-3.5" />
-              {lang.embed.open}
+              <Globe className="w-5 h-5" />
+              <span>{lang.embed.open}</span>
             </a>
             <button
               onClick={() => setShowLivePreview(true)}
-              className="px-4 py-2 rounded-lg bg-white border border-gray-300 text-slate-700 text-xs font-medium hover:bg-gray-50 flex items-center gap-1.5"
+              className="group px-5 py-3 rounded-xl bg-gradient-to-r from-purple-500 to-purple-600 text-white text-sm font-bold hover:from-purple-400 hover:to-purple-500 flex items-center gap-2 shadow-lg shadow-purple-500/30 transition-all duration-300 hover:scale-105"
             >
-              <Eye className="w-3.5 h-3.5" />
-              {lang.embed.preview}
+              <Eye className="w-5 h-5" />
+              <span>{lang.embed.preview}</span>
             </button>
           </div>
         </div>

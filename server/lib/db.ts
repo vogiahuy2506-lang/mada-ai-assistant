@@ -1428,6 +1428,9 @@ seedAdmin();
 seedSuperAdmin();
 seedDemoUsers();
 
+// ============== EXPORT DB FIRST (before permissions import) ==============
+export default db;
+
 // ============== PERMISSIONS INITIALIZATION ==============
 
 // Import and initialize permissions schema
@@ -1435,7 +1438,7 @@ import { initPermissionsSchema, seedDefaultPermissions } from './permissions';
 initPermissionsSchema();
 seedDefaultPermissions();
 
-export default db;
+// ============== TYPES ==============
 
 // ============== TYPES ==============
 

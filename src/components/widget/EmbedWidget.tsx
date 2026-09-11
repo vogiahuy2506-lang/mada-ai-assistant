@@ -28,6 +28,14 @@ interface EmbedWidgetProps {
   welcomeTitle?: string;
   isOpen?: boolean;
   onClose?: () => void;
+  // New settings
+  widgetType?: 'popup' | 'embedded' | 'floating';
+  chatBubbleEnabled?: boolean;
+  chatBubbleIcon?: string;
+  showLabel?: boolean;
+  labelPosition?: 'bottom' | 'top';
+  labelName?: string;
+  labelColor?: string;
 }
 
 const LANGUAGES: { code: Language; name: string; flag: string }[] = [
@@ -48,6 +56,14 @@ export function EmbedWidget({
   welcomeTitle: welcomeTitleProp,
   isOpen: isOpenProp,
   onClose,
+  // New settings
+  widgetType: widgetTypeProp = 'popup',
+  chatBubbleEnabled: chatBubbleEnabledProp = true,
+  chatBubbleIcon: chatBubbleIconProp = '💬',
+  showLabel: showLabelProp = true,
+  labelPosition: labelPositionProp = 'bottom',
+  labelName: labelNameProp = 'Chat với MADA',
+  labelColor: labelColorProp,
 }: EmbedWidgetProps) {
   const [internalIsOpen, setInternalIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
@@ -336,22 +352,58 @@ export function EmbedWidget({
 
   const currentLang = LANGUAGES.find(l => l.code === language) || LANGUAGES[0];
 
+  // Determine if we should show the chat button (only for popup type)
+  const shouldShowChatButton = chatBubbleEnabledProp && widgetTypeProp === 'popup' && !isOpen;
+
+  // Calculate the position of the chat button and label
+  const isLeftPosition = positionProp === 'bottom-left';
+  const labelBgColor = labelColorProp || configPrimaryColor;
+
   return (
     <>
-      {/* Chat Button */}
-      {!isOpen && (
+      {/* Chat Button with optional Label */}
+      {shouldShowChatButton && (
+        <div className="fixed bottom-6 z-50 flex flex-col items-center gap-2">
+          {/* Label (above or below button based on position) */}
+          {showLabelProp && (
+            <div
+              className={clsx(
+                'px-3 py-1.5 rounded-lg text-white text-xs font-medium shadow-lg whitespace-nowrap',
+                labelPositionProp === 'top' ? 'order-1' : 'order-2'
+              )}
+              style={{ backgroundColor: labelBgColor }}
+            >
+              {labelNameProp}
+            </div>
+          )}
+          
+          {/* Chat Bubble Button */}
+          <button
+            onClick={handleOpen}
+            className={clsx(
+              'w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-all hover:scale-110',
+              'text-white font-bold text-2xl border-2 border-white/20',
+              labelPositionProp === 'top' ? 'order-2' : 'order-1'
+            )}
+            style={{ 
+              backgroundColor: configPrimaryColor,
+              [isLeftPosition ? 'left' : 'right']: '24px'
+            }}
+          >
+            {chatBubbleIconProp}
+          </button>
+        </div>
+      )}
+
+      {/* For Embedded widget type - render without chat button */}
+      {widgetTypeProp === 'embedded' && !isOpen && (
         <button
           onClick={handleOpen}
-          className={clsx(
-            'fixed bottom-6 z-50 w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-all hover:scale-110',
-            'text-white font-bold text-xl border-2 border-white/20'
-          )}
-          style={{ 
-            backgroundColor: configPrimaryColor,
-            [positionProp === 'bottom-right' ? 'right' : 'left']: '24px'
-          }}
+          className="w-full h-full min-h-[400px] rounded-2xl border-2 border-dashed border-gray-300 flex flex-col items-center justify-center gap-3 text-gray-500 hover:border-cyan-400 hover:text-cyan-600 transition-colors"
+          style={{ backgroundColor: `${configPrimaryColor}10` }}
         >
-          💬
+          <span className="text-5xl">{chatBubbleIconProp}</span>
+          <span className="text-sm font-medium">{labelNameProp}</span>
         </button>
       )}
 
@@ -359,13 +411,18 @@ export function EmbedWidget({
       {isOpen && (
         <div
           className={clsx(
-            'fixed z-50 bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden transition-all',
+            'bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden transition-all',
             'border border-gray-200',
-            isMinimized ? 'w-16 h-16' : 'w-[380px] h-[600px]'
+            isMinimized ? 'w-16 h-16' : 'w-[380px] h-[600px]',
+            // Different positioning based on widget type
+            widgetTypeProp === 'popup' && 'fixed z-50',
+            widgetTypeProp === 'embedded' && 'w-full h-full',
+            widgetTypeProp === 'floating' && 'fixed z-50 w-[380px] h-[600px]'
           )}
           style={{
-            [positionProp === 'bottom-right' ? 'right' : 'left']: '24px',
-            bottom: '24px',
+            ...(widgetTypeProp === 'popup' || widgetTypeProp === 'floating'
+              ? { [positionProp === 'bottom-right' ? 'right' : 'left']: '24px', bottom: '24px' }
+              : {}),
           }}
         >
           {/* Header */}
@@ -402,12 +459,15 @@ export function EmbedWidget({
                     <span className="text-sm">{currentLang.flag}</span>
                   </button>
                 )}
-                <button
-                  onClick={() => setIsMinimized(true)}
-                  className="p-1.5 rounded-full hover:bg-white/20 transition-colors"
-                >
-                  <Minimize2 className="w-5 h-5" />
-                </button>
+                {/* Only show minimize for popup type */}
+                {widgetTypeProp === 'popup' && (
+                  <button
+                    onClick={() => setIsMinimized(true)}
+                    className="p-1.5 rounded-full hover:bg-white/20 transition-colors"
+                  >
+                    <Minimize2 className="w-5 h-5" />
+                  </button>
+                )}
                 <button
                   onClick={handleClose}
                   className="p-1.5 rounded-full hover:bg-white/20 transition-colors"
@@ -443,14 +503,14 @@ export function EmbedWidget({
             </div>
           )}
 
-          {/* Restore Button */}
+          {/* Restore Button (for popup type only) */}
           {isMinimized && (
             <button
               onClick={() => setIsMinimized(false)}
               className="w-full h-full flex items-center justify-center"
               style={{ backgroundColor: configPrimaryColor }}
             >
-              <span className="text-white text-2xl">💬</span>
+              <span className="text-white text-2xl">{chatBubbleIconProp}</span>
             </button>
           )}
 

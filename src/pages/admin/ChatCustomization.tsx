@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useChatSettingsStore, type SuggestedPrompt } from '@/stores';
 import type { Language } from '@/types';
-import { CheckCircle, Loader2, AlertCircle, Shield, Bot as BotIcon, X, Send } from 'lucide-react';
-import madaLogo from '@/assets/mada-logo.png';
+import { CheckCircle, Loader2, AlertCircle, Shield, Bot as BotIcon } from 'lucide-react';
 import { EmotionCustomization } from './EmotionCustomization';
 
 const LANGUAGES: { key: Language; label: string }[] = [
@@ -21,117 +20,8 @@ const ICON_OPTIONS = [
 interface ChatCustomizationProps {
   language?: Language;
   userRole?: 'admin' | 'superadmin' | 'super_admin' | 'user';
-  isInline?: boolean; // When true, hides the fixed-position MiniChatPreview
+  isInline?: boolean;
   onClose?: () => void;
-}
-
-// Mini Chat Preview Component
-function MiniChatPreview({ greeting, description, onClose }: { greeting: any; description: any; onClose: () => void }) {
-  const [messages, setMessages] = useState([
-    { id: '1', role: 'bot', content: greeting?.vi || 'Xin chào! Mình là MADA AI.' }
-  ]);
-  const [inputValue, setInputValue] = useState('');
-  const [isTyping, setIsTyping] = useState(false);
-
-  const handleSend = () => {
-    if (!inputValue.trim()) return;
-    
-    const userMsg = { id: Date.now().toString(), role: 'user', content: inputValue };
-    setMessages(prev => [...prev, userMsg]);
-    setInputValue('');
-    setIsTyping(true);
-    
-    setTimeout(() => {
-      setIsTyping(false);
-      setMessages(prev => [...prev, {
-        id: (Date.now() + 1).toString(),
-        role: 'bot',
-        content: description?.vi || 'Mình có thể giúp bạn phân tích tài liệu, xử lý dữ liệu từ các tệp hoặc trả lời các câu hỏi chuyên sâu.'
-      }]);
-    }, 1500);
-  };
-
-  return (
-    <div className="fixed right-6 bottom-6 z-50">
-      {/* Preview Container */}
-      <div className="bg-white rounded-2xl shadow-2xl border-2 border-black w-96 overflow-hidden animate-in slide-in-from-bottom-4">
-        {/* Header */}
-        <div className="p-4 flex items-center gap-3 border-b border-black/10 bg-gradient-to-r from-teal-500 to-cyan-500">
-          <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
-            <img src={madaLogo} alt="MADA" className="w-8 h-8 object-contain" />
-          </div>
-          <div className="flex-1">
-            <h4 className="text-white font-bold text-sm">MADA AI</h4>
-            <p className="text-white/80 text-xs">Đang hoạt động</p>
-          </div>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 rounded-full bg-white/20 text-white hover:bg-white/30 flex items-center justify-center transition-colors"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
-        {/* Welcome Banner */}
-        <div className="p-3 bg-teal-50 border-b border-teal-100">
-          <h3 className="font-bold text-teal-800 text-sm">{greeting?.vi || 'Xin chào! Mình là MADA AI.'}</h3>
-          <p className="text-xs text-teal-600 mt-1">{description?.vi || 'Mình có thể giúp bạn...'}</p>
-        </div>
-
-        {/* Messages */}
-        <div className="h-56 overflow-y-auto p-4 space-y-3 bg-gray-50">
-          {messages.map((msg) => (
-            <div
-              key={msg.id}
-              className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-            >
-              <div
-                className={`max-w-[85%] px-3 py-2 rounded-2xl text-sm ${
-                  msg.role === 'user'
-                    ? 'bg-blue-500 text-white rounded-br-md'
-                    : 'bg-white border border-gray-200 text-gray-800 rounded-bl-md'
-                }`}
-              >
-                {msg.content}
-              </div>
-            </div>
-          ))}
-          {isTyping && (
-            <div className="flex justify-start">
-              <div className="bg-white border border-gray-200 px-4 py-2 rounded-2xl rounded-bl-md">
-                <div className="flex gap-1">
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Input */}
-        <div className="p-3 border-t border-gray-200 bg-white">
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-              placeholder="Nhập tin nhắn..."
-              className="flex-1 px-3 py-2 rounded-full border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
-            />
-            <button
-              onClick={handleSend}
-              disabled={!inputValue.trim()}
-              className="w-10 h-10 rounded-full bg-teal-500 text-white flex items-center justify-center transition-colors disabled:opacity-50 hover:bg-teal-600"
-            >
-              <Send className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
 }
 
 export function ChatCustomization({ language = 'vi', userRole = 'admin', isInline = false, onClose }: ChatCustomizationProps) {
@@ -155,7 +45,6 @@ export function ChatCustomization({ language = 'vi', userRole = 'admin', isInlin
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [showLivePreview, setShowLivePreview] = useState(false);
 
   useEffect(() => {
     loadFromBackend();
@@ -321,15 +210,6 @@ export function ChatCustomization({ language = 'vi', userRole = 'admin', isInlin
 
   return (
     <div className="space-y-6">
-      {/* Live Preview Widget — hidden when used inline */}
-      {showLivePreview && !isInline && (
-        <MiniChatPreview
-          greeting={greeting}
-          description={description}
-          onClose={() => setShowLivePreview(false)}
-        />
-      )}
-
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
@@ -337,19 +217,6 @@ export function ChatCustomization({ language = 'vi', userRole = 'admin', isInlin
           <p className="text-sm text-on-surface-variant mt-1">{lang.subtitle}</p>
         </div>
         <div className="flex items-center gap-3">
-          {/* Live Preview Button */}
-          <button
-            onClick={() => setShowLivePreview(!showLivePreview)}
-            className={`px-4 py-2.5 rounded-xl font-bold text-sm border-2 border-black transition-all flex items-center gap-2 ${
-              showLivePreview 
-                ? 'bg-green-500 text-white shadow-[4px_4px_0px_0px_#000]' 
-                : 'bg-white text-on-surface hover:bg-green-50 shadow-[3px_3px_0px_0px_#000]'
-            }`}
-          >
-            <BotIcon className="w-4 h-4" />
-            {showLivePreview ? 'Tắt Preview' : 'Live Preview'}
-          </button>
-          
           <button
             onClick={handleSave}
             disabled={saving}
@@ -523,13 +390,13 @@ export function ChatCustomization({ language = 'vi', userRole = 'admin', isInlin
           </div>
           <button
             onClick={() => updateSettings({ fileAttachmentEnabled: !fileAttachmentEnabled })}
-            className={`relative w-12 h-7 rounded-full transition-colors border-2 border-black shadow-[2px_2px_0px_0px_#000] shrink-0 ${
-              fileAttachmentEnabled ? 'bg-primary' : 'bg-gray-200'
+            className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${
+              fileAttachmentEnabled ? 'bg-primary' : 'bg-gray-300'
             }`}
           >
             <span
-              className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-md transition-transform border border-black/20 ${
-                fileAttachmentEnabled ? 'translate-x-6' : 'translate-x-1'
+              className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-md transition-transform ${
+                fileAttachmentEnabled ? 'translate-x-5' : 'translate-x-0.5'
               }`}
             />
           </button>

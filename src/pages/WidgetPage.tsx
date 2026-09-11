@@ -15,6 +15,15 @@ export function WidgetPage() {
   const allowLanguageSwitch = searchParams.get('allowLanguageSwitch') !== 'false';
   const apiKey = searchParams.get('apiKey') || undefined;
   const welcomeTitle = searchParams.get('welcomeTitle') || undefined;
+  
+  // New widget settings
+  const widgetType = (searchParams.get('widgetType') as 'popup' | 'embedded' | 'floating') || undefined;
+  const chatBubbleEnabled = searchParams.get('chatBubbleEnabled') !== 'false';
+  const chatBubbleIcon = searchParams.get('chatBubbleIcon') || undefined;
+  const showLabel = searchParams.get('showLabel') !== 'false';
+  const labelPosition = (searchParams.get('labelPosition') as 'bottom' | 'top') || undefined;
+  const labelName = searchParams.get('labelName') || undefined;
+  const labelColor = searchParams.get('labelColor') || undefined;
 
   // Remove default styles for embed
   useEffect(() => {
@@ -34,6 +43,13 @@ export function WidgetPage() {
         allowLanguageSwitch={allowLanguageSwitch}
         apiKey={apiKey}
         welcomeTitle={welcomeTitle}
+        widgetType={widgetType}
+        chatBubbleEnabled={chatBubbleEnabled}
+        chatBubbleIcon={chatBubbleIcon}
+        showLabel={showLabel}
+        labelPosition={labelPosition}
+        labelName={labelName}
+        labelColor={labelColor}
       />
     </div>
   );

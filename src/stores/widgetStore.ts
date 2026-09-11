@@ -14,6 +14,19 @@ export interface WidgetConfig {
   position: 'bottom-right' | 'bottom-left';
   showBranding: boolean;
   
+  // Widget Type: 'popup' | 'embedded' | 'floating'
+  widgetType: 'popup' | 'embedded' | 'floating';
+  
+  // Chat Bubble Button
+  chatBubbleEnabled: boolean;
+  chatBubbleIcon: string;
+  
+  // Label Settings
+  showLabel: boolean;
+  labelPosition: 'bottom' | 'top';
+  labelName: string;
+  labelColor: string;
+  
   // Behavior
   defaultLanguage: Language;
   allowFileUpload: boolean;
@@ -54,6 +67,19 @@ const DEFAULT_WIDGET_CONFIG: WidgetConfig = {
   primaryColor: '#0891b2',
   position: 'bottom-right',
   showBranding: true,
+  
+  // Widget Type
+  widgetType: 'popup',
+  
+  // Chat Bubble Button
+  chatBubbleEnabled: true,
+  chatBubbleIcon: '💬',
+  
+  // Label Settings
+  showLabel: true,
+  labelPosition: 'bottom',
+  labelName: 'Chat với MADA',
+  labelColor: '#0891b2',
   
   defaultLanguage: 'vi',
   allowFileUpload: true,
@@ -174,7 +200,7 @@ export const useWidgetSettingsStore = create<WidgetSettingsState>()(
         
         if (type === 'iframe') {
           return `<iframe
-  src="${baseUrl}/embed"
+  src="${baseUrl}/embed?botName=${encodeURIComponent(config.botName)}&primaryColor=${encodeURIComponent(config.primaryColor)}&position=${config.position}&lang=${config.defaultLanguage}&widgetType=${config.widgetType}&chatBubbleEnabled=${config.chatBubbleEnabled}&chatBubbleIcon=${encodeURIComponent(config.chatBubbleIcon)}&showLabel=${config.showLabel}&labelPosition=${config.labelPosition}&labelName=${encodeURIComponent(config.labelName)}&labelColor=${encodeURIComponent(config.labelColor)}"
   width="400"
   height="600"
   style="border: none; border-radius: 12px; box-shadow: 0 4px 24px rgba(0,0,0,0.15);"
@@ -205,7 +231,14 @@ export const useWidgetSettingsStore = create<WidgetSettingsState>()(
     position: '${config.position}',
     defaultLanguage: '${config.defaultLanguage}',
     allowFileUpload: ${config.allowFileUpload},
-    allowLanguageSwitch: ${config.allowLanguageSwitch}
+    allowLanguageSwitch: ${config.allowLanguageSwitch},
+    widgetType: '${config.widgetType}',
+    chatBubbleEnabled: ${config.chatBubbleEnabled},
+    chatBubbleIcon: '${config.chatBubbleIcon}',
+    showLabel: ${config.showLabel},
+    labelPosition: '${config.labelPosition}',
+    labelName: '${config.labelName}',
+    labelColor: '${config.labelColor}'
   });
 </script>`;
       },

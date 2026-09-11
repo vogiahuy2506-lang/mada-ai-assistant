@@ -3,13 +3,22 @@ import { useNavigate } from 'react-router-dom';
 import { useWidgetSettingsStore } from '@/stores';
 import {
   CheckCircle, Loader2, AlertCircle, Copy, Code, Globe, X,
-  Send, Bot as BotIcon, Eye, EyeOff, Settings, Code2, ArrowLeft
+  Send, Bot as BotIcon, Eye, EyeOff, Settings, Code2, ArrowLeft,
+  MessageSquare, LayoutGrid, Layers
 } from 'lucide-react';
 
 const POSITIONS = [
   { value: 'bottom-right', label: 'Dưới phải' },
   { value: 'bottom-left', label: 'Dưới trái' },
 ];
+
+const WIDGET_TYPES = [
+  { value: 'popup', label: 'Popup', icon: MessageSquare, description: 'Mở khi click nút bong bóng' },
+  { value: 'embedded', label: 'Embedded', icon: LayoutGrid, description: 'Nhúng trực tiếp vào trang' },
+  { value: 'floating', label: 'Floating', icon: Layers, description: 'Hiện cố định trên trang' },
+];
+
+const BUBBLE_ICONS = ['💬', '🤖', '💭', '✨', '👋', '💡', '🎯', '🔮'];
 
 const PRESET_COLORS = [
   { color: '#0891b2', name: 'Cyan' },
@@ -130,7 +139,7 @@ export function WidgetCustomization({ language = 'vi', userRole = 'admin' }: Wid
 
   useEffect(() => {
     const baseUrl = window.location.origin;
-    const embedParams = `botName=${encodeURIComponent(config.botName)}&primaryColor=${encodeURIComponent(config.primaryColor)}&position=${config.position}&lang=${config.defaultLanguage}`;
+    const embedParams = `botName=${encodeURIComponent(config.botName)}&primaryColor=${encodeURIComponent(config.primaryColor)}&position=${config.position}&lang=${config.defaultLanguage}&widgetType=${config.widgetType}&chatBubbleEnabled=${config.chatBubbleEnabled}&chatBubbleIcon=${encodeURIComponent(config.chatBubbleIcon)}&showLabel=${config.showLabel}&labelPosition=${config.labelPosition}&labelName=${encodeURIComponent(config.labelName)}&labelColor=${encodeURIComponent(config.labelColor)}`;
 
     setIframeCode(`<iframe src="${baseUrl}/embed?${embedParams}" width="380" height="600" style="border:none;border-radius:16px;box-shadow:0 4px 24px rgba(0,0,0,0.15);" title="${config.botName}"></iframe>`);
 
@@ -140,7 +149,14 @@ export function WidgetCustomization({ language = 'vi', userRole = 'admin' }: Wid
     botName: '${config.botName}',
     primaryColor: '${config.primaryColor}',
     position: '${config.position}',
-    defaultLanguage: '${config.defaultLanguage}'
+    defaultLanguage: '${config.defaultLanguage}',
+    widgetType: '${config.widgetType}',
+    chatBubbleEnabled: ${config.chatBubbleEnabled},
+    chatBubbleIcon: '${config.chatBubbleIcon}',
+    showLabel: ${config.showLabel},
+    labelPosition: '${config.labelPosition}',
+    labelName: '${config.labelName}',
+    labelColor: '${config.labelColor}'
   });
 </script>`);
 
@@ -184,6 +200,14 @@ export function WidgetCustomization({ language = 'vi', userRole = 'admin' }: Wid
         allowFile: 'Đính kèm file',
         allowLangSwitch: 'Đổi ngôn ngữ',
         presets: 'Màu có sẵn',
+        widgetType: 'Kiểu Widget',
+        chatBubble: 'Nút bong bóng chat',
+        bubbleIcon: 'Icon bong bóng',
+        label: 'Nhãn',
+        showLabel: 'Hiện nhãn',
+        labelPosition: 'Vị trí nhãn',
+        labelName: 'Tên nhãn',
+        labelColor: 'Màu nhãn',
       },
       embed: {
         title: 'Mã nhúng',
@@ -204,7 +228,23 @@ export function WidgetCustomization({ language = 'vi', userRole = 'admin' }: Wid
       title: 'Chat Widget',
       subtitle: 'Configure and deploy chatbot on your website',
       tabs: { config: 'Config', embed: 'Embed' },
-      config: { botName: 'Bot Name', welcomeTitle: 'Welcome Message', primaryColor: 'Color', position: 'Position', allowFile: 'File Upload', allowLangSwitch: 'Language Switch', presets: 'Presets' },
+      config: { 
+        botName: 'Bot Name', 
+        welcomeTitle: 'Welcome Message', 
+        primaryColor: 'Color', 
+        position: 'Position', 
+        allowFile: 'File Upload', 
+        allowLangSwitch: 'Language Switch', 
+        presets: 'Presets',
+        widgetType: 'Widget Type',
+        chatBubble: 'Chat Bubble Button',
+        bubbleIcon: 'Bubble Icon',
+        label: 'Label',
+        showLabel: 'Show Label',
+        labelPosition: 'Label Position',
+        labelName: 'Label Name',
+        labelColor: 'Label Color',
+      },
       embed: { title: 'Embed Code', iframeTab: 'iFrame', scriptTab: 'JavaScript', publicTab: 'Public Link', copy: 'Copy', copied: 'Copied!', open: 'Open', preview: 'Preview' },
       save: 'Save',
       saving: 'Saving...',
@@ -215,7 +255,23 @@ export function WidgetCustomization({ language = 'vi', userRole = 'admin' }: Wid
       title: 'أداة المحادثة',
       subtitle: 'تكوين ونشر الشات بوت',
       tabs: { config: 'التكوين', embed: 'كود التضمين' },
-      config: { botName: 'الاسم', welcomeTitle: 'رسالة الترحيب', primaryColor: 'اللون', position: 'الموضع', allowFile: 'المرفقات', allowLangSwitch: 'اللغة', presets: 'الألوان' },
+      config: { 
+        botName: 'الاسم', 
+        welcomeTitle: 'رسالة الترحيب', 
+        primaryColor: 'اللون', 
+        position: 'الموضع', 
+        allowFile: 'المرفقات', 
+        allowLangSwitch: 'اللغة', 
+        presets: 'الألوان',
+        widgetType: 'نوع الأداة',
+        chatBubble: 'زر الفقاعة',
+        bubbleIcon: 'أيقونة الفقاعة',
+        label: 'التسمية',
+        showLabel: 'إظهار التسمية',
+        labelPosition: 'موضع التسمية',
+        labelName: 'اسم التسمية',
+        labelColor: 'لون التسمية',
+      },
       embed: { title: 'كود التضمين', iframeTab: 'iFrame', scriptTab: 'JavaScript', publicTab: 'الرابط', copy: 'نسخ', copied: 'تم!', open: 'فتح', preview: 'معاينة' },
       save: 'حفظ',
       saving: 'جارٍ...',
@@ -226,7 +282,23 @@ export function WidgetCustomization({ language = 'vi', userRole = 'admin' }: Wid
       title: 'Widget Chat',
       subtitle: 'Configurer et déployer le chatbot',
       tabs: { config: 'Config', embed: 'Intégration' },
-      config: { botName: 'Nom', welcomeTitle: 'Message', primaryColor: 'Couleur', position: 'Position', allowFile: 'Fichiers', allowLangSwitch: 'Langue', presets: 'Couleurs' },
+      config: { 
+        botName: 'Nom', 
+        welcomeTitle: 'Message', 
+        primaryColor: 'Couleur', 
+        position: 'Position', 
+        allowFile: 'Fichiers', 
+        allowLangSwitch: 'Langue', 
+        presets: 'Couleurs',
+        widgetType: 'Type',
+        chatBubble: 'Bulle',
+        bubbleIcon: 'Icône',
+        label: 'Étiquette',
+        showLabel: 'Afficher',
+        labelPosition: 'Position',
+        labelName: 'Nom',
+        labelColor: 'Couleur',
+      },
       embed: { title: "Code", iframeTab: 'iFrame', scriptTab: 'JavaScript', publicTab: 'Lien', copy: 'Copier', copied: 'OK!', open: 'Ouvrir', preview: 'Aperçu' },
       save: 'OK',
       saving: '...',
@@ -475,6 +547,158 @@ export function WidgetCustomization({ language = 'vi', userRole = 'admin' }: Wid
                     </button>
                   ))}
                 </div>
+              </div>
+
+              {/* Widget Type */}
+              <div>
+                <label className="block text-xs text-slate-500 mb-2">{lang.config.widgetType}</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {WIDGET_TYPES.map((type) => {
+                    const IconComponent = type.icon;
+                    return (
+                      <button
+                        key={type.value}
+                        onClick={() => !isReadOnly && updateConfig({ widgetType: type.value as any })}
+                        className={`flex flex-col items-center gap-1.5 py-3 px-2 rounded-lg border text-xs font-medium transition-all ${
+                          config.widgetType === type.value
+                            ? 'border-cyan-500 bg-cyan-50 text-cyan-700'
+                            : 'border-gray-300 text-slate-600 hover:bg-gray-50'
+                        }`}
+                      >
+                        <IconComponent className="w-5 h-5" />
+                        <span>{type.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Chat Bubble & Label Settings */}
+            <div className="space-y-4">
+              <h4 className="font-semibold text-slate-900 text-sm flex items-center gap-2">
+                <MessageSquare className="w-4 h-4 text-cyan-600" />
+                {lang.config.chatBubble}
+              </h4>
+
+              {/* Chat Bubble Toggle */}
+              <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-gray-50">
+                <span className="text-sm text-slate-700">{lang.config.chatBubble}</span>
+                <button
+                  onClick={() => !isReadOnly && updateConfig({ chatBubbleEnabled: !config.chatBubbleEnabled })}
+                  className={`w-10 h-5 rounded-full transition-colors relative ${
+                    config.chatBubbleEnabled ? 'bg-cyan-600' : 'bg-gray-300'
+                  }`}
+                >
+                  <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
+                    config.chatBubbleEnabled ? 'left-5' : 'left-0.5'
+                  }`} />
+                </button>
+              </div>
+
+              {/* Bubble Icon */}
+              <div>
+                <label className="block text-xs text-slate-500 mb-2">{lang.config.bubbleIcon}</label>
+                <div className="flex flex-wrap gap-2">
+                  {BUBBLE_ICONS.map((icon) => (
+                    <button
+                      key={icon}
+                      onClick={() => !isReadOnly && updateConfig({ chatBubbleIcon: icon })}
+                      className={`w-10 h-10 rounded-lg text-xl flex items-center justify-center transition-all ${
+                        config.chatBubbleIcon === icon
+                          ? 'ring-2 ring-cyan-500 bg-cyan-50'
+                          : 'bg-gray-100 hover:bg-gray-200'
+                      }`}
+                    >
+                      {icon}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Label Settings */}
+              <div className="pt-2 border-t border-gray-200">
+                <h4 className="font-semibold text-slate-900 text-sm flex items-center gap-2 mb-3">
+                  {lang.config.label}
+                </h4>
+
+                {/* Show Label Toggle */}
+                <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-gray-50 mb-3">
+                  <span className="text-sm text-slate-700">{lang.config.showLabel}</span>
+                  <button
+                    onClick={() => !isReadOnly && updateConfig({ showLabel: !config.showLabel })}
+                    className={`w-10 h-5 rounded-full transition-colors relative ${
+                      config.showLabel ? 'bg-cyan-600' : 'bg-gray-300'
+                    }`}
+                  >
+                    <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
+                      config.showLabel ? 'left-5' : 'left-0.5'
+                    }`} />
+                  </button>
+                </div>
+
+                {config.showLabel && (
+                  <>
+                    {/* Label Name */}
+                    <div className="mb-3">
+                      <label className="block text-xs text-slate-500 mb-1.5">{lang.config.labelName}</label>
+                      <input
+                        type="text"
+                        value={config.labelName}
+                        onChange={(e) => updateConfig({ labelName: e.target.value })}
+                        disabled={isReadOnly}
+                        className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 disabled:bg-gray-100"
+                        placeholder="Chat với MADA"
+                      />
+                    </div>
+
+                    {/* Label Position */}
+                    <div className="mb-3">
+                      <label className="block text-xs text-slate-500 mb-2">{lang.config.labelPosition}</label>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => !isReadOnly && updateConfig({ labelPosition: 'bottom' as any })}
+                          className={`flex-1 py-2 px-3 rounded-lg border text-xs font-medium transition-all ${
+                            config.labelPosition === 'bottom'
+                              ? 'border-cyan-500 bg-cyan-50 text-cyan-700'
+                              : 'border-gray-300 text-slate-600 hover:bg-gray-50'
+                          }`}
+                        >
+                          Dưới
+                        </button>
+                        <button
+                          onClick={() => !isReadOnly && updateConfig({ labelPosition: 'top' as any })}
+                          className={`flex-1 py-2 px-3 rounded-lg border text-xs font-medium transition-all ${
+                            config.labelPosition === 'top'
+                              ? 'border-cyan-500 bg-cyan-50 text-cyan-700'
+                              : 'border-gray-300 text-slate-600 hover:bg-gray-50'
+                          }`}
+                        >
+                          Trên
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Label Color */}
+                    <div>
+                      <label className="block text-xs text-slate-500 mb-1.5">{lang.config.labelColor}</label>
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="color"
+                          value={config.labelColor}
+                          onChange={(e) => updateConfig({ labelColor: e.target.value })}
+                          className="w-10 h-8 rounded border border-gray-300 cursor-pointer"
+                        />
+                        <input
+                          type="text"
+                          value={config.labelColor}
+                          onChange={(e) => updateConfig({ labelColor: e.target.value })}
+                          className="flex-1 px-3 py-1.5 rounded-lg border border-gray-300 text-sm font-mono"
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           </div>

@@ -319,13 +319,13 @@ export function EmotionCustomization({ language = 'vi', userRole = 'admin', isIn
             </div>
             <button
               onClick={() => updateEmotionSettings({ useBulletPoints: !emotionSettings.useBulletPoints })}
-              className={`relative w-12 h-7 rounded-full transition-colors border-2 border-black shadow-[2px_2px_0px_0px_#000] shrink-0 ${
+              className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${
                 emotionSettings.useBulletPoints ? 'bg-teal-500' : 'bg-slate-300'
               }`}
             >
               <span
-                className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-md transition-transform border border-black/20 ${
-                  emotionSettings.useBulletPoints ? 'translate-x-6' : 'translate-x-1'
+                className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-md transition-transform ${
+                  emotionSettings.useBulletPoints ? 'translate-x-5' : 'translate-x-0.5'
                 }`}
               />
             </button>
@@ -339,13 +339,13 @@ export function EmotionCustomization({ language = 'vi', userRole = 'admin', isIn
             </div>
             <button
               onClick={() => updateEmotionSettings({ useEmojis: !emotionSettings.useEmojis })}
-              className={`relative w-12 h-7 rounded-full transition-colors border-2 border-black shadow-[2px_2px_0px_0px_#000] shrink-0 ${
+              className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${
                 emotionSettings.useEmojis ? 'bg-teal-500' : 'bg-slate-300'
               }`}
             >
               <span
-                className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-md transition-transform border border-black/20 ${
-                  emotionSettings.useEmojis ? 'translate-x-6' : 'translate-x-1'
+                className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-md transition-transform ${
+                  emotionSettings.useEmojis ? 'translate-x-5' : 'translate-x-0.5'
                 }`}
               />
             </button>

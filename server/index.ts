@@ -86,6 +86,7 @@ import promptsRoutes from './routes/prompts';
 import promptTemplatesRoutes from './routes/prompt-templates';
 import urlImportRoutes from './routes/urlImport';
 import publicRoutes from './routes/public';
+import permissionsRoutes from './routes/permissions';
 
 // Load .env from project root (mada-ai-assistant/.env), not just cwd
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
@@ -486,6 +487,9 @@ app.use('/api/admin/prompts', promptsRoutes);
 app.use('/api/admin/prompt-templates', promptTemplatesRoutes);
 // Public routes (no auth required)
 app.use('/api/public', publicRoutes);
+
+// ============== PERMISSIONS ROUTES ==============
+app.use('/api/permissions', permissionsRoutes);
 
 // ============== WIDGET CONFIG ROUTES ==============
 import widgetRoutes from './routes/widget';

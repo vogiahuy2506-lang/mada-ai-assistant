@@ -202,6 +202,147 @@ export const systemApi = {
   },
 };
 
+// ============== PERMISSIONS ==============
+
+export interface Permission {
+  key: string;
+  label: string;
+  labelEn: string;
+  group: string;
+}
+
+export interface UserPermissions {
+  role: string;
+  plan: string;
+  customPermissions: string[];
+  deniedPermissions: string[];
+  effectivePermissions: string[];
+  features: {
+    admin_panel: boolean;
+    user_management: boolean;
+    kb_management: boolean;
+    product_management: boolean;
+    scraper: boolean;
+    analytics: boolean;
+    audit_logs: boolean;
+    consultations: boolean;
+    file_upload: boolean;
+    chat_export: boolean;
+  };
+}
+
+export const permissionsApi = {
+  /** Lấy danh sách tất cả permissions có sẵn (public). */
+  async list() {
+    return request<{
+      permissions: Permission[];
+      groups: { key: string; permissions: string[] }[];
+      roles: string[];
+      plans: string[];
+      defaultRolePermissions: Record<string, string[]>;
+      defaultPlanPermissions: Record<string, string[]>;
+    }>('/permissions/list');
+  },
+
+  /** Lấy permissions của user hiện tại (cần auth). */
+  async my() {
+    return request<{ data: UserPermissions }>('/permissions/my');
+  },
+
+  /** Lấy permissions của một user cụ thể (cần admin). */
+  async user(userId: string) {
+    return request<{
+      userId: string;
+      role: string;
+      plan: string;
+      customPermissions: string[];
+      deniedPermissions: string[];
+      effectivePermissions: string[];
+      rolePermissions: string[];
+      planPermissions: string[];
+    }>(`/permissions/user/${userId}`);
+  },
+
+  /** Kiểm tra xem user có permission cụ thể không. */
+  async check(userId: string, permission: string) {
+    return request<{ permission: string; hasPermission: boolean }>(`/permissions/user/${userId}/check`, {
+      method: 'POST',
+      body: JSON.stringify({ permission }),
+    });
+  },
+
+  /** Cấp quyền cho user (cần admin). */
+  async grant(userId: string, permission: string) {
+    return request<{ message: string }>(`/permissions/user/${userId}/grant`, {
+      method: 'POST',
+      body: JSON.stringify({ permission }),
+    });
+  },
+
+  /** Từ chối quyền của user (cần admin). */
+  async deny(userId: string, permission: string) {
+    return request<{ message: string }>(`/permissions/user/${userId}/deny`, {
+      method: 'POST',
+      body: JSON.stringify({ permission }),
+    });
+  },
+
+  /** Xóa custom permission của user (cần admin). */
+  async remove(userId: string, permission: string) {
+    return request<{ message: string }>(`/permissions/user/${userId}/${permission}`, {
+      method: 'DELETE',
+    });
+  },
+
+  /** Lấy permissions của tất cả roles. */
+  async getRoles() {
+    return request<Record<string, string[]>>('/permissions/roles');
+  },
+
+  /** Cập nhật permissions cho một role (cần super_admin). */
+  async updateRole(role: string, permissions: string[]) {
+    return request<{ message: string }>(`/permissions/roles/${role}`, {
+      method: 'PUT',
+      body: JSON.stringify({ permissions }),
+    });
+  },
+
+  /** Reset role về permissions mặc định (cần super_admin). */
+  async resetRole(role: string) {
+    return request<{ message: string }>(`/permissions/roles/${role}/reset`, {
+      method: 'POST',
+    });
+  },
+
+  /** Lấy permissions của tất cả plans. */
+  async getPlans() {
+    return request<Record<string, string[]>>('/permissions/plans');
+  },
+
+  /** Cập nhật permissions cho một plan (cần super_admin). */
+  async updatePlan(plan: string, permissions: string[]) {
+    return request<{ message: string }>(`/permissions/plans/${plan}`, {
+      method: 'PUT',
+      body: JSON.stringify({ permissions }),
+    });
+  },
+
+  /** Reset plan về permissions mặc định (cần super_admin). */
+  async resetPlan(plan: string) {
+    return request<{ message: string }>(`/permissions/plans/${plan}/reset`, {
+      method: 'POST',
+    });
+  },
+
+  /** Bulk update user permissions (cần admin). */
+  async bulkUpdate(userId: string, data: { grant?: string[]; deny?: string[]; remove?: string[] }) {
+    return request<{ message: string }>(`/permissions/user/${userId}/bulk`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+};
+
 // ============== FILE UPLOAD QUOTA ==============
 
 export interface FileUploadQuota {

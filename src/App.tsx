@@ -22,6 +22,7 @@ const AdminConsultations = lazy(() => import('@/pages/admin/AdminConsultations')
 const AdminProducts = lazy(() => import('@/pages/admin/AdminProducts'));
 const AdminScraper = lazy(() => import('@/pages/admin/AdminScraper'));
 const AdminAudit = lazy(() => import('@/pages/admin/AdminAudit'));
+const AdminPermissions = lazy(() => import('@/pages/admin/Permissions'));
 const WidgetCustomization = lazy(() => import('@/pages/admin/WidgetCustomization'));
 const DataManagerPage = lazy(() => import('@/pages/DataManagerPage'));
 const ProfilePage = lazy(() => import('@/pages/ProfilePage'));
@@ -139,6 +140,14 @@ function App() {
             element={
               <RoleGuard requiredRole="admin">
                 <AdminSettings />
+              </RoleGuard>
+            }
+          />
+          <Route
+            path="/admin/permissions"
+            element={
+              <RoleGuard requiredRole="admin">
+                <AdminPermissions />
               </RoleGuard>
             }
           />

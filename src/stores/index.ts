@@ -70,6 +70,10 @@ export const useAuthStore = create<AuthState>()(
         }
         clearTokens();
         set({ user: null, isAuthenticated: false });
+        // Clear permissions
+        import('@/stores').then(({ usePermissionsStore }) => {
+          usePermissionsStore.getState().clear();
+        });
       },
       updateUser: (updates) => set((state) => ({
         user: state.user ? { ...state.user, ...updates } : null,
@@ -145,6 +149,12 @@ export const useAuthStore = create<AuthState>()(
         setTokens(res.data.accessToken, res.data.refreshToken);
         const user = apiUserToUser(res.data.user);
         set({ user, isAuthenticated: true, isLoading: false });
+        
+        // Load user permissions
+        import('@/stores').then(({ usePermissionsStore }) => {
+          usePermissionsStore.getState().loadPermissions();
+        });
+        
         return { success: true };
       },
 
@@ -158,6 +168,12 @@ export const useAuthStore = create<AuthState>()(
         setTokens(res.data.accessToken, res.data.refreshToken);
         const user = apiUserToUser(res.data.user);
         set({ user, isAuthenticated: true, isLoading: false });
+        
+        // Load user permissions
+        import('@/stores').then(({ usePermissionsStore }) => {
+          usePermissionsStore.getState().loadPermissions();
+        });
+        
         return { success: true };
       },
 
@@ -167,6 +183,11 @@ export const useAuthStore = create<AuthState>()(
         if (res.success) {
           const user = apiUserToUser(res.data.user);
           set({ user, isAuthenticated: true });
+          
+          // Load user permissions
+          import('@/stores').then(({ usePermissionsStore }) => {
+            usePermissionsStore.getState().loadPermissions();
+          });
         }
       },
 
@@ -179,6 +200,11 @@ export const useAuthStore = create<AuthState>()(
         if (res.success) {
           const user = apiUserToUser(res.data.user);
           set({ user, isAuthenticated: true });
+          
+          // Load user permissions
+          import('@/stores').then(({ usePermissionsStore }) => {
+            usePermissionsStore.getState().loadPermissions();
+          });
         }
       },
     }),
@@ -653,4 +679,140 @@ export type { SuggestedPrompt, AIInstructions, EmotionSettings, EmotionPreset, E
 // Re-export WidgetSettingsStore
 export { useWidgetSettingsStore } from './widgetStore';
 export type { WidgetConfig } from './widgetStore';
+
+// ============== PERMISSIONS STORE ==============
+
+// Permission types
+export type Permission =
+  | 'users:read' | 'users:create' | 'users:update' | 'users:delete' | 'users:manage_roles'
+  | 'kb:read' | 'kb:create' | 'kb:update' | 'kb:delete' | 'kb:publish' | 'kb:import' | 'kb:export'
+  | 'products:read' | 'products:create' | 'products:update' | 'products:delete' | 'products:approve' | 'products:import' | 'products:export'
+  | 'agents:read' | 'agents:create' | 'agents:update' | 'agents:delete' | 'agents:configure' | 'agents:view_logs'
+  | 'prompts:read' | 'prompts:create' | 'prompts:update' | 'prompts:delete' | 'prompts:publish'
+  | 'settings:read' | 'settings:update' | 'settings:manage_permissions' | 'settings:manage_plans'
+  | 'scrape:read' | 'scrape:create' | 'scrape:execute' | 'scrape:cancel'
+  | 'analytics:read' | 'analytics:export'
+  | 'audit:read'
+  | 'consultations:read' | 'consultations:respond' | 'consultations:delete'
+  | 'files:upload' | 'files:delete'
+  | 'chat:use' | 'chat:export';
+
+// Feature types for easier checking
+export type Feature =
+  | 'admin_panel' | 'user_management' | 'kb_management' | 'product_management'
+  | 'scraper' | 'analytics' | 'audit_logs' | 'consultations'
+  | 'file_upload' | 'chat_export';
+
+// Permission store for caching user permissions
+interface PermissionsState {
+  effectivePermissions: string[];
+  customPermissions: string[];
+  deniedPermissions: string[];
+  features: Record<Feature, boolean>;
+  isLoaded: boolean;
+  
+  // Actions
+  loadPermissions: () => Promise<void>;
+  hasPermission: (permission: Permission) => boolean;
+  hasFeature: (feature: Feature) => boolean;
+  clear: () => void;
+}
+
+// Feature to permission mapping
+const FEATURE_PERMISSIONS: Record<Feature, Permission[]> = {
+  admin_panel: ['users:read', 'settings:read'],
+  user_management: ['users:read', 'users:update'],
+  kb_management: ['kb:read', 'kb:create'],
+  product_management: ['products:read', 'products:create'],
+  scraper: ['scrape:read', 'scrape:execute'],
+  analytics: ['analytics:read'],
+  audit_logs: ['audit:read'],
+  consultations: ['consultations:read'],
+  file_upload: ['files:upload'],
+  chat_export: ['chat:export'],
+};
+
+export const usePermissionsStore = create<PermissionsState>()((set, get) => ({
+  effectivePermissions: [],
+  customPermissions: [],
+  deniedPermissions: [],
+  features: {
+    admin_panel: false,
+    user_management: false,
+    kb_management: false,
+    product_management: false,
+    scraper: false,
+    analytics: false,
+    audit_logs: false,
+    consultations: false,
+    file_upload: false,
+    chat_export: false,
+  },
+  isLoaded: false,
+  
+  loadPermissions: async () => {
+    try {
+      const res = await fetch('/api/permissions/my', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('mada-access-token') || ''}`,
+        },
+      });
+      const data = await res.json();
+      if (data.success) {
+        const { effectivePermissions, customPermissions, deniedPermissions, features } = data.data;
+        
+        set({
+          effectivePermissions,
+          customPermissions,
+          deniedPermissions,
+          features,
+          isLoaded: true,
+        });
+      }
+    } catch (e) {
+      console.error('Failed to load permissions:', e);
+    }
+  },
+  
+  hasPermission: (permission) => {
+    const { effectivePermissions } = get();
+    return effectivePermissions.includes(permission);
+  },
+  
+  hasFeature: (feature) => {
+    const { features } = get();
+    return features[feature] || false;
+  },
+  
+  clear: () => {
+    set({
+      effectivePermissions: [],
+      customPermissions: [],
+      deniedPermissions: [],
+      features: {
+        admin_panel: false,
+        user_management: false,
+        kb_management: false,
+        product_management: false,
+        scraper: false,
+        analytics: false,
+        audit_logs: false,
+        consultations: false,
+        file_upload: false,
+        chat_export: false,
+      },
+      isLoaded: false,
+    });
+  },
+}));
+
+// Hook for checking permissions
+export function useHasPermission(permission: Permission): boolean {
+  return usePermissionsStore((s) => s.effectivePermissions.includes(permission));
+}
+
+// Hook for checking features
+export function useHasFeature(feature: Feature): boolean {
+  return usePermissionsStore((s) => s.features[feature] || false);
+}
 

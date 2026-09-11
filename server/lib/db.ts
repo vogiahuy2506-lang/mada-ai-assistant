@@ -1418,6 +1418,13 @@ seedAdmin();
 seedSuperAdmin();
 seedDemoUsers();
 
+// ============== PERMISSIONS INITIALIZATION ==============
+
+// Import and initialize permissions schema
+import { initPermissionsSchema, seedDefaultPermissions } from './permissions';
+initPermissionsSchema();
+seedDefaultPermissions();
+
 export default db;
 
 // ============== TYPES ==============

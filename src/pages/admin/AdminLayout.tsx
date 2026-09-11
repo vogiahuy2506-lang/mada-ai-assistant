@@ -96,6 +96,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'System Prompts', labelEn: 'System Prompts', labelAr: 'التعليمات', labelFr: 'Prompts Système', href: '/admin/prompts', icon: 'edit_note' },
   { label: 'Tư vấn', labelEn: 'Consultations', labelAr: 'الاستشارات', labelFr: 'Consultations', href: '/admin/consultations', icon: 'support_agent' },
   { label: 'Cấu hình', labelEn: 'Settings', labelAr: 'الإعدادات', labelFr: 'Paramètres', href: '/admin/settings', icon: 'settings_suggest', superAdminOnly: true },
+  { label: 'Phân quyền', labelEn: 'Permissions', labelAr: 'الأذونات', labelFr: 'Permissions', href: '/admin/permissions', icon: 'admin_panel_settings', superAdminOnly: true },
 ];
 
 interface AdminLayoutProps {

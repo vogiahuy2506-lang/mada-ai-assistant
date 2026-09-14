@@ -5,6 +5,11 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { v4 as uuidv4 } from 'uuid';
 import session from 'express-session';
+import { fileURLToPath } from 'url';
+
+// ESM-compatible __dirname
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // ============== SYSTEM PROMPTS MODULE ==============
 import { buildSystemPrompt } from './lib/prompts/systemPrompts';

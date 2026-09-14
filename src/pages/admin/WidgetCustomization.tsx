@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useWidgetSettingsStore } from '@/stores';
+import clsx from 'clsx';
 import {
   CheckCircle, Loader2, AlertCircle, Copy, Code, Globe, X,
   Send, Bot as BotIcon, Eye, EyeOff, Settings, Code2, ArrowLeft,
-  MessageSquare, LayoutGrid, Layers
+  MessageSquare, LayoutGrid, Layers, Sparkles
 } from 'lucide-react';
 
 const POSITIONS = [
@@ -325,46 +326,52 @@ export function WidgetCustomization({ language = 'vi', userRole = 'admin' }: Wid
         <MiniWidgetPreview config={config} onClose={() => setShowLivePreview(false)} />
       )}
 
-      {/* Hero Banner */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-500 via-blue-600 to-purple-600 p-6 text-white">
-        <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16" />
-        <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full -ml-12 -mb-12" />
-        <div className="relative flex items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => navigate('/admin')}
-              className="w-10 h-10 rounded-lg bg-white/20 backdrop-blur-sm flex items-center justify-center hover:bg-white/30 transition-colors"
-              title="Quay về trang chủ"
-            >
-              <ArrowLeft className="w-5 h-5 text-white" />
-            </button>
-            <div className="w-14 h-14 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
-              <BotIcon className="w-7 h-7 text-white" />
-            </div>
-            <div>
-              <h3 className="text-2xl font-bold">{lang.title}</h3>
-              <p className="text-sm text-white/80 mt-1">{lang.subtitle}</p>
+      {/* Hero Banner Section - Match AdminOverview style */}
+      <section className="mb-8">
+        <div className="flex justify-between items-end mb-6 relative gap-4 flex-wrap">
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-white to-secondary/10 backdrop-blur-xl rounded-3xl"></div>
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-primary/10 via-transparent to-transparent rounded-3xl"></div>
+          <div className="max-w-2xl relative z-10 py-5 px-5">
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => navigate('/admin')}
+                className="w-10 h-10 rounded-xl bg-white border-2 border-black flex items-center justify-center hover:bg-gray-50 transition-colors shadow-[2px_2px_0px_0px_#000]"
+                title="Quay về trang chủ"
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </button>
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-500 to-blue-500 flex items-center justify-center shadow-[3px_3px_0px_0px_#000] border-2 border-black">
+                <BotIcon className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h2 className="text-2xl md:text-3xl font-black text-on-surface">
+                  {lang.title}
+                </h2>
+                <p className="text-sm text-on-surface-variant">
+                  {lang.subtitle}
+                </p>
+              </div>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          {/* Action Buttons */}
+          <div className="relative z-10 py-5 px-5 flex items-center gap-3">
             <button
               onClick={() => setShowLivePreview(!showLivePreview)}
-              className={`px-4 py-2.5 rounded-xl text-sm font-bold border transition-all duration-300 ${
+              className={clsx(
+                'px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 border-2 border-black shadow-[3px_3px_0px_0px_#000]',
                 showLivePreview
-                  ? 'bg-white text-purple-600 border-white shadow-lg shadow-purple-500/30'
-                  : 'bg-white/10 text-white border-white/30 hover:bg-white/20 backdrop-blur-sm'
-              }`}
+                  ? 'bg-gradient-to-r from-violet-500 to-blue-500 text-white'
+                  : 'bg-white text-black hover:-translate-x-[1px] hover:-translate-y-[1px] hover:shadow-[4px_4px_0px_0px_#000]'
+              )}
             >
-              <span className="flex items-center gap-2">
-                {showLivePreview ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                {showLivePreview ? 'Ẩn Preview' : 'Xem Preview'}
-              </span>
+              {showLivePreview ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              {showLivePreview ? 'Ẩn Preview' : 'Xem Preview'}
             </button>
             {!isReadOnly && (
               <button
                 onClick={handleSave}
                 disabled={saving}
-                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-white to-white text-cyan-600 text-sm font-bold hover:from-cyan-50 hover:to-white disabled:opacity-50 flex items-center gap-2 shadow-lg shadow-white/20 transition-all duration-300 hover:scale-105"
+                className="px-4 py-2 rounded-xl bg-gradient-to-r from-violet-500 to-blue-500 text-white text-sm font-bold border-2 border-black shadow-[3px_3px_0px_0px_#000] flex items-center gap-2 disabled:opacity-50 hover:-translate-x-[1px] hover:-translate-y-[1px]"
               >
                 {saving ? (
                   <>
@@ -386,139 +393,121 @@ export function WidgetCustomization({ language = 'vi', userRole = 'admin' }: Wid
             )}
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* Tabs */}
-      <div className="flex gap-1 p-1.5 bg-gradient-to-r from-cyan-500/10 via-blue-500/10 to-purple-500/10 rounded-2xl border border-gray-200 w-fit">
+      {/* Tabs - Horizontal Navigation */}
+      <div className="inline-flex gap-1 bg-white rounded-xl border-2 border-black p-0.5 shadow-[2px_2px_0px_0px_#000]">
         <button
           onClick={() => setActiveTab('config')}
-          className={`px-6 py-3 rounded-xl text-sm font-bold transition-all duration-300 flex items-center gap-2.5 shadow-md ${
+          className={clsx(
+            'px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 border-2',
             activeTab === 'config'
-              ? 'bg-gradient-to-r from-cyan-500 to-cyan-600 text-white shadow-lg shadow-cyan-500/30 scale-105'
-              : 'bg-white text-slate-600 hover:bg-gradient-to-r hover:from-cyan-50 hover:to-cyan-100 border border-gray-200 hover:border-cyan-300 hover:shadow-sm'
-          }`}
-        >
-          <Settings className={`w-5 h-5 ${activeTab === 'config' ? 'text-white' : 'text-cyan-500'}`} />
-          <span>{lang.tabs.config}</span>
-          {activeTab === 'config' && (
-            <span className="ml-1 px-2 py-0.5 rounded-full bg-white/20 text-xs">Active</span>
+              ? 'bg-gradient-to-r from-violet-500 to-blue-500 text-white border-black shadow-[2px_2px_0px_0px_#000]'
+              : 'bg-gray-100 text-gray-600 border-transparent hover:bg-gray-200'
           )}
+        >
+          <Settings className="w-3.5 h-3.5" />
+          <span>{lang.tabs.config}</span>
         </button>
         <button
           onClick={() => setActiveTab('embed')}
-          className={`px-6 py-3 rounded-xl text-sm font-bold transition-all duration-300 flex items-center gap-2.5 shadow-md ${
+          className={clsx(
+            'px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 border-2',
             activeTab === 'embed'
-              ? 'bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/30 scale-105'
-              : 'bg-white text-slate-600 hover:bg-gradient-to-r hover:from-purple-50 hover:to-purple-100 border border-gray-200 hover:border-purple-300 hover:shadow-sm'
-          }`}
-        >
-          <Code2 className={`w-5 h-5 ${activeTab === 'embed' ? 'text-white' : 'text-purple-500'}`} />
-          <span>{lang.tabs.embed}</span>
-          {activeTab === 'embed' && (
-            <span className="ml-1 px-2 py-0.5 rounded-full bg-white/20 text-xs">Active</span>
+              ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white border-black shadow-[2px_2px_0px_0px_#000]'
+              : 'bg-gray-100 text-gray-600 border-transparent hover:bg-gray-200'
           )}
+        >
+          <Code2 className="w-3.5 h-3.5" />
+          <span>{lang.tabs.embed}</span>
         </button>
       </div>
 
       {/* Content */}
       {activeTab === 'config' && (
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
+        <div className="bg-white rounded-2xl border-2 border-black p-6 shadow-[4px_4px_0px_0px_#000]">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Bot Settings */}
             <div className="space-y-4">
-              <h4 className="font-semibold text-slate-900 text-sm flex items-center gap-2">
-                <BotIcon className="w-4 h-4 text-cyan-600" />
+              <h4 className="font-bold text-sm flex items-center gap-2 text-gray-900 uppercase tracking-wider">
+                <BotIcon className="w-4 h-4 text-violet-500" />
                 Cấu hình Bot
               </h4>
 
               <div>
-                <label className="block text-xs text-slate-500 mb-1.5">{lang.config.botName}</label>
+                <label className="block text-xs font-bold text-gray-600 mb-1.5">{lang.config.botName}</label>
                 <input
                   type="text"
                   value={config.botName}
                   onChange={(e) => updateConfig({ botName: e.target.value })}
                   disabled={isReadOnly}
-                  className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 disabled:bg-gray-100"
+                  className="w-full px-4 py-2.5 rounded-lg border-2 border-black text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 disabled:bg-gray-100 font-medium"
                   placeholder="MADA AI"
                 />
               </div>
 
               <div>
-                <label className="block text-xs text-slate-500 mb-1.5">{lang.config.welcomeTitle}</label>
+                <label className="block text-xs font-bold text-gray-600 mb-1.5">{lang.config.welcomeTitle}</label>
                 <textarea
                   value={config.welcomeTitle}
                   onChange={(e) => updateConfig({ welcomeTitle: e.target.value })}
                   disabled={isReadOnly}
                   rows={2}
-                  className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 disabled:bg-gray-100 resize-none"
+                  className="w-full px-4 py-2.5 rounded-lg border-2 border-black text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 disabled:bg-gray-100 resize-none font-medium"
                   placeholder="Xin chào! Mình là MADA AI..."
                 />
               </div>
 
               <div>
-                <label className="block text-xs text-slate-500 mb-1.5">Ngôn ngữ mặc định</label>
+                <label className="block text-xs font-bold text-gray-600 mb-1.5">Ngôn ngữ mặc định</label>
                 <select
                   value={config.defaultLanguage}
                   onChange={(e) => updateConfig({ defaultLanguage: e.target.value as any })}
                   disabled={isReadOnly}
-                  className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 disabled:bg-gray-100"
+                  className="w-full px-4 py-2.5 rounded-lg border-2 border-black text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 disabled:bg-gray-100 bg-white font-medium"
                 >
-                  <option value="vi">Tiếng Việt</option>
-                  <option value="en">English</option>
-                  <option value="ar">العربية</option>
-                  <option value="fr">Français</option>
+                  <option value="vi">Tiếng Việt 🇻🇳</option>
+                  <option value="en">English 🇺🇸</option>
+                  <option value="ar">العربية 🇸🇦</option>
+                  <option value="fr">Français 🇫🇷</option>
                 </select>
               </div>
 
               {/* Toggles */}
               <div className="space-y-2">
-                <div className="flex items-center justify-between py-3 px-4 rounded-xl bg-gradient-to-r from-gray-50 to-gray-100 border border-gray-200 hover:border-cyan-300 transition-colors">
-                  <span className="text-sm font-medium text-slate-700">{lang.config.allowFile}</span>
+                <div className="flex items-center justify-between py-3 px-4 rounded-xl bg-gray-50 border-2 border-black">
+                  <span className="text-sm font-bold text-gray-900">{lang.config.allowFile}</span>
                   <button
                     onClick={() => !isReadOnly && updateConfig({ allowFileUpload: !config.allowFileUpload })}
-                    className={`relative w-20 h-8 rounded-full transition-all duration-300 ${
-                      config.allowFileUpload 
-                        ? 'bg-gradient-to-r from-cyan-500 to-cyan-600 shadow-lg shadow-cyan-500/40' 
-                        : 'bg-gray-300'
-                    }`}
-                  >
-                    <span className={`absolute top-1.5 w-5 h-5 rounded-full bg-white shadow-lg transition-all duration-300 flex items-center justify-center ${
-                      config.allowFileUpload ? 'left-[58px]' : 'left-0.5'
-                    }`}>
-                      {config.allowFileUpload ? (
-                        <CheckCircle className="w-3 h-3 text-cyan-600" />
-                      ) : (
-                        <X className="w-3 h-3 text-gray-400" />
-                      )}
-                    </span>
-                    {config.allowFileUpload && (
-                      <span className="absolute right-2 text-[11px] text-white font-bold">ON</span>
+                    className={clsx(
+                      'relative w-12 h-7 rounded-full transition-colors flex-shrink-0 border-2 border-black',
+                      config.allowFileUpload ? 'bg-emerald-500' : 'bg-gray-300'
                     )}
+                  >
+                    <span
+                      className={clsx(
+                        'absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform',
+                        config.allowFileUpload ? 'left-[22px]' : 'left-0.5'
+                      )}
+                    />
                   </button>
                 </div>
 
-                <div className="flex items-center justify-between py-3 px-4 rounded-xl bg-gradient-to-r from-gray-50 to-gray-100 border border-gray-200 hover:border-cyan-300 transition-colors">
-                  <span className="text-sm font-medium text-slate-700">{lang.config.allowLangSwitch}</span>
+                <div className="flex items-center justify-between py-3 px-4 rounded-xl bg-gray-50 border-2 border-black">
+                  <span className="text-sm font-bold text-gray-900">{lang.config.allowLangSwitch}</span>
                   <button
                     onClick={() => !isReadOnly && updateConfig({ allowLanguageSwitch: !config.allowLanguageSwitch })}
-                    className={`relative w-20 h-8 rounded-full transition-all duration-300 ${
-                      config.allowLanguageSwitch 
-                        ? 'bg-gradient-to-r from-cyan-500 to-cyan-600 shadow-lg shadow-cyan-500/40' 
-                        : 'bg-gray-300'
-                    }`}
-                  >
-                    <span className={`absolute top-1.5 w-5 h-5 rounded-full bg-white shadow-lg transition-all duration-300 flex items-center justify-center ${
-                      config.allowLanguageSwitch ? 'left-[58px]' : 'left-0.5'
-                    }`}>
-                      {config.allowLanguageSwitch ? (
-                        <CheckCircle className="w-3 h-3 text-cyan-600" />
-                      ) : (
-                        <X className="w-3 h-3 text-gray-400" />
-                      )}
-                    </span>
-                    {config.allowLanguageSwitch && (
-                      <span className="absolute right-2 text-[11px] text-white font-bold">ON</span>
+                    className={clsx(
+                      'relative w-12 h-7 rounded-full transition-colors flex-shrink-0',
+                      config.allowLanguageSwitch ? 'bg-emerald-500' : 'bg-gray-300'
                     )}
+                  >
+                    <span
+                      className={clsx(
+                        'absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform',
+                        config.allowLanguageSwitch ? 'left-[22px]' : 'left-0.5'
+                      )}
+                    />
                   </button>
                 </div>
               </div>
@@ -526,38 +515,38 @@ export function WidgetCustomization({ language = 'vi', userRole = 'admin' }: Wid
 
             {/* Appearance */}
             <div className="space-y-4">
-              <h4 className="font-semibold text-slate-900 text-sm flex items-center gap-2">
+              <h4 className="font-bold text-sm flex items-center gap-2 text-gray-900 uppercase tracking-wider">
                 <div className="w-4 h-4 rounded" style={{ backgroundColor: config.primaryColor }} />
                 Giao diện
               </h4>
 
               <div>
-                <label className="block text-xs text-slate-500 mb-1.5">{lang.config.primaryColor}</label>
+                <label className="block text-xs font-bold text-gray-600 mb-1.5">{lang.config.primaryColor}</label>
                 <div className="flex items-center gap-3">
                   <input
                     type="color"
                     value={config.primaryColor}
                     onChange={(e) => updateConfig({ primaryColor: e.target.value })}
-                    className="w-12 h-10 rounded-lg border border-gray-300 cursor-pointer"
+                    className="w-12 h-10 rounded-lg cursor-pointer border-2 border-black"
                   />
                   <input
                     type="text"
                     value={config.primaryColor}
                     onChange={(e) => updateConfig({ primaryColor: e.target.value })}
-                    className="flex-1 px-3 py-2 rounded-lg border border-gray-300 text-sm font-mono"
+                    className="flex-1 px-4 py-2.5 rounded-lg border-2 border-black text-sm font-mono font-bold"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs text-slate-500 mb-2">{lang.config.presets}</label>
+                <label className="block text-xs font-bold text-gray-600 mb-2">{lang.config.presets}</label>
                 <div className="flex flex-wrap gap-2">
                   {PRESET_COLORS.map((preset) => (
                     <button
                       key={preset.color}
                       onClick={() => !isReadOnly && updateConfig({ primaryColor: preset.color })}
-                      className={`w-8 h-8 rounded-lg transition-transform hover:scale-110 ${
-                        config.primaryColor === preset.color ? 'ring-2 ring-offset-2 ring-gray-400' : ''
+                      className={`w-9 h-9 rounded-lg transition-all hover:scale-110 border-2 border-black ${
+                        config.primaryColor === preset.color ? 'ring-2 ring-offset-2 ring-violet-500' : ''
                       }`}
                       style={{ backgroundColor: preset.color }}
                       title={preset.name}
@@ -567,17 +556,18 @@ export function WidgetCustomization({ language = 'vi', userRole = 'admin' }: Wid
               </div>
 
               <div>
-                <label className="block text-xs text-slate-500 mb-2">{lang.config.position}</label>
+                <label className="block text-xs font-bold text-gray-600 mb-2">{lang.config.position}</label>
                 <div className="flex gap-2">
                   {POSITIONS.map((pos) => (
                     <button
                       key={pos.value}
                       onClick={() => !isReadOnly && updateConfig({ position: pos.value as any })}
-                      className={`flex-1 py-2 px-3 rounded-lg border text-xs font-medium transition-all ${
+                      className={clsx(
+                        'flex-1 py-2.5 px-3 rounded-lg text-xs font-bold transition-all border-2 border-black',
                         config.position === pos.value
-                          ? 'border-cyan-500 bg-cyan-50 text-cyan-700'
-                          : 'border-gray-300 text-slate-600 hover:bg-gray-50'
-                      }`}
+                          ? 'bg-gradient-to-r from-violet-500 to-blue-500 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      )}
                     >
                       {pos.label}
                     </button>
@@ -587,7 +577,7 @@ export function WidgetCustomization({ language = 'vi', userRole = 'admin' }: Wid
 
               {/* Widget Type */}
               <div>
-                <label className="block text-xs text-slate-500 mb-2">{lang.config.widgetType}</label>
+                <label className="block text-xs font-bold text-gray-600 mb-2">{lang.config.widgetType}</label>
                 <div className="grid grid-cols-3 gap-2">
                   {WIDGET_TYPES.map((type) => {
                     const IconComponent = type.icon;
@@ -595,11 +585,12 @@ export function WidgetCustomization({ language = 'vi', userRole = 'admin' }: Wid
                       <button
                         key={type.value}
                         onClick={() => !isReadOnly && updateConfig({ widgetType: type.value as any })}
-                        className={`flex flex-col items-center gap-1.5 py-3 px-2 rounded-lg border text-xs font-medium transition-all ${
+                        className={clsx(
+                          'flex flex-col items-center gap-1 py-3 px-2 rounded-lg text-xs font-bold transition-all border-2 border-black',
                           config.widgetType === type.value
-                            ? 'border-cyan-500 bg-cyan-50 text-cyan-700'
-                            : 'border-gray-300 text-slate-600 hover:bg-gray-50'
-                        }`}
+                            ? 'bg-gradient-to-r from-violet-500 to-blue-500 text-white'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        )}
                       >
                         <IconComponent className="w-5 h-5" />
                         <span>{type.label}</span>
@@ -611,152 +602,142 @@ export function WidgetCustomization({ language = 'vi', userRole = 'admin' }: Wid
             </div>
 
             {/* Chat Bubble & Label Settings */}
-            <div className="space-y-4">
-              <h4 className="font-semibold text-slate-900 text-sm flex items-center gap-2">
-                <MessageSquare className="w-4 h-4 text-cyan-600" />
+            <div className="space-y-4 md:col-span-2">
+              <h4 className="font-bold text-sm flex items-center gap-2 text-gray-900 uppercase tracking-wider">
+                <MessageSquare className="w-4 h-4 text-violet-500" />
                 {lang.config.chatBubble}
               </h4>
 
-              {/* Chat Bubble Toggle */}
-              <div className="flex items-center justify-between py-3 px-4 rounded-xl bg-gradient-to-r from-gray-50 to-gray-100 border border-gray-200 hover:border-cyan-300 transition-colors">
-                <span className="text-sm font-medium text-slate-700">{lang.config.chatBubble}</span>
-                <button
-                  onClick={() => !isReadOnly && updateConfig({ chatBubbleEnabled: !config.chatBubbleEnabled })}
-                  className={`relative w-20 h-8 rounded-full transition-all duration-300 ${
-                    config.chatBubbleEnabled 
-                      ? 'bg-gradient-to-r from-cyan-500 to-cyan-600 shadow-lg shadow-cyan-500/40' 
-                      : 'bg-gray-300'
-                  }`}
-                >
-                  <span className={`absolute top-1.5 w-5 h-5 rounded-full bg-white shadow-lg transition-all duration-300 flex items-center justify-center ${
-                    config.chatBubbleEnabled ? 'left-[58px]' : 'left-0.5'
-                  }`}>
-                    {config.chatBubbleEnabled ? (
-                      <CheckCircle className="w-3 h-3 text-cyan-600" />
-                    ) : (
-                      <X className="w-3 h-3 text-gray-400" />
-                    )}
-                  </span>
-                  {config.chatBubbleEnabled && (
-                    <span className="absolute right-2 text-[11px] text-white font-bold">ON</span>
-                  )}
-                </button>
-              </div>
-
-              {/* Bubble Icon */}
-              <div>
-                <label className="block text-xs text-slate-500 mb-2">{lang.config.bubbleIcon}</label>
-                <div className="flex flex-wrap gap-2">
-                  {BUBBLE_ICONS.map((icon) => (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Chat Bubble Settings */}
+                <div className="space-y-4 p-4 bg-gray-50 rounded-xl border-2 border-black shadow-sm">
+                  {/* Chat Bubble Toggle */}
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-bold text-gray-900">{lang.config.chatBubble}</span>
                     <button
-                      key={icon}
-                      onClick={() => !isReadOnly && updateConfig({ chatBubbleIcon: icon })}
-                      className={`w-10 h-10 rounded-lg text-xl flex items-center justify-center transition-all ${
-                        config.chatBubbleIcon === icon
-                          ? 'ring-2 ring-cyan-500 bg-cyan-50'
-                          : 'bg-gray-100 hover:bg-gray-200'
-                      }`}
-                    >
-                      {icon}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Label Settings */}
-              <div className="pt-2 border-t border-gray-200">
-                <h4 className="font-semibold text-slate-900 text-sm flex items-center gap-2 mb-3">
-                  {lang.config.label}
-                </h4>
-
-                {/* Show Label Toggle */}
-                <div className="flex items-center justify-between py-3 px-4 rounded-xl bg-gradient-to-r from-gray-50 to-gray-100 border border-gray-200 hover:border-cyan-300 transition-colors mb-3">
-                  <span className="text-sm font-medium text-slate-700">{lang.config.showLabel}</span>
-                  <button
-                    onClick={() => !isReadOnly && updateConfig({ showLabel: !config.showLabel })}
-                    className={`relative w-20 h-8 rounded-full transition-all duration-300 ${
-                      config.showLabel 
-                        ? 'bg-gradient-to-r from-cyan-500 to-cyan-600 shadow-lg shadow-cyan-500/40' 
-                        : 'bg-gray-300'
-                    }`}
-                  >
-                    <span className={`absolute top-1.5 w-5 h-5 rounded-full bg-white shadow-lg transition-all duration-300 flex items-center justify-center ${
-                      config.showLabel ? 'left-[58px]' : 'left-0.5'
-                    }`}>
-                      {config.showLabel ? (
-                        <CheckCircle className="w-3 h-3 text-cyan-600" />
-                      ) : (
-                        <X className="w-3 h-3 text-gray-400" />
+                      onClick={() => !isReadOnly && updateConfig({ chatBubbleEnabled: !config.chatBubbleEnabled })}
+                      className={clsx(
+                        'relative w-12 h-7 rounded-full transition-colors border-2 border-black',
+                        config.chatBubbleEnabled ? 'bg-emerald-500' : 'bg-gray-300'
                       )}
-                    </span>
-                    {config.showLabel && (
-                      <span className="absolute right-2 text-[11px] text-white font-bold">ON</span>
-                    )}
-                  </button>
+                    >
+                      <span
+                        className={clsx(
+                          'absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform',
+                          config.chatBubbleEnabled ? 'left-[22px]' : 'left-0.5'
+                        )}
+                      />
+                    </button>
+                  </div>
+
+                  {/* Bubble Icon */}
+                  <div>
+                    <label className="block text-xs font-bold text-gray-600 mb-2">{lang.config.bubbleIcon}</label>
+                    <div className="flex flex-wrap gap-2">
+                      {BUBBLE_ICONS.map((icon) => (
+                        <button
+                          key={icon}
+                          onClick={() => !isReadOnly && updateConfig({ chatBubbleIcon: icon })}
+                          className={clsx(
+                            'w-9 h-9 rounded-lg text-lg flex items-center justify-center transition-all border-2 border-black',
+                            config.chatBubbleIcon === icon
+                              ? 'bg-gradient-to-r from-violet-500 to-blue-500 text-white'
+                              : 'bg-white hover:bg-gray-100'
+                          )}
+                        >
+                          {icon}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
 
-                {config.showLabel && (
-                  <>
-                    {/* Label Name */}
-                    <div className="mb-3">
-                      <label className="block text-xs text-slate-500 mb-1.5">{lang.config.labelName}</label>
-                      <input
-                        type="text"
-                        value={config.labelName}
-                        onChange={(e) => updateConfig({ labelName: e.target.value })}
-                        disabled={isReadOnly}
-                        className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 disabled:bg-gray-100"
-                        placeholder="Chat với MADA"
+                {/* Label Settings */}
+                <div className="space-y-4 p-4 bg-gray-50 rounded-xl border-2 border-black shadow-sm">
+                  {/* Show Label Toggle */}
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-bold text-gray-900">{lang.config.showLabel}</span>
+                    <button
+                      onClick={() => !isReadOnly && updateConfig({ showLabel: !config.showLabel })}
+                      className={clsx(
+                        'relative w-12 h-7 rounded-full transition-colors border-2 border-black',
+                        config.showLabel ? 'bg-emerald-500' : 'bg-gray-300'
+                      )}
+                    >
+                      <span
+                        className={clsx(
+                          'absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform',
+                          config.showLabel ? 'left-[22px]' : 'left-0.5'
+                        )}
                       />
-                    </div>
+                    </button>
+                  </div>
 
-                    {/* Label Position */}
-                    <div className="mb-3">
-                      <label className="block text-xs text-slate-500 mb-2">{lang.config.labelPosition}</label>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => !isReadOnly && updateConfig({ labelPosition: 'bottom' as any })}
-                          className={`flex-1 py-2 px-3 rounded-lg border text-xs font-medium transition-all ${
-                            config.labelPosition === 'bottom'
-                              ? 'border-cyan-500 bg-cyan-50 text-cyan-700'
-                              : 'border-gray-300 text-slate-600 hover:bg-gray-50'
-                          }`}
-                        >
-                          Dưới
-                        </button>
-                        <button
-                          onClick={() => !isReadOnly && updateConfig({ labelPosition: 'top' as any })}
-                          className={`flex-1 py-2 px-3 rounded-lg border text-xs font-medium transition-all ${
-                            config.labelPosition === 'top'
-                              ? 'border-cyan-500 bg-cyan-50 text-cyan-700'
-                              : 'border-gray-300 text-slate-600 hover:bg-gray-50'
-                          }`}
-                        >
-                          Trên
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Label Color */}
-                    <div>
-                      <label className="block text-xs text-slate-500 mb-1.5">{lang.config.labelColor}</label>
-                      <div className="flex items-center gap-3">
-                        <input
-                          type="color"
-                          value={config.labelColor}
-                          onChange={(e) => updateConfig({ labelColor: e.target.value })}
-                          className="w-10 h-8 rounded border border-gray-300 cursor-pointer"
-                        />
+                  {config.showLabel && (
+                    <>
+                      {/* Label Name */}
+                      <div>
+                        <label className="block text-xs font-bold text-gray-600 mb-1.5">{lang.config.labelName}</label>
                         <input
                           type="text"
-                          value={config.labelColor}
-                          onChange={(e) => updateConfig({ labelColor: e.target.value })}
-                          className="flex-1 px-3 py-1.5 rounded-lg border border-gray-300 text-sm font-mono"
+                          value={config.labelName}
+                          onChange={(e) => updateConfig({ labelName: e.target.value })}
+                          disabled={isReadOnly}
+                          className="w-full px-4 py-2.5 rounded-lg border-2 border-black text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 disabled:bg-gray-100 font-medium"
+                          placeholder="Chat với MADA"
                         />
                       </div>
-                    </div>
-                  </>
-                )}
+
+                      {/* Label Position */}
+                      <div>
+                        <label className="block text-xs font-bold text-gray-600 mb-2">{lang.config.labelPosition}</label>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => !isReadOnly && updateConfig({ labelPosition: 'bottom' as any })}
+                            className={clsx(
+                              'flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all border-2 border-black',
+                              config.labelPosition === 'bottom'
+                                ? 'bg-gradient-to-r from-violet-500 to-blue-500 text-white'
+                                : 'bg-white text-gray-700 hover:bg-gray-100'
+                            )}
+                          >
+                            Dưới
+                          </button>
+                          <button
+                            onClick={() => !isReadOnly && updateConfig({ labelPosition: 'top' as any })}
+                            className={clsx(
+                              'flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all border-2 border-black',
+                              config.labelPosition === 'top'
+                                ? 'bg-gradient-to-r from-violet-500 to-blue-500 text-white'
+                                : 'bg-white text-gray-700 hover:bg-gray-100'
+                            )}
+                          >
+                            Trên
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Label Color */}
+                      <div>
+                        <label className="block text-xs font-bold text-gray-600 mb-1.5">{lang.config.labelColor}</label>
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="color"
+                            value={config.labelColor}
+                            onChange={(e) => updateConfig({ labelColor: e.target.value })}
+                            className="w-10 h-8 rounded-lg cursor-pointer border-2 border-black"
+                          />
+                          <input
+                            type="text"
+                            value={config.labelColor}
+                            onChange={(e) => updateConfig({ labelColor: e.target.value })}
+                            className="flex-1 px-3 py-1.5 rounded-lg border-2 border-black text-sm font-mono font-bold"
+                          />
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -768,13 +749,12 @@ export function WidgetCustomization({ language = 'vi', userRole = 'admin' }: Wid
           {/* Embed Options */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* iFrame */}
-            <div className="relative p-5 rounded-2xl bg-gradient-to-br from-slate-800 to-slate-900 text-white overflow-hidden group hover:shadow-xl hover:shadow-blue-500/20 transition-all duration-300 cursor-pointer"
+            <div className="relative p-5 rounded-xl bg-gradient-to-br from-slate-800 to-slate-900 text-white overflow-hidden group border-2 border-black shadow-[4px_4px_0px_0px_#000] hover:border-violet-500/50 transition-all cursor-pointer"
               onClick={() => handleCopy(iframeCode, 'iframe')}>
-              <div className="absolute top-0 right-0 w-20 h-20 bg-blue-500/20 rounded-full -mr-10 -mt-10 group-hover:scale-150 transition-transform duration-500" />
-              <div className="absolute bottom-0 left-0 w-16 h-16 bg-blue-600/20 rounded-full -ml-8 -mb-8" />
+              <div className="absolute top-0 right-0 w-20 h-20 bg-blue-500/10 rounded-full -mr-10 -mt-10 group-hover:scale-150 transition-transform duration-500" />
               <div className="relative flex items-center gap-3 mb-3">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/30">
-                  <Code className="w-6 h-6 text-white" />
+                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center border border-black">
+                  <Code className="w-5 h-5 text-white" />
                 </div>
                 <div>
                   <span className="text-sm font-bold">{lang.embed.iframeTab}</span>
@@ -782,7 +762,7 @@ export function WidgetCustomization({ language = 'vi', userRole = 'admin' }: Wid
                 </div>
               </div>
               <button
-                className="w-full py-2.5 rounded-xl bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-400 hover:to-blue-500 text-xs font-bold flex items-center justify-center gap-2 shadow-lg shadow-blue-500/30 transition-all duration-300"
+                className="w-full py-2 rounded-lg bg-blue-500 hover:bg-blue-400 text-xs font-bold flex items-center justify-center gap-2 transition-colors border border-black"
               >
                 {copiedCode === 'iframe' ? (
                   <>
@@ -799,13 +779,12 @@ export function WidgetCustomization({ language = 'vi', userRole = 'admin' }: Wid
             </div>
 
             {/* JavaScript */}
-            <div className="relative p-5 rounded-2xl bg-gradient-to-br from-slate-800 to-slate-900 text-white overflow-hidden group hover:shadow-xl hover:shadow-amber-500/20 transition-all duration-300 cursor-pointer"
+            <div className="relative p-5 rounded-xl bg-gradient-to-br from-slate-800 to-slate-900 text-white overflow-hidden group border-2 border-black shadow-[4px_4px_0px_0px_#000] hover:border-amber-500/50 transition-all cursor-pointer"
               onClick={() => handleCopy(scriptCode, 'script')}>
-              <div className="absolute top-0 right-0 w-20 h-20 bg-amber-500/20 rounded-full -mr-10 -mt-10 group-hover:scale-150 transition-transform duration-500" />
-              <div className="absolute bottom-0 left-0 w-16 h-16 bg-amber-600/20 rounded-full -ml-8 -mb-8" />
+              <div className="absolute top-0 right-0 w-20 h-20 bg-amber-500/10 rounded-full -mr-10 -mt-10 group-hover:scale-150 transition-transform duration-500" />
               <div className="relative flex items-center gap-3 mb-3">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center shadow-lg shadow-amber-500/30">
-                  <Code className="w-6 h-6 text-white" />
+                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center border border-black">
+                  <Code className="w-5 h-5 text-white" />
                 </div>
                 <div>
                   <span className="text-sm font-bold">{lang.embed.scriptTab}</span>
@@ -813,7 +792,7 @@ export function WidgetCustomization({ language = 'vi', userRole = 'admin' }: Wid
                 </div>
               </div>
               <button
-                className="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-xs font-bold flex items-center justify-center gap-2 shadow-lg shadow-amber-500/30 transition-all duration-300"
+                className="w-full py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-xs font-bold flex items-center justify-center gap-2 transition-colors border border-black"
               >
                 {copiedCode === 'script' ? (
                   <>
@@ -830,13 +809,12 @@ export function WidgetCustomization({ language = 'vi', userRole = 'admin' }: Wid
             </div>
 
             {/* Public Link */}
-            <div className="relative p-5 rounded-2xl bg-gradient-to-br from-slate-800 to-slate-900 text-white overflow-hidden group hover:shadow-xl hover:shadow-green-500/20 transition-all duration-300 cursor-pointer"
+            <div className="relative p-5 rounded-xl bg-gradient-to-br from-slate-800 to-slate-900 text-white overflow-hidden group border-2 border-black shadow-[4px_4px_0px_0px_#000] hover:border-green-500/50 transition-all cursor-pointer"
               onClick={() => handleCopy(publicLink, 'public')}>
-              <div className="absolute top-0 right-0 w-20 h-20 bg-green-500/20 rounded-full -mr-10 -mt-10 group-hover:scale-150 transition-transform duration-500" />
-              <div className="absolute bottom-0 left-0 w-16 h-16 bg-green-600/20 rounded-full -ml-8 -mb-8" />
+              <div className="absolute top-0 right-0 w-20 h-20 bg-green-500/10 rounded-full -mr-10 -mt-10 group-hover:scale-150 transition-transform duration-500" />
               <div className="relative flex items-center gap-3 mb-3">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center shadow-lg shadow-green-500/30">
-                  <Globe className="w-6 h-6 text-white" />
+                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center border border-black">
+                  <Globe className="w-5 h-5 text-white" />
                 </div>
                 <div>
                   <span className="text-sm font-bold">{lang.embed.publicTab}</span>
@@ -844,7 +822,7 @@ export function WidgetCustomization({ language = 'vi', userRole = 'admin' }: Wid
                 </div>
               </div>
               <button
-                className="w-full py-2.5 rounded-xl bg-gradient-to-r from-green-500 to-green-600 hover:from-green-400 hover:to-green-500 text-xs font-bold flex items-center justify-center gap-2 shadow-lg shadow-green-500/30 transition-all duration-300"
+                className="w-full py-2 rounded-lg bg-green-500 hover:bg-green-400 text-xs font-bold flex items-center justify-center gap-2 transition-colors border border-black"
               >
                 {copiedCode === 'public' ? (
                   <>
@@ -862,14 +840,14 @@ export function WidgetCustomization({ language = 'vi', userRole = 'admin' }: Wid
           </div>
 
           {/* Code Preview */}
-          <div className="p-4 rounded-xl bg-slate-800">
+          <div className="p-4 rounded-xl bg-slate-900 border-2 border-black shadow-[4px_4px_0px_0px_#000]">
             <div className="flex items-center gap-1.5 mb-3">
               <div className="w-2.5 h-2.5 rounded-full bg-red-500" />
               <div className="w-2.5 h-2.5 rounded-full bg-yellow-500" />
               <div className="w-2.5 h-2.5 rounded-full bg-green-500" />
-              <span className="ml-2 text-xs text-slate-400">Script Code</span>
+              <span className="ml-2 text-xs text-slate-400 font-mono">Script Code</span>
             </div>
-            <pre className="p-3 rounded-lg bg-slate-900 text-amber-300 text-xs font-mono overflow-x-auto max-h-48">
+            <pre className="p-3 rounded-lg bg-slate-800 text-amber-300 text-xs font-mono overflow-x-auto max-h-48 border border-black">
               <code>{scriptCode}</code>
             </pre>
           </div>
@@ -880,16 +858,16 @@ export function WidgetCustomization({ language = 'vi', userRole = 'admin' }: Wid
               href={publicLink}
               target="_blank"
               rel="noopener noreferrer"
-              className="group px-5 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-cyan-600 text-white text-sm font-bold hover:from-cyan-400 hover:to-cyan-500 flex items-center gap-2 shadow-lg shadow-cyan-500/30 transition-all duration-300 hover:scale-105"
+              className="px-4 py-2 rounded-xl bg-gradient-to-r from-violet-500 to-blue-500 text-white text-sm font-bold border-2 border-black shadow-[3px_3px_0px_0px_#000] flex items-center gap-2 hover:-translate-x-[1px] hover:-translate-y-[1px] hover:shadow-[4px_4px_0px_0px_#000]"
             >
-              <Globe className="w-5 h-5" />
+              <Globe className="w-4 h-4" />
               <span>{lang.embed.open}</span>
             </a>
             <button
               onClick={() => setShowLivePreview(true)}
-              className="group px-5 py-3 rounded-xl bg-gradient-to-r from-purple-500 to-purple-600 text-white text-sm font-bold hover:from-purple-400 hover:to-purple-500 flex items-center gap-2 shadow-lg shadow-purple-500/30 transition-all duration-300 hover:scale-105"
+              className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white text-sm font-bold border-2 border-black shadow-[3px_3px_0px_0px_#000] flex items-center gap-2 hover:-translate-x-[1px] hover:-translate-y-[1px] hover:shadow-[4px_4px_0px_0px_#000]"
             >
-              <Eye className="w-5 h-5" />
+              <Eye className="w-4 h-4" />
               <span>{lang.embed.preview}</span>
             </button>
           </div>
@@ -898,14 +876,14 @@ export function WidgetCustomization({ language = 'vi', userRole = 'admin' }: Wid
 
       {/* Messages */}
       {saveError && (
-        <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm flex items-center gap-2">
+        <div className="p-3 rounded-xl bg-red-50 border-2 border-red-300 text-red-700 text-sm flex items-center gap-2 font-bold">
           <AlertCircle className="w-4 h-4" />
           {saveError}
         </div>
       )}
 
       {isReadOnly && (
-        <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 text-sm flex items-center gap-2">
+        <div className="p-3 rounded-xl bg-amber-50 border-2 border-amber-300 text-amber-700 text-sm flex items-center gap-2 font-bold">
           <AlertCircle className="w-4 h-4" />
           Bạn không có quyền thay đổi cấu hình Widget. Liên hệ Super Admin.
         </div>

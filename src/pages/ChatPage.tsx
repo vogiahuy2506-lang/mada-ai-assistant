@@ -991,6 +991,15 @@ export function ChatPage() {
     return d.toLocaleDateString(language === 'vi' ? 'vi-VN' : language === 'en' ? 'en-US' : language === 'ar' ? 'ar-SA' : 'fr-FR', { day: '2-digit', month: '2-digit' });
   };
 
+  // Format full date time for tooltip
+  const formatFullDateTime = (ts: number): string => {
+    const d = new Date(ts);
+    const locale = language === 'vi' ? 'vi-VN' : language === 'en' ? 'en-US' : language === 'ar' ? 'ar-SA' : 'fr-FR';
+    const dateStr = d.toLocaleDateString(locale, { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const timeStr = d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
+    return `${dateStr}, ${timeStr}`;
+  };
+
   // Auto-open PaywallModal khi user load /chat với quota đã cạn sẵn
   useEffect(() => {
     const { user } = useAuthStore.getState();
@@ -2503,6 +2512,7 @@ export function ChatPage() {
                     </p>
                   )}
                   <button
+                    title={formatFullDateTime(conv.updatedAt)}
                     onClick={() => handleSelectConversation(conv.id)}
                     className={clsx(
                       'w-full flex items-start gap-2.5 px-3 py-2.5 rounded-xl transition-colors text-left group',
@@ -2522,6 +2532,7 @@ export function ChatPage() {
                         )}
                       </div>
                       <p className="text-[11px] text-slate-400 truncate mt-0.5">{conv.preview}</p>
+                      <p className="text-[10px] text-slate-300 mt-0.5 group-hover:hidden">{formatFullDateTime(conv.updatedAt)}</p>
                     </div>
                   </button>
                 </div>

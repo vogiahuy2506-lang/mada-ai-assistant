@@ -751,10 +751,15 @@ export const usePermissionsStore = create<PermissionsState>()((set, get) => ({
   isLoaded: false,
   
   loadPermissions: async () => {
+    // Skip if not logged in (no token = anonymous user)
+    const token = localStorage.getItem('mada-access-token');
+    if (!token) {
+      return;
+    }
     try {
       const res = await fetch('/api/permissions/my', {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('mada-access-token') || ''}`,
+          'Authorization': `Bearer ${token}`,
         },
       });
       const data = await res.json();

@@ -5,7 +5,8 @@ import { useSystemSettingsStore, useAuthStore } from '@/stores';
 import { useLanguageStore } from '@/stores';
 import clsx from 'clsx';
 import { systemApi } from '@/lib/api';
-import { CheckCircle, Loader2, AlertCircle, ShieldAlert } from 'lucide-react';
+import { CheckCircle, Loader2, AlertCircle, Shield, Settings, Lock, Cloud, CreditCard, Mail, Bug, Sparkles } from 'lucide-react';
+import { useTranslation } from '@/lib/translations';
 
 type Tab = 'general' | 'plans' | 'security' | 'ai' | 'integrations' | 'live' | 'system';
 type Language = 'vi' | 'en' | 'ar' | 'fr';
@@ -526,98 +527,111 @@ export function AdminSettings() {
       subtitle={lang.subtitle}
       showLayoutTitle={false}
     >
-      {/* Hero Banner Section */}
-      <section className="mb-12">
-        <div className="flex justify-between items-end mb-8 relative">
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-white to-secondary/10 backdrop-blur-xl rounded-3xl"></div>
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-primary/10 via-transparent to-transparent rounded-3xl"></div>
-          <div className="max-w-2xl relative z-10 py-8 px-6">
-            <h2 className="text-4xl font-black text-on-surface mb-4 tracking-tight">
-              {lang.title}
-            </h2>
-            <p className="text-lg font-medium text-on-surface-variant border-l-4 border-primary pl-6 py-2 bg-white/40 backdrop-blur-sm rounded-r-xl">
-              {lang.subtitle}
-            </p>
-          </div>
-          {/* Role Badge */}
-          <div className="relative z-10 pr-6">
-            {isSuperAdmin ? (
-              <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-amber-400 to-orange-500 text-white shadow-lg">
-                <ShieldAlert className="w-5 h-5" />
-                <span className="font-bold">Super Admin</span>
+      {/* ===================== HERO BANNER ===================== */}
+      <section className="mb-10">
+        <div className="bg-white rounded-2xl border border-outline-variant overflow-hidden">
+          {/* Banner Header - gradient strip */}
+          <div className="h-2 bg-gradient-to-r from-primary via-secondary to-tertiary" />
+          
+          <div className="p-8 md:p-10 flex flex-col md:flex-row md:items-center gap-6">
+            {/* Left: Title + Subtitle */}
+            <div className="flex-1">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center">
+                  <Settings className="w-6 h-6 text-primary" />
+                </div>
+                <div>
+                  <h1 className="text-2xl font-black text-on-surface tracking-tight leading-tight">
+                    {lang.title}
+                  </h1>
+                  <p className="text-sm text-on-surface-variant mt-0.5 leading-relaxed max-w-xl">
+                    {lang.subtitle}
+                  </p>
+                </div>
               </div>
-            ) : (
-              <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary/10 border border-primary/30 text-primary">
-                <span className="font-bold">Admin</span>
-                <span className="text-xs opacity-70">(Limited Access)</span>
-              </div>
-            )}
+            </div>
+
+            {/* Right: Role Badge */}
+            <div className="flex-shrink-0">
+              {isSuperAdmin ? (
+                <div className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200">
+                  <Shield className="w-4 h-4 text-amber-600" />
+                  <span className="text-sm font-bold text-amber-700">Super Admin</span>
+                </div>
+              ) : (
+                <div className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary/5 border border-primary/20">
+                  <Lock className="w-4 h-4 text-primary" />
+                  <span className="text-sm font-semibold text-primary">Admin</span>
+                  <span className="text-xs text-on-surface-variant">(Limited Access)</span>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </section>
 
-      {/* TABS */}
-      <div className="flex items-center gap-3 p-1.5 bg-white/60 backdrop-blur-xl rounded-full border-2 border-black mb-12 w-fit">
+      {/* ===================== TABS ===================== */}
+      <div className="flex items-center gap-1 p-1.5 bg-white rounded-xl border border-outline-variant mb-8 overflow-x-auto">
         {(
           [
-            { id: 'general', label: lang.tabs.general, icon: 'tune' },
-            { id: 'plans', label: lang.tabs.plans, icon: 'workspace_premium' },
-            { id: 'security', label: lang.tabs.security, icon: 'shield' },
-            { id: 'ai', label: lang.tabs.ai, icon: 'psychology' },
-            { id: 'integrations', label: lang.tabs.integrations, icon: 'extension' },
-            { id: 'live', label: lang.tabs.live, icon: 'monitor_heart' },
-            { id: 'system', label: 'System DB', icon: 'storage' },
-          ] as { id: Tab; label: string; icon: string }[]
+            { id: 'general', label: lang.tabs.general, icon: Settings },
+            { id: 'plans', label: lang.tabs.plans, icon: CreditCard },
+            { id: 'security', label: lang.tabs.security, icon: Shield },
+            { id: 'ai', label: lang.tabs.ai, icon: Sparkles },
+            { id: 'integrations', label: lang.tabs.integrations, icon: Cloud },
+            { id: 'live', label: lang.tabs.live, icon: AlertCircle },
+            { id: 'system', label: 'System DB', icon: Lock },
+          ] as { id: Tab; label: string; icon: any }[]
         ).map((t) => (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
             className={clsx(
-              'flex items-center gap-2 px-5 py-2 rounded-full font-bold text-sm transition-all border-2',
+              'flex items-center gap-2 px-4 py-2.5 rounded-lg font-label-md font-semibold text-sm transition-all whitespace-nowrap flex-shrink-0',
               tab === t.id
-                ? 'bg-primary text-white border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]'
-                : 'bg-transparent text-on-surface-variant hover:bg-white/80 border-transparent hover:border-black'
+                ? 'bg-primary text-on-primary shadow-sm'
+                : 'text-on-surface-variant hover:bg-surface-variant/50 hover:text-on-surface'
             )}
           >
-            <span className="material-symbols-outlined text-sm">{t.icon}</span>
+            <t.icon className="w-4 h-4 flex-shrink-0" />
             {t.label}
           </button>
         ))}
       </div>
 
-      {/* GENERAL */}
+      {/* ===================== GENERAL TAB ===================== */}
       {tab === 'general' && (
-        <div className="relative bg-gradient-to-br from-white/80 to-white/40 backdrop-blur-xl rounded-3xl border-3 border-black p-8 md:p-12 shadow-[12px_12px_0px_0px_#000]">
-          <div className="absolute inset-0 bg-gradient-to-b from-white/40 to-transparent rounded-3xl"></div>
-          <div className="relative z-10 space-y-6">
-            <h3 className="text-xl font-black text-on-surface mb-6">{lang.general.sectionTitle}</h3>
-
+        <div className="bg-white rounded-2xl border border-outline-variant overflow-hidden">
+          <div className="px-8 py-6 border-b border-outline-variant">
+            <h3 className="text-lg font-black text-on-surface">{lang.general.sectionTitle}</h3>
+          </div>
+          <div className="p-8 space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">{lang.general.systemName}</label>
+              <div className="space-y-2">
+                <label className="text-label-sm font-semibold text-on-surface">{lang.general.systemName}</label>
                 <input
                   defaultValue="MADA AI"
-                  className="w-full px-4 py-3 rounded-xl bg-white/60 border-2 border-black text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  className="w-full px-4 py-3 rounded-xl bg-surface-variant/30 border border-outline-variant text-on-surface text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30 transition-colors"
                 />
               </div>
-              <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">{lang.general.systemUrl}</label>
+              <div className="space-y-2">
+                <label className="text-label-sm font-semibold text-on-surface">{lang.general.systemUrl}</label>
                 <input
                   defaultValue="https://mada.ai"
-                  className="w-full px-4 py-3 rounded-xl bg-white/60 border-2 border-black text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  className="w-full px-4 py-3 rounded-xl bg-surface-variant/30 border border-outline-variant text-on-surface text-sm font-mono focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30 transition-colors"
                 />
               </div>
-              <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">{lang.general.contactEmail}</label>
+              <div className="space-y-2">
+                <label className="text-label-sm font-semibold text-on-surface">{lang.general.contactEmail}</label>
                 <input
                   type="email"
                   defaultValue="contact@mada.vn"
-                  className="w-full px-4 py-3 rounded-xl bg-white/60 border-2 border-black text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  className="w-full px-4 py-3 rounded-xl bg-surface-variant/30 border border-outline-variant text-on-surface text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30 transition-colors"
                 />
               </div>
-              <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">{lang.general.defaultLanguage}</label>
-                <select className="w-full px-4 py-3 rounded-xl bg-white/60 border-2 border-black text-sm focus:outline-none focus:ring-2 focus:ring-primary/30">
+              <div className="space-y-2">
+                <label className="text-label-sm font-semibold text-on-surface">{lang.general.defaultLanguage}</label>
+                <select className="w-full px-4 py-3 rounded-xl bg-surface-variant/30 border border-outline-variant text-on-surface text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30 transition-colors">
                   <option>{lang.languages[0]}</option>
                   <option>{lang.languages[1]}</option>
                   <option>{lang.languages[2]}</option>
@@ -626,20 +640,20 @@ export function AdminSettings() {
               </div>
             </div>
 
-            <div>
-              <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">{lang.general.description}</label>
+            <div className="space-y-2">
+              <label className="text-label-sm font-semibold text-on-surface">{lang.general.description}</label>
               <textarea
                 rows={3}
                 defaultValue="MADA AI - Trợ lý ảo thông minh hỗ trợ người khuyết tật tiếp cận công nghệ."
-                className="w-full px-4 py-3 rounded-xl bg-white/60 border-2 border-black text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/30"
+                className="w-full px-4 py-3 rounded-xl bg-surface-variant/30 border border-outline-variant text-on-surface text-sm resize-none focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30 transition-colors"
               />
             </div>
 
-            <div className="flex items-center gap-3 pt-4">
+            <div className="flex items-center gap-3 pt-2">
               <button
                 onClick={save}
                 disabled={isSaving}
-                className="px-6 py-3 rounded-xl bg-primary text-white font-bold text-sm border-2 border-black shadow-[4px_4px_0px_0px_#000] hover:-translate-x-1 hover:-translate-y-1 hover:shadow-[5px_5px_0px_0px_#000] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className="px-6 py-3 rounded-xl bg-primary text-on-primary font-label-md font-semibold text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isSaving ? (
                   <>
@@ -651,13 +665,13 @@ export function AdminSettings() {
                 )}
               </button>
               {savedAt && (
-                <span className="font-bold text-secondary flex items-center gap-1 animate-pulse">
+                <span className="text-sm font-semibold text-green-600 flex items-center gap-1.5">
                   <CheckCircle className="w-4 h-4" />
                   {lang.general.savedAt} {savedAt}
                 </span>
               )}
               {saveError && (
-                <span className="font-bold text-error flex items-center gap-1">
+                <span className="text-sm font-semibold text-error flex items-center gap-1.5">
                   <AlertCircle className="w-4 h-4" />
                   {saveError}
                 </span>
@@ -667,111 +681,100 @@ export function AdminSettings() {
         </div>
       )}
 
-      {/* PLANS & QUOTA */}
+      {/* ===================== PLANS TAB ===================== */}
       {tab === 'plans' && (
-        <div className="relative bg-gradient-to-br from-white/80 to-white/40 backdrop-blur-xl rounded-3xl border-3 border-black p-8 md:p-12 shadow-[12px_12px_0px_0px_#000]">
-          <div className="absolute inset-0 bg-gradient-to-b from-white/40 to-transparent rounded-3xl"></div>
-          <div className="relative z-10 space-y-8">
-            <h3 className="text-xl font-black text-on-surface mb-6">{lang.plans.sectionTitle}</h3>
-
-            {/* Anonymous User Quota */}
-            <div className="p-6 rounded-2xl bg-white/60 border-2 border-black shadow-[4px_4px_0px_0px_#000]">
-              <h4 className="font-bold text-on-surface mb-4">{lang.plans.anonQuota}</h4>
-              <div className="flex items-center gap-4 flex-wrap">
-                <div className="flex items-center gap-2">
+        <div className="space-y-6">
+          {/* Anonymous Quota */}
+          <div className="bg-white rounded-2xl border border-outline-variant overflow-hidden">
+            <div className="px-8 py-6 border-b border-outline-variant">
+              <h3 className="text-lg font-black text-on-surface">{lang.plans.anonQuota}</h3>
+              <p className="text-sm text-on-surface-variant mt-1">{lang.plans.anonQuotaDesc}</p>
+            </div>
+            <div className="p-8">
+              <div className="flex items-center gap-6 flex-wrap">
+                <label className="flex items-center gap-3 cursor-pointer">
                   <input
                     type="checkbox"
-                    id="anonUnlimited"
                     checked={anonymousLimit === -1}
                     onChange={(e) => setAnonymousLimit(e.target.checked ? -1 : 10)}
-                    className="w-5 h-5 rounded accent-primary"
+                    className="w-5 h-5 rounded border-outline text-primary focus:ring-primary"
                   />
-                  <label htmlFor="anonUnlimited" className="font-medium text-on-surface">
-                    {lang.plans.unlimited}
-                  </label>
-                </div>
-                {!anonymousLimit || anonymousLimit !== -1 ? (
-                  <div className="flex items-center gap-2">
+                  <span className="text-label-md font-semibold text-on-surface">{lang.plans.unlimited}</span>
+                </label>
+                {anonymousLimit !== -1 && (
+                  <div className="flex items-center gap-3">
                     <input
                       type="number"
                       min="1"
-                      value={anonymousLimit === -1 ? '' : anonymousLimit}
+                      value={anonymousLimit}
                       onChange={(e) => setAnonymousLimit(parseInt(e.target.value) || 10)}
-                      className="w-24 px-4 py-2 rounded-xl bg-white border-2 border-black text-sm font-mono text-center"
+                      className="w-24 px-4 py-2.5 rounded-xl bg-surface-variant/30 border border-outline-variant text-on-surface text-sm font-mono text-center focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30"
                     />
                     <span className="text-sm text-on-surface-variant">{lang.plans.messagesPerSession}</span>
                   </div>
-                ) : null}
+                )}
               </div>
-              <p className="text-xs text-on-surface-variant mt-2">
-                {lang.plans.anonQuotaDesc}
-              </p>
             </div>
+          </div>
 
-            {/* File Upload Limits */}
-            <div className="p-6 rounded-2xl bg-white/60 border-2 border-black shadow-[4px_4px_0px_0px_#000]">
-              <h4 className="font-bold text-on-surface mb-4">{lang.plans.fileUploadLimits}</h4>
-              <div className="space-y-4">
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-2 flex-1">
-                    <label className="font-medium text-on-surface whitespace-nowrap">{lang.plans.filePerSession}</label>
+          {/* File Upload Limits */}
+          <div className="bg-white rounded-2xl border border-outline-variant overflow-hidden">
+            <div className="px-8 py-6 border-b border-outline-variant">
+              <h3 className="text-lg font-black text-on-surface">{lang.plans.fileUploadLimits}</h3>
+            </div>
+            <div className="p-8 space-y-5">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="space-y-2">
+                  <label className="text-label-sm font-semibold text-on-surface">{lang.plans.maxPerSession}</label>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-on-surface-variant whitespace-nowrap">{lang.plans.filePerSession}</span>
                     <input
                       type="number"
                       min="1"
                       max="50"
                       value={maxFilesPerSession}
                       onChange={(e) => setMaxFilesPerSession(parseInt(e.target.value) || 10)}
-                      className="w-20 px-3 py-2 rounded-xl bg-white border-2 border-black text-sm font-mono text-center"
+                      className="w-20 px-3 py-2.5 rounded-xl bg-surface-variant/30 border border-outline-variant text-on-surface text-sm font-mono text-center focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30"
                     />
                   </div>
-                  <p className="text-xs text-on-surface-variant flex-shrink-0">
-                    {lang.plans.maxPerSession}
-                  </p>
                 </div>
-                
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-2 flex-1">
-                    <label className="font-medium text-on-surface whitespace-nowrap">{lang.plans.totalFiles}</label>
+                <div className="space-y-2">
+                  <label className="text-label-sm font-semibold text-on-surface">{lang.plans.maxTotalFiles}</label>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-on-surface-variant whitespace-nowrap">{lang.plans.totalFiles}</span>
                     <input
                       type="number"
                       min="10"
                       max="1000"
                       value={maxFilesTotal}
                       onChange={(e) => setMaxFilesTotal(parseInt(e.target.value) || 100)}
-                      className="w-20 px-3 py-2 rounded-xl bg-white border-2 border-black text-sm font-mono text-center"
+                      className="w-20 px-3 py-2.5 rounded-xl bg-surface-variant/30 border border-outline-variant text-on-surface text-sm font-mono text-center focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30"
                     />
                   </div>
-                  <p className="text-xs text-on-surface-variant flex-shrink-0">
-                    {lang.plans.maxTotalFiles}
-                  </p>
                 </div>
-                
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-2 flex-1">
-                    <label className="font-medium text-on-surface whitespace-nowrap">{lang.plans.fileSize}</label>
+                <div className="space-y-2">
+                  <label className="text-label-sm font-semibold text-on-surface">{lang.plans.maxFileSize}</label>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-on-surface-variant whitespace-nowrap">{lang.plans.fileSize}</span>
                     <input
                       type="number"
                       min="1"
                       max="100"
                       value={maxFileSizeMB}
                       onChange={(e) => setMaxFileSizeMB(parseInt(e.target.value) || 50)}
-                      className="w-20 px-3 py-2 rounded-xl bg-white border-2 border-black text-sm font-mono text-center"
+                      className="w-20 px-3 py-2.5 rounded-xl bg-surface-variant/30 border border-outline-variant text-on-surface text-sm font-mono text-center focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30"
                     />
-                    <span className="font-medium text-on-surface-variant">MB</span>
+                    <span className="text-sm font-semibold text-on-surface-variant">MB</span>
                   </div>
-                  <p className="text-xs text-on-surface-variant flex-shrink-0">
-                    {lang.plans.maxFileSize}
-                  </p>
                 </div>
               </div>
-              
-              <div className="mt-4 pt-4 border-t-2 border-black/10">
-                <p className="text-sm text-on-surface-variant mb-2">{lang.plans.supportedFormats}</p>
+              <div className="pt-2">
+                <p className="text-label-sm font-semibold text-on-surface mb-2">{lang.plans.supportedFormats}</p>
                 <div className="flex flex-wrap gap-2">
                   {['PDF', 'DOCX', 'TXT', 'PNG', 'JPEG', 'JPG', 'PPTX'].map((fmt) => (
                     <span
                       key={fmt}
-                      className="px-3 py-1 bg-primary/10 text-primary text-xs font-bold rounded-lg border border-primary/30"
+                      className="px-3 py-1.5 bg-primary/5 text-primary text-xs font-label-sm font-semibold rounded-lg border border-primary/20"
                     >
                       {fmt}
                     </span>
@@ -779,10 +782,14 @@ export function AdminSettings() {
                 </div>
               </div>
             </div>
+          </div>
 
-            {/* Plan Quotas */}
-            <div className="space-y-4">
-              <h4 className="font-bold text-on-surface">{lang.plans.planQuotas}</h4>
+          {/* Plan Quotas */}
+          <div className="bg-white rounded-2xl border border-outline-variant overflow-hidden">
+            <div className="px-8 py-6 border-b border-outline-variant">
+              <h3 className="text-lg font-black text-on-surface">{lang.plans.planQuotas}</h3>
+            </div>
+            <div className="p-8">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {[
                   { name: 'Free', color: 'gray', price: '0', current: false, planKey: 'free' },
@@ -791,48 +798,52 @@ export function AdminSettings() {
                 ].map((p) => (
                   <div
                     key={p.name}
-                    className={`p-5 rounded-2xl border-3 border-black shadow-[6px_6px_0px_0px_#000] ${
-                      p.current ? 'bg-primary/10' : 'bg-white/60'
-                    }`}
+                    className={clsx(
+                      'p-5 rounded-xl border',
+                      p.current ? 'border-primary bg-primary/5' : 'border-outline-variant'
+                    )}
                   >
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="text-xl font-black">{p.name}</span>
+                    <div className="flex items-center justify-between mb-4">
+                      <span className="text-lg font-black text-on-surface">{p.name}</span>
                       {p.current && (
-                        <span className="px-2.5 py-1 rounded-full bg-primary text-white text-xs font-bold border-2 border-black">
+                        <span className="px-2.5 py-1 rounded-full bg-primary text-on-primary text-xs font-bold">
                           {lang.plans.current}
                         </span>
                       )}
                     </div>
                     <div className="space-y-3">
-                      <div>
-                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">{lang.plans.pricePerMonth}</label>
+                      <div className="space-y-1.5">
+                        <label className="text-label-sm font-semibold text-on-surface-variant">{lang.plans.pricePerMonth}</label>
                         <input
                           defaultValue={p.price}
-                          className="w-full px-3 py-2 rounded-xl bg-white border-2 border-black text-sm font-mono"
+                          className="w-full px-3 py-2.5 rounded-xl bg-surface-variant/30 border border-outline-variant text-on-surface text-sm font-mono focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30"
                         />
                       </div>
-                      <div>
-                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">{lang.plans.quotaPerMonth}</label>
-                        <div className="flex items-center gap-2">
+                      <div className="space-y-1.5">
+                        <label className="text-label-sm font-semibold text-on-surface-variant">{lang.plans.quotaPerMonth}</label>
+                        <label className="flex items-center gap-2 cursor-pointer">
                           <input
                             type="checkbox"
                             checked={defaultPlanLimit === -1}
                             onChange={(e) => setDefaultPlanLimit(e.target.checked ? -1 : 50)}
-                            className="w-4 h-4 rounded accent-primary"
+                            className="w-4 h-4 rounded border-outline text-primary focus:ring-primary"
                           />
                           <span className="text-xs text-on-surface-variant">{lang.plans.unlimited}</span>
-                        </div>
+                        </label>
                       </div>
                     </div>
                   </div>
                 ))}
               </div>
             </div>
+          </div>
 
+          {/* Save Button */}
+          <div className="flex items-center gap-3">
             <button
               onClick={save}
               disabled={isSaving}
-              className="px-6 py-3 rounded-xl bg-primary text-white font-bold text-sm border-2 border-black shadow-[4px_4px_0px_0px_#000] hover:-translate-x-1 hover:-translate-y-1 hover:shadow-[5px_5px_0px_0px_#000] transition-all disabled:opacity-50 flex items-center gap-2"
+              className="px-6 py-3 rounded-xl bg-primary text-on-primary font-label-md font-semibold text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSaving ? (
                 <>
@@ -844,13 +855,13 @@ export function AdminSettings() {
               )}
             </button>
             {savedAt && (
-              <span className="font-bold text-secondary flex items-center gap-1 animate-pulse">
+              <span className="text-sm font-semibold text-green-600 flex items-center gap-1.5">
                 <CheckCircle className="w-4 h-4" />
                 {lang.general.savedAt} {savedAt}
               </span>
             )}
             {saveError && (
-              <span className="font-bold text-error flex items-center gap-1">
+              <span className="text-sm font-semibold text-error flex items-center gap-1.5">
                 <AlertCircle className="w-4 h-4" />
                 {saveError}
               </span>
@@ -859,13 +870,13 @@ export function AdminSettings() {
         </div>
       )}
 
-      {/* SECURITY */}
+      {/* ===================== SECURITY TAB ===================== */}
       {tab === 'security' && (
-        <div className="relative bg-gradient-to-br from-white/80 to-white/40 backdrop-blur-xl rounded-3xl border-3 border-black p-8 md:p-12 shadow-[12px_12px_0px_0px_#000]">
-          <div className="absolute inset-0 bg-gradient-to-b from-white/40 to-transparent rounded-3xl"></div>
-          <div className="relative z-10 space-y-6">
-            <h3 className="text-xl font-black text-on-surface mb-6">{lang.security.sectionTitle}</h3>
-
+        <div className="bg-white rounded-2xl border border-outline-variant overflow-hidden">
+          <div className="px-8 py-6 border-b border-outline-variant">
+            <h3 className="text-lg font-black text-on-surface">{lang.security.sectionTitle}</h3>
+          </div>
+          <div className="p-8 space-y-4">
             {([
               {
                 label: lang.security.require2FA,
@@ -897,59 +908,61 @@ export function AdminSettings() {
               <ToggleRow key={idx} label={item.label} desc={item.desc} value={item.value} />
             ))}
 
-            <div>
-              <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+            <div className="pt-4 border-t border-outline-variant space-y-2">
+              <label className="text-label-sm font-semibold text-on-surface">
                 {lang.security.jwtSecret}
               </label>
               <div className="flex gap-2">
                 <input
                   readOnly
                   value="sk_live_●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●"
-                  className="flex-1 px-4 py-3 rounded-xl bg-white border-2 border-black text-sm font-mono"
+                  className="flex-1 px-4 py-3 rounded-xl bg-surface-variant/30 border border-outline-variant text-on-surface text-sm font-mono"
                 />
-                <button className="px-4 py-2 rounded-xl bg-gray-100 border-2 border-black hover:bg-gray-200 font-bold transition-colors shadow-[2px_2px_0px_0px_#000]">
-                  <span className="material-symbols-outlined text-sm">refresh</span>
+                <button className="px-4 py-2.5 rounded-xl bg-surface-variant hover:bg-surface-variant/80 text-on-surface font-label-md font-semibold text-sm border border-outline-variant transition-colors">
+                  Refresh
                 </button>
               </div>
             </div>
 
-            <button
-              onClick={save}
-              disabled={isSaving}
-              className="px-6 py-3 rounded-xl bg-primary text-white font-bold text-sm border-2 border-black shadow-[4px_4px_0px_0px_#000] hover:-translate-x-1 hover:-translate-y-1 hover:shadow-[5px_5px_0px_0px_#000] transition-all disabled:opacity-50 flex items-center gap-2"
-            >
-              {isSaving ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  {lang.general.saving}
-                </>
-              ) : (
-                lang.security.saveConfig
+            <div className="flex items-center gap-3 pt-2">
+              <button
+                onClick={save}
+                disabled={isSaving}
+                className="px-6 py-3 rounded-xl bg-primary text-on-primary font-label-md font-semibold text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSaving ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    {lang.general.saving}
+                  </>
+                ) : (
+                  lang.security.saveConfig
+                )}
+              </button>
+              {savedAt && (
+                <span className="text-sm font-semibold text-green-600 flex items-center gap-1.5">
+                  <CheckCircle className="w-4 h-4" />
+                  {lang.general.savedAt} {savedAt}
+                </span>
               )}
-            </button>
-            {savedAt && (
-              <span className="font-bold text-secondary flex items-center gap-1 animate-pulse">
-                <CheckCircle className="w-4 h-4" />
-                {lang.general.savedAt} {savedAt}
-              </span>
-            )}
-            {saveError && (
-              <span className="font-bold text-error flex items-center gap-1">
-                <AlertCircle className="w-4 h-4" />
-                {saveError}
-              </span>
-            )}
+              {saveError && (
+                <span className="text-sm font-semibold text-error flex items-center gap-1.5">
+                  <AlertCircle className="w-4 h-4" />
+                  {saveError}
+                </span>
+              )}
+            </div>
           </div>
         </div>
       )}
 
-      {/* AI */}
+      {/* ===================== AI TAB ===================== */}
       {tab === 'ai' && (
-        <div className="relative bg-gradient-to-br from-white/80 to-white/40 backdrop-blur-xl rounded-3xl border-3 border-black p-8 md:p-12 shadow-[12px_12px_0px_0px_#000]">
-          <div className="absolute inset-0 bg-gradient-to-b from-white/40 to-transparent rounded-3xl"></div>
-          <div className="relative z-10 space-y-6">
-            <h3 className="text-xl font-black text-on-surface mb-6">{lang.ai.sectionTitle}</h3>
-
+        <div className="bg-white rounded-2xl border border-outline-variant overflow-hidden">
+          <div className="px-8 py-6 border-b border-outline-variant">
+            <h3 className="text-lg font-black text-on-surface">{lang.ai.sectionTitle}</h3>
+          </div>
+          <div className="p-8 space-y-4">
             {([
               {
                 name: lang.ai.madaLLM,
@@ -963,109 +976,119 @@ export function AdminSettings() {
                 version: 'v2.0',
                 status: 'active',
                 desc: lang.ai.madaVisionDesc,
-                color: 'tertiary',
+                color: 'secondary',
               },
               {
                 name: lang.ai.madaVoice,
                 version: 'v1.5',
                 status: 'beta',
                 desc: lang.ai.madaVoiceDesc,
-                color: 'secondary',
+                color: 'tertiary',
               },
             ] as { name: string; version: string; status: string; desc: string; color: string }[]
             ).map((m) => (
               <div
                 key={m.name}
-                className="flex items-start gap-4 p-5 rounded-2xl bg-white/60 border-2 border-black shadow-[4px_4px_0px_0px_#000]"
+                className="flex items-start gap-4 p-5 rounded-xl border border-outline-variant hover:border-outline transition-colors"
               >
-                <div className={`w-12 h-12 rounded-xl border-2 border-black flex items-center justify-center shadow-[2px_2px_0px_0px_#000] ${
-                  m.color === 'primary' ? 'bg-primary/20' : m.color === 'secondary' ? 'bg-secondary/20' : 'bg-tertiary/20'
-                }`}>
-                  <span className={`material-symbols-outlined text-xl ${
+                <div className={clsx(
+                  'w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0',
+                  m.color === 'primary' ? 'bg-primary/10' : m.color === 'secondary' ? 'bg-secondary/10' : 'bg-tertiary/10'
+                )}>
+                  <Sparkles className={clsx(
+                    'w-5 h-5',
                     m.color === 'primary' ? 'text-primary' : m.color === 'secondary' ? 'text-secondary' : 'text-tertiary'
-                  }`}>psychology</span>
+                  )} />
                 </div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1 flex-wrap">
                     <h4 className="font-bold text-on-surface">{m.name}</h4>
-                    <span className="px-2 py-0.5 rounded bg-gray-100 text-xs font-mono text-on-surface-variant border border-black/20">{m.version}</span>
-                    <span className={`px-2.5 py-1 rounded-full text-xs font-bold border-2 border-black ${
+                    <span className="px-2 py-0.5 rounded bg-surface-variant text-xs font-mono text-on-surface-variant">{m.version}</span>
+                    <span className={clsx(
+                      'px-2.5 py-1 rounded-full text-xs font-bold',
                       m.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
-                    }`}>
+                    )}>
                       {m.status.toUpperCase()}
                     </span>
                   </div>
                   <p className="text-sm text-on-surface-variant">{m.desc}</p>
                 </div>
-                <button className="px-4 py-2 rounded-xl bg-primary text-white text-sm font-bold border-2 border-black shadow-[2px_2px_0px_0px_#000] hover:-translate-y-1 hover:shadow-[3px_3px_0px_0px_#000] transition-all">
+                <button className="px-4 py-2.5 rounded-xl bg-primary text-on-primary text-sm font-label-md font-semibold hover:bg-primary/90 transition-colors flex-shrink-0">
                   {lang.ai.update}
                 </button>
               </div>
             ))}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">{lang.ai.temperature}</label>
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.1"
-                  defaultValue="0.7"
-                  className="w-full"
-                />
+            <div className="pt-4 border-t border-outline-variant grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="text-label-sm font-semibold text-on-surface">{lang.ai.temperature}</label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.1"
+                    defaultValue="0.7"
+                    className="flex-1"
+                  />
+                  <span className="text-sm font-mono text-on-surface-variant w-8 text-right">0.7</span>
+                </div>
               </div>
-              <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">{lang.ai.maxTokens}</label>
+              <div className="space-y-2">
+                <label className="text-label-sm font-semibold text-on-surface">{lang.ai.maxTokens}</label>
                 <input
                   type="number"
                   defaultValue="2048"
-                  className="w-full px-4 py-3 rounded-xl bg-white/60 border-2 border-black text-sm font-mono"
+                  className="w-full px-4 py-3 rounded-xl bg-surface-variant/30 border border-outline-variant text-on-surface text-sm font-mono focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30"
                 />
               </div>
             </div>
 
-            <button
-              onClick={save}
-              className="px-6 py-3 rounded-xl bg-primary text-white font-bold text-sm border-2 border-black shadow-[4px_4px_0px_0px_#000] hover:-translate-x-1 hover:-translate-y-1 hover:shadow-[5px_5px_0px_0px_#000] transition-all"
-            >
-              {lang.ai.saveConfig}
-            </button>
+            <div className="flex items-center gap-3 pt-2">
+              <button
+                onClick={save}
+                className="px-6 py-3 rounded-xl bg-primary text-on-primary font-label-md font-semibold text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
+              >
+                {lang.ai.saveConfig}
+              </button>
+            </div>
           </div>
         </div>
       )}
 
-      {/* INTEGRATIONS */}
+      {/* ===================== INTEGRATIONS TAB ===================== */}
       {tab === 'integrations' && (
-        <div className="relative bg-gradient-to-br from-white/80 to-white/40 backdrop-blur-xl rounded-3xl border-3 border-black p-8 md:p-12 shadow-[12px_12px_0px_0px_#000]">
-          <div className="absolute inset-0 bg-gradient-to-b from-white/40 to-transparent rounded-3xl"></div>
-          <div className="relative z-10 space-y-4">
-            <h3 className="text-xl font-black text-on-surface mb-6">{lang.integrations.sectionTitle}</h3>
-
+        <div className="bg-white rounded-2xl border border-outline-variant overflow-hidden">
+          <div className="px-8 py-6 border-b border-outline-variant">
+            <h3 className="text-lg font-black text-on-surface">{lang.integrations.sectionTitle}</h3>
+          </div>
+          <div className="p-8 space-y-3">
             {([
-              { name: lang.integrations.openai, desc: lang.integrations.openaiDesc, icon: 'auto_awesome', connected: true, color: 'primary' },
-              { name: lang.integrations.googleCloud, desc: lang.integrations.googleCloudDesc, icon: 'cloud', connected: true, color: 'tertiary' },
-              { name: lang.integrations.stripe, desc: lang.integrations.stripeDesc, icon: 'credit_card', connected: false, color: 'secondary' },
-              { name: lang.integrations.sendgrid, desc: lang.integrations.sendgridDesc, icon: 'mail', connected: true, color: 'error' },
-              { name: lang.integrations.sentry, desc: lang.integrations.sentryDesc, icon: 'bug_report', connected: true, color: 'primary' },
-            ] as { name: string; desc: string; icon: string; connected: boolean; color: string }[]
+              { name: lang.integrations.openai, desc: lang.integrations.openaiDesc, icon: Sparkles, connected: true, color: 'primary' },
+              { name: lang.integrations.googleCloud, desc: lang.integrations.googleCloudDesc, icon: Cloud, connected: true, color: 'secondary' },
+              { name: lang.integrations.stripe, desc: lang.integrations.stripeDesc, icon: CreditCard, connected: false, color: 'primary' },
+              { name: lang.integrations.sendgrid, desc: lang.integrations.sendgridDesc, icon: Mail, connected: true, color: 'error' },
+              { name: lang.integrations.sentry, desc: lang.integrations.sentryDesc, icon: Bug, connected: true, color: 'primary' },
+            ] as { name: string; desc: string; icon: any; connected: boolean; color: string }[]
             ).map((s) => (
               <div
                 key={s.name}
-                className="flex items-center gap-4 p-5 rounded-2xl bg-white/60 border-2 border-black shadow-[4px_4px_0px_0px_#000] hover:shadow-[6px_6px_0px_0px_#000] transition-all"
+                className="flex items-center gap-4 p-4 rounded-xl border border-outline-variant hover:border-primary/30 transition-colors"
               >
-                <div className={`w-12 h-12 rounded-xl border-2 border-black flex items-center justify-center shadow-[2px_2px_0px_0px_#000] ${
-                  s.color === 'primary' ? 'bg-primary/20' : s.color === 'secondary' ? 'bg-secondary/20' : s.color === 'tertiary' ? 'bg-tertiary/20' : 'bg-error/20'
-                }`}>
-                  <span className={`material-symbols-outlined text-xl ${
-                    s.color === 'primary' ? 'text-primary' : s.color === 'secondary' ? 'text-secondary' : s.color === 'tertiary' ? 'text-tertiary' : 'text-error'
-                  }`}>{s.icon}</span>
+                <div className={clsx(
+                  'w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0',
+                  s.color === 'primary' ? 'bg-primary/10' : s.color === 'secondary' ? 'bg-secondary/10' : s.color === 'error' ? 'bg-error/10' : 'bg-surface-variant'
+                )}>
+                  <s.icon className={clsx(
+                    'w-5 h-5',
+                    s.color === 'primary' ? 'text-primary' : s.color === 'secondary' ? 'text-secondary' : s.color === 'error' ? 'text-error' : 'text-on-surface-variant'
+                  )} />
                 </div>
-                <div className="flex-1">
+                <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <p className="font-bold text-on-surface">{s.name}</p>
                     {s.connected && (
-                      <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-xs font-bold border border-green-300">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-50 text-green-700 text-xs font-bold border border-green-200">
                         <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
                         {lang.integrations.connected}
                       </span>
@@ -1075,10 +1098,10 @@ export function AdminSettings() {
                 </div>
                 <button
                   className={clsx(
-                    'px-4 py-2 rounded-xl font-bold text-sm border-2 border-black transition-all shadow-[2px_2px_0px_0px_#000]',
+                    'px-4 py-2.5 rounded-xl font-label-md font-semibold text-sm transition-colors flex-shrink-0',
                     s.connected
-                      ? 'bg-red-100 text-red-600 hover:shadow-[3px_3px_0px_0px_#000]'
-                      : 'bg-primary text-white hover:-translate-y-1 hover:shadow-[3px_3px_0px_0px_#000]'
+                      ? 'border border-outline-variant text-on-surface-variant hover:bg-red-50 hover:text-red-600 hover:border-red-200'
+                      : 'bg-primary text-on-primary hover:bg-primary/90'
                   )}
                 >
                   {s.connected ? lang.integrations.disconnect : lang.integrations.connect}
@@ -1089,82 +1112,86 @@ export function AdminSettings() {
         </div>
       )}
 
-      {/* LIVE STATUS */}
+      {/* ===================== LIVE STATUS TAB ===================== */}
       {tab === 'live' && (
-        <div className="relative bg-gradient-to-br from-white/80 to-white/40 backdrop-blur-xl rounded-3xl border-3 border-black p-8 md:p-12 shadow-[12px_12px_0px_0px_#000]">
-          <div className="absolute inset-0 bg-gradient-to-b from-white/40 to-transparent rounded-3xl"></div>
-          <div className="relative z-10 space-y-6">
-            <div>
-              <h3 className="text-xl font-black text-on-surface">{lang.live.sectionTitle}</h3>
-              <p className="text-sm text-on-surface-variant mt-1">
-                {lang.live.sectionDesc}
-              </p>
+        <div className="space-y-6">
+          <div className="bg-white rounded-2xl border border-outline-variant overflow-hidden">
+            <div className="px-8 py-6 border-b border-outline-variant">
+              <h3 className="text-lg font-black text-on-surface">{lang.live.sectionTitle}</h3>
+              <p className="text-sm text-on-surface-variant mt-1">{lang.live.sectionDesc}</p>
             </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="p-6 rounded-2xl bg-primary/10 border-2 border-primary/30 shadow-[4px_4px_0px_0px_#000]">
+            <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Users Card */}
+              <div className="p-6 rounded-xl bg-primary/5 border border-primary/20">
                 <div className="flex items-center gap-2 mb-4">
-                  <span className="material-symbols-outlined text-primary text-xl">group</span>
-                  <h4 className="font-bold text-on-surface">{lang.live.users}</h4>
+                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <svg className="w-4 h-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+                  </div>
+                  <h4 className="font-black text-on-surface">{lang.live.users}</h4>
                 </div>
                 {userStats ? (
                   <div className="grid grid-cols-2 gap-3">
-                    <div className="p-3 rounded-xl bg-white/60 border border-black/10">
-                      <p className="text-xs text-on-surface-variant">{lang.live.total}</p>
-                      <p className="text-xl font-black">{userStats.total}</p>
+                    <div className="p-3 rounded-lg bg-white border border-outline-variant">
+                      <p className="text-label-sm text-on-surface-variant">{lang.live.total}</p>
+                      <p className="text-xl font-black text-on-surface mt-1">{userStats.total}</p>
                     </div>
-                    <div className="p-3 rounded-xl bg-white/60 border border-black/10">
-                      <p className="text-xs text-on-surface-variant">{lang.live.active}</p>
-                      <p className="text-xl font-black text-secondary">{userStats.active}</p>
+                    <div className="p-3 rounded-lg bg-white border border-outline-variant">
+                      <p className="text-label-sm text-on-surface-variant">{lang.live.active}</p>
+                      <p className="text-xl font-black text-secondary mt-1">{userStats.active}</p>
                     </div>
-                    <div className="p-3 rounded-xl bg-white/60 border border-black/10">
-                      <p className="text-xs text-on-surface-variant">{lang.live.suspended}</p>
-                      <p className="text-xl font-black text-error">{userStats.suspended}</p>
+                    <div className="p-3 rounded-lg bg-white border border-outline-variant">
+                      <p className="text-label-sm text-on-surface-variant">{lang.live.suspended}</p>
+                      <p className="text-xl font-black text-error mt-1">{userStats.suspended}</p>
                     </div>
-                    <div className="p-3 rounded-xl bg-white/60 border border-black/10">
-                      <p className="text-xs text-on-surface-variant">{lang.live.pending}</p>
-                      <p className="text-xl font-black text-tertiary">{userStats.pending}</p>
+                    <div className="p-3 rounded-lg bg-white border border-outline-variant">
+                      <p className="text-label-sm text-on-surface-variant">{lang.live.pending}</p>
+                      <p className="text-xl font-black text-tertiary mt-1">{userStats.pending}</p>
                     </div>
                   </div>
                 ) : (
-                  <p className="text-on-surface-variant py-4 text-center">{lang.live.loading}</p>
+                  <p className="text-sm text-on-surface-variant py-4 text-center">{lang.live.loading}</p>
                 )}
               </div>
 
-              <div className="p-6 rounded-2xl bg-secondary/10 border-2 border-secondary/30 shadow-[4px_4px_0px_0px_#000]">
+              {/* Knowledge Base Card */}
+              <div className="p-6 rounded-xl bg-secondary/5 border border-secondary/20">
                 <div className="flex items-center gap-2 mb-4">
-                  <span className="material-symbols-outlined text-secondary text-xl">storage</span>
-                  <h4 className="font-bold text-on-surface">{lang.live.knowledgeBase}</h4>
+                  <div className="w-8 h-8 rounded-lg bg-secondary/10 flex items-center justify-center">
+                    <svg className="w-4 h-4 text-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" /></svg>
+                  </div>
+                  <h4 className="font-black text-on-surface">{lang.live.knowledgeBase}</h4>
                 </div>
                 {kbStats ? (
                   <div className="space-y-3">
-                    <div className="flex justify-between p-3 rounded-xl bg-white/60 border border-black/10">
+                    <div className="flex justify-between items-center p-3 rounded-lg bg-white border border-outline-variant">
                       <span className="text-sm text-on-surface-variant">{lang.live.totalDocs}</span>
                       <span className="text-lg font-black text-primary">{kbStats.totalDocuments}</span>
                     </div>
-                    <div className="flex justify-between p-3 rounded-xl bg-white/60 border border-black/10">
+                    <div className="flex justify-between items-center p-3 rounded-lg bg-white border border-outline-variant">
                       <span className="text-sm text-on-surface-variant">{lang.live.categories}</span>
                       <span className="text-lg font-black text-secondary">{kbStats.totalCategories}</span>
                     </div>
                     {kbStats.totalSize !== undefined && (
-                      <div className="flex justify-between p-3 rounded-xl bg-white/60 border border-black/10">
+                      <div className="flex justify-between items-center p-3 rounded-lg bg-white border border-outline-variant">
                         <span className="text-sm text-on-surface-variant">{lang.live.storageSize}</span>
                         <span className="text-lg font-black text-tertiary">{(kbStats.totalSize / 1024).toFixed(2)} KB</span>
                       </div>
                     )}
                   </div>
                 ) : (
-                  <p className="text-on-surface-variant py-4 text-center">{lang.live.loading}</p>
+                  <p className="text-sm text-on-surface-variant py-4 text-center">{lang.live.loading}</p>
                 )}
               </div>
             </div>
+          </div>
 
-            <div className="p-6 rounded-2xl bg-tertiary/10 border-2 border-tertiary/30 shadow-[4px_4px_0px_0px_#000]">
-              <div className="flex items-center gap-2 mb-4">
-                <span className="material-symbols-outlined text-tertiary text-xl">api</span>
-                <h4 className="font-bold text-on-surface">{lang.live.endpoints}</h4>
-              </div>
-              <div className="font-mono text-sm space-y-1 text-on-surface-variant p-4 bg-white/60 rounded-xl border border-black/10">
+          {/* Endpoints */}
+          <div className="bg-white rounded-2xl border border-outline-variant overflow-hidden">
+            <div className="px-8 py-6 border-b border-outline-variant">
+              <h3 className="text-lg font-black text-on-surface">{lang.live.endpoints}</h3>
+            </div>
+            <div className="p-8">
+              <div className="font-mono text-sm space-y-1.5 text-on-surface-variant p-4 bg-surface-variant/30 rounded-xl border border-outline-variant">
                 <p>• GET /api/health</p>
                 <p>• GET /api/users | PATCH /api/users/:id</p>
                 <p>• GET /api/knowledge/stats | GET /api/knowledge/search</p>
@@ -1175,64 +1202,67 @@ export function AdminSettings() {
           </div>
         </div>
       )}
-    {tab === 'system' && (
-        <div className="relative bg-gradient-to-br from-white/80 to-white/40 backdrop-blur-xl rounded-3xl border-3 border-black p-8 md:p-12 shadow-[12px_12px_0px_0px_#000]">
-          <div className="relative z-10 space-y-6">
-            <div className="flex items-center justify-between">
+
+      {/* ===================== SYSTEM DB TAB ===================== */}
+      {tab === 'system' && (
+        <div className="bg-white rounded-2xl border border-outline-variant overflow-hidden">
+          <div className="px-8 py-6 border-b border-outline-variant">
+            <div className="flex items-center justify-between flex-wrap gap-4">
               <div>
-                <h3 className="text-xl font-black text-on-surface">System Settings (DB)</h3>
+                <h3 className="text-lg font-black text-on-surface">System Settings (DB)</h3>
                 <p className="text-sm text-on-surface-variant mt-1">
-                  Toàn bộ cấu hình hệ thống được lưu trong <code className="text-xs bg-slate-100 px-1.5 py-0.5 rounded">system_settings</code> table.
+                  Toàn bộ cấu hình hệ thống được lưu trong <code className="text-xs bg-surface-variant px-1.5 py-0.5 rounded">system_settings</code> table.
                 </p>
               </div>
               {!isSuperAdmin && (
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-100 border border-amber-300 text-amber-700">
-                  <span className="material-symbols-outlined text-sm">lock</span>
-                  <span className="text-xs font-bold">Super Admin Only</span>
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-200">
+                  <Lock className="w-4 h-4 text-amber-600" />
+                  <span className="text-xs font-bold text-amber-700">Super Admin Only</span>
                 </div>
               )}
             </div>
+          </div>
 
-            {/* Access Denied for non-Super Admin */}
-            {!isSuperAdmin ? (
-              <div className="p-12 text-center bg-amber-50 rounded-2xl border-2 border-amber-200">
-                <ShieldAlert className="w-12 h-12 mx-auto text-amber-500 mb-4" />
-                <h4 className="text-lg font-bold text-amber-800 mb-2">Truy cập bị hạn chế</h4>
-                <p className="text-sm text-amber-600">
-                  System DB chỉ dành cho Super Admin. Bạn không có quyền xem hoặc chỉnh sửa các cấu hình này.
-                </p>
-              </div>
-            ) : Object.keys(dbGrouped).length === 0 ? (
-              <div className="p-8 text-center bg-white/60 rounded-2xl border-2 border-dashed border-black/20">
-                <span className="material-symbols-outlined text-3xl text-on-surface-variant">inbox</span>
-                <p className="text-sm text-on-surface-variant mt-2">Đang tải...</p>
-              </div>
-            ) : (
+          {/* Access Denied */}
+          {!isSuperAdmin ? (
+            <div className="p-12 text-center">
+              <Shield className="w-12 h-12 mx-auto text-amber-500 mb-4" />
+              <h4 className="text-lg font-bold text-amber-800 mb-2">Truy cập bị hạn chế</h4>
+              <p className="text-sm text-amber-600">
+                System DB chỉ dành cho Super Admin. Bạn không có quyền xem hoặc chỉnh sửa các cấu hình này.
+              </p>
+            </div>
+          ) : Object.keys(dbGrouped).length === 0 ? (
+            <div className="p-8 text-center">
+              <p className="text-sm text-on-surface-variant">Đang tải...</p>
+            </div>
+          ) : (
+            <div className="p-8">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {Object.entries(dbGrouped).map(([catKey, items]) => {
                   const cat = dbCategories[catKey] || { label: catKey, icon: 'settings' };
                   return (
-                    <div key={catKey} className="bg-white/60 rounded-2xl border-2 border-black p-5 shadow-[3px_3px_0px_0px_#000]">
-                      <div className="flex items-center gap-2 mb-3">
-                        <span className="material-symbols-outlined text-primary">{cat.icon}</span>
+                    <div key={catKey} className="rounded-xl border border-outline-variant overflow-hidden">
+                      <div className="px-5 py-4 bg-surface-variant/30 border-b border-outline-variant flex items-center gap-2">
+                        <Settings className="w-4 h-4 text-primary" />
                         <h4 className="font-bold text-on-surface">{cat.label}</h4>
-                        <span className="ml-auto text-xs bg-slate-100 px-2 py-0.5 rounded-full">{items.length}</span>
+                        <span className="ml-auto text-xs bg-surface-variant px-2 py-0.5 rounded-full text-on-surface-variant">{items.length}</span>
                       </div>
-                      <div className="space-y-1.5">
+                      <div className="divide-y divide-outline-variant/50">
                         {items.map((item) => (
-                          <div key={item.key} className="flex items-center justify-between text-sm p-2 rounded-lg hover:bg-slate-50">
-                            <div className="flex-1 min-w-0">
+                          <div key={item.key} className="flex items-center justify-between px-5 py-3 hover:bg-surface-variant/20 transition-colors">
+                            <div className="flex-1 min-w-0 mr-4">
                               <div className="font-mono text-xs text-on-surface truncate">{item.key}</div>
                               {item.description && (
                                 <div className="text-[10px] text-on-surface-variant truncate">{item.description}</div>
                               )}
                             </div>
                             <div className={clsx(
-                              'ml-2 px-2 py-0.5 rounded text-xs font-mono',
-                              item.type === 'number' && 'bg-blue-100 text-blue-700',
-                              item.type === 'boolean' && 'bg-purple-100 text-purple-700',
-                              item.type === 'string' && 'bg-slate-100 text-slate-700',
-                              item.type === 'json' && 'bg-amber-100 text-amber-700'
+                              'px-2.5 py-1 rounded text-xs font-mono flex-shrink-0',
+                              item.type === 'number' && 'bg-blue-50 text-blue-700',
+                              item.type === 'boolean' && 'bg-purple-50 text-purple-700',
+                              item.type === 'string' && 'bg-surface-variant text-on-surface-variant',
+                              item.type === 'json' && 'bg-amber-50 text-amber-700'
                             )}>
                               {String(item.value)}
                             </div>
@@ -1243,11 +1273,10 @@ export function AdminSettings() {
                   );
                 })}
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       )}
-
     </AdminLayout>
   );
 }
@@ -1255,26 +1284,27 @@ export function AdminSettings() {
 function ToggleRow({ label, desc, value }: { label: string; desc: string; value: boolean }) {
   const [enabled, setEnabled] = useState(value);
   return (
-    <div className="flex items-start justify-between gap-4 p-4 rounded-2xl bg-white/60 border-2 border-black shadow-[3px_3px_0px_0px_#000]">
+    <div className="flex items-start justify-between gap-4 p-4 rounded-xl border border-outline-variant hover:border-primary/20 transition-colors">
       <div className="flex-1">
-        <p className="font-bold text-on-surface">{label}</p>
-        <p className="text-sm text-on-surface-variant">{desc}</p>
+        <p className="font-label-md font-semibold text-on-surface">{label}</p>
+        <p className="text-sm text-on-surface-variant mt-0.5">{desc}</p>
       </div>
       <button
         onClick={() => setEnabled(!enabled)}
         className={clsx(
-          'relative w-14 h-7 rounded-full transition-colors flex-shrink-0',
-          enabled ? 'bg-primary' : 'bg-gray-300'
+          'relative w-12 h-7 rounded-full transition-colors flex-shrink-0 mt-0.5',
+          enabled ? 'bg-primary' : 'bg-surface-variant'
         )}
       >
         <span
           className={clsx(
-            'absolute top-1.5 w-4 h-4 rounded-full bg-white shadow-md transition-transform',
-            enabled ? 'left-[38px]' : 'left-0.5'
+            'absolute top-1 w-5 h-5 rounded-full bg-white shadow-sm transition-transform',
+            enabled ? 'left-[28px]' : 'left-1'
           )}
         />
       </button>
     </div>
   );
 }
+
 export default AdminSettings;

@@ -120,6 +120,23 @@ const heavyApiRateLimiter = createRateLimiter({
 app.use('/api/recommend', heavyApiRateLimiter);
 app.use('/api/chat', heavyApiRateLimiter);
 
+// ============== SECURITY HEADERS (CSP) ==============
+// CSP header for local development - allows localhost resources
+app.use((_req, res, next) => {
+  res.setHeader('Content-Security-Policy', 
+    "default-src 'self'; " +
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval'; " +
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+    "font-src 'self' https://fonts.gstatic.com data:; " +
+    "img-src 'self' data: blob: http://localhost:* https://localhost:*; " +
+    "connect-src 'self' http://localhost:* https://localhost:* ws://localhost:* wss://localhost:*; " +
+    "frame-ancestors 'self'; " +
+    "worker-src 'self' blob:; " +
+    "object-src 'none';"
+  );
+  next();
+});
+
 // ============== PERFORMANCE MONITORING ==============
 // In-memory storage for performance metrics
 const performanceMetrics = {

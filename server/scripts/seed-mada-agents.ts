@@ -323,9 +323,8 @@ async function main() {
   console.log('  4. Chạy: npx tsx server/scripts/mada-scraper.ts --category <slug> --ingest');
 }
 
-// Run if executed directly (CJS: use require.main, ESM: use import.meta.url)
-if ((typeof require !== 'undefined' && require.main === module) ||
-  (typeof import.meta !== 'undefined' && (import.meta.url === `file://${process.argv[1]}` || import.meta.url.endsWith(process.argv[1] || '') || process.argv[1]?.endsWith('seed-mada-agents.ts')))) {
+// Run if executed directly (ESM: use import.meta.url)
+if ((typeof import.meta !== 'undefined' && (import.meta.url === `file://${process.argv[1]}` || import.meta.url.endsWith(process.argv[1] || '') || process.argv[1]?.endsWith('seed-mada-agents.ts')))) {
   main();
 }
 

@@ -740,6 +740,57 @@ export const translations = {
     'dataManager.alertFileAdded': 'Đã thêm {{count}} tài liệu từ {{filename}}',
     'dataManager.confirmClearKb': 'Bạn có chắc muốn xóa toàn bộ cơ sở tri thức? Hành động này không thể hoàn tác.',
     'dataManager.uploadFailed': 'Upload thất bại',
+
+    // Additional common translations for ChatPage
+    'chat.validName': 'Vui lòng nhập họ tên',
+    'chat.validEmail': 'Vui lòng nhập email',
+    'chat.validEmailFormat': 'Email không hợp lệ',
+    'chat.validDisability': 'Vui lòng chọn loại khuyết tật',
+    'chat.validBudget': 'Vui lòng chọn ngân sách',
+    'chat.validNeeds': 'Vui lòng mô tả nhu cầu',
+    'chat.submitError': 'Có lỗi xảy ra. Vui lòng thử lại.',
+    'chat.googleLoginFailed': 'Đăng nhập Google thất bại. Vui lòng thử lại.',
+    'chat.fileTooLarge': 'File "{{filename}}" quá lớn. Vui lòng chọn file nhỏ hơn 10MB.',
+    'chat.rateLimit': 'Bạn đã gửi quá nhiều yêu cầu. Vui lòng chờ khoảng {{time}} rồi thử lại.',
+    'chat.sessionExpired': 'Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.',
+    'chat.serverBusy': 'Máy chủ đang bận. Vui lòng thử lại sau vài giây.',
+    'chat.generalError': 'Đã xảy ra lỗi. Vui lòng thử lại.',
+    'chat.cannotProcess': 'Xin lỗi, tôi không thể xử lý yêu cầu của bạn lúc này. Vui lòng thử lại sau.',
+    'chat.connectionError': 'Đã xảy ra lỗi kết nối. Vui lòng kiểm tra kết nối internet và thử lại.',
+    'chat.urlError': 'Không thể kết nối đến URL. Vui lòng kiểm tra lại đường dẫn.',
+    'chat.notFoundInfo': 'Không tìm thấy thông tin phù hợp?',
+    'chat.loading': 'Đang tải...',
+
+    // Auth messages
+    'auth.invalidEmail': 'Email không hợp lệ. Vui lòng kiểm tra lại.',
+    'auth.enterName': 'Vui lòng nhập tên của bạn.',
+    'auth.loginError': 'Đã xảy ra lỗi. Vui lòng thử lại.',
+    'auth.connectionError': 'Đã xảy ra lỗi kết nối. Vui lòng kiểm tra server đang chạy.',
+    'auth.googleError': 'Có lỗi khi đăng nhập Google. Vui lòng thử lại.',
+
+    // Session expired
+    'session.expired': 'Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.',
+
+    // Admin messages
+    'admin.selectOneToImport': 'Vui lòng chọn ít nhất 1 bot để import.',
+    'admin.enterUrl': 'Vui lòng nhập URL',
+    'admin.loadingWebpage': 'Đang tải trang web...',
+    'admin.enterNameEmail': 'Vui lòng nhập tên và email',
+    'admin.passwordOnce': 'Mật khẩu chỉ hiển thị 1 lần. Vui lòng copy và gửi cho nhân viên qua kênh bảo mật.',
+    'admin.templateNotFound': 'Không tìm thấy template',
+    'admin.removeFromAgents': 'Vui lòng gỡ prompt khỏi các agents trước khi xóa, hoặc xóa/deactivate agents liên quan.',
+
+    // Widget messages
+    'widget.error': 'Đã xảy ra lỗi. Vui lòng thử lại.',
+    'widget.sorry': 'Xin lỗi, đã xảy ra lỗi. Vui lòng thử lại.',
+
+    // Product pages
+    'product.notFound': 'Không tìm thấy sản phẩm',
+    'product.noResults': 'Không tìm thấy sản phẩm',
+    'category.notFound': 'Không tìm thấy danh mục',
+    'category.viewAll': 'Xem tất cả sản phẩm',
+    'home': 'Trang chủ',
+    'products': 'Sản phẩm',
   },
 
   en: {
@@ -1463,6 +1514,57 @@ export const translations = {
     'dataManager.alertFileAdded': 'Added {{count}} documents from {{filename}}',
     'dataManager.confirmClearKb': 'Are you sure you want to clear the entire knowledge base? This action cannot be undone.',
     'dataManager.uploadFailed': 'Upload failed',
+
+    // Additional common translations for ChatPage
+    'chat.validName': 'Please enter your name',
+    'chat.validEmail': 'Please enter email',
+    'chat.validEmailFormat': 'Invalid email',
+    'chat.validDisability': 'Please select disability type',
+    'chat.validBudget': 'Please select budget',
+    'chat.validNeeds': 'Please describe your needs',
+    'chat.submitError': 'An error occurred. Please try again.',
+    'chat.googleLoginFailed': 'Google login failed. Please try again.',
+    'chat.fileTooLarge': 'File "{{filename}}" is too large. Please select a file smaller than 10MB.',
+    'chat.rateLimit': 'You have sent too many requests. Please wait about {{time}} and try again.',
+    'chat.sessionExpired': 'Session expired. Please log in again.',
+    'chat.serverBusy': 'Server is busy. Please try again in a few seconds.',
+    'chat.generalError': 'An error occurred. Please try again.',
+    'chat.cannotProcess': 'Sorry, I cannot process your request at this time. Please try again later.',
+    'chat.connectionError': 'Connection error occurred. Please check your internet connection and try again.',
+    'chat.urlError': 'Cannot connect to URL. Please check the link.',
+    'chat.notFoundInfo': 'Didn\'t find relevant information?',
+    'chat.loading': 'Loading...',
+
+    // Auth messages
+    'auth.invalidEmail': 'Invalid email. Please check again.',
+    'auth.enterName': 'Please enter your name.',
+    'auth.loginError': 'An error occurred. Please try again.',
+    'auth.connectionError': 'Connection error occurred. Please check if the server is running.',
+    'auth.googleError': 'Error logging in with Google. Please try again.',
+
+    // Session expired
+    'session.expired': 'Session expired. Please log in again.',
+
+    // Admin messages
+    'admin.selectOneToImport': 'Please select at least 1 bot to import.',
+    'admin.enterUrl': 'Please enter URL',
+    'admin.loadingWebpage': 'Loading webpage...',
+    'admin.enterNameEmail': 'Please enter name and email',
+    'admin.passwordOnce': 'Password is only shown once. Please copy and send to staff via secure channel.',
+    'admin.templateNotFound': 'Template not found',
+    'admin.removeFromAgents': 'Please remove the prompt from agents before deleting, or delete/deactivate related agents.',
+
+    // Widget messages
+    'widget.error': 'An error occurred. Please try again.',
+    'widget.sorry': 'Sorry, an error occurred. Please try again.',
+
+    // Product pages
+    'product.notFound': 'Product not found',
+    'product.noResults': 'No products found',
+    'category.notFound': 'Category not found',
+    'category.viewAll': 'View all products',
+    'home': 'Home',
+    'products': 'Products',
   },
 
   ar: {
@@ -2186,6 +2288,57 @@ export const translations = {
     'dataManager.alertFileAdded': 'تمت إضافة {{count}} مستندات من {{filename}}',
     'dataManager.confirmClearKb': 'هل أنت متأكد من رغبتك في مسح قاعدة المعرفة بالكامل؟ لا يمكن التراجع عن هذا الإجراء.',
     'dataManager.uploadFailed': 'فشل الرفع',
+
+    // Additional common translations for ChatPage
+    'chat.validName': 'يرجى إدخال اسمك',
+    'chat.validEmail': 'يرجى إدخال البريد الإلكتروني',
+    'chat.validEmailFormat': 'البريد الإلكتروني غير صالح',
+    'chat.validDisability': 'يرجى تحديد نوع الإعاقة',
+    'chat.validBudget': 'يرجى تحديد الميزانية',
+    'chat.validNeeds': 'يرجى وصف احتياجاتك',
+    'chat.submitError': 'حدث خطأ. يرجى المحاولة مرة أخرى.',
+    'chat.googleLoginFailed': 'فشل تسجيل الدخول عبر Google. يرجى المحاولة مرة أخرى.',
+    'chat.fileTooLarge': 'الملف "{{filename}}" كبير جدًا. يرجى اختيار ملف أصغر من 10 ميجابايت.',
+    'chat.rateLimit': 'أرسلت طلبات كثيرة جدًا. يرجى الانتظار حوالي {{time}} ثم المحاولة مرة أخرى.',
+    'chat.sessionExpired': 'انتهت صلاحية الجلسة. يرجى تسجيل الدخول مرة أخرى.',
+    'chat.serverBusy': 'الخادم مشغول. يرجى المحاولة مرة أخرى بعد لحظات.',
+    'chat.generalError': 'حدث خطأ. يرجى المحاولة مرة أخرى.',
+    'chat.cannotProcess': 'عذرًا، لا يمكنني معالجة طلبك في الوقت الحالي. يرجى المحاولة مرة أخرى لاحقًا.',
+    'chat.connectionError': 'حدث خطأ في الاتصال. يرجى التحقق من اتصالك بالإنترنت والمحاولة مرة أخرى.',
+    'chat.urlError': 'لا يمكن الاتصال بعنوان URL. يرجى التحقق من الرابط.',
+    'chat.notFoundInfo': 'لم تجد معلومات مناسبة؟',
+    'chat.loading': 'جاري التحميل...',
+
+    // Auth messages
+    'auth.invalidEmail': 'البريد الإلكتروني غير صالح. يرجى التحقق مرة أخرى.',
+    'auth.enterName': 'يرجى إدخال اسمك.',
+    'auth.loginError': 'حدث خطأ. يرجى المحاولة مرة أخرى.',
+    'auth.connectionError': 'حدث خطأ في الاتصال. يرجى التحقق من تشغيل الخادم.',
+    'auth.googleError': 'خطأ في تسجيل الدخول عبر Google. يرجى المحاولة مرة أخرى.',
+
+    // Session expired
+    'session.expired': 'انتهت صلاحية الجلسة. يرجى تسجيل الدخول مرة أخرى.',
+
+    // Admin messages
+    'admin.selectOneToImport': 'يرجى اختيار روبوت واحد على الأقل للاستيراد.',
+    'admin.enterUrl': 'يرجى إدخال عنوان URL',
+    'admin.loadingWebpage': 'جاري تحميل صفحة الويب...',
+    'admin.enterNameEmail': 'يرجى إدخال الاسم والبريد الإلكتروني',
+    'admin.passwordOnce': 'كلمة المرور تظهر مرة واحدة فقط. يرجى النسخ وإرسالها للموظف عبر قناة آمنة.',
+    'admin.templateNotFound': 'لم يتم العثور على القالب',
+    'admin.removeFromAgents': 'يرجى إزالة الموجه من الوكلاء قبل الحذف، أو حذف/تعطيل الوكلاء المتعلقين.',
+
+    // Widget messages
+    'widget.error': 'حدث خطأ. يرجى المحاولة مرة أخرى.',
+    'widget.sorry': 'عذرًا، حدث خطأ. يرجى المحاولة مرة أخرى.',
+
+    // Product pages
+    'product.notFound': 'لم يتم العثور على المنتج',
+    'product.noResults': 'لم يتم العثور على منتجات',
+    'category.notFound': 'لم يتم العثور على الفئة',
+    'category.viewAll': 'عرض جميع المنتجات',
+    'home': 'الرئيسية',
+    'products': 'المنتجات',
   },
 
   fr: {
@@ -2909,6 +3062,57 @@ export const translations = {
     'dataManager.alertFileAdded': '{{count}} documents ajoutés depuis {{filename}}',
     'dataManager.confirmClearKb': 'Êtes-vous sûr de vouloir vider toute la base de connaissances ? Cette action est irréversible.',
     'dataManager.uploadFailed': 'Échec du téléversement',
+
+    // Additional common translations for ChatPage
+    'chat.validName': 'Veuillez entrer votre nom',
+    'chat.validEmail': 'Veuillez entrer votre email',
+    'chat.validEmailFormat': 'Email invalide',
+    'chat.validDisability': 'Veuillez sélectionner le type de handicap',
+    'chat.validBudget': 'Veuillez sélectionner le budget',
+    'chat.validNeeds': 'Veuillez décrire vos besoins',
+    'chat.submitError': 'Une erreur est survenue. Veuillez réessayer.',
+    'chat.googleLoginFailed': 'Échec de la connexion Google. Veuillez réessayer.',
+    'chat.fileTooLarge': 'Le fichier "{{filename}}" est trop volumineux. Veuillez sélectionner un fichier inférieur à 10 Mo.',
+    'chat.rateLimit': 'Vous avez envoyé trop de requêtes. Veuillez patienter environ {{time}} puis réessayer.',
+    'chat.sessionExpired': 'Session expirée. Veuillez vous reconnecter.',
+    'chat.serverBusy': 'Le serveur est occupé. Veuillez réessayer dans quelques instants.',
+    'chat.generalError': 'Une erreur est survenue. Veuillez réessayer.',
+    'chat.cannotProcess': 'Désolé, je ne peux pas traiter votre demande pour le moment. Veuillez réessayer plus tard.',
+    'chat.connectionError': 'Erreur de connexion. Veuillez vérifier votre connexion internet et réessayer.',
+    'chat.urlError': 'Impossible de se connecter à l\'URL. Veuillez vérifier le lien.',
+    'chat.notFoundInfo': 'Vous n\'avez pas trouvé d\'informations pertinentes ?',
+    'chat.loading': 'Chargement...',
+
+    // Auth messages
+    'auth.invalidEmail': 'Email invalide. Veuillez vérifier.',
+    'auth.enterName': 'Veuillez entrer votre nom.',
+    'auth.loginError': 'Une erreur est survenue. Veuillez réessayer.',
+    'auth.connectionError': 'Erreur de connexion. Veuillez vérifier si le serveur est en cours d\'exécution.',
+    'auth.googleError': 'Erreur de connexion avec Google. Veuillez réessayer.',
+
+    // Session expired
+    'session.expired': 'Session expirée. Veuillez vous reconnecter.',
+
+    // Admin messages
+    'admin.selectOneToImport': 'Veuillez sélectionner au moins 1 bot à importer.',
+    'admin.enterUrl': 'Veuillez entrer l\'URL',
+    'admin.loadingWebpage': 'Chargement de la page web...',
+    'admin.enterNameEmail': 'Veuillez entrer le nom et l\'email',
+    'admin.passwordOnce': 'Le mot de passe n\'est affiché qu\'une seule fois. Veuillez le copier et l\'envoyer au personnel via un canal sécurisé.',
+    'admin.templateNotFound': 'Modèle non trouvé',
+    'admin.removeFromAgents': 'Veuillez retirer le prompt des agents avant de supprimer, ou supprimer/désactiver les agents concernés.',
+
+    // Widget messages
+    'widget.error': 'Une erreur est survenue. Veuillez réessayer.',
+    'widget.sorry': 'Désolé, une erreur est survenue. Veuillez réessayer.',
+
+    // Product pages
+    'product.notFound': 'Produit non trouvé',
+    'product.noResults': 'Aucun produit trouvé',
+    'category.notFound': 'Catégorie non trouvée',
+    'category.viewAll': 'Voir tous les produits',
+    'home': 'Accueil',
+    'products': 'Produits',
   },
 } as const;
 

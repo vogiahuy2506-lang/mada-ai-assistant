@@ -50,7 +50,7 @@ export function ProductDetailPage() {
     if (!id) return;
     setLoading(true);
     setAddedCompare(false);
-    fetch(`${API}/products/${id}`)
+    fetch(`${API}/products/${id}?lang=${language}`)
       .then((r) => r.json())
       .then((d) => {
         if (d.success) {

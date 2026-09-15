@@ -19,6 +19,7 @@ import {
 } from '../lib/scraping/productExtractor';
 import { syncProductToKnowledge } from '../lib/syncKbProducts';
 import { scrapeProductMetadata } from '../lib/scrapeProductMetadata';
+import { translateProduct, detectLanguage as detectTextLang, type SupportedLanguage } from '../lib/translationService';
 
 const router = express.Router();
 
@@ -551,46 +552,61 @@ router.post('/import-url/save', async (req, res) => {
 
     const insert = db.prepare(`
       INSERT INTO kb_products (
-        id, title, title_en, description, description_en, content,
+        id, title, title_en, title_ar, title_fr,
+        description, description_en, description_ar, description_fr,
+        content,
         category, brand, model, price_range, source_url, product_url,
         image_url, iso_codes, wcag_level, who_gate_area, status, featured,
         sort_order, language, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const now = new Date().toISOString();
     let inserted = 0;
     let skipped = 0;
 
-    const txn = db.transaction((items: ExtractedProduct[]) => {
-      const syncedIds: string[] = [];
-      for (const p of items) {
-        if (!forceReimport && existingUrls.has(p.url)) {
-          skipped++;
-          continue;
-        }
-        const row = mapProductToRow(p, defaultCategory);
+    // ⭐ Pre-process: translate all products BEFORE inserting (translation is async)
+    console.log(`🌐 Translating ${productsToSave.length} products to all languages...`);
+    const translatedRows: Array<{ row: any; translations: any }> = [];
+    for (const p of productsToSave) {
+      if (!forceReimport && existingUrls.has(p.url)) {
+        skipped++;
+        continue;
+      }
+      const row = mapProductToRow(p, defaultCategory);
+      const detectedLang = detectTextLang(row.title, row.description || '');
+      const translations = await translateProduct({
+        title: row.title,
+        description: row.description,
+        content: row.content,
+        sourceLang: detectedLang as SupportedLanguage,
+      }).catch(() => ({ title_en: '', title_ar: '', title_fr: '', description_en: '', description_ar: '', description_fr: '', content_en: '', content_ar: '', content_fr: '' }));
+      translatedRows.push({ row, translations });
+    }
+
+    // Then insert in a synchronous transaction
+    const syncedIds: string[] = [];
+    const txn = db.transaction(() => {
+      for (const { row, translations } of translatedRows) {
         insert.run(
-          row.id, row.title, row.title_en, row.description, row.description_en, row.content,
-          row.category, row.brand, row.model, row.price_range, row.source_url, row.product_url,
+          row.id, row.title, row.title_en || translations.title_en, translations.title_ar, translations.title_fr,
+          row.description, row.description_en || translations.description_en, translations.description_ar, translations.description_fr,
+          row.content, row.category, row.brand, row.model, row.price_range, row.source_url, row.product_url,
           row.image_url, JSON.stringify(row.iso_codes), row.wcag_level, row.who_gate_area,
           row.status, row.featured, row.sort_order, row.language, now, now
         );
 
-        // ⭐ Auto-sync sang knowledge_items để AI/RAG biết đến
+        // ⭐ Auto-sync to knowledge_items
         try {
           const syncRes = syncProductToKnowledge(row);
           if (syncRes.knowledge_item_id) syncedIds.push(syncRes.knowledge_item_id);
         } catch (e) {
           console.warn(`[import-url/save] sync fail for ${row.id}:`, e);
         }
-
         inserted++;
       }
-      return syncedIds;
     });
-
-    const syncedIds = txn(productsToSave);
+    txn();
 
     console.log(
       `💾 [import-url/save] Saved ${inserted} (skipped ${skipped}) from ${url} (method=${result.method}, fetch=${result.fetchMethod}, ${result.durationMs}ms, synced=${syncedIds.length})`

@@ -8,6 +8,7 @@ import { Search, Filter, X, Package, ArrowRight } from 'lucide-react';
 import { PublicLayout } from '@/components/PublicLayout';
 import { useLanguageStore } from '@/stores';
 import { formatPrice } from '@/lib/formatPrice';
+import { t } from '@/lib/translations';
 import clsx from 'clsx';
 
 interface Product {
@@ -80,6 +81,7 @@ export function ProductsPage() {
     params.set('order', sortOrder);
     params.set('limit', String(PAGE_SIZE));
     params.set('offset', String((page - 1) * PAGE_SIZE));
+    params.set('lang', language);
 
     fetch(`${API}/products?${params}`)
       .then((r) => r.json())
@@ -115,7 +117,7 @@ export function ProductsPage() {
 
   const titleText = language === 'en' ? 'Products' : 'Sản phẩm';
   const searchPlaceholder = language === 'en' ? 'Search products...' : 'Tìm kiếm sản phẩm...';
-  const noResultsText = language === 'en' ? 'No products found' : 'Không tìm thấy sản phẩm';
+  const noResultsText = t('product.noResults');
   const filtersText = language === 'en' ? 'Filters' : 'Bộ lọc';
   const sortText = language === 'en' ? 'Sort' : 'Sắp xếp';
   const categoryText = language === 'en' ? 'Category' : 'Danh mục';

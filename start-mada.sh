@@ -13,9 +13,11 @@ cd "/Users/vohuy/Downloads/MADA AI ASSISTANT/mada-ai-assistant"
 # Kill existing processes
 echo "🧹 Cleaning up existing processes..."
 lsof -ti:3001 2>/dev/null | xargs kill -9 2>/dev/null || true
+lsof -ti:4567 2>/dev/null | xargs kill -9 2>/dev/null || true
+lsof -ti:4568 2>/dev/null | xargs kill -9 2>/dev/null || true
 lsof -ti:5173 2>/dev/null | xargs kill -9 2>/dev/null || true
 lsof -ti:5174 2>/dev/null | xargs kill -9 2>/dev/null || true
-sleep 1
+sleep 2
 
 # Cleanup on exit
 cleanup() {
@@ -28,14 +30,22 @@ cleanup() {
 }
 trap cleanup INT TERM
 
-# Start backend in background
+# Build server (esbuild is fast)
+echo "⚙️  Building server..."
+npm run build:server > "$LOG_DIR/build.log" 2>&1
+
+# Start backend in background (use compiled node instead of tsx to avoid EPERM)
 echo "⚡ Starting backend (port 3001)..."
-nohup npm run server > "$LOG_DIR/server.log" 2>&1 &
+nohup node dist/server.mjs > "$LOG_DIR/server.log" 2>&1 &
 SERVER_PID=$!
 
-# Start frontend in background (parallel)
+# Start frontend (find free port)
 echo "🎨 Starting frontend (port 5173)..."
-nohup npm run dev > "$LOG_DIR/vite.log" 2>&1 &
+# Try 5173 first, fallback to 5174 if taken
+VITE_PORT=5173
+lsof -ti:5173 > /dev/null 2>&1 && VITE_PORT=5174
+lsof -ti:5174 > /dev/null 2>&1 && VITE_PORT=5175
+nohup npx vite --port $VITE_PORT > "$LOG_DIR/vite.log" 2>&1 &
 FRONTEND_PID=$!
 
 echo "📋 PIDs: backend=$SERVER_PID  frontend=$FRONTEND_PID"
@@ -47,7 +57,7 @@ for i in {1..30}; do
     BACKEND_OK=false
     FRONTEND_OK=false
     curl -s http://localhost:3001/api/health > /dev/null 2>&1 && BACKEND_OK=true
-    curl -s http://localhost:5173 > /dev/null 2>&1 && FRONTEND_OK=true
+    curl -s http://localhost:$VITE_PORT > /dev/null 2>&1 && FRONTEND_OK=true
 
     if $BACKEND_OK && $FRONTEND_OK; then
         break
@@ -61,7 +71,7 @@ echo "📊 Status:"
 
 if $BACKEND_OK; then
     echo "   ✅ Backend  → http://localhost:3001"
-    STATS=$(curl -s http://localhost:3001/api/knowledge/stats 2>/dev/null)
+    STATS=$(curl -s http://localhost:3001/api/kb/stats 2>/dev/null)
     DOCS=$(echo "$STATS" | grep -o '"totalDocuments":[0-9]*' | grep -o '[0-9]*' || echo "?")
     echo "      KB: $DOCS documents"
 else
@@ -69,7 +79,7 @@ else
 fi
 
 if $FRONTEND_OK; then
-    echo "   ✅ Frontend → http://localhost:5173"
+    echo "   ✅ Frontend → http://localhost:$VITE_PORT"
 else
     echo "   ❌ Frontend failed — check: tail -f $LOG_DIR/vite.log"
 fi

@@ -504,8 +504,19 @@ class VectorStore {
   async getStats(): Promise<any> {
     const provider = getEmbeddingProvider();
 
+    // Always get real count from Pinecone, not from in-memory store
+    let totalDocuments = this.inMemoryStore.size;
+    try {
+      if (this.pineconeIndex) {
+        const stats = await this.pineconeIndex.describeIndexStats();
+        totalDocuments = (stats.namespaces?.['__default__']?.recordCount) || 0;
+      }
+    } catch (e) {
+      // Fall back to in-memory count
+    }
+
     return {
-      totalDocuments: this.inMemoryStore.size,
+      totalDocuments,
       indexName: pineconeConfig.indexName,
       isInitialized: this.isInitialized,
       provider: this.activeDbProvider,

@@ -13,9 +13,16 @@ interface ProductRow {
   id: string;
   title: string;
   title_en: string;
+  title_ar: string;
+  title_fr: string;
   description: string;
   description_en: string;
+  description_ar: string;
+  description_fr: string;
   content: string;
+  content_en: string;
+  content_ar: string;
+  content_fr: string;
   category: string;
   brand: string;
   model: string;
@@ -34,14 +41,47 @@ interface ProductRow {
   updated_at: string;
 }
 
-function publishRow(row: ProductRow) {
+type SupportedLang = 'vi' | 'en' | 'ar' | 'fr';
+
+function getLocalizedText(row: ProductRow, lang: SupportedLang): { title: string; description: string; content: string } {
+  if (lang === 'en') return {
+    title: row.title_en || row.title,
+    description: row.description_en || row.description,
+    content: row.content_en || row.content,
+  };
+  if (lang === 'ar') return {
+    title: row.title_ar || row.title_en || row.title,
+    description: row.description_ar || row.description_en || row.description,
+    content: row.content_ar || row.content_en || row.content,
+  };
+  if (lang === 'fr') return {
+    title: row.title_fr || row.title_en || row.title,
+    description: row.description_fr || row.description_en || row.description,
+    content: row.content_fr || row.content_en || row.content,
+  };
+  // Default: Vietnamese
+  return {
+    title: row.title,
+    description: row.description,
+    content: row.content,
+  };
+}
+
+function publishRow(row: ProductRow, lang: SupportedLang = 'vi') {
   let iso: string[] = [];
   try {
     iso = JSON.parse(row.iso_codes || '[]');
   } catch {
     iso = [];
   }
-  return { ...row, iso_codes: iso };
+  const localized = getLocalizedText(row, lang);
+  return {
+    ...row,
+    title: localized.title,
+    description: localized.description,
+    content: localized.content,
+    iso_codes: iso,
+  };
 }
 
 // ============== CATEGORIES ==============
@@ -87,7 +127,13 @@ router.get('/products', (req, res) => {
       offset = '0',
       sort = 'created_at',
       order = 'DESC',
+      lang = 'vi',
     } = req.query;
+
+    // Validate language
+    const userLang: SupportedLang = ['vi', 'en', 'ar', 'fr'].includes(String(lang)) 
+      ? String(lang) as SupportedLang 
+      : 'vi';
 
     const where: string[] = ["status = 'published'"];
     const params: any[] = [];
@@ -162,7 +208,7 @@ router.get('/products', (req, res) => {
     res.json({
       success: true,
       data: {
-        items: rows.map(publishRow),
+        items: rows.map(r => publishRow(r, userLang)),
         total: countRow.total,
         limit: lim,
         offset: off,
@@ -180,6 +226,9 @@ router.get('/products', (req, res) => {
 // GET /api/public/products/:id - product detail
 router.get('/products/:id', (req, res) => {
   try {
+    const lang: SupportedLang = ['vi', 'en', 'ar', 'fr'].includes(String(req.query.lang))
+      ? String(req.query.lang) as SupportedLang
+      : 'vi';
     const tableCheck = db
       .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='kb_products'")
       .get();
@@ -201,8 +250,8 @@ router.get('/products/:id', (req, res) => {
     res.json({
       success: true,
       data: {
-        product: publishRow(row),
-        related: related.map(publishRow),
+        product: publishRow(row, lang),
+        related: related.map(r => publishRow(r, lang)),
       },
     });
   } catch (err: any) {
@@ -213,9 +262,12 @@ router.get('/products/:id', (req, res) => {
 // GET /api/public/search - alias for /products with q param, returns search-friendly format
 router.get('/search', (req, res) => {
   try {
-    const { q = '', limit = '20' } = req.query;
+    const { q = '', limit = '20', lang = 'vi' } = req.query;
     const query = String(q).trim();
     const lim = Math.min(parseInt(String(limit)) || 20, 50);
+    const userLang: SupportedLang = ['vi', 'en', 'ar', 'fr'].includes(String(lang))
+      ? String(lang) as SupportedLang
+      : 'vi';
 
     if (!query) {
       return res.json({ success: true, data: { items: [], total: 0, query: '' } });
@@ -252,7 +304,7 @@ router.get('/search', (req, res) => {
     res.json({
       success: true,
       data: {
-        items: rows.map(publishRow),
+        items: rows.map(r => publishRow(r, userLang)),
         total: countRow.total,
         query,
       },
@@ -263,15 +315,18 @@ router.get('/search', (req, res) => {
 });
 
 // GET /api/public/featured - featured products for homepage
-router.get('/featured', (_, res) => {
+router.get('/featured', (req, res) => {
   try {
+    const lang: SupportedLang = ['vi', 'en', 'ar', 'fr'].includes(String(req.query.lang))
+      ? String(req.query.lang) as SupportedLang
+      : 'vi';
     const rows = db
       .prepare(
         "SELECT * FROM kb_products WHERE status = 'published' AND featured = 1 ORDER BY sort_order ASC, created_at DESC LIMIT 12"
       )
       .all() as ProductRow[];
 
-    res.json({ success: true, data: rows.map(publishRow) });
+    res.json({ success: true, data: rows.map(r => publishRow(r, lang)) });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
   }

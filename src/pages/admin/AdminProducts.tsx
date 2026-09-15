@@ -7,6 +7,7 @@ import { getImageUrl } from '../../lib/imageProxy';
 import { useTranslation } from '@/lib/translations';
 import {
  Plus, RefreshCw, Loader2, CheckCircle2, AlertCircle,
+ Languages,
 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -443,9 +444,10 @@ const handleImportFromUrl = async () => {
 }
 
 // ==================== PRODUCT CARD ====================
-function ProductCard({ product, categoryName, onEdit, onDelete, onTogglePublish }: {
+function ProductCard({ product, categoryName, onEdit, onDelete, onTogglePublish, onTranslate }: {
  product: Product; categoryName: string;
  onEdit: (p: Product) => void; onDelete: (p: Product) => void; onTogglePublish: (p: Product) => void;
+ onTranslate: (p: Product) => void;
 }) {
  const { t } = useTranslation();
  const isPublished = product.status === 'published';
@@ -494,6 +496,11 @@ function ProductCard({ product, categoryName, onEdit, onDelete, onTogglePublish 
 
     {/* Actions */}
     <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+     <button onClick={(e) => { e.stopPropagation(); onTranslate(product); }}
+      className="w-7 h-7 rounded bg-white/90 border border-slate-300 flex items-center justify-center text-slate-600 hover:bg-purple-100 hover:text-purple-600 transition-colors"
+      title="Dịch AI (EN/AR/FR)">
+      <Languages className="w-4 h-4" />
+     </button>
      <button onClick={(e) => { e.stopPropagation(); onEdit(product); }}
       className="w-7 h-7 rounded bg-white/90 border border-slate-300 flex items-center justify-center text-slate-600 hover:bg-blue-100 hover:text-blue-600 transition-colors"
       title={t('admin.common.edit')}>
@@ -672,6 +679,21 @@ const handleTogglePublish = async (prod: Product) => {
   const newStatus = prod.status === 'published' ? 'draft' : 'published';
   await adminApi.publishProduct(prod.id, newStatus as any);
   await loadProducts();
+};
+
+const handleTranslate = async (prod: Product) => {
+  if (!confirm(`Dịch sản phẩm "${prod.title}" sang EN/AR/FR bằng AI?`)) return;
+  try {
+    const result = await adminApi.translateProduct(prod.id);
+    if (result.success) {
+      alert(`✅ Đã dịch thành công!`);
+      await loadProducts();
+    } else {
+      alert(`❌ Lỗi: ${result.error}`);
+    }
+  } catch (e) {
+    alert(`❌ Lỗi: ${(e as Error)?.message}`);
+  }
 };
 
 const handlePublishAll = async () => {
@@ -1000,7 +1022,7 @@ const totalPages = Math.ceil(totalProducts / pageSize);
            />
           )}
           <ProductCard product={prod} categoryName={getCategoryName(prod.category)}
-           onEdit={(p) => { setEditingProduct(p); setShowProductModal(true); }} onDelete={handleDeleteProduct} onTogglePublish={handleTogglePublish} />
+           onEdit={(p) => { setEditingProduct(p); setShowProductModal(true); }} onDelete={handleDeleteProduct} onTogglePublish={handleTogglePublish} onTranslate={handleTranslate} />
          </div>
         ))}
        </div>

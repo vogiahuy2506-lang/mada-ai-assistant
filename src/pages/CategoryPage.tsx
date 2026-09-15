@@ -7,6 +7,7 @@ import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, Package } from 'lucide-react';
 import { PublicLayout } from '@/components/PublicLayout';
 import { useLanguageStore } from '@/stores';
+import { t } from '@/lib/translations';
 import { ProductsPage } from './ProductsPage';
 
 interface Category {
@@ -52,13 +53,13 @@ export function CategoryPage() {
       <PublicLayout>
         <div className="text-center py-20">
           <Package className="w-16 h-16 text-slate-300 mx-auto mb-4" aria-hidden="true" />
-          <h1 className="text-2xl font-black mb-2">Không tìm thấy danh mục</h1>
+          <h1 className="text-2xl font-black mb-2">{t('category.notFound')}</h1>
           <Link
             to="/products"
             className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary text-on-primary rounded-xl font-bold mt-4"
           >
             <ArrowLeft className="w-4 h-4" aria-hidden="true" />
-            Xem tất cả sản phẩm
+            {t('category.viewAll')}
           </Link>
         </div>
       </PublicLayout>
@@ -75,9 +76,9 @@ export function CategoryPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <nav className="text-sm text-slate-600 mb-4" aria-label="Breadcrumb">
             <ol className="flex items-center gap-1 flex-wrap" role="list">
-              <li><Link to="/" className="hover:text-primary">Trang chủ</Link></li>
+              <li><Link to="/" className="hover:text-primary">{t('home')}</Link></li>
               <li aria-hidden="true">/</li>
-              <li><Link to="/products" className="hover:text-primary">Sản phẩm</Link></li>
+              <li><Link to="/products" className="hover:text-primary">{t('products')}</Link></li>
               <li aria-hidden="true">/</li>
               <li className="text-slate-900 font-bold" aria-current="page">{name}</li>
             </ol>

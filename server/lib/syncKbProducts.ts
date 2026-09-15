@@ -19,8 +19,12 @@ export interface KbProduct {
   id: string;
   title: string;
   title_en?: string | null;
+  title_ar?: string | null;
+  title_fr?: string | null;
   description?: string | null;
   description_en?: string | null;
+  description_ar?: string | null;
+  description_fr?: string | null;
   content?: string | null;
   category: string;
   brand?: string | null;
@@ -114,7 +118,13 @@ export function syncProductToKnowledge(product: KbProduct): {
     db.prepare(`
       UPDATE knowledge_items SET
         title = ?,
+        title_en = ?,
+        title_ar = ?,
+        title_fr = ?,
         description = ?,
+        description_en = ?,
+        description_ar = ?,
+        description_fr = ?,
         content = ?,
         url = ?,
         category = ?,
@@ -123,13 +133,20 @@ export function syncProductToKnowledge(product: KbProduct): {
         who_gate_area = ?,
         status = 'published',
         indexed = 0,
+        translated = 1,
         language = ?,
         metadata = ?,
         updated_at = ?
       WHERE id = ?
     `).run(
       product.title,
+      product.title_en || '',
+      product.title_ar || '',
+      product.title_fr || '',
       product.description || '',
+      product.description_en || '',
+      product.description_ar || '',
+      product.description_fr || '',
       content,
       product.product_url || product.source_url || '',
       product.category,
@@ -186,15 +203,23 @@ function insertKnowledgeItemWithContent(
 
   db.prepare(`
     INSERT INTO knowledge_items (
-      id, title, description, content, source, source_type, url,
+      id, title, title_en, title_ar, title_fr,
+      description, description_en, description_ar, description_fr,
+      content, source, source_type, url,
       category, iso_codes, wcag_level, who_gate_area,
       auto_classified, confidence, status, chunk_count, language,
-      metadata, indexed, indexed_at, created_by, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0.8, ?, 1, ?, ?, 0, NULL, NULL, ?, ?)
+      metadata, indexed, indexed_at, created_by, created_at, updated_at, translated
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0.8, ?, 1, ?, ?, 0, NULL, NULL, ?, ?, 1)
   `).run(
     id,
     product.title,
+    product.title_en || '',
+    product.title_ar || '',
+    product.title_fr || '',
     product.description || '',
+    product.description_en || '',
+    product.description_ar || '',
+    product.description_fr || '',
     content,
     product.product_url || `kb_product:${product.id}`,
     'manual',

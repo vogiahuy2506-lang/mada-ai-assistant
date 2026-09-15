@@ -253,6 +253,86 @@ try {
   }
 }
 
+// ============== KNOWLEDGE ITEMS TRANSLATION MIGRATION ==============
+try {
+  const kiCols = db.prepare("PRAGMA table_info(knowledge_items)").all() as any[];
+  const kiColNames = kiCols.map((c: any) => c.name);
+
+  // Add translation columns for all 4 languages
+  if (!kiColNames.includes('title_en')) {
+    db.exec(`ALTER TABLE knowledge_items ADD COLUMN title_en TEXT NOT NULL DEFAULT ''`);
+  }
+  if (!kiColNames.includes('title_ar')) {
+    db.exec(`ALTER TABLE knowledge_items ADD COLUMN title_ar TEXT NOT NULL DEFAULT ''`);
+  }
+  if (!kiColNames.includes('title_fr')) {
+    db.exec(`ALTER TABLE knowledge_items ADD COLUMN title_fr TEXT NOT NULL DEFAULT ''`);
+  }
+  if (!kiColNames.includes('description_en')) {
+    db.exec(`ALTER TABLE knowledge_items ADD COLUMN description_en TEXT`);
+  }
+  if (!kiColNames.includes('description_ar')) {
+    db.exec(`ALTER TABLE knowledge_items ADD COLUMN description_ar TEXT`);
+  }
+  if (!kiColNames.includes('description_fr')) {
+    db.exec(`ALTER TABLE knowledge_items ADD COLUMN description_fr TEXT`);
+  }
+  if (!kiColNames.includes('content_en')) {
+    db.exec(`ALTER TABLE knowledge_items ADD COLUMN content_en TEXT NOT NULL DEFAULT ''`);
+  }
+  if (!kiColNames.includes('content_ar')) {
+    db.exec(`ALTER TABLE knowledge_items ADD COLUMN content_ar TEXT NOT NULL DEFAULT ''`);
+  }
+  if (!kiColNames.includes('content_fr')) {
+    db.exec(`ALTER TABLE knowledge_items ADD COLUMN content_fr TEXT NOT NULL DEFAULT ''`);
+  }
+  if (!kiColNames.includes('translated')) {
+    db.exec(`ALTER TABLE knowledge_items ADD COLUMN translated INTEGER NOT NULL DEFAULT 0`);
+  }
+  console.log('✅ Knowledge items translation columns added');
+} catch (e: any) {
+  if (!e.message?.includes('duplicate column')) {
+    console.warn('⚠️ Knowledge items translation migration:', e.message);
+  }
+}
+
+// ============== KB_PRODUCTS TRANSLATION MIGRATION ==============
+try {
+  const pCols = db.prepare("PRAGMA table_info(kb_products)").all() as any[];
+  const pColNames = pCols.map((c: any) => c.name);
+
+  // Add translation columns for all 4 languages
+  if (!pColNames.includes('title_ar')) {
+    db.exec(`ALTER TABLE kb_products ADD COLUMN title_ar TEXT NOT NULL DEFAULT ''`);
+  }
+  if (!pColNames.includes('title_fr')) {
+    db.exec(`ALTER TABLE kb_products ADD COLUMN title_fr TEXT NOT NULL DEFAULT ''`);
+  }
+  if (!pColNames.includes('description_ar')) {
+    db.exec(`ALTER TABLE kb_products ADD COLUMN description_ar TEXT`);
+  }
+  if (!pColNames.includes('description_fr')) {
+    db.exec(`ALTER TABLE kb_products ADD COLUMN description_fr TEXT`);
+  }
+  if (!pColNames.includes('content')) {
+    db.exec(`ALTER TABLE kb_products ADD COLUMN content TEXT`);
+  }
+  if (!pColNames.includes('content_en')) {
+    db.exec(`ALTER TABLE kb_products ADD COLUMN content_en TEXT`);
+  }
+  if (!pColNames.includes('content_ar')) {
+    db.exec(`ALTER TABLE kb_products ADD COLUMN content_ar TEXT`);
+  }
+  if (!pColNames.includes('content_fr')) {
+    db.exec(`ALTER TABLE kb_products ADD COLUMN content_fr TEXT`);
+  }
+  console.log('✅ KB Products translation columns added');
+} catch (e: any) {
+  if (!e.message?.includes('duplicate column')) {
+    console.warn('⚠️ KB Products translation migration:', e.message);
+  }
+}
+
 // ============== SCHEDULED SOURCES SCHEMA ==============
 
 db.exec(`

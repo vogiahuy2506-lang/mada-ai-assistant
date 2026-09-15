@@ -376,12 +376,12 @@ function ConsultationModal({
   
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
-    if (!formData.name.trim()) newErrors.name = language === 'vi' ? 'Vui lòng nhập họ tên' : language === 'en' ? 'Please enter your name' : language === 'ar' ? 'يرجى إدخال اسمك' : 'Veuillez entrer votre nom';
-    if (!formData.email.trim()) newErrors.email = language === 'vi' ? 'Vui lòng nhập email' : language === 'en' ? 'Please enter email' : language === 'ar' ? 'يرجى إدخال البريد الإلكتروني' : 'Veuillez entrer l\'email';
-    else if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = language === 'vi' ? 'Email không hợp lệ' : language === 'en' ? 'Invalid email' : language === 'ar' ? 'بريد إلكتروني غير صالح' : 'Email invalide';
-    if (!formData.disabilityType) newErrors.disabilityType = language === 'vi' ? 'Vui lòng chọn loại khuyết tật' : language === 'en' ? 'Please select disability type' : language === 'ar' ? 'يرجى تحديد نوع الإعاقة' : 'Veuillez sélectionner le type de handicap';
-    if (!formData.budget) newErrors.budget = language === 'vi' ? 'Vui lòng chọn ngân sách' : language === 'en' ? 'Please select budget' : language === 'ar' ? 'يرجى تحديد الميزانية' : 'Veuillez sélectionner le budget';
-    if (!formData.message.trim()) newErrors.message = language === 'vi' ? 'Vui lòng mô tả nhu cầu' : language === 'en' ? 'Please describe your needs' : language === 'ar' ? 'يرجى وصف احتياجاتك' : 'Veuillez décrire vos besoins';
+    if (!formData.name.trim()) newErrors.name = t('chat.validName', language);
+    if (!formData.email.trim()) newErrors.email = t('chat.validEmail', language);
+    else if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = t('chat.validEmailFormat', language);
+    if (!formData.disabilityType) newErrors.disabilityType = t('chat.validDisability', language);
+    if (!formData.budget) newErrors.budget = t('chat.validBudget', language);
+    if (!formData.message.trim()) newErrors.message = t('chat.validNeeds', language);
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -409,7 +409,7 @@ function ConsultationModal({
         setFormData({ name: '', email: '', phone: '', disabilityType: '', budget: '', priority: '', interestedDevices: [], message: '' });
         onClose();
       } else {
-        alert(data.error || 'Có lỗi xảy ra. Vui lòng thử lại.');
+        alert(data.error || t('chat.submitError', language));
       }
     } catch (error) {
       console.error('Consultation submit error:', error);
@@ -1036,7 +1036,7 @@ export function ChatPage() {
     
     if (error) {
       console.error('Google OAuth error:', error);
-      alert('Đăng nhập Google thất bại. Vui lòng thử lại.');
+      alert(t('chat.googleLoginFailed'));
       window.history.replaceState({}, '', window.location.pathname);
       return;
     }
@@ -1185,7 +1185,7 @@ export function ChatPage() {
     for (const file of filesToProcess) {
       // Check file size (max 10MB)
       if (file.size > 10 * 1024 * 1024) {
-        alert(`File "${file.name}" quá lớn. Vui lòng chọn file nhỏ hơn 10MB.`);
+        alert(t('chat.fileTooLarge').replace('{{filename}}', file.name));
         continue;
       }
 
@@ -1631,9 +1631,7 @@ export function ChatPage() {
           const resetTime = retryAfter ? new Date(parseInt(retryAfter)).toLocaleTimeString() : 'một phút';
           addMessage({
             role: 'assistant',
-            content: language === 'vi'
-              ? `⚠️ Bạn đã gửi quá nhiều yêu cầu. Vui lòng chờ khoảng ${resetTime} rồi thử lại.`
-              : `⚠️ Too many requests. Please wait until ${resetTime} and try again.`,
+            content: t('chat.rateLimit').replace('{{time}}', resetTime),
           });
           setLoading(false);
           setIsGeneratingResponse(false);
@@ -1644,9 +1642,7 @@ export function ChatPage() {
         if (response.status === 401) {
           addMessage({
             role: 'assistant',
-            content: language === 'vi'
-              ? '⚠️ Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.'
-              : '⚠️ Session expired. Please log in again.',
+            content: t('chat.sessionExpired'),
           });
           setLoading(false);
           setIsGeneratingResponse(false);
@@ -1669,16 +1665,12 @@ export function ChatPage() {
         if (response.status >= 500) {
           addMessage({
             role: 'assistant',
-            content: language === 'vi'
-              ? '⚠️ Máy chủ đang bận. Vui lòng thử lại sau vài giây.'
-              : '⚠️ Server is busy. Please try again in a few seconds.',
+            content: t('chat.serverBusy'),
           });
         } else {
           addMessage({
             role: 'assistant',
-            content: language === 'vi'
-              ? '⚠️ Đã xảy ra lỗi. Vui lòng thử lại.'
-              : '⚠️ An error occurred. Please try again.',
+            content: t('chat.generalError'),
           });
         }
         setLoading(false);
@@ -1766,14 +1758,14 @@ export function ChatPage() {
       } else {
         addMessage({
           role: 'assistant',
-          content: 'Xin lỗi, tôi không thể xử lý yêu cầu của bạn lúc này. Vui lòng thử lại sau.',
+          content: t('chat.cannotProcess'),
         });
       }
     } catch (error) {
       console.error('Chat error:', error);
       addMessage({
         role: 'assistant',
-        content: 'Đã xảy ra lỗi kết nối. Vui lòng kiểm tra kết nối internet và thử lại.',
+        content: t('chat.connectionError'),
       });
     } finally {
       // Refund quota if API failed so user doesn't lose a turn
@@ -2200,7 +2192,7 @@ export function ChatPage() {
       console.error('Fetch URL error:', error);
       addMessage({
         role: 'assistant',
-        content: `❌ Không thể kết nối đến URL. Vui lòng kiểm tra lại đường dẫn.`,
+        content: t('chat.urlError'),
       });
     } finally {
       setIsFetchingUrl(false);
@@ -3498,10 +3490,7 @@ function MessageBubble({
               </div>
               <div className="flex-1">
                 <h4 className="text-sm font-bold text-amber-800 mb-1">
-                  {language === 'vi' ? 'Không tìm thấy thông tin phù hợp?' : 
-                   language === 'en' ? 'Can\'t find relevant information?' :
-                   language === 'ar' ? 'لم يتم العثور على معلومات مناسبة؟' :
-                   'Impossible de trouver des informations pertinentes?'}
+                  {t('chat.notFoundInfo')}
                 </h4>
                 <p className="text-xs text-amber-700 mb-3">
                   {language === 'vi' ? 'Đội ngũ chuyên gia MADA có thể hỗ trợ bạn chi tiết hơn.' :

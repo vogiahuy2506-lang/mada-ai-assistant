@@ -232,18 +232,18 @@ router.post('/products', requireAdmin, (req, res) => {
     
     db.prepare(`
       INSERT INTO kb_products (
-        id, title, title_en, description, description_en, content, category,
+        id, title, title_en, title_ar, title_fr,
+        description, description_en, description_ar, description_fr, content, content_en, content_ar, content_fr, category,
         brand, model, price_range, source_url, product_url, image_url,
         iso_codes, wcag_level, who_gate_area, status, featured, sort_order, language,
         created_by, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id,
       title,
-      title_en || '',
-      description || '',
-      description_en || '',
-      content || '',
+      title_en || '', '', '',
+      description || '', description_en || '', '', '',
+      content || '', '', '', '',
       category,
       brand || '',
       model || '',

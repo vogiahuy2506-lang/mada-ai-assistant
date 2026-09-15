@@ -206,6 +206,12 @@ export const adminApi = {
       { method: 'POST', body: JSON.stringify(payload) }
     )) as { success: boolean; updated: number; scope: string; message: string; error?: string };
   },
+  async translateProduct(id: string, languages?: string[]) {
+    return request<{ success: boolean; data?: Product; message?: string }>(`/admin/products/${id}/translate`, {
+      method: 'PATCH',
+      body: JSON.stringify({ languages: languages || ['en', 'ar', 'fr'] }),
+    });
+  },
 
   // ============== AGENTS ==============
   async getAgents() {

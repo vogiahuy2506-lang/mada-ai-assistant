@@ -7,6 +7,7 @@ import clsx from 'clsx';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { Language } from '@/types';
+import { t } from '@/lib/translations';
 
 interface Message {
   id: string;
@@ -327,7 +328,7 @@ export function EmbedWidget({
           setMessages(prev => [...prev, {
             id: assistantMsgId,
             role: 'assistant',
-            content: data.error || 'Đã xảy ra lỗi. Vui lòng thử lại.',
+            content: data.error || t('widget.error', language),
           }]);
         }
       }
@@ -337,7 +338,7 @@ export function EmbedWidget({
       setMessages(prev => [...prev, {
         id: assistantMsgId,
         role: 'assistant',
-        content: 'Xin lỗi, đã xảy ra lỗi. Vui lòng thử lại.',
+        content: t('widget.sorry', language),
       }]);
     } finally {
       setIsLoading(false);

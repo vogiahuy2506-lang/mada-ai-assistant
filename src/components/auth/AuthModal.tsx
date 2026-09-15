@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Mail, Lock, User as UserIcon, X, Eye, EyeOff, Loader2 } from 'lucide-react';
 import madaLogo from '@/assets/mada-logo.png';
-import { useAuthModalStore, useAuthStore, useAnonQuotaStore } from '@/stores';
+import { useAuthModalStore, useAuthStore, useAnonQuotaStore, useLanguageStore } from '@/stores';
+import { t } from '@/lib/translations';
 
 interface FormState {
   email: string;
@@ -18,6 +19,7 @@ export function AuthModal() {
   const registerWithEmail = useAuthStore((s) => s.registerWithEmail);
   const navigate = useNavigate();
   const resetAnon = useAnonQuotaStore((s) => s.reset);
+  const language = useLanguageStore((s) => s.language);
 
   const [tab, setTab] = useState<AuthTab>(mode);
   const [form, setForm] = useState<FormState>({ email: '', password: '', name: '' });
@@ -62,7 +64,7 @@ export function AuthModal() {
     setError(null);
 
     if (!validateEmail(form.email)) {
-      setError('Email không hợp lệ. Vui lòng kiểm tra lại.');
+      setError(t('auth.invalidEmail', language));
       return;
     }
     if (form.password.length < 6) {
@@ -70,7 +72,7 @@ export function AuthModal() {
       return;
     }
     if (tab === 'register' && !form.name.trim()) {
-      setError('Vui lòng nhập tên của bạn.');
+      setError(t('auth.enterName', language));
       return;
     }
 
@@ -85,7 +87,7 @@ export function AuthModal() {
       console.log('📦 Auth result:', result);
 
       if (!result.success) {
-        setError(result.error || 'Đã xảy ra lỗi. Vui lòng thử lại.');
+        setError(result.error || t('auth.loginError', language));
         return;
       }
 
@@ -102,7 +104,7 @@ export function AuthModal() {
       }, 50);
     } catch (err: any) {
       console.error('❌ Auth error:', err);
-      setError('Đã xảy ra lỗi kết nối. Vui lòng kiểm tra server đang chạy.');
+      setError(t('auth.connectionError', language));
     } finally {
       setLoading(false);
     }
@@ -115,7 +117,7 @@ export function AuthModal() {
       window.location.href = `${import.meta.env.VITE_API_URL || 'http://localhost:3002'}/api/auth/google`;
     } catch (err) {
       console.error('Google auth error:', err);
-      setError('Có lỗi khi đăng nhập Google. Vui lòng thử lại.');
+      setError(t('auth.googleError', language));
       setLoading(false);
     }
   };

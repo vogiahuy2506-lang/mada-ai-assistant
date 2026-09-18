@@ -392,13 +392,13 @@ export default function AdminUsers() {
   return (
     <AdminLayout
       title={t('admin.users.title')}
-      titleEn="User Management"
-      titleAr="إدارة المستخدمين"
-      titleFr="Gestion des utilisateurs"
+      titleEn={t('admin.users.titleEn')}
+      titleAr={t('admin.users.titleAr')}
+      titleFr={t('admin.users.titleFr')}
       subtitle={t('admin.users.subtitle')}
-      subtitleEn="View, lock, delete and create staff accounts in the system."
-      subtitleAr="عرض وقفل وحذف وإنشاء حسابات الموظفين في النظام."
-      subtitleFr="Voir, verrouiller, supprimer et créer des comptes du personnel."
+      subtitleEn={t('admin.users.subtitleEn')}
+      subtitleAr={t('admin.users.subtitleAr')}
+      subtitleFr={t('admin.users.subtitleFr')}
       showFab={false}
       showLayoutTitle={false}
     >

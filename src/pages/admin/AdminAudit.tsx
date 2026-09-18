@@ -266,7 +266,7 @@ export function AdminAudit() {
           <div className="relative z-10 p-16 text-center">
             <span className="material-symbols-outlined text-7xl text-on-surface-variant/30 mb-3 inline-block" style={{ fontVariationSettings: "'FILL' 0" }}>history_edu</span>
             <p className="text-sm text-on-surface-variant mt-2">
-              {isEn ? 'No activity logs yet. Try logging in or performing CRUD actions.' : 'Chưa có nhật ký hoạt động nào. Thử tạo thao tác (login, CRUD product, etc.)'}
+              {t('admin.audit.emptyHint')}
             </p>
           </div>
         ) : (
@@ -335,7 +335,7 @@ export function AdminAudit() {
                       <span className="material-symbols-outlined text-sm">
                         {isExpanded ? 'expand_less' : 'expand_more'}
                       </span>
-                      {isExpanded ? (isEn ? 'Close' : 'Thu gọn') : (isEn ? 'Details' : 'Chi tiết')}
+                      {isExpanded ? t('admin.audit.close') : t('admin.audit.details')}
                     </button>
                   </div>
 
@@ -344,21 +344,21 @@ export function AdminAudit() {
                       {/* Summary grid */}
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
                         <div className="bg-white rounded-lg border border-black/10 p-3">
-                          <p className="text-[10px] uppercase font-bold tracking-wider text-on-surface-variant mb-1">ID</p>
+                          <p className="text-[10px] uppercase font-bold tracking-wider text-on-surface-variant mb-1">{t('admin.audit.id')}</p>
                           <p className="font-mono text-xs font-bold text-on-surface truncate">{log.id}</p>
                         </div>
                         <div className="bg-white rounded-lg border border-black/10 p-3">
-                          <p className="text-[10px] uppercase font-bold tracking-wider text-on-surface-variant mb-1">{isEn ? 'User' : 'User'}</p>
+                          <p className="text-[10px] uppercase font-bold tracking-wider text-on-surface-variant mb-1">{t('admin.audit.user')}</p>
                           <p className="font-mono text-xs font-bold text-on-surface truncate">{log.user_id || '—'}</p>
                         </div>
                         <div className="bg-white rounded-lg border border-black/10 p-3">
-                          <p className="text-[10px] uppercase font-bold tracking-wider text-on-surface-variant mb-1">{isEn ? 'Action' : 'Hành động'}</p>
+                          <p className="text-[10px] uppercase font-bold tracking-wider text-on-surface-variant mb-1">{t('admin.audit.action')}</p>
                           <p className={clsx('inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border', badgeClass(log.action))}>
                             {log.action}
                           </p>
                         </div>
                         <div className="bg-white rounded-lg border border-black/10 p-3">
-                          <p className="text-[10px] uppercase font-bold tracking-wider text-on-surface-variant mb-1">IP Address</p>
+                          <p className="text-[10px] uppercase font-bold tracking-wider text-on-surface-variant mb-1">{t('admin.audit.ipAddress')}</p>
                           <p className="font-mono text-xs font-bold text-on-surface">{log.ip_address || '—'}</p>
                         </div>
                       </div>
@@ -368,7 +368,7 @@ export function AdminAudit() {
                         <div className="mb-4">
                           <h5 className="text-xs font-black uppercase tracking-wider text-on-surface mb-2 flex items-center gap-1.5">
                             <span className="material-symbols-outlined text-sm">target</span>
-                            {isEn ? 'Target / Resource' : 'Đối tượng'}
+                            {t('admin.audit.targetResource')}
                           </h5>
                           <div className="bg-white rounded-lg border border-black/10 p-3 font-mono text-xs text-on-surface break-all">
                             {log.target}
@@ -381,7 +381,7 @@ export function AdminAudit() {
                         <div className="mb-4">
                           <h5 className="text-xs font-black uppercase tracking-wider text-on-surface mb-2 flex items-center gap-1.5">
                             <span className="material-symbols-outlined text-sm">devices</span>
-                            {isEn ? 'User Agent (Browser / Device)' : 'Thiết bị / Trình duyệt'}
+                            {t('admin.audit.userAgent')}
                           </h5>
                           <div className="bg-white rounded-lg border border-black/10 p-3 font-mono text-[11px] text-on-surface-variant break-all">
                             {log.user_agent}
@@ -394,7 +394,7 @@ export function AdminAudit() {
                         <div>
                           <h5 className="text-xs font-black uppercase tracking-wider text-on-surface mb-2 flex items-center gap-1.5">
                             <span className="material-symbols-outlined text-sm">data_object</span>
-                            {isEn ? 'Change Payload (JSON)' : 'Dữ liệu thay đổi (JSON)'}
+                            {t('admin.audit.changePayload')}
                           </h5>
                           <pre className="bg-slate-900 rounded-lg p-3 font-mono text-xs text-emerald-300 break-all whitespace-pre-wrap border-2 border-black overflow-x-auto">
                             {(() => {
@@ -421,14 +421,10 @@ export function AdminAudit() {
         <div className="text-sm text-blue-900">
           <p className="font-bold mb-1.5 flex items-center gap-2">
             <span className="material-symbols-outlined text-base" style={{ fontVariationSettings: "'FILL' 1" }}>history_edu</span>
-            {isEn ? 'How Audit Logs Work' : 'Cách hoạt động của Audit Logs'}
+            {t('admin.audit.howItWorks')}
           </p>
           <p className="leading-relaxed">
-            {isEn ? (
-              <>Logs are auto-generated by <code className="px-1.5 py-0.5 bg-white/60 rounded font-mono text-xs border border-blue-200">db.prepare('INSERT INTO audit_logs...')</code> in each admin route. See code in <code className="px-1.5 py-0.5 bg-white/60 rounded font-mono text-xs border border-blue-200">server/routes/</code>.</>
-            ) : (
-              <>Logs được tạo tự động bởi <code className="px-1.5 py-0.5 bg-white/60 rounded font-mono text-xs border border-blue-200">db.prepare('INSERT INTO audit_logs...')</code> ở các route admin. Xem code chi tiết trong <code className="px-1.5 py-0.5 bg-white/60 rounded font-mono text-xs border border-blue-200">server/routes/</code>.</>
-            )}
+            {t('admin.audit.howItWorksDesc1')} <code className="px-1.5 py-0.5 bg-white/60 rounded font-mono text-xs border border-blue-200">{t('admin.audit.codeInsert')}</code> {t('admin.audit.howItWorksDesc2')} <code className="px-1.5 py-0.5 bg-white/60 rounded font-mono text-xs border border-blue-200">{t('admin.audit.codeRoutes')}</code>.
           </p>
         </div>
       </div>

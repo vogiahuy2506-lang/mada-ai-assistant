@@ -46,7 +46,7 @@ export function AdminOverview() {
   const [filterBotId, setFilterBotId] = useState<string>('');
   const [loading, setLoading] = useState(true);
 
-  const { t, language, getBotName } = useAdminOverviewTranslation();
+  const { t, getBotName } = useAdminOverviewTranslation();
 
   const load = useCallback(async () => {
     setLoading(true);

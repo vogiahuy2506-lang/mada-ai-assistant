@@ -5,7 +5,7 @@ import { Loader2, Search, Plus, Edit2, Trash2, ToggleLeft, ToggleRight, FileText
 import { adminApi } from './adminApi';
 import { getAccessToken } from '@/lib/api';
 import { usePromptStore, useAuthStore, useLanguageStore, type SystemPromptRow } from '@/stores';
-import { useTranslation, type Language } from '@/lib/translations';
+import { useTranslation } from '@/lib/translations';
 import { PromptsEditor } from './PromptsEditor';
 import { ChatCustomization } from './ChatCustomization';
 
@@ -37,7 +37,7 @@ export function AdminPrompts() {
   const setStorePrompts = usePromptStore((s) => s.setPrompts);
 
   // Get current language from store
-  const language = useLanguageStore((s) => s.language);
+  useLanguageStore((s) => s.language); // Keep subscription to store
   const { t } = useTranslation();
 
   // Category labels based on language

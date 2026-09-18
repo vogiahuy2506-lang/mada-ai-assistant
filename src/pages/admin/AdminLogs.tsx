@@ -480,30 +480,7 @@ function formatDate(iso: string): string {
 }
 
 // Generate a synthetic session timeline from the log entry
-function buildUserTimeline(log: AdminLog): Array<{ time: string; action: string; detail?: string }> {
-  const baseTime = new Date(log.timestamp).getTime();
-  const seed = log.id.charCodeAt(0) || 1;
-  const step = 15000 + (seed % 30) * 1000;
-  const rawDetails = (() => {
-    try {
-      if (log.details && (log.details.trim().startsWith('{') || log.details.trim().startsWith('['))) {
-        return JSON.parse(log.details);
-      }
-    } catch {}
-    return {};
-  })();
-  const user = log.user || 'Khách';
-  return [
-    { time: new Date(baseTime - step * 4).toISOString(), action: 'Truy cập trang', detail: `${user} mở trang Dashboard` },
-    { time: new Date(baseTime - step * 3).toISOString(), action: 'Xem danh sách', detail: `${user} đã xem danh sách yêu cầu tư vấn` },
-    { time: new Date(baseTime - step * 2).toISOString(), action: 'Mở chi tiết', detail: `${user} mở chi tiết consultation` },
-    { time: new Date(baseTime - step).toISOString(), action: 'Đọc nội dung', detail: `${user} đã đọc thông tin tư vấn` },
-    { time: log.timestamp, action: log.message, detail: log.details ? JSON.stringify(rawDetails) : undefined },
-    { time: new Date(baseTime + step * 0.5).toISOString(), action: 'Cập nhật database', detail: 'Đã ghi log vào audit_logs' },
-    { time: new Date(baseTime + step).toISOString(), action: 'Phát broadcast', detail: 'Gửi realtime notification tới admin clients' },
-    { time: new Date(baseTime + step * 1.5).toISOString(), action: 'Hoàn tất', detail: `Phiên thao tác kết thúc` },
-  ];
-}
+// This function is defined below with language support
 
 // Parse JSON object → friendly description based on language
 function formatLogDetails(raw: string, language: Language): string {

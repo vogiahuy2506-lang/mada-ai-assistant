@@ -90,11 +90,11 @@ export function AdminSettings() {
         setSavedAt(new Date().toLocaleTimeString());
         setTimeout(() => setSavedAt(null), 3000);
       } else {
-        setSaveError(lang.general.saveFailed);
+        setSaveError(lang['admin.settings.general.saveFailed']);
       }
     } catch (e) {
       console.error('Save error:', e);
-      setSaveError(lang.general.connectionError);
+      setSaveError(lang['admin.settings.general.connectionError']);
     } finally {
       setIsSaving(false);
     }
@@ -282,8 +282,8 @@ export function AdminSettings() {
           {/* Anonymous Quota */}
           <div className="bg-white rounded-2xl border border-outline-variant overflow-hidden">
             <div className="px-8 py-6 border-b border-outline-variant">
-              <h3 className="text-lg font-black text-on-surface">{lang.plans.anonQuota}</h3>
-              <p className="text-sm text-on-surface-variant mt-1">{lang.plans.anonQuotaDesc}</p>
+              <h3 className="text-lg font-black text-on-surface">{lang['admin.settings.plans.anonQuota']}</h3>
+              <p className="text-sm text-on-surface-variant mt-1">{lang['admin.settings.plans.anonQuotaDesc']}</p>
             </div>
             <div className="p-8">
               <div className="flex items-center gap-6 flex-wrap">
@@ -294,7 +294,7 @@ export function AdminSettings() {
                     onChange={(e) => setAnonymousLimit(e.target.checked ? -1 : 10)}
                     className="w-5 h-5 rounded border-outline text-primary focus:ring-primary"
                   />
-                  <span className="text-label-md font-semibold text-on-surface">{lang.plans.unlimited}</span>
+                  <span className="text-label-md font-semibold text-on-surface">{lang['admin.settings.plans.unlimited']}</span>
                 </label>
                 {anonymousLimit !== -1 && (
                   <div className="flex items-center gap-3">
@@ -305,7 +305,7 @@ export function AdminSettings() {
                       onChange={(e) => setAnonymousLimit(parseInt(e.target.value) || 10)}
                       className="w-24 px-4 py-2.5 rounded-xl bg-surface-variant/30 border border-outline-variant text-on-surface text-sm font-mono text-center focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30"
                     />
-                    <span className="text-sm text-on-surface-variant">{lang.plans.messagesPerSession}</span>
+                    <span className="text-sm text-on-surface-variant">{lang['admin.settings.plans.messagesPerSession']}</span>
                   </div>
                 )}
               </div>
@@ -315,14 +315,14 @@ export function AdminSettings() {
           {/* File Upload Limits */}
           <div className="bg-white rounded-2xl border border-outline-variant overflow-hidden">
             <div className="px-8 py-6 border-b border-outline-variant">
-              <h3 className="text-lg font-black text-on-surface">{lang.plans.fileUploadLimits}</h3>
+              <h3 className="text-lg font-black text-on-surface">{lang['admin.settings.plans.fileUploadLimits']}</h3>
             </div>
             <div className="p-8 space-y-5">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="space-y-2">
-                  <label className="text-label-sm font-semibold text-on-surface">{lang.plans.maxPerSession}</label>
+                  <label className="text-label-sm font-semibold text-on-surface">{lang['admin.settings.plans.maxPerSession']}</label>
                   <div className="flex items-center gap-2">
-                    <span className="text-sm text-on-surface-variant whitespace-nowrap">{lang.plans.filePerSession}</span>
+                    <span className="text-sm text-on-surface-variant whitespace-nowrap">{lang['admin.settings.plans.filePerSession']}</span>
                     <input
                       type="number"
                       min="1"
@@ -334,9 +334,9 @@ export function AdminSettings() {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-label-sm font-semibold text-on-surface">{lang.plans.maxTotalFiles}</label>
+                  <label className="text-label-sm font-semibold text-on-surface">{lang['admin.settings.plans.maxTotalFiles']}</label>
                   <div className="flex items-center gap-2">
-                    <span className="text-sm text-on-surface-variant whitespace-nowrap">{lang.plans.totalFiles}</span>
+                    <span className="text-sm text-on-surface-variant whitespace-nowrap">{lang['admin.settings.plans.totalFiles']}</span>
                     <input
                       type="number"
                       min="10"
@@ -348,9 +348,9 @@ export function AdminSettings() {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-label-sm font-semibold text-on-surface">{lang.plans.maxFileSize}</label>
+                  <label className="text-label-sm font-semibold text-on-surface">{lang['admin.settings.plans.maxFileSize']}</label>
                   <div className="flex items-center gap-2">
-                    <span className="text-sm text-on-surface-variant whitespace-nowrap">{lang.plans.fileSize}</span>
+                    <span className="text-sm text-on-surface-variant whitespace-nowrap">{lang['admin.settings.plans.fileSize']}</span>
                     <input
                       type="number"
                       min="1"
@@ -364,7 +364,7 @@ export function AdminSettings() {
                 </div>
               </div>
               <div className="pt-2">
-                <p className="text-label-sm font-semibold text-on-surface mb-2">{lang.plans.supportedFormats}</p>
+                <p className="text-label-sm font-semibold text-on-surface mb-2">{lang['admin.settings.plans.supportedFormats']}</p>
                 <div className="flex flex-wrap gap-2">
                   {['PDF', 'DOCX', 'TXT', 'PNG', 'JPEG', 'JPG', 'PPTX'].map((fmt) => (
                     <span
@@ -382,7 +382,7 @@ export function AdminSettings() {
           {/* Plan Quotas */}
           <div className="bg-white rounded-2xl border border-outline-variant overflow-hidden">
             <div className="px-8 py-6 border-b border-outline-variant">
-              <h3 className="text-lg font-black text-on-surface">{lang.plans.planQuotas}</h3>
+              <h3 className="text-lg font-black text-on-surface">{lang['admin.settings.plans.planQuotas']}</h3>
             </div>
             <div className="p-8">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -402,20 +402,20 @@ export function AdminSettings() {
                       <span className="text-lg font-black text-on-surface">{p.name}</span>
                       {p.current && (
                         <span className="px-2.5 py-1 rounded-full bg-primary text-on-primary text-xs font-bold">
-                          {lang.plans.current}
+                          {lang['admin.settings.plans.current']}
                         </span>
                       )}
                     </div>
                     <div className="space-y-3">
                       <div className="space-y-1.5">
-                        <label className="text-label-sm font-semibold text-on-surface-variant">{lang.plans.pricePerMonth}</label>
+                        <label className="text-label-sm font-semibold text-on-surface-variant">{lang['admin.settings.plans.pricePerMonth']}</label>
                         <input
                           defaultValue={p.price}
                           className="w-full px-3 py-2.5 rounded-xl bg-surface-variant/30 border border-outline-variant text-on-surface text-sm font-mono focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30"
                         />
                       </div>
                       <div className="space-y-1.5">
-                        <label className="text-label-sm font-semibold text-on-surface-variant">{lang.plans.quotaPerMonth}</label>
+                        <label className="text-label-sm font-semibold text-on-surface-variant">{lang['admin.settings.plans.quotaPerMonth']}</label>
                         <label className="flex items-center gap-2 cursor-pointer">
                           <input
                             type="checkbox"
@@ -423,7 +423,7 @@ export function AdminSettings() {
                             onChange={(e) => setDefaultPlanLimit(e.target.checked ? -1 : 50)}
                             className="w-4 h-4 rounded border-outline text-primary focus:ring-primary"
                           />
-                          <span className="text-xs text-on-surface-variant">{lang.plans.unlimited}</span>
+                          <span className="text-xs text-on-surface-variant">{lang['admin.settings.plans.unlimited']}</span>
                         </label>
                       </div>
                     </div>
@@ -443,16 +443,16 @@ export function AdminSettings() {
               {isSaving ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  {lang.general.saving}
+                  {lang['admin.settings.general.saving']}
                 </>
               ) : (
-                lang.plans.saveConfig
+                lang['admin.settings.plans.saveConfig']
               )}
             </button>
             {savedAt && (
               <span className="text-sm font-semibold text-green-600 flex items-center gap-1.5">
                 <CheckCircle className="w-4 h-4" />
-                {lang.general.savedAt} {savedAt}
+                {lang['admin.settings.general.savedAt']} {savedAt}
               </span>
             )}
             {saveError && (
@@ -469,33 +469,33 @@ export function AdminSettings() {
       {tab === 'security' && (
         <div className="bg-white rounded-2xl border border-outline-variant overflow-hidden">
           <div className="px-8 py-6 border-b border-outline-variant">
-            <h3 className="text-lg font-black text-on-surface">{lang.security.sectionTitle}</h3>
+            <h3 className="text-lg font-black text-on-surface">{lang['admin.settings.security.sectionTitle']}</h3>
           </div>
           <div className="p-8 space-y-4">
             {([
               {
-                label: lang.security.require2FA,
-                desc: lang.security.require2FADesc,
+                label: lang['admin.settings.security.require2FA'],
+                desc: lang['admin.settings.security.require2FADesc'],
                 value: true,
               },
               {
-                label: lang.security.allowGoogle,
-                desc: lang.security.allowGoogleDesc,
+                label: lang['admin.settings.security.allowGoogle'],
+                desc: lang['admin.settings.security.allowGoogleDesc'],
                 value: true,
               },
               {
-                label: lang.security.ipWhitelist,
-                desc: lang.security.ipWhitelistDesc,
+                label: lang['admin.settings.security.ipWhitelist'],
+                desc: lang['admin.settings.security.ipWhitelistDesc'],
                 value: false,
               },
               {
-                label: lang.security.auditLog,
-                desc: lang.security.auditLogDesc,
+                label: lang['admin.settings.security.auditLog'],
+                desc: lang['admin.settings.security.auditLogDesc'],
                 value: true,
               },
               {
-                label: lang.security.autoLock,
-                desc: lang.security.autoLockDesc,
+                label: lang['admin.settings.security.autoLock'],
+                desc: lang['admin.settings.security.autoLockDesc'],
                 value: true,
               },
             ] as { label: string; desc: string; value: boolean }[]
@@ -505,7 +505,7 @@ export function AdminSettings() {
 
             <div className="pt-4 border-t border-outline-variant space-y-2">
               <label className="text-label-sm font-semibold text-on-surface">
-                {lang.security.jwtSecret}
+                {lang['admin.settings.security.jwtSecret']}
               </label>
               <div className="flex gap-2">
                 <input
@@ -528,16 +528,16 @@ export function AdminSettings() {
                 {isSaving ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    {lang.general.saving}
+                    {lang['admin.settings.general.saving']}
                   </>
                 ) : (
-                  lang.security.saveConfig
+                  lang['admin.settings.security.saveConfig']
                 )}
               </button>
               {savedAt && (
                 <span className="text-sm font-semibold text-green-600 flex items-center gap-1.5">
                   <CheckCircle className="w-4 h-4" />
-                  {lang.general.savedAt} {savedAt}
+                  {lang['admin.settings.general.savedAt']} {savedAt}
                 </span>
               )}
               {saveError && (
@@ -555,29 +555,29 @@ export function AdminSettings() {
       {tab === 'ai' && (
         <div className="bg-white rounded-2xl border border-outline-variant overflow-hidden">
           <div className="px-8 py-6 border-b border-outline-variant">
-            <h3 className="text-lg font-black text-on-surface">{lang.ai.sectionTitle}</h3>
+            <h3 className="text-lg font-black text-on-surface">{lang['admin.settings.ai.sectionTitle']}</h3>
           </div>
           <div className="p-8 space-y-4">
             {([
               {
-                name: lang.ai.madaLLM,
+                name: lang['admin.settings.ai.madaLLM'],
                 version: 'v4.2.1',
                 status: 'active',
-                desc: lang.ai.madaLLMDesc,
+                desc: lang['admin.settings.ai.madaLLMDesc'],
                 color: 'primary',
               },
               {
-                name: lang.ai.madaVision,
+                name: lang['admin.settings.ai.madaVision'],
                 version: 'v2.0',
                 status: 'active',
-                desc: lang.ai.madaVisionDesc,
+                desc: lang['admin.settings.ai.madaVisionDesc'],
                 color: 'secondary',
               },
               {
-                name: lang.ai.madaVoice,
+                name: lang['admin.settings.ai.madaVoice'],
                 version: 'v1.5',
                 status: 'beta',
-                desc: lang.ai.madaVoiceDesc,
+                desc: lang['admin.settings.ai.madaVoiceDesc'],
                 color: 'tertiary',
               },
             ] as { name: string; version: string; status: string; desc: string; color: string }[]
@@ -609,14 +609,14 @@ export function AdminSettings() {
                   <p className="text-sm text-on-surface-variant">{m.desc}</p>
                 </div>
                 <button className="px-4 py-2.5 rounded-xl bg-primary text-on-primary text-sm font-label-md font-semibold hover:bg-primary/90 transition-colors flex-shrink-0">
-                  {lang.ai.update}
+                  {lang['admin.settings.ai.update']}
                 </button>
               </div>
             ))}
 
             <div className="pt-4 border-t border-outline-variant grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
-                <label className="text-label-sm font-semibold text-on-surface">{lang.ai.temperature}</label>
+                <label className="text-label-sm font-semibold text-on-surface">{lang['admin.settings.ai.temperature']}</label>
                 <div className="flex items-center gap-3">
                   <input
                     type="range"
@@ -630,7 +630,7 @@ export function AdminSettings() {
                 </div>
               </div>
               <div className="space-y-2">
-                <label className="text-label-sm font-semibold text-on-surface">{lang.ai.maxTokens}</label>
+                <label className="text-label-sm font-semibold text-on-surface">{lang['admin.settings.ai.maxTokens']}</label>
                 <input
                   type="number"
                   defaultValue="2048"
@@ -644,7 +644,7 @@ export function AdminSettings() {
                 onClick={save}
                 className="px-6 py-3 rounded-xl bg-primary text-on-primary font-label-md font-semibold text-sm flex items-center gap-2 hover:bg-primary/90 transition-colors"
               >
-                {lang.ai.saveConfig}
+                {lang['admin.settings.ai.saveConfig']}
               </button>
             </div>
           </div>
@@ -655,15 +655,15 @@ export function AdminSettings() {
       {tab === 'integrations' && (
         <div className="bg-white rounded-2xl border border-outline-variant overflow-hidden">
           <div className="px-8 py-6 border-b border-outline-variant">
-            <h3 className="text-lg font-black text-on-surface">{lang.integrations.sectionTitle}</h3>
+            <h3 className="text-lg font-black text-on-surface">{lang['admin.settings.integrations.sectionTitle']}</h3>
           </div>
           <div className="p-8 space-y-3">
             {([
-              { name: lang.integrations.openai, desc: lang.integrations.openaiDesc, icon: Sparkles, connected: true, color: 'primary' },
-              { name: lang.integrations.googleCloud, desc: lang.integrations.googleCloudDesc, icon: Cloud, connected: true, color: 'secondary' },
-              { name: lang.integrations.stripe, desc: lang.integrations.stripeDesc, icon: CreditCard, connected: false, color: 'primary' },
-              { name: lang.integrations.sendgrid, desc: lang.integrations.sendgridDesc, icon: Mail, connected: true, color: 'error' },
-              { name: lang.integrations.sentry, desc: lang.integrations.sentryDesc, icon: Bug, connected: true, color: 'primary' },
+              { name: lang['admin.settings.integrations.openai'], desc: lang['admin.settings.integrations.openaiDesc'], icon: Sparkles, connected: true, color: 'primary' },
+              { name: lang['admin.settings.integrations.googleCloud'], desc: lang['admin.settings.integrations.googleCloudDesc'], icon: Cloud, connected: true, color: 'secondary' },
+              { name: lang['admin.settings.integrations.stripe'], desc: lang['admin.settings.integrations.stripeDesc'], icon: CreditCard, connected: false, color: 'primary' },
+              { name: lang['admin.settings.integrations.sendgrid'], desc: lang['admin.settings.integrations.sendgridDesc'], icon: Mail, connected: true, color: 'error' },
+              { name: lang['admin.settings.integrations.sentry'], desc: lang['admin.settings.integrations.sentryDesc'], icon: Bug, connected: true, color: 'primary' },
             ] as { name: string; desc: string; icon: any; connected: boolean; color: string }[]
             ).map((s) => (
               <div
@@ -685,7 +685,7 @@ export function AdminSettings() {
                     {s.connected && (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-50 text-green-700 text-xs font-bold border border-green-200">
                         <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
-                        {lang.integrations.connected}
+                        {lang['admin.settings.integrations.connected']}
                       </span>
                     )}
                   </div>
@@ -699,7 +699,7 @@ export function AdminSettings() {
                       : 'bg-primary text-on-primary hover:bg-primary/90'
                   )}
                 >
-                  {s.connected ? lang.integrations.disconnect : lang.integrations.connect}
+                  {s.connected ? lang['admin.settings.integrations.disconnect'] : lang['admin.settings.integrations.connect']}
                 </button>
               </div>
             ))}
@@ -712,8 +712,8 @@ export function AdminSettings() {
         <div className="space-y-6">
           <div className="bg-white rounded-2xl border border-outline-variant overflow-hidden">
             <div className="px-8 py-6 border-b border-outline-variant">
-              <h3 className="text-lg font-black text-on-surface">{lang.live.sectionTitle}</h3>
-              <p className="text-sm text-on-surface-variant mt-1">{lang.live.sectionDesc}</p>
+              <h3 className="text-lg font-black text-on-surface">{lang['admin.settings.live.sectionTitle']}</h3>
+              <p className="text-sm text-on-surface-variant mt-1">{lang['admin.settings.live.sectionDesc']}</p>
             </div>
             <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Users Card */}
@@ -722,29 +722,29 @@ export function AdminSettings() {
                   <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
                     <svg className="w-4 h-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
                   </div>
-                  <h4 className="font-black text-on-surface">{lang.live.users}</h4>
+                  <h4 className="font-black text-on-surface">{lang['admin.settings.live.users']}</h4>
                 </div>
                 {userStats ? (
                   <div className="grid grid-cols-2 gap-3">
                     <div className="p-3 rounded-lg bg-white border border-outline-variant">
-                      <p className="text-label-sm text-on-surface-variant">{lang.live.total}</p>
+                      <p className="text-label-sm text-on-surface-variant">{lang['admin.settings.live.total']}</p>
                       <p className="text-xl font-black text-on-surface mt-1">{userStats.total}</p>
                     </div>
                     <div className="p-3 rounded-lg bg-white border border-outline-variant">
-                      <p className="text-label-sm text-on-surface-variant">{lang.live.active}</p>
+                      <p className="text-label-sm text-on-surface-variant">{lang['admin.settings.live.active']}</p>
                       <p className="text-xl font-black text-secondary mt-1">{userStats.active}</p>
                     </div>
                     <div className="p-3 rounded-lg bg-white border border-outline-variant">
-                      <p className="text-label-sm text-on-surface-variant">{lang.live.suspended}</p>
+                      <p className="text-label-sm text-on-surface-variant">{lang['admin.settings.live.suspended']}</p>
                       <p className="text-xl font-black text-error mt-1">{userStats.suspended}</p>
                     </div>
                     <div className="p-3 rounded-lg bg-white border border-outline-variant">
-                      <p className="text-label-sm text-on-surface-variant">{lang.live.pending}</p>
+                      <p className="text-label-sm text-on-surface-variant">{lang['admin.settings.live.pending']}</p>
                       <p className="text-xl font-black text-tertiary mt-1">{userStats.pending}</p>
                     </div>
                   </div>
                 ) : (
-                  <p className="text-sm text-on-surface-variant py-4 text-center">{lang.live.loading}</p>
+                  <p className="text-sm text-on-surface-variant py-4 text-center">{lang['admin.settings.live.loading']}</p>
                 )}
               </div>
 
@@ -754,27 +754,27 @@ export function AdminSettings() {
                   <div className="w-8 h-8 rounded-lg bg-secondary/10 flex items-center justify-center">
                     <svg className="w-4 h-4 text-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" /></svg>
                   </div>
-                  <h4 className="font-black text-on-surface">{lang.live.knowledgeBase}</h4>
+                  <h4 className="font-black text-on-surface">{lang['admin.settings.live.knowledgeBase']}</h4>
                 </div>
                 {kbStats ? (
                   <div className="space-y-3">
                     <div className="flex justify-between items-center p-3 rounded-lg bg-white border border-outline-variant">
-                      <span className="text-sm text-on-surface-variant">{lang.live.totalDocs}</span>
+                      <span className="text-sm text-on-surface-variant">{lang['admin.settings.live.totalDocs']}</span>
                       <span className="text-lg font-black text-primary">{kbStats.totalDocuments}</span>
                     </div>
                     <div className="flex justify-between items-center p-3 rounded-lg bg-white border border-outline-variant">
-                      <span className="text-sm text-on-surface-variant">{lang.live.categories}</span>
+                      <span className="text-sm text-on-surface-variant">{lang['admin.settings.live.categories']}</span>
                       <span className="text-lg font-black text-secondary">{kbStats.totalCategories}</span>
                     </div>
                     {kbStats.totalSize !== undefined && (
                       <div className="flex justify-between items-center p-3 rounded-lg bg-white border border-outline-variant">
-                        <span className="text-sm text-on-surface-variant">{lang.live.storageSize}</span>
+                        <span className="text-sm text-on-surface-variant">{lang['admin.settings.live.storageSize']}</span>
                         <span className="text-lg font-black text-tertiary">{(kbStats.totalSize / 1024).toFixed(2)} KB</span>
                       </div>
                     )}
                   </div>
                 ) : (
-                  <p className="text-sm text-on-surface-variant py-4 text-center">{lang.live.loading}</p>
+                  <p className="text-sm text-on-surface-variant py-4 text-center">{lang['admin.settings.live.loading']}</p>
                 )}
               </div>
             </div>
@@ -783,7 +783,7 @@ export function AdminSettings() {
           {/* Endpoints */}
           <div className="bg-white rounded-2xl border border-outline-variant overflow-hidden">
             <div className="px-8 py-6 border-b border-outline-variant">
-              <h3 className="text-lg font-black text-on-surface">{lang.live.endpoints}</h3>
+              <h3 className="text-lg font-black text-on-surface">{lang['admin.settings.live.endpoints']}</h3>
             </div>
             <div className="p-8">
               <div className="font-mono text-sm space-y-1.5 text-on-surface-variant p-4 bg-surface-variant/30 rounded-xl border border-outline-variant">
@@ -804,9 +804,9 @@ export function AdminSettings() {
           <div className="px-8 py-6 border-b border-outline-variant">
             <div className="flex items-center justify-between flex-wrap gap-4">
               <div>
-                <h3 className="text-lg font-black text-on-surface">{lang.system.dbTitle}</h3>
+                <h3 className="text-lg font-black text-on-surface">{lang['admin.settings.system.dbTitle']}</h3>
                 <p className="text-sm text-on-surface-variant mt-1">
-                  {lang.system.dbDescription.replace('{table}', <code className="text-xs bg-surface-variant px-1.5 py-0.5 rounded">system_settings</code>)}
+                  {lang['admin.settings.system.dbDescription'].replace('{table}', <code className="text-xs bg-surface-variant px-1.5 py-0.5 rounded">system_settings</code>)}
                 </p>
               </div>
               {!isSuperAdmin && (
@@ -822,14 +822,14 @@ export function AdminSettings() {
           {!isSuperAdmin ? (
             <div className="p-12 text-center">
               <Shield className="w-12 h-12 mx-auto text-amber-500 mb-4" />
-              <h4 className="text-lg font-bold text-amber-800 mb-2">{lang.system.accessDenied}</h4>
+              <h4 className="text-lg font-bold text-amber-800 mb-2">{lang['admin.settings.system.accessDenied']}</h4>
               <p className="text-sm text-amber-600">
-                {lang.system.accessDeniedDesc}
+                {lang['admin.settings.system.accessDeniedDesc']}
               </p>
             </div>
           ) : Object.keys(dbGrouped).length === 0 ? (
             <div className="p-8 text-center">
-              <p className="text-sm text-on-surface-variant">{lang.system.loading}</p>
+              <p className="text-sm text-on-surface-variant">{lang['admin.settings.system.loading']}</p>
             </div>
           ) : (
             <div className="p-8">
@@ -878,9 +878,9 @@ export function AdminSettings() {
         <div className="space-y-6">
           <div className="bg-white rounded-2xl border border-outline-variant overflow-hidden">
             <div className="px-8 py-6 border-b border-outline-variant">
-              <h3 className="text-lg font-black text-on-surface">{lang.templates.sectionTitle}</h3>
+              <h3 className="text-lg font-black text-on-surface">{lang['admin.settings.templates.sectionTitle']}</h3>
               <p className="text-sm text-on-surface-variant mt-1">
-                {lang.templates.sectionDesc}
+                {lang['admin.settings.templates.sectionDesc']}
               </p>
             </div>
             <div className="p-6">

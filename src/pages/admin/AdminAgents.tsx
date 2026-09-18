@@ -4,6 +4,7 @@ import { adminApi } from './adminApi';
 import { MADA_BOTS } from '@/lib/madaBots';
 import { broadcastAgentChange } from '@/lib/agentBroadcast';
 import { useAuthStore, usePromptStore, useAgentStore, useLanguageStore } from '@/stores';
+import { useTranslation } from '@/lib/translations';
 import clsx from 'clsx';
 
 // ============== TYPES ==============
@@ -269,6 +270,7 @@ export function AdminAgents() {
   const loadAgentsForChat = useAgentStore((s) => s.loadAgents);
   const removeAgentForChat = useAgentStore((s) => s.removeAgent);
   const { language } = useLanguageStore();
+  const { t } = useTranslation();
 
   const [agents, setAgents] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -727,8 +729,8 @@ export function AdminAgents() {
       const res = await adminApi.testAgent({ agentId: testAgentId, message: inputSnapshot });
       if (res.success && res.data && res.data.response) {
         // Always use the agent name from the server response (authoritative source)
-        if (res.data.agentName) {
-          setTestAgentObj(prev => prev ? { ...prev, name: res.data.agentName } : null);
+        if (res.data?.agentName) {
+          setTestAgentObj(prev => prev ? { ...prev, name: res.data!.agentName } : null);
         }
         setTestMessages(prev => [...prev, {
           role: 'assistant',

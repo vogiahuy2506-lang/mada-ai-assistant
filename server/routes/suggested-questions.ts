@@ -367,7 +367,7 @@ router.delete('/bulk/delete', requireAdmin, (req: Request, res: Response) => {
 });
 
 // POST /api/admin/suggested-questions/import-defaults - Import SAMPLE_QUESTIONS from types as defaults
-router.post('/import-defaults', requireAdmin, (req: Request, res: Response) => {
+router.post('/import-defaults', requireAdmin, (_req: Request, res: Response) => {
   try {
     const { SAMPLE_QUESTIONS } = require('../../src/types/index.ts');
     
@@ -410,7 +410,7 @@ router.post('/import-defaults', requireAdmin, (req: Request, res: Response) => {
 });
 
 // GET /api/admin/suggested-questions/stats - Get statistics
-router.get('/stats/all', (req: Request, res: Response) => {
+router.get('/stats/all', (_req: Request, res: Response) => {
   try {
     const stats = {
       total: db.prepare('SELECT COUNT(*) as count FROM suggested_questions').get() as { count: number },

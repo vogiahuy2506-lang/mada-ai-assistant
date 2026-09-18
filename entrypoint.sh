@@ -44,7 +44,23 @@ if [ -d /app/data ]; then
   fi
 fi
 
-# ---- Step 4: Optional - Migrate to Pinecone nếu flag được bật ----
+# ---- Step 4: Cleanup seed data from suggested_questions ----
+# Database can be at /app/data/mada.db (volume) or /app/mada-ai-assistant/data/mada.db
+for DB_PATH in /app/data/mada.db /app/mada-ai-assistant/data/mada.db; do
+  if [ -f "$DB_PATH" ]; then
+    echo "🧹 Checking $DB_PATH for seed questions..."
+    SEED_COUNT=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM suggested_questions WHERE id LIKE 'sq_%';" 2>/dev/null || echo "0")
+    if [ "$SEED_COUNT" != "0" ] && [ -n "$SEED_COUNT" ]; then
+      sqlite3 "$DB_PATH" "DELETE FROM suggested_questions WHERE id LIKE 'sq_%';"
+      echo "🗑️  Deleted $SEED_COUNT seed questions from $DB_PATH"
+    else
+      echo "✅ No seed questions found in $DB_PATH"
+    fi
+    break
+  fi
+done
+
+# ---- Step 5: Optional - Migrate to Pinecone nếu flag được bật ----
 if [ "${RUN_PINEONE_MIGRATE:-false}" = "true" ]; then
   echo "🔄 Running Pinecone migration..."
   npm run pinecone:migrate || echo "⚠️  Migration failed - continuing"

@@ -10,25 +10,13 @@ function useTranslation() {
   const { language } = useLanguageStore();
   const t = (key: string): string => {
     const lang = language as Language;
-    const keys = key.split('.');
-    let value: unknown = translations[lang];
-    for (const k of keys) {
-      if (value && typeof value === 'object' && k in value) {
-        value = (value as Record<string, unknown>)[k];
-      } else {
-        // Fallback to Vietnamese if key not found
-        let fallback: unknown = translations['vi'];
-        for (const fk of keys) {
-          if (fallback && typeof fallback === 'object' && fk in fallback) {
-            fallback = (fallback as Record<string, unknown>)[fk];
-          } else {
-            return key; // Return key if not found
-          }
-        }
-        return typeof fallback === 'string' ? fallback : key;
-      }
-    }
-    return typeof value === 'string' ? value : key;
+    // Translations uses flat keys like 'admin.layout.controlCenter'
+    const value = translations[lang]?.[key as keyof typeof translations['vi']];
+    if (typeof value === 'string') return value;
+    // Fallback to Vietnamese
+    const fallback = translations['vi']?.[key as keyof typeof translations['vi']];
+    if (typeof fallback === 'string') return fallback;
+    return key; // Return key if not found
   };
   return { t, language };
 }

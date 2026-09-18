@@ -150,8 +150,8 @@ app.use((_req, res, next) => {
     "script-src 'self' 'unsafe-inline' 'unsafe-eval'; " +
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
     "font-src 'self' https://fonts.gstatic.com data:; " +
-    "img-src 'self' data: blob: http://localhost:* https://localhost:*; " +
-    "connect-src 'self' http://localhost:* https://localhost:* ws://localhost:* wss://localhost:*; " +
+    "img-src 'self' data: blob: http://localhost:* https://localhost:* https://api.dicebear.com; " +
+    "connect-src 'self' http://localhost:* https://localhost:* ws://localhost:* wss://localhost:* https://api.dicebear.com; " +
     "frame-ancestors 'self'; " +
     "worker-src 'self' blob:; " +
     "object-src 'none';"

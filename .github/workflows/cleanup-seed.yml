@@ -1,0 +1,35 @@
+# Cleanup: Delete seed data from suggested_questions table on production
+# Run once and DELETE this file afterwards
+name: Cleanup Seed Data
+
+on:
+  workflow_dispatch:
+
+jobs:
+  delete-seed:
+    name: Delete Seed Questions
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Delete seed questions via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          command_timeout: 2m
+          script: |
+            echo "Finding container..."
+            CONTAINER=$(docker ps --format '{{.Names}}' | grep -E 'mada|app' | head -1)
+            echo "Container: $CONTAINER"
+            
+            echo "Checking current row count..."
+            docker exec $CONTAINER sh -c "sqlite3 /app/mada-ai-assistant/data/mada.db 'SELECT COUNT(*) as total, COUNT(CASE WHEN id LIKE \"sq_%\" THEN 1 END) as seed_count FROM suggested_questions;'"
+            
+            echo "Deleting seed questions..."
+            docker exec $CONTAINER sh -c "sqlite3 /app/mada-ai-assistant/data/mada.db \"DELETE FROM suggested_questions WHERE id LIKE 'sq_%';\""
+            
+            echo "Verifying..."
+            docker exec $CONTAINER sh -c "sqlite3 /app/mada-ai-assistant/data/mada.db 'SELECT COUNT(*) as remaining FROM suggested_questions;'"
+            
+            echo "✅ Done!"

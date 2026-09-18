@@ -544,6 +544,183 @@ class VectorStore {
   async shutdown(): Promise<void> {
     console.log('🔌 Vector store disconnected');
   }
+
+  // ============== HYBRID SEARCH (BM25 + Vector) ==============
+
+  /**
+   * BM25 keyword search implementation
+   * @param query - Search query
+   * @param topK - Number of results to return
+   * @param filter - Optional filter
+   * @returns Array of search results with BM25 scores
+   */
+  private async searchBM25(query: string, topK: number, filter?: SearchFilter): Promise<Array<{ doc: any; bm25Score: number }>> {
+    const results: Array<{ doc: any; bm25Score: number }> = [];
+    
+    // Tokenize query
+    const queryTerms = query.toLowerCase().split(/\s+/).filter(t => t.length > 2);
+    if (queryTerms.length === 0) return results;
+
+    // Calculate document frequencies for BM25
+    const docCount = this.inMemoryStore.size;
+    if (docCount === 0) return results;
+
+    // Calculate term frequencies across all docs
+    const termDocFreq: Map<string, number> = new Map();
+    const termDocLengths: Map<string, number[]> = new Map();
+    
+    this.inMemoryStore.forEach(doc => {
+      if (filter?.botId && doc.metadata?.botId !== filter.botId) return;
+      if (filter?.madaCategory && doc.metadata?.madaCategory !== filter.madaCategory) return;
+      
+      const content = (doc.content || '').toLowerCase();
+      const terms = content.split(/\s+/).filter(t => t.length > 2);
+      
+      // Count unique terms per document
+      const uniqueTerms = new Set(terms);
+      for (const term of uniqueTerms) {
+        termDocFreq.set(term, (termDocFreq.get(term) || 0) + 1);
+      }
+      
+      // Store doc lengths for avg calculation
+      for (const term of queryTerms) {
+        if (!termDocLengths.has(term)) termDocLengths.set(term, []);
+        termDocLengths.get(term)!.push(terms.length);
+      }
+    });
+
+    // BM25 parameters
+    const k1 = 1.5; // Term frequency saturation
+    const b = 0.75; // Length normalization
+    
+    // Calculate average document length per term
+    const avgDocLengths: Map<string, number> = new Map();
+    for (const [term, lengths] of termDocLengths) {
+      avgDocLengths.set(term, lengths.reduce((a, b) => a + b, 0) / lengths.length);
+    }
+
+    // Score each document
+    this.inMemoryStore.forEach(doc => {
+      if (filter?.botId && doc.metadata?.botId !== filter.botId) return;
+      if (filter?.madaCategory && doc.metadata?.madaCategory !== filter.madaCategory) return;
+      
+      const content = (doc.content || '').toLowerCase();
+      const docLength = content.split(/\s+/).length;
+      
+      let score = 0;
+      for (const term of queryTerms) {
+        // Term frequency in document
+        const termFreq = (content.match(new RegExp(`\\b${term}\\b`, 'g')) || []).length;
+        if (termFreq === 0) continue;
+        
+        // Document frequency
+        const df = termDocFreq.get(term) || 1;
+        
+        // IDF (Inverse Document Frequency)
+        const idf = Math.log((docCount - df + 0.5) / (df + 0.5) + 1);
+        
+        // BM25 formula
+        const avgDL = avgDocLengths.get(term) || 1;
+        const termWeight = (termFreq * (k1 + 1)) / (termFreq + k1 * (1 - b + b * docLength / avgDL));
+        
+        score += idf * termWeight;
+      }
+      
+      if (score > 0) {
+        results.push({ doc, bm25Score: score });
+      }
+    });
+
+    // Sort by BM25 score
+    results.sort((a, b) => b.bm25Score - a.bm25Score);
+    
+    return results.slice(0, topK * 2); // Return more results for fusion
+  }
+
+  /**
+   * Hybrid search combining vector similarity + BM25 keyword search
+   * Uses Reciprocal Rank Fusion (RRF) to combine scores
+   * 
+   * @param query - Search query
+   * @param topK - Number of results to return
+   * @param filter - Optional filter
+   * @param vectorWeight - Weight for vector search (default 0.7)
+   * @param bm25Weight - Weight for BM25 search (default 0.3)
+   */
+  async hybridSearch(
+    query: string, 
+    topK: number = 10, 
+    filter?: SearchFilter,
+    vectorWeight: number = 0.7,
+    bm25Weight: number = 0.3
+  ): Promise<SearchResult[]> {
+    const provider = getEmbeddingProvider();
+    
+    // Get vector search results
+    let vectorResults: SearchResult[] = [];
+    if (provider) {
+      try {
+        vectorResults = await this.search(query, topK * 2, filter);
+      } catch (e) {
+        console.warn('⚠️ Vector search failed in hybrid:', (e as Error).message);
+      }
+    }
+    
+    // Get BM25 results
+    let bm25Results: Array<{ doc: any; bm25Score: number }> = [];
+    try {
+      bm25Results = await this.searchBM25(query, topK * 2, filter);
+    } catch (e) {
+      console.warn('⚠️ BM25 search failed in hybrid:', (e as Error).message);
+    }
+    
+    // Reciprocal Rank Fusion (RRF)
+    const RRF_K = 60; // RRF constant
+    const fusedScores: Map<string, { doc: any; fusedScore: number; vectorScore?: number; bm25Score?: number }> = new Map();
+    
+    // Add vector scores
+    vectorResults.forEach((result, rank) => {
+      const id = result.metadata?.itemId || result.metadata?.source || `vec-${rank}`;
+      const rrfScore = vectorWeight / (RRF_K + rank + 1);
+      fusedScores.set(id, { 
+        doc: result, 
+        fusedScore: rrfScore, 
+        vectorScore: result.score 
+      });
+    });
+    
+    // Add BM25 scores
+    bm25Results.forEach(({ doc, bm25Score }, rank) => {
+      const id = doc.metadata?.itemId || doc.metadata?.source || `bm25-${rank}`;
+      const rrfScore = bm25Weight / (RRF_K + rank + 1);
+      
+      if (fusedScores.has(id)) {
+        fusedScores.get(id)!.fusedScore += rrfScore;
+        fusedScores.get(id)!.bm25Score = bm25Score;
+      } else {
+        fusedScores.set(id, { 
+          doc, 
+          fusedScore: rrfScore, 
+          bm25Score 
+        });
+      }
+    });
+    
+    // Sort by fused score and return topK
+    const sortedResults = Array.from(fusedScores.values())
+      .sort((a, b) => b.fusedScore - a.fusedScore)
+      .slice(0, topK)
+      .map(({ doc, fusedScore, vectorScore, bm25Score }) => ({
+        content: doc.content || doc,
+        metadata: doc.metadata || {},
+        score: fusedScore,
+        vectorScore,
+        bm25Score,
+        distance: 1 - fusedScore,
+      }));
+    
+    return sortedResults;
+  }
 }
 
 // Singleton instance

@@ -1,10 +1,18 @@
+node:internal/modules/cjs/loader:1450
+  throw err;
+  ^
 
-> mada-ai-assistant@1.0.0 dev
-> vite
+Error: Cannot find module '/Users/vohuy/Downloads/MADA AI ASSISTANT/mada-ai-assistant/dist/index.js'
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1447:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1058:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1063:22)
+    at Module._load (node:internal/modules/cjs/loader:1233:25)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:245:24)
+    at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)
+    at node:internal/main/run_main_module:33:47 {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: []
+}
 
-error when starting dev server:
-Error: listen EPERM: operation not permitted ::1:5173
-    at Server.setupListenHandle [as _listen2] (node:net:1918:21)
-    at listenInCluster (node:net:1997:12)
-    at GetAddrInfoReqWrap.callback (node:net:2206:7)
-    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:133:8)
+Node.js v25.4.0

@@ -718,20 +718,6 @@ interface PermissionsState {
   clear: () => void;
 }
 
-// Feature to permission mapping
-const FEATURE_PERMISSIONS: Record<Feature, Permission[]> = {
-  admin_panel: ['users:read', 'settings:read'],
-  user_management: ['users:read', 'users:update'],
-  kb_management: ['kb:read', 'kb:create'],
-  product_management: ['products:read', 'products:create'],
-  scraper: ['scrape:read', 'scrape:execute'],
-  analytics: ['analytics:read'],
-  audit_logs: ['audit:read'],
-  consultations: ['consultations:read'],
-  file_upload: ['files:upload'],
-  chat_export: ['chat:export'],
-};
-
 export const usePermissionsStore = create<PermissionsState>()((set, get) => ({
   effectivePermissions: [],
   customPermissions: [],

@@ -4,6 +4,77 @@ import { vectorStore } from './vectorStore';
 import { rerankService, type RerankableItem } from './rerankService';
 import db from '../db';
 
+// ============ PROXY BYPASS FETCH ============
+// Custom fetch that bypasses system proxy for Google API
+async function noProxyFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+  
+  // Only bypass proxy for Google APIs
+  if (url.includes('generativelanguage.googleapis.com') || url.includes('aiplatform.googleapis.com')) {
+    // Save and clear proxy environment
+    const savedEnv: Record<string, string | undefined> = {
+      HTTP_PROXY: process.env.HTTP_PROXY,
+      HTTPS_PROXY: process.env.HTTPS_PROXY,
+      http_proxy: process.env.http_proxy,
+      https_proxy: process.env.https_proxy,
+      ALL_PROXY: process.env.ALL_PROXY,
+      all_proxy: process.env.all_proxy,
+    };
+    
+    delete process.env.HTTP_PROXY;
+    delete process.env.HTTPS_PROXY;
+    delete process.env.http_proxy;
+    delete process.env.https_proxy;
+    delete process.env.ALL_PROXY;
+    delete process.env.all_proxy;
+    
+    try {
+      return await fetch(url, init);
+    } finally {
+      // Restore proxy settings
+      for (const [key, val] of Object.entries(savedEnv)) {
+        if (val !== undefined) {
+          process.env[key] = val;
+        }
+      }
+    }
+  }
+  
+  return fetch(input, init);
+}
+
+// Direct Gemini API call that bypasses proxy
+async function callGeminiDirect(apiKey: string, modelName: string, prompt: string, tools?: any): Promise<any> {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+  
+  const body: any = {
+    contents: [{ parts: [{ text: prompt }] }],
+    generationConfig: {
+      temperature: 0.3,
+      maxOutputTokens: 2048,
+      topP: 0.8,
+      topK: 20,
+    },
+  };
+  
+  if (tools?.length > 0) {
+    body.tools = tools;
+  }
+  
+  const response = await noProxyFetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Gemini API error: ${response.status} - ${errorText}`);
+  }
+  
+  return response.json();
+}
+
 // ============ SCHEMA DEFINITIONS ============
 
 /**
@@ -255,7 +326,16 @@ class RAGEngine {
 
     this.genAI = new GoogleGenerativeAI(apiKey);
     this._isConfigured = true;
-    console.log('✅ RAG Engine initialized with Gemini');
+    
+    // Clear proxy environment variables for this process to ensure direct connection
+    delete process.env.HTTP_PROXY;
+    delete process.env.HTTPS_PROXY;
+    delete process.env.http_proxy;
+    delete process.env.https_proxy;
+    delete process.env.ALL_PROXY;
+    delete process.env.all_proxy;
+    
+    console.log('✅ RAG Engine initialized with Gemini (proxy bypassed)');
   }
 
   async query(
@@ -341,45 +421,50 @@ class RAGEngine {
         }],
       });
 
-      // Use structured output (Task 5)
+      // Use direct API call (bypasses proxy issues)
       let structuredResponse: any = null;
       let answer: string;
       let confidence: number;
 
       try {
-        const result = await model.generateContent(prompt);
-        const response = result.response;
-
-        // Try structured JSON first (SDK parses functionCalls properly)
-        if (response.functionCalls?.length > 0) {
-          const fnCall = response.functionCalls()[0];
+        // Call Gemini API directly (no SDK, no proxy)
+        const apiKey = process.env.GEMINI_API_KEY!;
+        const geminiResult = await callGeminiDirect(apiKey, 'gemini-2.5-flash', prompt, tools ? [{ functionDeclarations: [RAG_RESPONSE_SCHEMA] }] : undefined);
+        
+        // Parse the response
+        const candidates = geminiResult?.candidates || [];
+        const parts = candidates[0]?.content?.parts || [];
+        
+        // Try function call first (structured output)
+        const functionCallPart = parts.find((p: any) => p.functionCall);
+        if (functionCallPart?.functionCall) {
+          const fnCall = functionCallPart.functionCall;
           if (fnCall.name === 'rag_response') {
             structuredResponse = fnCall.args;
             answer = postProcessMarkdown(structuredResponse.replyText || '');
             confidence = structuredResponse.confidence || this.calculateConfidence(finalDocs, hasContext);
           } else {
-            // Fallback to text
-            const rawAnswer = response.text();
+            // Fallback to text from function call args
+            const rawAnswer = fnCall.args?.replyText || fnCall.args?.answer || fnCall.args?.text || '';
             answer = postProcessMarkdown(rawAnswer);
             confidence = this.calculateConfidence(finalDocs, hasContext);
           }
-        } else if (response.text && response.text().length > 0) {
-          // No function call - use text directly
-          const rawAnswer = response.text();
-          answer = postProcessMarkdown(rawAnswer);
-          confidence = this.calculateConfidence(finalDocs, hasContext);
         } else {
-          // FALLBACK: SDK không parse function call từ Gemini 2.5+/3.5+
-          // → Parse thủ công từ raw response (workaround cho @google/generative-ai@0.24.1)
-          const rawAnswer = this.extractAnswerFromRawResponse(result);
+          // Regular text response
+          const textParts = parts.filter((p: any) => p.text);
+          const rawAnswer = textParts.map((p: any) => p.text).join('\n');
           answer = postProcessMarkdown(rawAnswer);
           confidence = this.calculateConfidence(finalDocs, hasContext);
         }
       } catch (schemaError: any) {
         console.warn('[RAG] Schema parsing failed, using text fallback:', schemaError.message?.slice(0, 80));
         try {
-          const result = await model.generateContent(prompt);
-          const rawAnswer = result.response.text();
+          // Retry without structured output
+          const apiKey = process.env.GEMINI_API_KEY!;
+          const geminiResult = await callGeminiDirect(apiKey, 'gemini-2.5-flash', prompt, undefined);
+          const parts = geminiResult?.candidates?.[0]?.content?.parts || [];
+          const textParts = parts.filter((p: any) => p.text);
+          const rawAnswer = textParts.map((p: any) => p.text).join('\n');
           answer = postProcessMarkdown(rawAnswer);
           confidence = this.calculateConfidence(finalDocs, hasContext);
         } catch (textError) {
@@ -655,7 +740,10 @@ ${tail.answerPrompt}`;
       .map((d: any) => (typeof d.score === 'number' ? d.score : 0.5))
       .slice(0, 5);
     const top1 = scores[0] || 0;
-    const avgTop3 = scores.slice(0, 3).reduce((a, b) => a + b, 0) / Math.min(3, scores.length);
+    // Guard against division by zero: if scores.length is 0, use 1 as denominator
+    const avgTop3 = scores.length > 0 
+      ? scores.slice(0, 3).reduce((a, b) => a + b, 0) / Math.max(1, Math.min(3, scores.length))
+      : 0;
 
     // ⭐ Rerank score 0.5-0.7 thường là "liên quan một phần" (trùng keyword nhưng
     // không match intent). Cần penalty mạnh.
@@ -736,23 +824,29 @@ ${tail.answerPrompt}`;
     const { botId, madaCategory, priority = false } = options;
     const filter = (botId || madaCategory) ? { botId, madaCategory } : undefined;
 
-    // Pass 1: search theo filter (nếu có)
+    // Pass 1: search theo filter (nếu có) - Dùng hybrid search để kết hợp vector + keyword
     let primary: any[] = [];
     if (filter) {
       try {
-        primary = await vectorStore.search(userQuery, { topK, filter });
-        console.log(`🔍 [RAG] Filter search (botId=${botId}, madaCategory=${madaCategory}): ${primary.length} docs`);
+        // Hybrid search: kết hợp vector similarity + BM25 keyword matching
+        primary = await vectorStore.hybridSearch(userQuery, topK, filter, 0.7, 0.3);
+        console.log(`🔍 [RAG] Hybrid search (filter) (botId=${botId}, madaCategory=${madaCategory}): ${primary.length} docs`);
       } catch (err) {
-        console.warn('⚠️ [RAG] Filter search failed:', err);
+        console.warn('⚠️ [RAG] Hybrid filter search failed, falling back to vector:', err);
+        try {
+          primary = await vectorStore.search(userQuery, { topK, filter });
+        } catch (err2) {
+          console.warn('⚠️ [RAG] Vector filter search also failed:', err2);
+        }
       }
     }
 
-    // Nếu priority mode VÀ chưa đủ → fallback search toàn bộ KB
+    // Nếu priority mode VÀ chưa đủ → fallback hybrid search toàn bộ KB
     if (priority && filter && primary.length < topK) {
       const need = topK - primary.length;
       console.log(`🔁 [RAG] Priority fallback: cần thêm ${need} docs từ toàn bộ KB`);
       try {
-        const fallback = await vectorStore.search(userQuery, { topK: need, filter: undefined });
+        const fallback = await vectorStore.hybridSearch(userQuery, need, undefined, 0.7, 0.3);
         // Merge, tránh trùng
         const primaryIds = new Set(primary.map((d: any) => d.id || d.metadata?.source));
         const merged = [...primary];
@@ -766,14 +860,41 @@ ${tail.answerPrompt}`;
         }
         return merged;
       } catch (err) {
-        console.warn('⚠️ [RAG] Fallback search failed:', err);
+        console.warn('⚠️ [RAG] Fallback hybrid search failed, trying vector:', err);
+        try {
+          const fallback = await vectorStore.search(userQuery, { topK: need, filter: undefined });
+          const primaryIds = new Set(primary.map((d: any) => d.id || d.metadata?.source));
+          const merged = [...primary];
+          for (const doc of fallback) {
+            const id = doc.id || doc.metadata?.source;
+            if (!primaryIds.has(id)) {
+              merged.push(doc);
+              primaryIds.add(id);
+            }
+            if (merged.length >= topK) break;
+          }
+          return merged;
+        } catch (err2) {
+          console.warn('⚠️ [RAG] Fallback search also failed:', err2);
+        }
       }
     }
 
     // Nếu không có filter hoặc không priority → trả về primary hoặc search toàn bộ
     if (!filter) {
-      const noFilterResults = await vectorStore.search(userQuery, topK);
-      if (noFilterResults.length > 0) return noFilterResults;
+      try {
+        // Hybrid search: kết hợp vector + BM25
+        const noFilterResults = await vectorStore.hybridSearch(userQuery, topK, undefined, 0.7, 0.3);
+        if (noFilterResults.length > 0) return noFilterResults;
+      } catch (err) {
+        console.warn('⚠️ [RAG] Hybrid search failed, falling back to vector:', err);
+        try {
+          const noFilterResults = await vectorStore.search(userQuery, topK);
+          if (noFilterResults.length > 0) return noFilterResults;
+        } catch (err2) {
+          console.warn('⚠️ [RAG] Vector search also failed:', err2);
+        }
+      }
       return await this.sqliteFallback(userQuery, topK);
     }
 
@@ -824,11 +945,12 @@ ${tail.answerPrompt}`;
         }
       }
 
+      // ⭐ Fix: Include ALL source types (web, manual, pdf, text, etc.) — imported products have source_type='manual'
       const sql = `
         SELECT id, title, content, source, category, metadata,
           (${keywords.map(() => 'CASE WHEN LOWER(title) LIKE ? THEN 2 ELSE 0 END + CASE WHEN LOWER(content) LIKE ? THEN 1 ELSE 0 END').join(' + ')}) as score
         FROM knowledge_items
-        WHERE source_type = 'web'
+        WHERE source_type IN ('web', 'manual', 'pdf', 'text', 'image', 'docx', 'xlsx', 'csv')
           AND (${likeConditions})
           ${categoryFilter}
         ORDER BY score DESC, length(content) DESC
@@ -842,7 +964,7 @@ ${tail.answerPrompt}`;
         SELECT id, title, content, source, category, metadata,
           (${keywords.map(() => '(CASE WHEN LOWER(title) LIKE ? THEN 2 ELSE 0 END + CASE WHEN LOWER(content) LIKE ? THEN 1 ELSE 0 END)').join(' + ')}) as match_score
         FROM knowledge_items
-        WHERE source_type = 'web'
+        WHERE source_type IN ('web', 'manual', 'pdf', 'text', 'image', 'docx', 'xlsx', 'csv')
           AND (${likeConditions})
           ${categoryFilter}
         ORDER BY match_score DESC

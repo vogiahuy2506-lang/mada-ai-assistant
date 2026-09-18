@@ -6,6 +6,47 @@
 
 import { GoogleGenerativeAI, type FunctionDeclaration } from '@google/generative-ai';
 
+// ============ PROXY BYPASS ============
+async function callGeminiNoProxy(apiKey: string, modelName: string, prompt: string, tools?: any): Promise<any> {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+  
+  // Clear proxy env vars for this call
+  const savedEnv: Record<string, string | undefined> = {
+    HTTP_PROXY: process.env.HTTP_PROXY,
+    HTTPS_PROXY: process.env.HTTPS_PROXY,
+    http_proxy: process.env.http_proxy,
+    https_proxy: process.env.https_proxy,
+  };
+  delete process.env.HTTP_PROXY;
+  delete process.env.HTTPS_PROXY;
+  delete process.env.http_proxy;
+  delete process.env.https_proxy;
+  
+  try {
+    const body: any = {
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { temperature: 0.1, maxOutputTokens: 2048 },
+    };
+    if (tools?.length > 0) body.tools = tools;
+    
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Gemini API error: ${response.status}`);
+    }
+    
+    return response.json();
+  } finally {
+    for (const [key, val] of Object.entries(savedEnv)) {
+      if (val !== undefined) process.env[key] = val;
+    }
+  }
+}
+
 // ============ SCHEMA DEFINITIONS ============
 
 /**
@@ -103,56 +144,36 @@ export class RerankService {
 
       // Build prompt cho Gemini
       const prompt = this.buildRerankPrompt(query, items);
-
-      const model = this.client.getGenerativeModel({
-        model: 'gemini-3.5-flash',
-        generationConfig: {
-          temperature: 0.1,
-          maxOutputTokens: 2048,
-        },
-        tools: [{
-          functionDeclarations: [RERANK_RESPONSE_SCHEMA]
-        }],
-      });
+      const apiKey = process.env.GEMINI_API_KEY!;
 
       let scores: number[] = [];
 
       try {
-        const result = await model.generateContent(prompt);
-        const response = result.response;
-
-        // Try structured JSON first (functionCall)
-        try {
-          if (response.functionCalls && typeof response.functionCalls === 'function') {
-            const fnCalls = response.functionCalls();
-            if (Array.isArray(fnCalls) && fnCalls.length > 0) {
-              const fnCall = fnCalls[0];
-              if (fnCall.name === 'rerank_response' && fnCall.args?.scores) {
-                scores = fnCall.args.scores;
-              }
-            }
-          }
-        } catch {
-          // ignore - manual parse fallback
-        }
-
-        // Fallback: if no structured response, parse text
-        if (scores.length === 0) {
-          try {
-            const text = response.text().trim();
-            if (text) {
-              scores = this.parseScores(text, items.length);
-            }
-          } catch {
-            // response.text() may throw - ignore
+        // Call Gemini directly (bypasses proxy)
+        const result = await callGeminiNoProxy(apiKey, 'gemini-2.5-flash', prompt, [{ functionDeclarations: [RERANK_RESPONSE_SCHEMA] }]);
+        
+        // Parse the response
+        const parts = result?.candidates?.[0]?.content?.parts || [];
+        const functionCallPart = parts.find((p: any) => p.functionCall);
+        
+        if (functionCallPart?.functionCall?.args?.scores) {
+          scores = functionCallPart.functionCall.args.scores;
+        } else {
+          // Try text parsing
+          const textParts = parts.filter((p: any) => p.text);
+          const text = textParts.map((p: any) => p.text).join('\n').trim();
+          if (text) {
+            scores = this.parseScores(text, items.length);
           }
         }
       } catch (schemaError: any) {
         // Schema failed - fallback to text parsing
         console.warn('⚠️ Rerank schema parsing failed, using text fallback:', schemaError.message?.slice(0, 80));
         try {
-          const result = await model.generateContent(prompt);
-          const text = result.response.text().trim();
+          const result = await callGeminiNoProxy(apiKey, 'gemini-2.5-flash', prompt, undefined);
+          const parts = result?.candidates?.[0]?.content?.parts || [];
+          const textParts = parts.filter((p: any) => p.text);
+          const text = textParts.map((p: any) => p.text).join('\n').trim();
           if (text) {
             scores = this.parseScores(text, items.length);
           }

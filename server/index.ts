@@ -85,13 +85,35 @@ import adminRoutes from './routes/admin';
 import adminScraperRoutes from './routes/admin-scraper';
 import promptsRoutes from './routes/prompts';
 import promptTemplatesRoutes from './routes/prompt-templates';
+import suggestedQuestionsRoutes from './routes/suggested-questions';
 import urlImportRoutes from './routes/urlImport';
 import publicRoutes from './routes/public';
 import permissionsRoutes from './routes/permissions';
+import chatRoutes from './routes/chat';
+
+// Chat context (shared state)
+import { setRagInitialized } from './lib/chat-context';
 
 // Load .env from project root (mada-ai-assistant/.env), not just cwd
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 dotenv.config(); // fallback to local .env if any
+
+// ============== UNHANDLED PROMISE REJECTION HANDLER ==============
+// Prevents silent crashes from unhandled promise rejections
+process.on('unhandledRejection', (reason: unknown, promise: Promise<unknown>) => {
+  console.error('🚨 UNHANDLED PROMISE REJECTION:');
+  console.error('Promise:', promise);
+  console.error('Reason:', reason instanceof Error ? reason.stack : reason);
+  // Don't exit - let the server continue running
+});
+
+process.on('uncaughtException', (error: Error) => {
+  console.error('🚨 UNCAUGHT EXCEPTION:');
+  console.error('Error:', error.message);
+  console.error('Stack:', error.stack);
+  // For uncaught exceptions, we should exit as the process is in an undefined state
+  process.exit(1);
+});
 
 const app = express();
 const PORT = process.env.PORT || 3002;
@@ -503,11 +525,14 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/admin/scraper', adminScraperRoutes);
 app.use('/api/admin/prompts', promptsRoutes);
 app.use('/api/admin/prompt-templates', promptTemplatesRoutes);
-// Public routes (no auth required)
+app.use('/api/admin/suggested-questions', suggestedQuestionsRoutes);
 app.use('/api/public', publicRoutes);
 
 // ============== PERMISSIONS ROUTES ==============
 app.use('/api/permissions', permissionsRoutes);
+
+// ============== CHAT ROUTES (AI/RAG Pipeline) ==============
+app.use('/api/chat', chatRoutes);
 
 // ============== WIDGET CONFIG ROUTES ==============
 import widgetRoutes from './routes/widget';
@@ -788,7 +813,7 @@ app.use((err: any, _req: any, res: any, _next: any) => {
 });
 
 // Initialize RAG on startup
-let ragInitialized = false;
+export let ragInitialized = false;
 
 /**
  * Sync all knowledge_items từ SQLite → vector store khi khởi động.
@@ -868,6 +893,7 @@ async function initializeServices() {
     ragEngine.initialize();
     guardrails.initialize();
     ragInitialized = true;
+    setRagInitialized(true); // Sync with chat-context module
     console.log('🚀 RAG system ready');
     console.log('🛡️ Guardrails system ready');
 
@@ -930,7 +956,7 @@ const HOST = '0.0.0.0';
 // Without this, routes registered after this line would be unreachable because the
 // HTTP server starts before those route registration calls execute.
 setImmediate(() => {
-  const _server = app.listen(PORT, HOST, () => {
+  const server = app.listen(Number(PORT), HOST, () => {
     console.log(`🚀 MADA AI Server running on http://${HOST}:${PORT}`);
     console.log(`📚 API Documentation: http://localhost:${PORT}/api/health`);
     console.log(`🌐 Frontend: http://localhost:${PORT}/`);
@@ -939,6 +965,7 @@ setImmediate(() => {
     console.log(`🛡️  Guardrails: Active`);
     console.log(`🔐 Auth: SQLite + bcrypt + JWT (admin: ${process.env.ADMIN_EMAIL || 'admin@mada.vn'})`);
   });
+  void server; // intentionally kept for graceful shutdown support
 });
 
 // ============== MAPPING AGENT TO MADA ==============

@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Unit Test: RAG Engine - MADA AI Assistant
  * Tests core RAG functionality
@@ -7,7 +8,7 @@ import { describe, it, expect, beforeAll } from 'vitest';
 
 // Mock the vector store for testing
 const mockVectorStore = {
-  search: async (query: string, topK: number = 5) => {
+  search: async (_query: string, _topK: number = 5) => {
     // Simulate search results
     return [
       {
@@ -38,7 +39,7 @@ const mockVectorStore = {
 
 // Mock RAG engine
 const createMockRagEngine = () => ({
-  async query(userQuery: string, language: string = 'vi') {
+  async query(userQuery: string, _language: string = 'vi') {
     const results = await mockVectorStore.search(userQuery, 5);
     
     // Build context from results
@@ -330,7 +331,7 @@ describe('Guardrails', () => {
       ];
       
       inappropriateQueries.forEach(query => {
-        const isInappropriate = /\b(violence|illegal|dangerous)\b/i.test(query);
+        const _isInappropriate = /\b(violence|illegal|dangerous)\b/i.test(query);
         // This would fail in real implementation
         // expect(isInappropriate).toBe(true);
       });

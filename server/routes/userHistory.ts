@@ -2,7 +2,12 @@
 import { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { authenticate, optionalAuth } from '../lib/auth';
+import type { Request, Response } from 'express';
 import db from '../lib/db';
+
+interface AuthRequest extends Request {
+  user?: { id: string; email?: string; role?: string };
+}
 
 const router = Router();
 

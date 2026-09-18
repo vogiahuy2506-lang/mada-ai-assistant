@@ -81,7 +81,7 @@ router.get('/stats', (_req: Request, res: Response) => {
 router.post('/:userId/approve', async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
-    const adminId = (req as Request & { user?: { id: string } }).user?.id;
+    const adminId = (req as Request & { user?: { id: string } }).user?.id || '';
     
     const result = await approveUser(userId, adminId);
     
@@ -104,7 +104,7 @@ router.post('/:userId/reject', async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
     const { reason } = req.body;
-    const adminId = (req as Request & { user?: { id: string } }).user?.id;
+    const adminId = (req as Request & { user?: { id: string } }).user?.id || '';
     
     const result = await rejectUser(userId, adminId, reason);
     
@@ -126,7 +126,7 @@ router.post('/:userId/reject', async (req: Request, res: Response) => {
 router.post('/bulk-approve', async (req: Request, res: Response) => {
   try {
     const { userIds } = req.body;
-    const adminId = (req as Request & { user?: { id: string } }).user?.id;
+    const adminId = (req as Request & { user?: { id: string } }).user?.id || '';
     
     if (!Array.isArray(userIds) || userIds.length === 0) {
       return res.status(400).json({ 

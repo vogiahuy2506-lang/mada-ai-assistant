@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { getAccessToken } from '@/lib/api';
 
 export interface Agent {
   id: string;
@@ -23,15 +24,30 @@ export interface Agent {
 const API_BASE = '/api';
 
 async function apiRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(options.headers || {}),
-    },
-  });
-  // Some proxies/old server builds may return HTML or empty body for 401.
-  // Read as text first so we don't crash on `.json()`.
+  const token = getAccessToken();
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${path}`, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(options.headers || {}),
+      },
+    });
+  } catch (err: any) {
+    if (err?.name === 'AbortError') {
+      const netErr: any = new Error('Request timed out. Please try again.');
+      netErr.status = 0;
+      throw netErr;
+    }
+    if (err?.message === 'Failed to fetch' || err instanceof TypeError) {
+      const netErr: any = new Error('Không thể kết nối server. Vui lòng kiểm tra kết nối mạng.');
+      netErr.status = 0;
+      throw netErr;
+    }
+    throw err;
+  }
   const text = await res.text();
   let json: any = null;
   if (text) {
@@ -54,35 +70,22 @@ async function apiRequest<T>(path: string, options: RequestInit = {}): Promise<T
   return json as T;
 }
 
-// Default agents — used as fallback when backend is unreachable
-const DEFAULT_AGENTS: Agent[] = [
+// Default agents — ONLY used as temporary placeholder BEFORE first backend sync.
+const PLACEHOLDER_AGENTS: Agent[] = [
   {
-    id: 'default',
-    name: 'MADA Assistant',
-    description: 'Trợ lý ảo chính của MADA, hỗ trợ người khuyết tật tiếp cận công nghệ.',
-    avatar: '🤖',
-    systemPrompt: 'Bạn là MADA, trợ lý ảo thông minh hỗ trợ người khuyết tật tiếp cận công nghệ. Hãy trả lời thân thiện, hữu ích.',
-    capabilities: ['chat', 'file_analysis', 'accessibility_help'],
-    isActive: true,
-    createdBy: 'admin',
-    createdAt: Date.now(),
-    updatedAt: Date.now(),
-  },
-  {
-    id: 'expert',
-    name: 'Chuyên gia AT',
-    description: 'Chuyên gia về công nghệ hỗ trợ người khuyết tật.',
-    avatar: '👨‍🏫',
-    systemPrompt: 'Bạn là chuyên gia công nghệ hỗ trợ (AT Specialist). Cung cấp tư vấn chuyên sâu về thiết bị và phần mềm hỗ trợ.',
-    capabilities: ['expert_consultation', 'device_recommendation', 'training'],
-    isActive: true,
+    id: '__loading__',
+    name: 'Đang tải agents...',
+    description: 'Vui lòng chờ trong giây lát.',
+    avatar: '⏳',
+    systemPrompt: '',
+    capabilities: [],
+    isActive: false,
     createdBy: 'admin',
     createdAt: Date.now(),
     updatedAt: Date.now(),
   },
 ];
 
-// Map backend agent → frontend Agent shape
 function mapBackendAgent(a: any): Agent {
   return {
     id: a.id,
@@ -90,11 +93,15 @@ function mapBackendAgent(a: any): Agent {
     description: a.description || '',
     avatar: a.avatar || '🤖',
     systemPrompt: a.system_prompt || '',
-    capabilities: Array.isArray(a.capabilities) ? a.capabilities : JSON.parse(a.capabilities || '[]'),
-    isActive: a.isActive ?? a.is_active === 1,
+    capabilities: Array.isArray(a.capabilities) ? a.capabilities : [],
+    isActive: a.isActive === true || a.is_active === 1,
     createdBy: a.created_by === 'admin' || a.createdBy === 'admin' ? 'admin' : 'user',
-    createdAt: a.createdAt ? new Date(a.createdAt).getTime() : Date.now(),
-    updatedAt: a.updatedAt ? new Date(a.updatedAt).getTime() : Date.now(),
+    createdAt: a.createdAt ? new Date(a.createdAt).getTime()
+      : a.created_at ? new Date(a.created_at).getTime()
+      : Date.now(),
+    updatedAt: a.updatedAt ? new Date(a.updatedAt).getTime()
+      : a.updated_at ? new Date(a.updated_at).getTime()
+      : Date.now(),
     madaCategory: a.mada_category || a.madaCategory,
     botId: a.bot_id || a.botId,
     promptId: a.promptId || a.prompt_id || undefined,
@@ -111,12 +118,8 @@ interface AgentState {
   lastSynced: number | null;
   syncError: string | null;
   backendConnected: boolean;
-
-  // Sync with backend
   loadAgents: () => Promise<void>;
   refreshAgent: (id: string) => Promise<void>;
-
-  // CRUD (sync local state)
   getActiveAgents: () => Agent[];
   getAgentsByCreator: (creator: 'admin' | 'user') => Agent[];
   getAgentById: (id: string) => Agent | undefined;
@@ -124,17 +127,34 @@ interface AgentState {
   upsertAgent: (agent: Agent) => void;
   removeAgent: (id: string) => void;
   toggleAgentActive: (id: string) => void;
-
-  // User-friendly aliases
   addAgent: (input: Omit<Agent, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }) => void;
   updateAgent: (id: string, patch: Partial<Agent>) => void;
   deleteAgent: (id: string) => void;
 }
 
-export const useAgentStore = create<AgentState>()(
+// Auto-sync interval
+let syncIntervalId: ReturnType<typeof setInterval> | null = null;
+
+const clearSyncInterval = () => {
+  if (syncIntervalId !== null) {
+    clearInterval(syncIntervalId);
+    syncIntervalId = null;
+  }
+};
+
+const startSyncInterval = (loadFn: () => Promise<void>, intervalMs = 30_000) => {
+  clearSyncInterval();
+  syncIntervalId = setInterval(() => {
+    console.log('[agentStore] Periodic sync — reloading agents from backend...');
+    loadFn();
+  }, intervalMs);
+};
+
+// Create the store
+const agentStore = create<AgentState>()(
   persist(
     (set, get) => ({
-      agents: DEFAULT_AGENTS,
+      agents: PLACEHOLDER_AGENTS,
       isLoading: false,
       isSyncing: false,
       lastSynced: null,
@@ -142,45 +162,59 @@ export const useAgentStore = create<AgentState>()(
       backendConnected: false,
 
       loadAgents: async () => {
-        set({ isLoading: true, syncError: null });
+        const isFirstLoad = get().lastSynced === null;
+        set({ isLoading: isFirstLoad, isSyncing: !isFirstLoad, syncError: null });
+
         try {
-          // 1) Ưu tiên endpoint public (no-auth, chỉ trả active agents).
-          //    Phù hợp cho cả user thường trên ChatPage.
           let res: { success: boolean; data: any[] } | null = null;
+
           try {
             res = await apiRequest<{ success: boolean; data: any[] }>('/public/agents');
           } catch (pubErr) {
-            // 2) Fallback: thử endpoint admin (chỉ hoạt động nếu user đã đăng nhập admin).
-            console.warn('[agentStore] /public/agents failed, falling back to /admin/agents:', pubErr);
-            try {
-              res = await apiRequest<{ success: boolean; data: any[] }>('/admin/agents');
-            } catch (adminErr) {
-              // Cả 2 đều fail → dùng defaults (ví dụ: chưa đăng nhập, server tắt, proxy 401)
-              throw adminErr;
+            const token = getAccessToken();
+            if (token) {
+              console.warn('[agentStore] /public/agents failed, falling back to /admin/agents:', pubErr);
+              try {
+                res = await apiRequest<{ success: boolean; data: any[] }>('/admin/agents');
+              } catch (adminErr) {
+                throw adminErr;
+              }
+            } else {
+              throw pubErr;
             }
           }
 
           if (res && res.success && Array.isArray(res.data)) {
             const agents = res.data.map(mapBackendAgent);
+            console.log(`[agentStore] ✅ Loaded ${agents.length} agents from backend`);
+
             set({
               agents,
               lastSynced: Date.now(),
               backendConnected: true,
               isLoading: false,
+              isSyncing: false,
             });
+
+            startSyncInterval(get().loadAgents.bind(get), 30_000);
             return;
           }
-          throw new Error('Unexpected response');
+          throw new Error('Unexpected response shape');
         } catch (err) {
-          console.warn('[agentStore] loadAgents failed, using cached/default agents:', err);
-          set((state) => ({
+          console.warn('[agentStore] loadAgents failed:', err);
+
+          const existingAgents = get().agents;
+          const hasRealAgents = existingAgents.length > 0 && existingAgents[0]?.id !== '__loading__';
+
+          set({
             isLoading: false,
-            // Giữ nguyên agents đã có (cached) nếu có, fallback về DEFAULT_AGENTS
-            // khi lần đầu load. Tránh xóa dữ liệu user đã customize.
-            agents: state.agents && state.agents.length > 0 ? state.agents : DEFAULT_AGENTS,
+            isSyncing: false,
+            agents: hasRealAgents ? existingAgents : PLACEHOLDER_AGENTS,
             backendConnected: false,
             syncError: err instanceof Error ? err.message : 'Failed to load agents',
-          }));
+          });
+
+          clearSyncInterval();
         }
       },
 
@@ -228,7 +262,6 @@ export const useAgentStore = create<AgentState>()(
         }));
       },
 
-      // Convenience wrappers used by AgentCustomizer
       addAgent: (input) => {
         const now = Date.now();
         const id = input.id ?? `user-agent-${now}`;
@@ -267,16 +300,20 @@ export const useAgentStore = create<AgentState>()(
     }),
     {
       name: 'mada-agents',
-      // Only persist non-loading state
-      partialize: (state) => ({
-        agents: state.agents,
-        lastSynced: state.lastSynced,
-      }),
+      partialize: (state) => {
+        const realAgents = state.agents.filter(a => a.id !== '__loading__');
+        return {
+          agents: realAgents.length > 0 ? realAgents : [],
+          lastSynced: state.lastSynced,
+        };
+      },
     }
   )
 );
 
-// Selected Agent Store (unchanged)
+export const useAgentStore = agentStore;
+
+// Selected Agent Store
 interface SelectedAgentState {
   selectedAgentId: string | null;
   setSelectedAgentId: (id: string | null) => void;

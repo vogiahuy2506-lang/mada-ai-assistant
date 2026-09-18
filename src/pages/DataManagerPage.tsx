@@ -1,14 +1,27 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useNavigate, Link, useLocation } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import {
   CloudUpload, Globe, FileText,
   Loader2, CheckCircle, AlertCircle, Trash2, Eye,
   Search, Filter, Plus, Clock, Database, Brain, Upload, FilePlus, Sparkles,
-  X, Link as LinkIcon, BookOpen, RefreshCw, Trash, FileCheck, Lightbulb, MessageCircle, Package,
+  X, BookOpen, RefreshCw, Trash, FileCheck, Lightbulb, MessageCircle, Package,
   Menu, X as XIcon
 } from 'lucide-react';
 import clsx from 'clsx';
 import { useTranslation } from '@/lib/translations';
+import { getAccessToken } from '@/lib/api';
+
+// Helper: fetch với auth header
+function authFetch(url: string, options: RequestInit = {}) {
+  const token = getAccessToken();
+  return fetch(url, {
+    ...options,
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(options.headers || {}),
+    },
+  });
+}
 
 interface KnowledgeItem {
   id: string;
@@ -76,12 +89,12 @@ export function DataManagerPage() {
     
     try {
       // Get the item content first
-      const itemRes = await fetch(`/api/kb/items/${itemId}`);
+      const itemRes = await authFetch(`/api/kb/items/${itemId}`);
       const itemData = await itemRes.json();
       
       if (itemData.success && itemData.data.content) {
         // Call the suggestion endpoint
-        const suggestRes = await fetch('/api/kb/suggest', {
+        const suggestRes = await authFetch('/api/kb/suggest', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -109,14 +122,14 @@ export function DataManagerPage() {
     setIsLoading(true);
     try {
       // Fetch stats
-      const statsRes = await fetch('/api/knowledge/stats');
+      const statsRes = await authFetch('/api/knowledge/stats');
       const statsData = await statsRes.json();
       if (statsData.success) {
         setStats(statsData.data);
       }
 
       // Fetch logs
-      const logsRes = await fetch('/api/data/logs');
+      const logsRes = await authFetch('/api/data/logs');
       const logsData = await logsRes.json();
       if (logsData.success) {
         const items: KnowledgeItem[] = logsData.data.slice(0, 50).map((log: any) => ({
@@ -142,7 +155,7 @@ export function DataManagerPage() {
     setIsCollecting(true);
 
     try {
-      const response = await fetch('/api/kb/scrape-with-suggest', {
+      const response = await authFetch('/api/kb/scrape-with-suggest', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: websiteUrl }),
@@ -185,7 +198,7 @@ export function DataManagerPage() {
     setIsCollecting(true);
 
     try {
-      const response = await fetch('/api/knowledge/text', {
+      const response = await authFetch('/api/knowledge/text', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -223,7 +236,7 @@ export function DataManagerPage() {
     setIsAddingSeed(true);
 
     try {
-      const response = await fetch('/api/data/sample', { method: 'POST' });
+      const response = await authFetch('/api/data/sample', { method: 'POST' });
       const data = await response.json();
 
       if (data.success) {
@@ -241,7 +254,7 @@ export function DataManagerPage() {
     setIsAddingSeed(true);
 
     try {
-      const response = await fetch('/api/data/seed', { method: 'POST' });
+      const response = await authFetch('/api/data/seed', { method: 'POST' });
       const data = await response.json();
 
       if (data.success) {
@@ -278,7 +291,7 @@ export function DataManagerPage() {
     formData.append('file', selectedFile);
 
     try {
-      const response = await fetch('/api/knowledge/upload', {
+      const response = await authFetch('/api/knowledge/upload', {
         method: 'POST',
         body: formData,
       });
@@ -327,7 +340,7 @@ export function DataManagerPage() {
     }
 
     try {
-      await fetch('/api/knowledge', { method: 'DELETE' });
+      await authFetch('/api/knowledge', { method: 'DELETE' });
       setKnowledgeItems([]);
       await fetchKnowledgeBase();
     } catch (error) {
@@ -350,10 +363,10 @@ export function DataManagerPage() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   
   const navItems = [
-    { id: 'knowledge', label: t('dataManager.navKnowledge'), icon: Brain, path: '/data' },
-    { id: 'collect', label: t('dataManager.navCollect'), icon: Globe, path: '/data/collect' },
-    { id: 'documents', label: t('dataManager.navDocuments'), icon: FileText, path: '/data/documents' },
-    { id: 'categories', label: t('dataManager.navCategories'), icon: Package, path: '/data/categories' },
+    { id: 'knowledge', label: t('dataManager.pageTitle'), icon: Brain, path: '/data' },
+    { id: 'collect', label: t('dataManager.collectFromWebsite'), icon: Globe, path: '/data/collect' },
+    { id: 'documents', label: t('dataManager.totalDocs'), icon: FileText, path: '/data/documents' },
+    { id: 'categories', label: t('dataManager.topics'), icon: Package, path: '/data/categories' },
   ];
   
   return (
@@ -846,7 +859,7 @@ export function DataManagerPage() {
                     addMode === 'url' ? 'bg-primary text-on-primary' : 'bg-surface-container'
                   )}
                 >
-                  <Link className="w-4 h-4" />
+                  <Globe className="w-4 h-4" />
                   {t('dataManager.tabUrl')}
                 </button>
                 <button

@@ -5,10 +5,10 @@ import { useSystemSettingsStore, useAuthStore } from '@/stores';
 import { useLanguageStore } from '@/stores';
 import clsx from 'clsx';
 import { systemApi } from '@/lib/api';
-import { CheckCircle, Loader2, AlertCircle, Shield, Settings, Lock, Cloud, CreditCard, Mail, Bug, Sparkles } from 'lucide-react';
-import { useTranslation } from '@/lib/translations';
+import { CheckCircle, Loader2, AlertCircle, Shield, Settings, Lock, Cloud, CreditCard, Mail, Bug, Sparkles, FileText, Zap, ArrowRight } from 'lucide-react';
+import { PromptTemplates } from './PromptTemplates';
 
-type Tab = 'general' | 'plans' | 'security' | 'ai' | 'integrations' | 'live' | 'system';
+type Tab = 'general' | 'plans' | 'security' | 'ai' | 'integrations' | 'live' | 'system' | 'templates';
 type Language = 'vi' | 'en' | 'ar' | 'fr';
 
 // Translation object
@@ -24,6 +24,7 @@ const t = {
       integrations: 'Tích hợp',
       live: 'Trạng thái thật',
       system: 'System DB',
+      templates: 'Templates',
     },
     general: {
       sectionTitle: 'Thông tin chung',
@@ -130,6 +131,7 @@ const t = {
       integrations: 'Integrations',
       live: 'Live Status',
       system: 'System DB',
+      templates: 'Templates',
     },
     general: {
       sectionTitle: 'General Information',
@@ -236,6 +238,7 @@ const t = {
       integrations: 'التكاملات',
       live: 'الحالة المباشرة',
       system: 'قاعدة النظام',
+      templates: 'القوالب',
     },
     general: {
       sectionTitle: 'المعلومات العامة',
@@ -342,6 +345,7 @@ const t = {
       integrations: 'Intégrations',
       live: 'État en Direct',
       system: 'Base de Données',
+      templates: 'Modèles',
     },
     general: {
       sectionTitle: 'Informations Générales',
@@ -454,7 +458,7 @@ export function AdminSettings() {
   
   // Get current user role
   const user = useAuthStore((s) => s.user);
-  const isSuperAdmin = user?.role === 'superadmin' || user?.role === 'super_admin';
+  const isSuperAdmin = user?.role === 'super_admin';
 
   const {
     anonymousLimit,
@@ -549,6 +553,21 @@ export function AdminSettings() {
                   </p>
                 </div>
               </div>
+              
+              {/* Prompt Templates Banner */}
+              <button
+                onClick={() => setTab('templates')}
+                className="group flex items-center gap-4 p-4 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl border border-indigo-200/50 hover:border-indigo-300 hover:shadow-md transition-all w-full md:w-auto"
+              >
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                  <Zap className="w-6 h-6 text-white" />
+                </div>
+                <div className="text-left flex-1">
+                  <h3 className="font-bold text-slate-800">Prompt Templates</h3>
+                  <p className="text-xs text-slate-500 mt-0.5">Template có sẵn theo ngành</p>
+                </div>
+                <ArrowRight className="w-5 h-5 text-indigo-400 group-hover:translate-x-1 transition-transform" />
+              </button>
             </div>
 
             {/* Right: Role Badge */}
@@ -581,6 +600,7 @@ export function AdminSettings() {
             { id: 'integrations', label: lang.tabs.integrations, icon: Cloud },
             { id: 'live', label: lang.tabs.live, icon: AlertCircle },
             { id: 'system', label: 'System DB', icon: Lock },
+            { id: 'templates', label: lang.tabs.templates, icon: FileText },
           ] as { id: Tab; label: string; icon: any }[]
         ).map((t) => (
           <button
@@ -1275,6 +1295,23 @@ export function AdminSettings() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ===================== TEMPLATES TAB ===================== */}
+      {tab === 'templates' && (
+        <div className="space-y-6">
+          <div className="bg-white rounded-2xl border border-outline-variant overflow-hidden">
+            <div className="px-8 py-6 border-b border-outline-variant">
+              <h3 className="text-lg font-black text-on-surface">Prompt Templates</h3>
+              <p className="text-sm text-on-surface-variant mt-1">
+                Quản lý và áp dụng các template prompt có sẵn theo ngành.
+              </p>
+            </div>
+            <div className="p-6">
+              <PromptTemplates isInline={true} />
+            </div>
+          </div>
         </div>
       )}
     </AdminLayout>

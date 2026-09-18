@@ -8,8 +8,13 @@ import { v4 as uuidv4 } from 'uuid';
 import db from '../lib/db';
 import { logActivity } from '../index';
 import { translateProduct, SupportedLanguage } from '../lib/translationService';
+import { authenticate } from '../lib/auth';
+import { syncProductToKnowledge, type KbProduct } from '../lib/syncKbProducts';
 
 const router = express.Router();
+
+// Apply authentication to all routes in this router
+router.use(authenticate as any);
 
 // ============== TYPES ==============
 
@@ -355,7 +360,6 @@ router.patch('/items/:id/translate', async (req, res) => {
     }
 
     const sourceLang = (row.language || 'vi') as SupportedLanguage;
-    const allText = [row.title, row.description || '', row.content ? row.content.slice(0, 2000) : ''].filter(Boolean).join('\n\n');
 
     const translations = await translateProduct({
       title: row.title,
@@ -477,23 +481,56 @@ router.post('/items/bulk', (req, res) => {
 
     const now = new Date().toISOString();
     let added = 0;
+    // Track inserted product IDs and their status for syncing
+    const insertedProducts: { id: string; status: string }[] = [];
 
     for (const item of items) {
       const id = `prod_${uuidv4().slice(0, 12)}`;
+      const status = item.status || 'draft';
       stmt.run(
         id, item.title || '', item.title_en || '', '', '',
         item.description || '', item.description_en || '', '', '',
         item.content || '', item.category || 'general', item.brand || '', item.model || '',
         item.price_range || '', item.source_url || '', item.product_url || '',
         item.image_url || '', JSON.stringify(item.iso_codes || []), item.wcag_level || '',
-        item.who_gate_area || '', item.status || 'draft', item.featured ? 1 : 0,
+        item.who_gate_area || '', status, item.featured ? 1 : 0,
         item.sort_order || 0, item.language || 'vi', now, now
       );
       added++;
+      insertedProducts.push({ id, status });
     }
 
-    logActivity('success', `Bulk import ${added} sản phẩm`, 'Admin Products');
-    res.json({ success: true, message: `Đã thêm ${added} sản phẩm`, added });
+    // ⭐ Auto-sync published products to knowledge_items so AI/RAG can find them
+    const syncResults: { id: string; action: string; knowledge_item_id?: string }[] = [];
+    for (const p of insertedProducts) {
+      if (p.status === 'published') {
+        const product = db.prepare('SELECT * FROM kb_products WHERE id = ?').get(p.id) as KbProduct | undefined;
+        if (product) {
+          const result = syncProductToKnowledge(product);
+          syncResults.push({ id: p.id, action: result.action, knowledge_item_id: result.knowledge_item_id });
+        }
+      }
+    }
+
+    const publishedCount = insertedProducts.filter(p => p.status === 'published').length;
+    const syncedCount = syncResults.length;
+
+    logActivity('success', `Bulk import ${added} sản phẩm (${publishedCount} published, ${syncedCount} synced to KB)`, 'Admin Products');
+
+    const needsReindex = syncedCount > 0;
+    res.json({
+      success: true,
+      message: `Đã thêm ${added} sản phẩm`,
+      details: {
+        added,
+        publishedCount,
+        syncedToKnowledge: syncedCount,
+        needsReindex,
+        reindexMessage: needsReindex
+          ? '⚠️ Cần chạy "Sync & Reindex Vector Store" để AI tìm được sản phẩm'
+          : null,
+      },
+    });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
   }

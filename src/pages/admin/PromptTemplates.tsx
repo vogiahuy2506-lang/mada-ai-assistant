@@ -43,7 +43,7 @@ interface Props {
   isInline?: boolean;
 }
 
-export function PromptTemplates({ onSelectTemplate, onClose, isInline: _isInline = false }: Props) {
+export function PromptTemplates({ onSelectTemplate, onClose, isInline = false }: Props) {
   const [templates, setTemplates] = useState<PromptTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterCategory, setFilterCategory] = useState('all');
@@ -314,8 +314,8 @@ export function PromptTemplates({ onSelectTemplate, onClose, isInline: _isInline
     );
   }
 
-  return (
-    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+  const content = (
+    <>
       {/* Header */}
       <div className="p-5 border-b border-slate-100">
         <div className="flex items-center justify-between mb-4">
@@ -512,6 +512,16 @@ export function PromptTemplates({ onSelectTemplate, onClose, isInline: _isInline
           </button>
         </div>
       </div>
+    </>
+  );
+
+  if (isInline) {
+    return content;
+  }
+
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      {content}
     </div>
   );
 }

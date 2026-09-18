@@ -1,6 +1,10 @@
 import { useState } from 'react';
-import { useChatSettingsStore, type EmotionPreset, type EmotionIntensity, type ResponseStyle } from '@/stores';
-import { CheckCircle, Loader2, AlertCircle, Shield } from 'lucide-react';
+import { useChatSettingsStore, type EmotionPreset, type EmotionIntensity } from '@/stores';
+import type { UserRole } from '@/types';
+import { CheckCircle, AlertCircle, Shield } from 'lucide-react';
+
+// Local type for response length options
+type ResponseLengthOption = 'short' | 'medium' | 'long' | 'mixed';
 
 const EMOTION_PRESETS: { id: EmotionPreset; label: string; labelEn: string; description: string; descriptionEn: string }[] = [
   {
@@ -53,7 +57,7 @@ const INTENSITY_OPTIONS: { id: EmotionIntensity; label: string; labelEn: string;
   { id: 'high', label: 'Mạnh mẽ', labelEn: 'High', description: 'Thể hiện cảm xúc rõ ràng', descriptionEn: 'Clear emotional expression' },
 ];
 
-const RESPONSE_LENGTH_OPTIONS: { id: ResponseStyle; label: string; labelEn: string; description: string; descriptionEn: string }[] = [
+const RESPONSE_LENGTH_OPTIONS: { id: ResponseLengthOption; label: string; labelEn: string; description: string; descriptionEn: string }[] = [
   { id: 'short', label: 'Ngắn gọn', labelEn: 'Short', description: '1-2 đoạn, đi thẳng vào vấn đề', descriptionEn: '1-2 paragraphs, straight to the point' },
   { id: 'medium', label: 'Vừa phải', labelEn: 'Medium', description: '3-4 đoạn với giải thích cơ bản', descriptionEn: '3-4 paragraphs with basic explanations' },
   { id: 'long', label: 'Chi tiết', labelEn: 'Long', description: 'Nhiều đoạn với đầy đủ thông tin', descriptionEn: 'Multiple paragraphs with full information' },
@@ -62,22 +66,18 @@ const RESPONSE_LENGTH_OPTIONS: { id: ResponseStyle; label: string; labelEn: stri
 
 interface EmotionCustomizationProps {
   language?: string;
-  userRole?: 'admin' | 'super_admin' | 'user';
+  userRole?: UserRole;
   isInline?: boolean;
   onClose?: () => void;
 }
 
-export function EmotionCustomization({ language = 'vi', userRole = 'admin', isInline = false, onClose }: EmotionCustomizationProps) {
+export function EmotionCustomization({ language = 'vi', userRole = 'admin' }: EmotionCustomizationProps) {
   const {
     emotionSettings,
     updateEmotionSettings,
-    saveEmotionSettings,
-    isSavingEmotion,
   } = useChatSettingsStore();
 
-  const [saveSuccess, setSaveSuccess] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
+  const [saveError] = useState<string | null>(null);
 
   const t = {
     vi: {
@@ -137,20 +137,6 @@ export function EmotionCustomization({ language = 'vi', userRole = 'admin', isIn
   };
 
   const lang = t[language as keyof typeof t] || t.vi;
-
-  const handleSave = async () => {
-    setSaving(true);
-    setSaveError(null);
-    try {
-      await saveEmotionSettings();
-      setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 3000);
-    } catch (e: any) {
-      setSaveError(e.message || lang.error);
-    } finally {
-      setSaving(false);
-    }
-  };
 
   if (userRole !== 'super_admin' && userRole !== 'admin') {
     return (
@@ -359,7 +345,7 @@ export function EmotionCustomization({ language = 'vi', userRole = 'admin', isIn
             {RESPONSE_LENGTH_OPTIONS.map((option) => (
               <button
                 key={option.id}
-                onClick={() => updateEmotionSettings({ maxResponseLength: option.id })}
+                onClick={() => updateEmotionSettings({ maxResponseLength: option.id as 'short' | 'medium' | 'long' })}
                 className={`px-4 py-2 rounded-lg border-2 text-xs font-bold transition-all ${
                   emotionSettings.maxResponseLength === option.id
                     ? 'bg-teal-500 text-white border-teal-700 shadow-[2px_2px_0px_0px_#000]'

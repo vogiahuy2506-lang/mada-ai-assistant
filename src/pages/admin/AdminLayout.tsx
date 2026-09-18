@@ -93,6 +93,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Nhật ký Hoạt động', labelEn: 'Activity Logs', labelAr: 'سجل النشاط', labelFr: 'Journal d\'activité', href: '/admin/logs', icon: 'history_edu' },
   { label: 'Phân tích', labelEn: 'Analytics', labelAr: 'التحليلات', labelFr: 'Analytique', href: '/admin/analytics', icon: 'analytics' },
   { label: 'Agents', labelEn: 'Agents', labelAr: 'الوكلاء', labelFr: 'Agents', href: '/admin/agents', icon: 'smart_toy' },
+  { label: 'Câu hỏi gợi ý', labelEn: 'Suggested Questions', labelAr: 'الأسئلة المقترحة', labelFr: 'Questions suggérées', href: '/admin/suggested-questions', icon: 'quiz', superAdminOnly: true },
   { label: 'System Prompts', labelEn: 'System Prompts', labelAr: 'التعليمات', labelFr: 'Prompts Système', href: '/admin/prompts', icon: 'edit_note' },
   { label: 'Tư vấn', labelEn: 'Consultations', labelAr: 'الاستشارات', labelFr: 'Consultations', href: '/admin/consultations', icon: 'support_agent' },
   { label: 'Upload File', labelEn: 'File Upload', labelAr: 'رفع الملفات', labelFr: 'Upload de fichiers', href: '/admin/file-management', icon: 'upload_file', superAdminOnly: true },
@@ -129,11 +130,10 @@ export function AdminLayout({
 }: AdminLayoutProps) {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, logout, isSuperAdmin, isAdmin } = useAuthStore();
+  const { user, logout, isSuperAdmin } = useAuthStore();
   const { language } = useLanguageStore();
   const isRtl = language === 'ar';
   const isUserSuperAdmin = isSuperAdmin();
-  const isUserAdmin = isAdmin();
 
   const getNavLabel = (item: NavItem) => {
     if (language === 'en') return item.labelEn;

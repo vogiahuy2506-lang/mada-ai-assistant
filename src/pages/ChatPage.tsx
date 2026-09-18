@@ -22,7 +22,8 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { CATEGORY_INFO, SAMPLE_QUESTIONS, AT_SPECIALIST_KEYWORDS, type ATCategory, type Language, type SuggestedProduct } from '@/types';
 import { t } from '@/lib/translations';
-import { userHistoryApi, fileQuotaApi, type FileUploadQuota } from '@/lib/api';
+import { userHistoryApi, fileQuotaApi, getAccessToken, type FileUploadQuota } from '@/lib/api';
+import { onAgentChange } from '@/lib/agentBroadcast';
 
 // Attachment options - use getAttachmentOptions(language) inside component
 function getAttachmentOptions(lang: Language) {
@@ -850,10 +851,29 @@ export function ChatPage() {
   // ⭐ Sync agents from backend on mount + when window regains focus
   const loadAgents = useAgentStore((s) => s.loadAgents);
   useEffect(() => {
-    loadAgents();
-    const onFocus = () => loadAgents();
+    // ⭐ Force reload từ backend - không dùng cache
+    console.log('[ChatPage] Loading agents from backend...');
+    loadAgents().then(() => {
+      console.log('[ChatPage] Agents loaded, count:', useAgentStore.getState().agents.length);
+    }).catch((err) => {
+      console.error('[ChatPage] Failed to load agents:', err);
+    });
+    const onFocus = () => {
+      console.log('[ChatPage] Window focus - reloading agents...');
+      loadAgents();
+    };
     window.addEventListener('focus', onFocus);
     return () => window.removeEventListener('focus', onFocus);
+  }, [loadAgents]);
+
+  // ⭐ Lắng nghe broadcast từ AdminAgents - cập nhật agents ngay khi admin thêm/sửa/xóa bot
+  useEffect(() => {
+    const cleanup = onAgentChange((event) => {
+      console.log('[ChatPage] 📡 Received agent change broadcast:', event.type, event);
+      // Reload agents ngay lập tức khi có thay đổi từ Admin
+      loadAgents();
+    });
+    return cleanup;
   }, [loadAgents]);
 
   // Load chat settings from backend on mount
@@ -906,9 +926,13 @@ export function ChatPage() {
     mode: string
   ): Promise<string[]> => {
     try {
+      const token = getAccessToken();
       const res = await fetch('/api/chat/follow-up', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({
           userMessage,
           aiResponse,
@@ -945,10 +969,15 @@ export function ChatPage() {
     }, 100);
   }, []);
 
-  // Agent state
-  const activeAgents = useAgentStore((s) => s.getActiveAgents());
+  // Agent state - subscribe to agents array directly for proper reactivity
+  const agents = useAgentStore((s) => s.agents);
+  const activeAgents = agents.filter(a => a.isActive);
   const { selectedAgentId } = useSelectedAgentStore();
-  const selectedAgent = activeAgents.find(a => a.id === selectedAgentId) || activeAgents[0];
+  // Fallback to default agent if no agent is selected or activeAgents is empty
+  const defaultAgent = activeAgents[0];
+  const selectedAgent = selectedAgentId
+    ? activeAgents.find(a => a.id === selectedAgentId) || defaultAgent
+    : defaultAgent;
 
   // Chat history from persisted store
   const historyConversations = useChatHistoryStore((s) => s.conversations);
@@ -1176,7 +1205,7 @@ export function ChatPage() {
     const remaining = MAX_DROP_FILES - selectedFiles.length;
     
     if (remaining <= 0) {
-      alert('Đã đạt giới hạn tối đa 5 file.');
+      alert(t('chat.fileLimit'));
       return;
     }
 
@@ -1433,7 +1462,7 @@ export function ChatPage() {
         
         // Chuẩn bị attachments để gửi lên server (có base64/content)
         // Ưu tiên content đã parse (từ mammoth/pdf.js) thay vì gửi raw base64
-        if (f.content && !f.content.includes('đang chờ parse')) {
+        if (f.content && !f.content.includes('waiting to parse')) {
           // Đã có nội dung parse sẵn (từ mammoth/pdf.js frontend) - dùng luôn
           attachmentsForApi.push({
             name: f.name,
@@ -1506,9 +1535,13 @@ export function ChatPage() {
 
       // ===== STREAMING MODE =====
       if (useStream) {
+        const token = getAccessToken();
         const response = await fetch(chatEndpoint, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
           body: JSON.stringify(chatBody),
           signal: abortControllerRef.current.signal,
         });
@@ -1616,9 +1649,13 @@ export function ChatPage() {
       }
 
       // ===== NON-STREAMING MODE (with files) =====
+      const token2 = getAccessToken();
       const response = await fetch(chatEndpoint, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token2 ? { Authorization: `Bearer ${token2}` } : {}),
+        },
         body: JSON.stringify(chatBody),
         signal: abortControllerRef.current.signal,
       });
@@ -1815,7 +1852,7 @@ export function ChatPage() {
     addMessage({
       role: 'assistant',
       content: language === 'vi' 
-        ? '⏹️ Đã dừng phản hồi theo yêu cầu của bạn.'
+        ? t('chat.stoppedResponse')
         : '⏹️ Response stopped as requested.',
     });
   };
@@ -2099,7 +2136,7 @@ export function ChatPage() {
               } else if (file.type === 'application/pdf') {
                 // PDF - gửi file lên server để parse
                 // Lưu file để gửi kèm request
-                fileData.content = `[File PDF: ${file.name}]\n(Kích thước: ${(file.size / 1024).toFixed(1)} KB - đang chờ parse...)`;
+                fileData.content = t('chat.pdfFilePending').replace('{{name}}', file.name).replace('{{size}}', (file.size / 1024).toFixed(1));
                 fileData.originalFile = file; // Lưu file gốc để gửi lên server
               } else if (file.type.includes('word') || file.name.endsWith('.docx')) {
                 // DOCX - đọc bằng mammoth
@@ -2112,12 +2149,12 @@ export function ChatPage() {
                 try {
                   fileData.content = await file.text();
                 } catch {
-                  fileData.content = `[File nhị phân: ${file.name}]`;
+                  fileData.content = t('chat.binaryFile').replace('{{name}}', file.name);
                 }
               }
             } catch (err) {
               console.error('Error reading file:', err);
-              fileData.content = `[Không thể đọc nội dung file: ${file.name}]`;
+              fileData.content = t('chat.cannotReadFile').replace('{{name}}', file.name);
             }
             
             fileData.isLoading = false;
@@ -2185,7 +2222,7 @@ export function ChatPage() {
       } else {
         addMessage({
           role: 'assistant',
-          content: `❌ Không thể tải nội dung từ URL: ${data.error || 'Lỗi không xác định'}`,
+          content: t('chat.urlLoadError').replace('{{error}}', data.error || 'Unknown error'),
         });
       }
     } catch (error) {
@@ -2205,7 +2242,7 @@ export function ChatPage() {
     console.log('Consultation submitted:', data);
     addMessage({
       role: 'user',
-      content: `📋 Đã gửi yêu cầu tư vấn chuyên gia MADA`,
+      content: t('chat.consultSent'),
     });
   };
 
@@ -2228,10 +2265,10 @@ export function ChatPage() {
                 </span>
               </div>
               <p className="text-xl font-bold text-violet-700">
-                {language === 'vi' ? 'Thả file để đính kèm' : language === 'en' ? 'Drop files to attach' : 'Déposez les fichiers'}
+                {t('chat.dropFiles')}
               </p>
               <p className="text-sm text-slate-500">
-                {language === 'vi' ? 'Hỗ trợ: Hình ảnh, PDF, DOCX, TXT (tối đa 10MB)' : 'Supports: Images, PDF, DOCX, TXT (max 10MB)'}
+                {t('chat.supportedFormats')}
               </p>
             </div>
           </div>
@@ -2321,7 +2358,7 @@ export function ChatPage() {
           </button>
         </div>
 
-        {/* Sử dụng WIDGET Button - Chỉ hiển thị cho Admin/Super Admin */}
+        {/* Use Widget Button - Only for Admin/Super Admin */}
         {(user?.role === 'admin' || user?.role === 'super_admin') && (
           <div className="px-4 mb-3 shrink-0">
             <button
@@ -2329,7 +2366,7 @@ export function ChatPage() {
               className="w-full flex items-center justify-center gap-1.5 py-2 px-3 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-semibold text-xs shadow-sm hover:shadow-md transition-all active:scale-[0.98] border border-amber-500/30"
             >
               <span className="material-symbols-outlined text-base">widgets</span>
-              <span>Sử dụng WIDGET</span>
+              <span>{t('chat.useWidget')}</span>
             </button>
           </div>
         )}
@@ -2366,7 +2403,7 @@ export function ChatPage() {
                       if (hasMessages && activeConversationId && messages.length > 0) {
                         addOrUpdateConversation({
                           id: activeConversationId,
-                          title: messages[0]?.content?.slice(0, 40) || (language === 'vi' ? 'Cuộc trò chuyện' : language === 'en' ? 'Conversation' : language === 'ar' ? 'محادثة' : 'Conversation'),
+                          title: messages[0]?.content?.slice(0, 40) || t('chat.conversation'),
                           date: new Date().toISOString().slice(0, 10),
                           preview: messages[messages.length - 1]?.content ?? '',
                           messages: messages.length,
@@ -2458,6 +2495,71 @@ export function ChatPage() {
               </div>
             </div>
           )}
+          {/* Custom Agents (không thuộc 7 category cố định) */}
+          {agents.filter(a => a.isActive && !a.madaCategory).map((agent) => {
+            const isActive = selectedAgentId === agent.id;
+            return (
+              <button
+                key={agent.id}
+                onClick={() => {
+                  const hasMessages = messages.length > 0;
+                  if (hasMessages && activeConversationId && messages.length > 0) {
+                    addOrUpdateConversation({
+                      id: activeConversationId,
+                      title: messages[0]?.content?.slice(0, 40) || t('chat.conversation'),
+                      date: new Date().toISOString().slice(0, 10),
+                      preview: messages[messages.length - 1]?.content ?? '',
+                      messages: messages.length,
+                      pinned: false,
+                      category: activeCategory,
+                      createdAt: Date.now() - 60_000,
+                      updatedAt: Date.now(),
+                    });
+                  }
+                  window.speechSynthesis?.cancel();
+                  setSpeakingId(null);
+                  clearMessages();
+                  setActiveConversationId(null);
+                  setInputValue('');
+                  setStreamingContent('');
+                  setActiveCategory(null);
+                  useSelectedAgentStore.getState().setSelectedAgentId(agent.id);
+
+                  if (window.innerWidth < 768) {
+                    setSidebarOpen(false);
+                  }
+                }}
+                className={clsx(
+                  'w-full flex items-center gap-3 px-4 py-3 transition-colors rounded-2xl group',
+                  isActive
+                    ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white'
+                    : 'text-slate-500 hover:bg-surface-container-low hover:text-on-background'
+                )}
+              >
+                <div className={clsx(
+                  'w-8 h-8 rounded-lg flex items-center justify-center transition-colors text-lg',
+                  isActive ? 'bg-white/20' : 'bg-orange-100'
+                )}>
+                  <span className={clsx(
+                    isActive ? 'text-white' : 'text-orange-600'
+                  )}>
+                    {agent.avatar}
+                  </span>
+                </div>
+                <div className="flex-1 min-w-0 text-left">
+                  <p className="text-xs font-bold uppercase tracking-tight">
+                    {agent.name}
+                  </p>
+                  <p className={clsx(
+                    'text-[10px] truncate',
+                    isActive ? 'text-white/70' : 'text-on-surface-variant'
+                  )}>
+                    {agent.description || (language === 'vi' ? 'Agent tùy chỉnh' : language === 'en' ? 'Custom Agent' : 'Agent personnalisé')}
+                  </p>
+                </div>
+              </button>
+            );
+          })}
         </nav>
 
         {/* Recent Chats Header */}
@@ -2487,8 +2589,8 @@ export function ChatPage() {
             {historyConversations.length === 0 && (
               <div className="flex flex-col items-center justify-center text-center px-4 py-8 text-slate-400">
                 <MessageSquare className="w-7 h-7 mb-2 opacity-40" />
-                <p className="text-xs font-medium">{language === 'vi' ? 'Chưa có hội thoại nào' : language === 'en' ? 'No conversations yet' : language === 'ar' ? 'لا توجد محادثات' : 'Pas de conversations'}</p>
-                <p className="text-[10px] mt-1 opacity-70">{language === 'vi' ? 'Bắt đầu chat để lưu lịch sử tự động' : language === 'en' ? 'Start chatting to save history automatically' : language === 'ar' ? 'ابدأ المحادثة للحفظ التلقائي' : 'Commencez à discuter'}</p>
+                <p className="text-xs font-medium">{t('chat.noChatsYet')}</p>
+                <p className="text-[10px] mt-1 opacity-70">{t('chat.startToSave')}</p>
               </div>
             )}
 
@@ -2757,9 +2859,27 @@ export function ChatPage() {
                       : (language === 'vi' ? 'THÔNG TIN BỔ TRỢ & TIÊU CHUẨN' : language === 'en' ? 'SUPPLEMENTARY INFO & STANDARDS' : language === 'ar' ? 'المعلومات والمعايير الإضافية' : 'INFO SUPPLÉMENTAIRES & NORMES')}
                   </h2>
                 </div>
-                <div className="text-[10px] font-mono text-slate-400 tracking-widest hidden md:block">
-                  AGENT_ID: {selectedAgentId || 'none'}
-                </div>
+
+                {/* ⭐ Agent Selector Dropdown */}
+                {activeAgents.length > 0 && (
+                  <div className="relative" ref={null}>
+                    <select
+                      value={selectedAgentId || 'default'}
+                      onChange={(e) => {
+                        const newId = e.target.value === 'default' ? null : e.target.value;
+                        useSelectedAgentStore.getState().setSelectedAgentId(newId);
+                      }}
+                      className="appearance-none bg-white border-2 border-slate-200 rounded-full px-3 py-1.5 pr-8 text-xs font-bold text-slate-700 cursor-pointer hover:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-300 transition-all"
+                    >
+                      {activeAgents.map((agent) => (
+                        <option key={agent.id} value={agent.id}>
+                          {agent.avatar} {agent.name}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+                  </div>
+                )}
               </div>
 
               {/* Messages */}

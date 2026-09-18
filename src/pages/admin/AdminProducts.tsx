@@ -622,7 +622,14 @@ export function AdminProducts() {
   try {
    const res = await adminApi.getCategories();
    if (res.success && res.data) setCategories(Array.isArray(res.data) ? res.data : []);
-  } catch (e) { console.error(e); }
+  } catch (e: unknown) {
+   // Ignore AbortError (timeout)
+   if (e instanceof Error && e.name === 'AbortError') {
+    console.warn('AdminProducts: Failed to load categories (timeout)');
+   } else {
+    console.error(e);
+   }
+  }
  }, []);
 
  const loadProducts = useCallback(async () => {
@@ -647,7 +654,14 @@ export function AdminProducts() {
     setProducts(items.slice(page * pageSize, (page + 1) * pageSize));
     setTotalProducts(items.length);
    }
-  } catch (e) { console.error(e); } finally { setLoading(false); }
+  } catch (e: unknown) {
+   // Ignore AbortError (timeout)
+   if (e instanceof Error && e.name === 'AbortError') {
+    console.warn('AdminProducts: Failed to load products (timeout)');
+   } else {
+    console.error(e);
+   }
+  } finally { setLoading(false); }
  }, [search, filterCategory, showFeatured, filterIso, filterWho, page]);
 
  useEffect(() => { loadCategories(); }, [loadCategories]);
@@ -860,6 +874,22 @@ const totalPages = Math.ceil(totalProducts / pageSize);
         <CheckCircle2 className="w-4 h-4" /> {t('admin.products.publishAll')}
        </button>
       )}
+      <button onClick={async () => {
+        if (!confirm('🔄 Sync tất cả sản phẩm vào AI Knowledge Base?\n\nĐiều này sẽ:\n1. Đồng bộ kb_products → Knowledge Items\n2. Index vào Vector Store để AI tìm được\n\nCó thể mất 30-60 giây.')) return;
+        try {
+          const result = await (adminApi as any).syncAndIndex();
+          if (result?.success) {
+            alert(result.message || '✅ Sync hoàn tất!');
+          } else {
+            alert('❌ Lỗi: ' + (result?.error || 'Không rõ'));
+          }
+        } catch (e) {
+          alert('❌ Lỗi: ' + (e as Error)?.message);
+        }
+      }}
+       className="px-4 py-2 rounded-lg bg-violet-500 text-white font-bold text-sm border-2 border-black hover:bg-violet-600 transition-all flex items-center gap-2 shadow-[2px_2px_0px_0px_#000]">
+       <RefreshCw className="w-4 h-4" /> Sync & Index
+      </button>
       <button onClick={() => setViewMode('products')} 
        className={clsx('px-4 py-2 rounded-lg font-bold text-sm transition-all border-2 border-black',
         viewMode === 'products' 

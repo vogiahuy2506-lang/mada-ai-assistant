@@ -46,8 +46,8 @@ router.post('/register', async (req, res) => {
     const defaultStatus = ADMIN_APPROVAL_REQUIRED ? 'pending' : 'active';
 
     db.prepare(`
-  INSERT INTO users (id, email, name, password_hash, role, plan, status, provider, quota_used, quota_limit, created_at, updated_at)
-  VALUES (?, ?, ?, ?, 'user', 'free', ?, 'email', 0, 10, ?, ?)
+  INSERT INTO users (id, email, name, password_hash, role, plan, status, provider, avatar, quota_used, quota_limit, last_login_at, created_at, updated_at)
+  VALUES (?, ?, ?, ?, 'user', 'free', ?, 'email', NULL, 0, 10, NULL, ?, ?)
 `).run(id, normalizedEmail, name.trim(), passwordHash, defaultStatus, now, now);
 
     const user = db.prepare('SELECT * FROM users WHERE id = ?').get(id) as UserRow;

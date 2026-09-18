@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useCallback } from 'react';
 import { AdminLayout } from './AdminLayout';
 import { adminApi, AdminLog } from './adminApi';
 import { useTranslation } from '@/lib/translations';
+import { getAccessToken } from '@/lib/api';
 import clsx from 'clsx';
 
 type LogLevel = AdminLog['level'] | 'critical';
@@ -226,8 +227,12 @@ export function AdminLogs() {
 
   const handleClear = async () => {
     if (!confirm('Xóa toàn bộ nhật ký?')) return;
-    const res = await fetch('/api/admin/logs', { method: 'DELETE', headers: { Authorization: `Bearer ${localStorage.getItem('mada-access-token') || ''}` } });
-    if (res.ok) fetchLogs();
+    try {
+      const res = await fetch('/api/admin/logs', { method: 'DELETE', headers: { Authorization: `Bearer ${getAccessToken() || ''}` } });
+      if (res.ok) fetchLogs();
+    } catch (e) {
+      console.warn('AdminLogs: Failed to clear logs', e);
+    }
   };
 
   return (

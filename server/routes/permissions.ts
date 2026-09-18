@@ -6,7 +6,7 @@
 
 import { Router, Response } from 'express';
 import db from '../lib/db';
-import { authenticate, requireRole, AuthRequest } from '../lib/auth';
+import { authenticate, requireRole } from '../lib/auth';
 import {
   Permission,
   Role,
@@ -96,9 +96,12 @@ router.get('/plan/:plan', (req, res) => {
 // ============== AUTHENTICATED ROUTES ==============
 
 // GET /api/permissions/my - Get current user's effective permissions
-router.get('/my', authenticate, (req: AuthRequest, res: Response) => {
+router.get('/my', authenticate, (req: any, res: Response) => {
   try {
-    const user = req.user!;
+    const user = req.user;
+    if (!user) {
+      return res.status(401).json({ success: false, error: 'Not authenticated' });
+    }
     const { granted, denied } = getUserCustomPermissions(user.id);
     
     const context: UserPermissionContext = {
@@ -139,10 +142,10 @@ router.get('/my', authenticate, (req: AuthRequest, res: Response) => {
 });
 
 // GET /api/permissions/user/:userId - Get permissions for a specific user
-router.get('/user/:userId', authenticate, (req: AuthRequest, res: Response) => {
+router.get('/user/:userId', authenticate, (req: any, res: Response) => {
   try {
     const { userId } = req.params;
-    const currentUser = req.user!;
+    const currentUser = req.user;
     
     // Only admins can view other users' permissions
     if (userId !== currentUser.id && !['admin', 'super_admin'].includes(currentUser.role)) {
@@ -183,11 +186,11 @@ router.get('/user/:userId', authenticate, (req: AuthRequest, res: Response) => {
 });
 
 // POST /api/permissions/user/:userId/check - Check if user has a specific permission
-router.post('/user/:userId/check', authenticate, (req: AuthRequest, res: Response) => {
+router.post('/user/:userId/check', authenticate, (req: any, res: Response) => {
   try {
     const { userId } = req.params;
     const { permission } = req.body;
-    const currentUser = req.user!;
+    const currentUser = req.user;
     
     if (!permission || !isValidPermission(permission)) {
       return res.status(400).json({ success: false, error: 'Invalid permission' });
@@ -222,11 +225,11 @@ router.post('/user/:userId/check', authenticate, (req: AuthRequest, res: Respons
 });
 
 // POST /api/permissions/user/:userId/grant - Grant a permission to a user
-router.post('/user/:userId/grant', authenticate, requireRole('admin', 'super_admin'), (req: AuthRequest, res: Response) => {
+router.post('/user/:userId/grant', authenticate, requireRole('admin', 'super_admin'), (req: any, res: Response) => {
   try {
     const { userId } = req.params;
     const { permission } = req.body;
-    const currentUser = req.user!;
+    const currentUser = req.user;
     
     if (!permission || !isValidPermission(permission)) {
       return res.status(400).json({ success: false, error: 'Invalid permission' });
@@ -255,7 +258,7 @@ router.post('/user/:userId/grant', authenticate, requireRole('admin', 'super_adm
 });
 
 // POST /api/permissions/user/:userId/deny - Deny a permission from a user
-router.post('/user/:userId/deny', authenticate, requireRole('admin', 'super_admin'), (req: AuthRequest, res: Response) => {
+router.post('/user/:userId/deny', authenticate, requireRole('admin', 'super_admin'), (req: any, res: Response) => {
   try {
     const { userId } = req.params;
     const { permission } = req.body;
@@ -282,7 +285,7 @@ router.post('/user/:userId/deny', authenticate, requireRole('admin', 'super_admi
 });
 
 // DELETE /api/permissions/user/:userId/:permission - Remove custom permission
-router.delete('/user/:userId/:permission', authenticate, requireRole('admin', 'super_admin'), (req: AuthRequest, res: Response) => {
+router.delete('/user/:userId/:permission', authenticate, requireRole('admin', 'super_admin'), (req: any, res: Response) => {
   try {
     const { userId, permission } = req.params;
     
@@ -305,7 +308,7 @@ router.delete('/user/:userId/:permission', authenticate, requireRole('admin', 's
 // ============== ROLE MANAGEMENT ROUTES ==============
 
 // GET /api/permissions/roles - Get all role permissions
-router.get('/roles', authenticate, requireRole('admin', 'super_admin'), (_req: AuthRequest, res: Response) => {
+router.get('/roles', authenticate, requireRole('admin', 'super_admin'), (_req: any, res: Response) => {
   try {
     const roles: Role[] = ['super_admin', 'admin', 'data_manager', 'expert', 'user'];
     
@@ -313,7 +316,7 @@ router.get('/roles', authenticate, requireRole('admin', 'super_admin'), (_req: A
     for (const role of roles) {
       let perms = getRolePermissions(role);
       if (perms.length === 0) {
-        perms = (DEFAULT_ROLE_PERMISSIONS[role] || []) as string[];
+        perms = (DEFAULT_ROLE_PERMISSIONS[role] || []) as Permission[];
       }
       rolePermissions[role] = perms;
     }
@@ -325,7 +328,7 @@ router.get('/roles', authenticate, requireRole('admin', 'super_admin'), (_req: A
 });
 
 // PUT /api/permissions/roles/:role - Update permissions for a role
-router.put('/roles/:role', authenticate, requireRole('super_admin'), (req: AuthRequest, res: Response) => {
+router.put('/roles/:role', authenticate, requireRole('super_admin'), (req: any, res: Response) => {
   try {
     const { role } = req.params;
     const { permissions } = req.body;
@@ -339,14 +342,9 @@ router.put('/roles/:role', authenticate, requireRole('super_admin'), (req: AuthR
     }
     
     // Validate all permissions
-    const validPermissions: string[] = [];
-    for (const p of permissions) {
-      if (isValidPermission(p)) {
-        validPermissions.push(p);
-      }
-    }
+    const validPermissions = permissions.filter((p: string): p is Permission => isValidPermission(p));
     
-    updateRolePermissions(role as Role, validPermissions as Permission[]);
+    updateRolePermissions(role as Role, validPermissions);
     
     res.json({
       success: true,
@@ -359,7 +357,7 @@ router.put('/roles/:role', authenticate, requireRole('super_admin'), (req: AuthR
 });
 
 // POST /api/permissions/roles/:role/reset - Reset role to default permissions
-router.post('/roles/:role/reset', authenticate, requireRole('super_admin'), (req: AuthRequest, res: Response) => {
+router.post('/roles/:role/reset', authenticate, requireRole('super_admin'), (req: any, res: Response) => {
   try {
     const { role } = req.params;
     
@@ -383,7 +381,7 @@ router.post('/roles/:role/reset', authenticate, requireRole('super_admin'), (req
 // ============== PLAN MANAGEMENT ROUTES ==============
 
 // GET /api/permissions/plans - Get all plan permissions
-router.get('/plans', authenticate, requireRole('admin', 'super_admin'), (_req: AuthRequest, res: Response) => {
+router.get('/plans', authenticate, requireRole('admin', 'super_admin'), (_req: any, res: Response) => {
   try {
     const plans: Plan[] = ['free', 'pro', 'enterprise'];
     
@@ -391,7 +389,7 @@ router.get('/plans', authenticate, requireRole('admin', 'super_admin'), (_req: A
     for (const plan of plans) {
       let perms = getPlanPermissions(plan);
       if (perms.length === 0) {
-        perms = (DEFAULT_PLAN_PERMISSIONS[plan] || []) as string[];
+        perms = (DEFAULT_PLAN_PERMISSIONS[plan] || []) as Permission[];
       }
       planPermissions[plan] = perms;
     }
@@ -403,7 +401,7 @@ router.get('/plans', authenticate, requireRole('admin', 'super_admin'), (_req: A
 });
 
 // PUT /api/permissions/plans/:plan - Update permissions for a plan
-router.put('/plans/:plan', authenticate, requireRole('super_admin'), (req: AuthRequest, res: Response) => {
+router.put('/plans/:plan', authenticate, requireRole('super_admin'), (req: any, res: Response) => {
   try {
     const { plan } = req.params;
     const { permissions } = req.body;
@@ -417,14 +415,9 @@ router.put('/plans/:plan', authenticate, requireRole('super_admin'), (req: AuthR
     }
     
     // Validate all permissions
-    const validPermissions: string[] = [];
-    for (const p of permissions) {
-      if (isValidPermission(p)) {
-        validPermissions.push(p);
-      }
-    }
+    const validPermissions = permissions.filter((p: string): p is Permission => isValidPermission(p));
     
-    updatePlanPermissions(plan as Plan, validPermissions as Permission[]);
+    updatePlanPermissions(plan as Plan, validPermissions);
     
     res.json({
       success: true,
@@ -437,7 +430,7 @@ router.put('/plans/:plan', authenticate, requireRole('super_admin'), (req: AuthR
 });
 
 // POST /api/permissions/plans/:plan/reset - Reset plan to default permissions
-router.post('/plans/:plan/reset', authenticate, requireRole('super_admin'), (req: AuthRequest, res: Response) => {
+router.post('/plans/:plan/reset', authenticate, requireRole('super_admin'), (req: any, res: Response) => {
   try {
     const { plan } = req.params;
     
@@ -461,11 +454,11 @@ router.post('/plans/:plan/reset', authenticate, requireRole('super_admin'), (req
 // ============== BULK USER MANAGEMENT ==============
 
 // POST /api/permissions/user/:userId/bulk - Bulk update user permissions
-router.post('/user/:userId/bulk', authenticate, requireRole('admin', 'super_admin'), (req: AuthRequest, res: Response) => {
+router.post('/user/:userId/bulk', authenticate, requireRole('admin', 'super_admin'), (req: any, res: Response) => {
   try {
     const { userId } = req.params;
     const { grant = [], deny = [], remove = [] } = req.body;
-    const currentUser = req.user!;
+    const currentUser = req.user;
     
     const targetUser = db.prepare('SELECT id FROM users WHERE id = ?').get(userId);
     if (!targetUser) {

@@ -114,7 +114,7 @@ export function AuthModal() {
     setLoading(true);
     setError(null);
     try {
-      window.location.href = `${import.meta.env.VITE_API_URL || 'http://localhost:3002'}/api/auth/google`;
+      window.location.href = `${import.meta.env.VITE_API_URL || 'http://localhost:3005'}/api/auth/google`;
     } catch (err) {
       console.error('Google auth error:', err);
       setError(t('auth.googleError', language));

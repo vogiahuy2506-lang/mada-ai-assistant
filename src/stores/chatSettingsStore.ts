@@ -213,9 +213,6 @@ export const useChatSettingsStore = create<ChatSettingsState>()(
       loadFromBackend: async () => {
         set({ isLoading: true });
         try {
-          // First try public endpoint (no auth required for chat settings)
-          const token = localStorage.getItem('mada-access-token');
-
           // Try public chat-settings endpoint
           try {
             const publicRes = await fetch('/api/admin/chat-settings/public');

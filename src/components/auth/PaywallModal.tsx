@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { X, Lock, Sparkles, Check, Building2, ArrowRight, Loader2 } from 'lucide-react';
-import { usePaywallModalStore, useAuthModalStore, useAuthStore } from '@/stores';
+import { usePaywallModalStore, useAuthModalStore, useAuthStore, useLanguageStore } from '@/stores';
+import { t } from '@/lib/translations';
 import type { UserPlan } from '@/types';
 
 interface PlanCard {
@@ -14,64 +15,18 @@ interface PlanCard {
   cta: string;
 }
 
-const PLANS: PlanCard[] = [
-  {
-    id: 'free',
-    name: 'Free',
-    price: '0đ',
-    priceNote: 'vĩnh viễn',
-    desc: 'Dành cho người dùng cá nhân trải nghiệm',
-    features: [
-      '10 lượt trò chuyện miễn phí',
-      'Truy cập 7 danh mục AT',
-      'Tra cứu tiêu chuẩn ISO/WCAG/WHO',
-      'Hỗ trợ cộng đồng',
-    ],
-    cta: 'Tiếp tục dùng Free',
-  },
-  {
-    id: 'pro',
-    name: 'Pro',
-    price: '299.000đ',
-    priceNote: '/tháng',
-    desc: 'Dành cho chuyên gia & người dùng thường xuyên',
-    features: [
-      'Không giới hạn lượt trò chuyện',
-      'Phân tích chuyên sâu theo ISO 9999',
-      'Xuất báo cáo PDF chuyên nghiệp',
-      'Lịch sử hội thoại không giới hạn',
-      'Hỗ trợ ưu tiên 24/7',
-      'Tích hợp API nâng cao',
-    ],
-    highlight: true,
-    cta: 'Nâng cấp Pro ngay',
-  },
-  {
-    id: 'enterprise',
-    name: 'Enterprise',
-    price: 'Liên hệ',
-    priceNote: 'báo giá',
-    desc: 'Dành cho tổ chức, trường học, bệnh viện',
-    features: [
-      'Mọi tính năng của Pro',
-      'Dashboard quản trị đa người dùng',
-      'Tùy chỉnh tri thức riêng',
-      'SLA & bảo mật cấp doanh nghiệp',
-      'Đào tạo chuyên gia AT chuyên trách',
-      'Triển khai on-premise tùy chọn',
-    ],
-    cta: 'Liên hệ tư vấn',
-  },
-];
-
 export function PaywallModal() {
   const { isOpen, reason, close } = usePaywallModalStore();
   const authModal = useAuthModalStore();
   const user = useAuthStore((s) => s.user);
   const setPlan = useAuthStore((s) => s.setPlan);
   const resetQuota = useAuthStore((s) => s.resetQuota);
+  const language = useLanguageStore((s) => s.language ?? 'vi') as 'vi' | 'en' | 'ar' | 'fr';
 
   const [loadingPlan, setLoadingPlan] = useState<UserPlan | null>(null);
+
+  // Translation helper
+  const tr = (key: string) => t(key as any, language);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -119,6 +74,70 @@ export function PaywallModal() {
     authModal.open('login');
   };
 
+  // Plan data with translations
+  const plans: PlanCard[] = [
+    {
+      id: 'free',
+      name: 'Free',
+      price: '0đ',
+      priceNote: tr('paywall.freeForever'),
+      desc: tr('paywall.personalUse'),
+      features: [
+        tr('paywall.freeFeature1'),
+        tr('paywall.freeFeature2'),
+        tr('paywall.freeFeature3'),
+        tr('paywall.freeFeature4'),
+      ],
+      cta: tr('paywall.continueFree'),
+    },
+    {
+      id: 'pro',
+      name: 'Pro',
+      price: '299.000đ',
+      priceNote: tr('paywall.perMonth'),
+      desc: tr('paywall.proForPros'),
+      features: [
+        tr('paywall.proFeature1'),
+        tr('paywall.proFeature2'),
+        tr('paywall.proFeature3'),
+        tr('paywall.proFeature4'),
+        tr('paywall.proFeature5'),
+        tr('paywall.proFeature6'),
+      ],
+      highlight: true,
+      cta: tr('paywall.upgradePro'),
+    },
+    {
+      id: 'enterprise',
+      name: 'Enterprise',
+      price: tr('paywall.contactSales'),
+      priceNote: tr('paywall.customQuote'),
+      desc: tr('paywall.forOrgs'),
+      features: [
+        tr('paywall.entFeature1'),
+        tr('paywall.entFeature2'),
+        tr('paywall.entFeature3'),
+        tr('paywall.entFeature4'),
+        tr('paywall.entFeature5'),
+        tr('paywall.entFeature6'),
+      ],
+      cta: tr('paywall.contactSalesCta'),
+    },
+  ];
+
+  // Reason-based title and description
+  const getTitle = () => {
+    if (reason === 'anonymous_exhausted') return tr('paywall.anonymousExhausted');
+    if (reason === 'file_upload_exhausted') return tr('paywall.fileUploadExhausted');
+    return tr('paywall.freePlanExhausted');
+  };
+
+  const getDescription = () => {
+    if (reason === 'anonymous_exhausted') return tr('paywall.anonymousDesc');
+    if (reason === 'file_upload_exhausted') return tr('paywall.fileUploadDesc');
+    return tr('paywall.freeDesc');
+  };
+
   return (
     <div
       className="fixed inset-0 z-[200] flex items-center justify-center p-4 animate-in fade-in duration-200 overflow-y-auto"
@@ -129,7 +148,7 @@ export function PaywallModal() {
         <button
           onClick={close}
           className="absolute -top-3 -right-3 w-10 h-10 rounded-full bg-white shadow-xl flex items-center justify-center text-slate-500 hover:text-slate-900 z-20"
-          aria-label="Đóng"
+          aria-label={tr('paywall.close')}
         >
           <X className="w-5 h-5" />
         </button>
@@ -155,18 +174,10 @@ export function PaywallModal() {
             </div>
 
             <h2 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight mb-2">
-              {reason === 'anonymous_exhausted'
-                ? 'Bạn đã dùng hết lượt miễn phí'
-                : reason === 'file_upload_exhausted'
-                ? 'Đã hết lượt tải file trong tháng'
-                : 'Đã hết lượt trong gói Free'}
+              {getTitle()}
             </h2>
             <p className="text-slate-500 max-w-xl mx-auto">
-              {reason === 'anonymous_exhausted'
-                ? 'Đăng ký miễn phí để tiếp tục trò chuyện với MADA AI — nhận ngay 10 lượt trải nghiệm.'
-                : reason === 'file_upload_exhausted'
-                ? 'Bạn đã sử dụng hết 10 lượt tải file trong tháng này. Nâng cấp Pro để tải không giới hạn và mở khóa thêm tính năng nâng cao.'
-                : 'Nâng cấp lên Pro để mở khóa cuộc trò chuyện không giới hạn và các tính năng chuyên gia.'}
+              {getDescription()}
             </p>
 
             {!user && (
@@ -174,7 +185,7 @@ export function PaywallModal() {
                 onClick={handleLogin}
                 className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-violet-50 border border-violet-200 text-violet-700 text-sm font-bold hover:bg-violet-100 transition-colors"
               >
-                Đã có tài khoản? Đăng nhập
+                {tr('paywall.alreadyHaveAccount')}
                 <ArrowRight className="w-3.5 h-3.5" />
               </button>
             )}
@@ -182,7 +193,7 @@ export function PaywallModal() {
 
           <div className="px-6 md:px-8 pb-10">
             <div className="grid md:grid-cols-3 gap-4">
-              {PLANS.map((plan) => (
+              {plans.map((plan) => (
                 <div
                   key={plan.id}
                   className={`relative rounded-2xl p-6 transition-all ${
@@ -208,7 +219,7 @@ export function PaywallModal() {
                   {plan.highlight && (
                     <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-gradient-to-r from-violet-500 to-blue-500 text-white text-[10px] font-black uppercase tracking-widest flex items-center gap-1 shadow-lg">
                       <Sparkles className="w-3 h-3" />
-                      Phổ biến nhất
+                      {tr('paywall.popular')}
                     </div>
                   )}
 
@@ -255,7 +266,7 @@ export function PaywallModal() {
                     {loadingPlan === plan.id ? (
                       <>
                         <Loader2 className="w-4 h-4 animate-spin" />
-                        Đang xử lý...
+                        {tr('paywall.processing')}
                       </>
                     ) : (
                       plan.cta
@@ -266,7 +277,7 @@ export function PaywallModal() {
             </div>
 
             <p className="text-center text-[11px] text-slate-400 mt-6">
-              Mọi gói đều có thể hủy bất kỳ lúc nào. Thanh toán an toàn qua Stripe/PayPal/VNPay.
+              {tr('paywall.cancelAnyTime')}
             </p>
           </div>
         </div>

@@ -238,7 +238,7 @@ router.delete('/:id', requireAdmin, (req, res) => {
  * POST /api/admin/prompt-templates/:id/apply
  * Áp dụng template vào một prompt hiện có
  */
-router.post('/:id/apply', requireAdmin, (req, res) => {
+router.post('/:id/apply', requireAdmin, (req: any, res) => {
   try {
     const { target_prompt_id, change_summary } = req.body;
     
@@ -324,7 +324,7 @@ router.get('/versions/:promptId', requireAdmin, (req, res) => {
  * POST /api/admin/prompt-versions/:promptId/restore/:versionId
  * Khôi phục phiên bản cũ
  */
-router.post('/versions/:promptId/restore/:versionId', requireAdmin, (req, res) => {
+router.post('/versions/:promptId/restore/:versionId', requireAdmin, (req: any, res) => {
   try {
     const { promptId, versionId } = req.params;
     
@@ -460,7 +460,8 @@ router.post('/validate', requireAdmin, (req, res) => {
     }
     
     const hasErrors = issues.some(i => i.severity === 'error');
-    const hasWarnings = issues.some(i => i.severity === 'warning');
+    const _hasWarnings = issues.some(i => i.severity === 'warning');
+    void _hasWarnings; // Placeholder for future use
     
     res.json({
       success: true,

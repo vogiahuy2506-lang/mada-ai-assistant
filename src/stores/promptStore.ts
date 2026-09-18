@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { getAccessToken } from '@/lib/api';
 
 export interface SystemPromptRow {
   id: string;
@@ -17,13 +18,30 @@ export interface SystemPromptRow {
 const API_BASE = '/api';
 
 async function apiRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(options.headers || {}),
-    },
-  });
+  const token = getAccessToken();
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${path}`, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(options.headers || {}),
+      },
+    });
+  } catch (err: any) {
+    if (err?.name === 'AbortError') {
+      const netErr: any = new Error('Request timed out. Please try again.');
+      netErr.status = 0;
+      throw netErr;
+    }
+    if (err?.message === 'Failed to fetch' || err instanceof TypeError) {
+      const netErr: any = new Error('Không thể kết nối server. Vui lòng kiểm tra kết nối mạng.');
+      netErr.status = 0;
+      throw netErr;
+    }
+    throw err;
+  }
   const text = await res.text();
   let json: any = null;
   if (text) {

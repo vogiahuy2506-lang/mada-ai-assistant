@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useChatSettingsStore, type SuggestedPrompt } from '@/stores';
-import type { Language } from '@/types';
-import { CheckCircle, Loader2, AlertCircle, Shield, Bot as BotIcon } from 'lucide-react';
+import type { Language, UserRole } from '@/types';
+import { CheckCircle, Loader2, AlertCircle, Shield, Bot as BotIcon, ChevronDown, ChevronUp, Zap } from 'lucide-react';
 import { EmotionCustomization } from './EmotionCustomization';
+import { PromptTemplates } from './PromptTemplates';
 
 const LANGUAGES: { key: Language; label: string }[] = [
   { key: 'vi', label: 'Tiếng Việt' },
@@ -19,14 +20,16 @@ const ICON_OPTIONS = [
 
 interface ChatCustomizationProps {
   language?: Language;
-  userRole?: 'admin' | 'superadmin' | 'super_admin' | 'user';
+  userRole?: UserRole;
   isInline?: boolean;
   onClose?: () => void;
 }
 
-export function ChatCustomization({ language = 'vi', userRole = 'admin', isInline = false, onClose }: ChatCustomizationProps) {
+export function ChatCustomization({ language = 'vi', userRole = 'admin', onClose: _onClose }: ChatCustomizationProps) {
   // Check both 'superadmin' (DB) and 'super_admin' (code) for backward compatibility
-  const isSuperAdmin = userRole === 'superadmin' || userRole === 'super_admin';
+  const isSuperAdmin = userRole === 'super_admin' || (userRole as unknown) === 'superadmin';
+  
+  const [showTemplates, setShowTemplates] = useState(false);
   
   const {
     greeting,
@@ -38,8 +41,6 @@ export function ChatCustomization({ language = 'vi', userRole = 'admin', isInlin
     loadFromBackend,
     updateSettings,
     saveToBackend,
-    saveAiInstructions,
-    isSavingAi,
   } = useChatSettingsStore();
 
   const [saving, setSaving] = useState(false);
@@ -417,7 +418,7 @@ export function ChatCustomization({ language = 'vi', userRole = 'admin', isInlin
           language={language}
           userRole={userRole}
           isInline={true}
-          onClose={onClose}
+          onClose={_onClose}
         />
       </div>
 
@@ -479,6 +480,35 @@ export function ChatCustomization({ language = 'vi', userRole = 'admin', isInlin
             className="w-full px-4 py-3 rounded-xl bg-white border-2 border-black/20 font-mono text-sm resize-y focus:outline-none focus:ring-2 focus:ring-amber-400 disabled:bg-slate-100"
           />
         </div>
+      </div>
+
+      {/* Section: Prompt Templates */}
+      <div className="rounded-2xl border-2 border-black overflow-hidden shadow-[4px_4px_0px_0px_#000]">
+        <button
+          onClick={() => setShowTemplates(!showTemplates)}
+          className="w-full p-5 flex items-center justify-between bg-white hover:bg-slate-50 transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center">
+              <Zap className="w-5 h-5 text-white" />
+            </div>
+            <div className="text-left">
+              <h4 className="font-bold text-slate-800">Prompt Templates</h4>
+              <p className="text-xs text-slate-500">Templates có sẵn theo ngành để áp dụng nhanh</p>
+            </div>
+          </div>
+          {showTemplates ? (
+            <ChevronUp className="w-5 h-5 text-slate-400" />
+          ) : (
+            <ChevronDown className="w-5 h-5 text-slate-400" />
+          )}
+        </button>
+        
+        {showTemplates && (
+          <div className="border-t border-slate-200">
+            <PromptTemplates />
+          </div>
+        )}
       </div>
 
       {/* Disclaimer */}

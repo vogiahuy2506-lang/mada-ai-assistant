@@ -81,7 +81,7 @@ export interface AuthRequest extends Request {
   user?: UserRow;
 }
 
-export function authenticate(req: AuthRequest, res: Response, next: NextFunction) {
+export function authenticate(req: Request, res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization;
   const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
 
@@ -101,7 +101,7 @@ export function authenticate(req: AuthRequest, res: Response, next: NextFunction
       return res.status(403).json({ success: false, error: 'Account suspended', code: 'SUSPENDED' });
     }
 
-    req.user = user;
+    (req as AuthRequest).user = user;
     next();
   } catch (err) {
     if (err instanceof jwt.TokenExpiredError) {
@@ -115,18 +115,19 @@ export function authenticate(req: AuthRequest, res: Response, next: NextFunction
 }
 
 export function requireRole(...roles: UserRow['role'][]) {
-  return (req: AuthRequest, res: Response, next: NextFunction) => {
-    if (!req.user) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const user = (req as AuthRequest).user;
+    if (!user) {
       return res.status(401).json({ success: false, error: 'Auth required' });
     }
     // super_admin và admin có quyền truy cập tất cả các role
-    if (req.user.role === 'super_admin' || req.user.role === 'admin') {
+    if (user.role === 'super_admin' || user.role === 'admin') {
       return next();
     }
-    if (!roles.includes(req.user.role)) {
+    if (!roles.includes(user.role)) {
       return res.status(403).json({
         success: false,
-        error: `Requires role: ${roles.join(' or ')}, you are: ${req.user.role}`,
+        error: `Requires role: ${roles.join(' or ')}, you are: ${user.role}`,
         code: 'FORBIDDEN',
       });
     }
@@ -134,7 +135,7 @@ export function requireRole(...roles: UserRow['role'][]) {
   };
 }
 
-export function optionalAuth(req: AuthRequest, _res: Response, next: NextFunction) {
+export function optionalAuth(req: Request, _res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization;
   const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
   if (!token) return next();
@@ -143,7 +144,7 @@ export function optionalAuth(req: AuthRequest, _res: Response, next: NextFunctio
     const payload = verifyAccessToken(token);
     const user = db.prepare('SELECT * FROM users WHERE id = ?').get(payload.sub) as UserRow | undefined;
     if (user && user.status !== 'suspended') {
-      req.user = user;
+      (req as AuthRequest).user = user;
     }
   } catch {
     // ignore invalid tokens for optional auth

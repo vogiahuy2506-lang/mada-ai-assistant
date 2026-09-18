@@ -14,8 +14,12 @@ import { vectorStore } from '../lib/rag/vectorStore';
 import { AT_CATEGORIES, classifyContent } from '../lib/rag/taxonomy';
 import { detectFileType, parsePDFFile, parseDocxFile } from '../lib/rag/fileParsers';
 import { logActivity } from '../index';
+import { authenticate, requireRole } from '../lib/auth';
 
 const router = express.Router();
+
+// Apply authentication to write routes (POST/PATCH/DELETE) for KB management
+// Note: GET routes remain public for browsing
 
 // ============== MULTER CONFIG ==============
 
@@ -141,7 +145,7 @@ router.get('/items/:id', (req, res) => {
 
 // ============== KNOWLEDGE ITEM — UPDATE ==============
 
-router.patch('/items/:id', (req, res) => {
+router.patch('/items/:id', authenticate as any, requireRole('admin', 'data_manager') as any, (req, res) => {
   try {
     const allowed = ['title', 'description', 'category', 'status', 'language'];
     const sets: string[] = [];
@@ -200,7 +204,7 @@ router.patch('/items/:id', (req, res) => {
 
 // ============== KNOWLEDGE ITEM — DELETE ==============
 
-router.delete('/items/:id', async (req, res) => {
+router.delete('/items/:id', authenticate as any, requireRole('admin', 'data_manager') as any, async (req, res) => {
   try {
     const row = db.prepare('SELECT * FROM knowledge_items WHERE id = ?').get(req.params.id) as any;
     if (!row) return res.status(404).json({ success: false, error: 'Item not found' });
@@ -220,7 +224,7 @@ router.delete('/items/:id', async (req, res) => {
 
 // ============== KNOWLEDGE ITEM — PUBLISH/UNPUBLISH ==============
 
-router.post('/items/:id/publish', (req, res) => {
+router.post('/items/:id/publish', authenticate as any, requireRole('admin', 'data_manager') as any, (req, res) => {
   try {
     const { status } = req.body;
     if (!['published', 'draft', 'archived'].includes(status)) {
@@ -236,7 +240,7 @@ router.post('/items/:id/publish', (req, res) => {
 
 // ============== KNOWLEDGE ITEM — RE-EMBED ==============
 
-router.post('/items/:id/reindex', async (req, res) => {
+router.post('/items/:id/reindex', authenticate as any, requireRole('admin', 'data_manager') as any, async (req, res) => {
   try {
     const row = db.prepare('SELECT * FROM knowledge_items WHERE id = ?').get(req.params.id) as any;
     if (!row) return res.status(404).json({ success: false, error: 'Item not found' });
@@ -269,7 +273,7 @@ router.post('/items/:id/reindex', async (req, res) => {
 
 // ============== REINDEX ALL ==============
 
-router.post('/reindex-all', async (_req, res) => {
+router.post('/reindex-all', authenticate as any, requireRole('admin') as any, async (_req, res) => {
   try {
     const result = await vectorStore.reindexAll();
     res.json({ success: true, data: result, message: `Đã reindex ${result.count} tài liệu` });
@@ -294,7 +298,7 @@ router.use((err: any, _req: any, res: any, _next: any) => {
 
 // ============== FILE UPLOAD (multipart) ==============
 
-router.post('/upload', upload.single('file'), async (req, res) => {
+router.post('/upload', authenticate as any, requireRole('admin', 'data_manager') as any, upload.single('file'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ success: false, error: 'Không có file nào được upload' });
@@ -361,7 +365,7 @@ router.post('/upload', upload.single('file'), async (req, res) => {
 
 // ============== IMAGE UPLOAD (chuyên cho OCR) ==============
 
-router.post('/upload-image', upload.single('file'), async (req, res) => {
+router.post('/upload-image', authenticate as any, requireRole('admin', 'data_manager') as any, upload.single('file'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ success: false, error: 'Không có ảnh nào được upload' });
@@ -401,7 +405,7 @@ router.post('/upload-image', upload.single('file'), async (req, res) => {
 
 // ============== EXTRACT TEXT FROM FILE (for chat attachments) ==============
 
-router.post('/extract-text', upload.single('file'), async (req, res) => {
+router.post('/extract-text', authenticate as any, requireRole('admin', 'data_manager') as any, upload.single('file'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ success: false, error: 'Không có file nào được upload' });
@@ -454,7 +458,7 @@ router.post('/extract-text', upload.single('file'), async (req, res) => {
 
 // ============== TEXT INGEST ==============
 
-router.post('/text', async (req, res) => {
+router.post('/text', authenticate as any, requireRole('admin', 'data_manager') as any, async (req, res) => {
   try {
     const { content, title, language = 'vi' } = req.body;
     if (!content || content.length < 30) {
@@ -476,7 +480,7 @@ router.post('/text', async (req, res) => {
 
 // ============== WEB SCRAPE ==============
 
-router.post('/scrape', async (req, res) => {
+router.post('/scrape', authenticate as any, requireRole('admin', 'data_manager') as any, async (req, res) => {
   try {
     const { url, title, language = 'vi' } = req.body;
     if (!url || !url.match(/^https?:\/\//)) {

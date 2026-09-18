@@ -2,21 +2,76 @@ import { getAccessToken } from '@/lib/api';
 
 const API_BASE = '/api';
 
-async function request<T>(path: string, options: RequestInit = {}): Promise<{ success: boolean; data?: T; error?: string }> {
-  const token = getAccessToken();
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(options.headers || {}),
-    },
-  });
-  const json = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    return { success: false, error: json.error || res.statusText };
+// Helper: fetch với timeout để tránh infinite hang
+async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs = 15000): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { ...options, signal: controller.signal });
+    clearTimeout(timeoutId);
+    return res;
+  } catch (err: any) {
+    clearTimeout(timeoutId);
+    if (err?.name === 'AbortError') {
+      const timeoutErr: any = new Error(`Request timed out after ${timeoutMs}ms`);
+      timeoutErr.name = 'AbortError';
+      throw timeoutErr;
+    }
+    throw err;
   }
-  return json;
+}
+
+async function request<T>(path: string, options: RequestInit = {}, retry = true): Promise<{ success: boolean; data?: T; error?: string }> {
+  const token = getAccessToken();
+  const refreshToken = localStorage.getItem('mada-refresh-token');
+  try {
+    const res = await fetchWithTimeout(`${API_BASE}${path}`, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(options.headers || {}),
+      },
+    });
+
+    // Auto-refresh token on 401
+    if (res.status === 401 && retry && refreshToken) {
+      try {
+        const refreshRes = await fetchWithTimeout(`${API_BASE}/auth/refresh`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refreshToken }),
+        }, 10000);
+        if (refreshRes.ok) {
+          const refreshData = await refreshRes.json().catch(() => null);
+          if (refreshData?.success) {
+            localStorage.setItem('mada-access-token', refreshData.data.accessToken);
+            localStorage.setItem('mada-refresh-token', refreshData.data.refreshToken);
+            // Retry request with new token
+            return request(path, options, false);
+          }
+        }
+      } catch {
+        // Refresh failed, continue to error handling
+      }
+    }
+
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      return { success: false, error: json.error || res.statusText };
+    }
+    return json;
+  } catch (err: any) {
+    // Return a graceful error response instead of throwing
+    // This prevents "Unhandled Promise Rejection" from crashing the app
+    if (err?.name === 'AbortError') {
+      return { success: false, error: 'Request timed out. Please try again.' };
+    }
+    if (err?.message === 'Failed to fetch' || err?.message?.includes('fetch') || err instanceof TypeError) {
+      return { success: false, error: 'Network error. Please check your connection.' };
+    }
+    return { success: false, error: err?.message || 'Unknown error' };
+  }
 }
 
 export interface AdminUser {
@@ -213,34 +268,44 @@ export const adminApi = {
     });
   },
 
+  // ⭐ Sync kb_products → knowledge_items AND vector store (complete fix)
+  async syncAndIndex() {
+    return (await request<any>('/admin/products/sync-and-index', { method: 'POST' })) as {
+      success: boolean;
+      data: {
+        kbSync: { inserted: number; updated: number; archived: number; errors: any[] };
+        vectorIndex: { indexed: number; skipped: number; totalInVectorStore: number };
+      };
+      message: string;
+      error?: string;
+    };
+  },
+
   // ============== AGENTS ==============
   async getAgents() {
-    return request<{
-      success: boolean;
-      data: Array<{
-        id: string;
-        name: string;
-        description: string;
-        avatar: string;
-        system_prompt: string;
-        capabilities: string[];
-        is_active: number;
-        isActive: boolean;
-        created_by: string;
-        mada_category: string | null;
-        bot_id: string | null;
-        avatar_url: string | null;
-        knowledge_url: string | null;
-        product_url: string | null;
-        prompt_id: string | null;
-        promptId: string | null;
-        last_crawl_at: string | null;
-        last_crawl_status: string | null;
-        last_crawl_count: number;
-        created_at: string;
-        updated_at: string;
-      }>;
-    }>('/admin/agents');
+    return request<Array<{
+      id: string;
+      name: string;
+      description: string;
+      avatar: string;
+      system_prompt: string;
+      capabilities: string[];
+      is_active: number;
+      isActive: boolean;
+      created_by: string;
+      mada_category: string | null;
+      bot_id: string | null;
+      avatar_url: string | null;
+      knowledge_url: string | null;
+      product_url: string | null;
+      prompt_id: string | null;
+      promptId: string | null;
+      last_crawl_at: string | null;
+      last_crawl_status: string | null;
+      last_crawl_count: number;
+      created_at: string;
+      updated_at: string;
+    }>>('/admin/agents');
   },
   async createAgent(data: any) {
     return request<any>('/admin/agents', { method: 'POST', body: JSON.stringify(data) });
@@ -692,5 +757,134 @@ export const adminApi = {
       method: 'POST',
       body: JSON.stringify({ prompt, question, language }),
     });
+  },
+
+  // ============== SUGGESTED QUESTIONS ==============
+  async getSuggestedQuestions(params?: { 
+    agent_id?: string; 
+    category?: string; 
+    view_mode?: string; 
+    language?: string; 
+    is_active?: boolean;
+  }) {
+    const p = new URLSearchParams();
+    if (params?.agent_id) p.set('agent_id', params.agent_id);
+    if (params?.category) p.set('category', params.category);
+    if (params?.view_mode) p.set('view_mode', params.view_mode);
+    if (params?.language) p.set('language', params.language);
+    if (params?.is_active !== undefined) p.set('is_active', String(params.is_active));
+    const q = p.toString();
+    return request<any[]>(`/admin/suggested-questions${q ? `?${q}` : ''}`);
+  },
+
+  async getSuggestedQuestionsGrouped(params?: { agent_id?: string }) {
+    const p = new URLSearchParams();
+    if (params?.agent_id) p.set('agent_id', params.agent_id);
+    const q = p.toString();
+    return request<any[]>(`/admin/suggested-questions/grouped${q ? `?${q}` : ''}`);
+  },
+
+  async getSuggestedQuestionsForAgent(params: { 
+    agent_id?: string; 
+    category: string; 
+    view_mode?: string; 
+    language?: string;
+  }) {
+    const p = new URLSearchParams({ category: params.category });
+    if (params.agent_id) p.set('agent_id', params.agent_id);
+    if (params.view_mode) p.set('view_mode', params.view_mode);
+    if (params.language) p.set('language', params.language);
+    return request<{ data: any[]; source: string }>(`/admin/suggested-questions/for-agent?${p.toString()}`);
+  },
+
+  async createSuggestedQuestion(data: {
+    agent_id?: string;
+    category: string;
+    view_mode?: string;
+    language?: string;
+    question: string;
+    sort_order?: number;
+    is_active?: boolean;
+  }) {
+    return request<any>('/admin/suggested-questions', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async createSuggestedQuestionsBulk(questions: Array<{
+    agent_id?: string;
+    category: string;
+    view_mode?: string;
+    language?: string;
+    question: string;
+    sort_order?: number;
+    is_active?: boolean;
+  }>) {
+    return request<{ count: number }>('/admin/suggested-questions/bulk', {
+      method: 'POST',
+      body: JSON.stringify({ questions }),
+    });
+  },
+
+  async updateSuggestedQuestion(id: string, updates: {
+    agent_id?: string | null;
+    category?: string;
+    view_mode?: string;
+    language?: string;
+    question?: string;
+    sort_order?: number;
+    is_active?: boolean;
+  }) {
+    return request<any>(`/admin/suggested-questions/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(updates),
+    });
+  },
+
+  async updateSuggestedQuestionsBulk(questions: Array<{
+    id: string;
+    agent_id?: string | null;
+    category?: string;
+    view_mode?: string;
+    language?: string;
+    question?: string;
+    sort_order?: number;
+    is_active?: boolean;
+  }>) {
+    return request<{ count: number }>('/admin/suggested-questions/bulk', {
+      method: 'PATCH',
+      body: JSON.stringify({ questions }),
+    });
+  },
+
+  async deleteSuggestedQuestion(id: string) {
+    return request<any>(`/admin/suggested-questions/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
+  async deleteSuggestedQuestionsBulk(ids: string[]) {
+    return request<{ count: number }>('/admin/suggested-questions/bulk/delete', {
+      method: 'DELETE',
+      body: JSON.stringify({ ids }),
+    });
+  },
+
+  async importSuggestedQuestionDefaults() {
+    return request<{ count: number }>('/admin/suggested-questions/import-defaults', {
+      method: 'POST',
+    });
+  },
+
+  async getSuggestedQuestionsStats() {
+    return request<{
+      total: { count: number };
+      byCategory: Array<{ category: string; count: number }>;
+      byViewMode: Array<{ view_mode: string; count: number }>;
+      byLanguage: Array<{ language: string; count: number }>;
+      active: { count: number };
+      agentSpecific: { count: number };
+    }>('/admin/suggested-questions/stats/all');
   },
 };

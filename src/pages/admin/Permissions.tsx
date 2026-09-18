@@ -4,33 +4,18 @@
  * Trang quản lý phân quyền cho Admin/Super Admin
  */
 
-import React, { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { AdminLayout } from './AdminLayout';
-import { getAccessToken, getRefreshToken, permissionsApi, type Permission, type UserPermissions } from '../../lib/api';
+import { getAccessToken, getRefreshToken, type Permission, type UserPermissions } from '../../lib/api';
 import { useAuthStore } from '@/stores';
-import { useTranslation } from '@/lib/translations';
 import clsx from 'clsx';
 import {
-  Shield, ShieldCheck, ShieldOff, Key, Users, Package, 
-  Loader2, Save, RotateCcw, Check, X, ChevronDown, ChevronUp,
-  Search, AlertTriangle, Sparkles
+  Shield, ShieldCheck, Key, Users, Package, 
+  Loader2, Save, RotateCcw, X, ChevronDown, ChevronUp,
+  AlertTriangle
 } from 'lucide-react';
 
 type TabType = 'users' | 'roles' | 'plans';
-
-interface RolePermission {
-  role: string;
-  label: string;
-  color: string;
-  permissions: string[];
-}
-
-interface PlanPermission {
-  plan: string;
-  label: string;
-  color: string;
-  permissions: string[];
-}
 
 export default function PermissionsPage() {
   const [loading, setLoading] = useState(true);
@@ -58,14 +43,29 @@ export default function PermissionsPage() {
     const token = getAccessToken();
     if (token) headers['Authorization'] = `Bearer ${token}`;
 
-    const res = await fetch(`/api${path}`, { ...init, headers });
+    let res: Response;
+    try {
+      res = await fetch(`/api${path}`, { ...init, headers });
+    } catch (err: any) {
+      if (err?.name === 'AbortError' || err?.message === 'Failed to fetch' || err instanceof TypeError) {
+        throw new Error('Yêu cầu bị gián đoạn. Vui lòng thử lại.');
+      }
+      throw err;
+    }
 
     if (res.status === 401 && retry && getRefreshToken()) {
-      const refreshRes = await fetch('/api/auth/refresh', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refreshToken: getRefreshToken() }),
-      });
+      let refreshRes: Response;
+      try {
+        refreshRes = await fetch('/api/auth/refresh', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refreshToken: getRefreshToken() }),
+        });
+      } catch (err: any) {
+        localStorage.removeItem('mada-access-token');
+        localStorage.removeItem('mada-refresh-token');
+        throw new Error('Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.');
+      }
       if (refreshRes.ok) {
         const data = await refreshRes.json();
         if (data.success) {
@@ -149,7 +149,7 @@ export default function PermissionsPage() {
   }, [selectedUserId, loadUserPermissions]);
 
   // ─── Toggle permission ───
-  const togglePermission = (permKey: string, type: 'role' | 'plan' | 'user', key: string) => {
+  const togglePermission = (permKey: string, _type: 'role' | 'plan' | 'user', key: string) => {
     setRolePermissions(prev => {
       const current = prev[key] || [];
       if (current.includes(permKey)) {
@@ -271,11 +271,6 @@ export default function PermissionsPage() {
   const getPermLabel = (permKey: string) => {
     const perm = permissions.find(p => p.key === permKey);
     return perm?.label || permKey;
-  };
-
-  const getPermGroup = (permKey: string) => {
-    const perm = permissions.find(p => p.key === permKey);
-    return perm?.group || 'Khác';
   };
 
   // ─── Render ───

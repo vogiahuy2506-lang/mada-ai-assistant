@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useChatSettingsStore, useLanguageStore } from '@/stores';
+import { useChatSettingsStore } from '@/stores';
 import {
   Send, Paperclip, X, Minimize2, Loader2, ImageIcon, FileText, Copy, Check, Bot
 } from 'lucide-react';
@@ -8,6 +8,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { Language } from '@/types';
 import { t } from '@/lib/translations';
+import { getAccessToken } from '@/lib/api';
 
 interface Message {
   id: string;
@@ -63,7 +64,7 @@ export function EmbedWidget({
   chatBubbleIcon: chatBubbleIconProp = '💬',
   showLabel: showLabelProp = true,
   labelPosition: labelPositionProp = 'bottom',
-  labelName: labelNameProp = 'Chat với MADA',
+  labelName: labelNameProp = 'Chat with MADA',
   labelColor: labelColorProp,
 }: EmbedWidgetProps) {
   const [internalIsOpen, setInternalIsOpen] = useState(false);
@@ -113,28 +114,49 @@ export function EmbedWidget({
     }
     return 'MADA AI';
   };
+
   const configBotName = botNameProp || extractBotName(greeting.vi) || 'MADA AI';
   const configPrimaryColor = primaryColorProp || '#0891b2';
   const configAllowFileUpload = allowFileUploadProp && fileAttachmentEnabled;
   const configAllowLanguageSwitch = allowLanguageSwitchProp;
-  const configWelcomeTitle = welcomeTitleProp || greeting[language] || greeting.vi;
 
+  // Get the correct greeting based on current language - wait for greeting to be loaded
+  const configWelcomeTitle = welcomeTitleProp || (greeting[language] || greeting.vi);
+  const configDescription = description[language] || description.vi;
+
+  // Reload chat settings when widget opens to get fresh data
   useEffect(() => {
-    loadChatSettings();
-  }, [loadChatSettings]);
+    if (isOpen) {
+      loadChatSettings();
+    }
+  }, [isOpen, loadChatSettings]);
 
+  // Add welcome message when widget opens and greeting is loaded
   useEffect(() => {
     if (isOpen && messages.length === 0) {
-      // Add welcome message
+      // Add welcome message with the correct language greeting and description
       setMessages([
         {
           id: 'welcome',
           role: 'assistant',
-          content: `${configWelcomeTitle}\n\n${description[language] || description.vi}`,
+          content: `${configWelcomeTitle}\n\n${configDescription}`,
         },
       ]);
     }
-  }, [isOpen, language, configWelcomeTitle, description]);
+  }, [isOpen, configWelcomeTitle, configDescription, greeting, description]);
+
+  // Update welcome message when language changes (if chat is already open)
+  useEffect(() => {
+    if (isOpen && messages.length > 0 && messages[0].id === 'welcome') {
+      setMessages([
+        {
+          id: 'welcome',
+          role: 'assistant',
+          content: `${configWelcomeTitle}\n\n${configDescription}`,
+        },
+      ]);
+    }
+  }, [language, configWelcomeTitle, configDescription, greeting, description]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -255,9 +277,13 @@ export function EmbedWidget({
       
       if (useStream) {
         // Streaming mode
+        const token = getAccessToken();
         const response = await fetch('/api/chat/stream', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
           body: JSON.stringify(chatBody),
         });
 
@@ -307,9 +333,13 @@ export function EmbedWidget({
         ));
       } else {
         // Non-streaming mode for file uploads
+        const token2 = getAccessToken();
         const response = await fetch('/api/chat-with-file', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token2 ? { Authorization: `Bearer ${token2}` } : {}),
+          },
           body: JSON.stringify(chatBody),
         });
 
@@ -320,7 +350,7 @@ export function EmbedWidget({
           setMessages(prev => [...prev, {
             id: assistantMsgId,
             role: 'assistant',
-            content: data.data?.response || data.response || data.message || 'Đã xảy ra lỗi.',
+            content: data.data?.response || data.response || data.message || t('widget.error', language),
             confidence: data.confidence || 0.5,
           }]);
         } else {
@@ -592,7 +622,7 @@ export function EmbedWidget({
                     <div className="bg-white border border-gray-200 rounded-2xl px-4 py-3 shadow-sm">
                       <div className="flex items-center gap-2 text-gray-500">
                         <Loader2 className="w-4 h-4 animate-spin" />
-                        <span className="text-sm">Đang trả lời...</span>
+                        <span className="text-sm">{t('widget.replying', language)}</span>
                       </div>
                     </div>
                   </div>
@@ -643,7 +673,7 @@ export function EmbedWidget({
                         <div className="absolute bottom-12 left-0 bg-white rounded-xl shadow-lg border border-gray-200 p-2 min-w-[160px] z-10">
                           <label className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-50 cursor-pointer">
                             <ImageIcon className="w-4 h-4 text-gray-500" />
-                            <span className="text-sm">Hình ảnh</span>
+                            <span className="text-sm">{t('widget.image', language)}</span>
                             <input
                               type="file"
                               accept="image/*"
@@ -654,7 +684,7 @@ export function EmbedWidget({
                           </label>
                           <label className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-50 cursor-pointer">
                             <FileText className="w-4 h-4 text-gray-500" />
-                            <span className="text-sm">Tài liệu</span>
+                            <span className="text-sm">{t('widget.document', language)}</span>
                             <input
                               type="file"
                               accept=".pdf,.doc,.docx,.txt"
@@ -680,9 +710,8 @@ export function EmbedWidget({
                           handleSend();
                         }
                       }}
-                      placeholder="Nhập tin nhắn..."
+                      placeholder={t('widget.typeMessage', language)}
                       className="w-full px-4 py-2 rounded-xl border border-gray-200 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-offset-0"
-                      style={{ focusRing: `${configPrimaryColor}40` }}
                       rows={1}
                     />
                   </div>

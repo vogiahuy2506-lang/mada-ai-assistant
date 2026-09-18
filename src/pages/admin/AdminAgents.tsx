@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { AdminLayout } from './AdminLayout';
 import { adminApi } from './adminApi';
 import { MADA_BOTS } from '@/lib/madaBots';
+import { broadcastAgentChange } from '@/lib/agentBroadcast';
 import { useAuthStore, usePromptStore, useAgentStore } from '@/stores';
 import { useTranslation } from '@/lib/translations';
 import clsx from 'clsx';
@@ -70,7 +71,7 @@ function AgentAvatar({
 // ============== MAIN COMPONENT ==============
 export function AdminAgents() {
   const { user } = useAuthStore();
-  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
+  const isSuperAdmin = user?.role === 'super_admin';
   const loadAgentsForChat = useAgentStore((s) => s.loadAgents);
   const removeAgentForChat = useAgentStore((s) => s.removeAgent);
 
@@ -83,6 +84,7 @@ export function AdminAgents() {
 
   // Test Agent state
   const [testAgentId, setTestAgentId] = useState<string | null>(null);
+  const [testAgentObj, setTestAgentObj] = useState<Agent | null>(null);
   const [testInput, setTestInput] = useState('');
   const [testMessages, setTestMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string; latency?: number; confidence?: number }>>([]);
   const [testing, setTesting] = useState(false);
@@ -99,7 +101,9 @@ export function AdminAgents() {
 
   // Import modal state
   const [showImportModal, setShowImportModal] = useState(false);
-  const [importSelected, setImportSelected] = useState<Set<string>>(new Set(MADA_BOTS.map(b => b.id)));
+  // ⭐ importSelected giờ chứa ID của agents từ DATABASE (không chỉ MADA_BOTS)
+  // Super Admin tạo bot mới → bot đó sẽ tự xuất hiện trong danh sách import
+  const [importSelected, setImportSelected] = useState<Set<string>>(new Set());
   const [importing, setImporting] = useState(false);
 
   const openKbModal = async (agent: { id: string; name: string }) => {
@@ -175,11 +179,13 @@ export function AdminAgents() {
     prompt_id: '' as string,
     capabilities: [] as string[],
     knowledge_url: '',
-    product_url: '',
+    product_urls: [] as string[],
     crawl_follow_links: false,
     crawl_max_depth: 1,
     crawl_max_pages: 5,
   });
+  const [newProductUrl, setNewProductUrl] = useState('');
+  const [productUrlError, setProductUrlError] = useState('');
   const [availablePrompts, setAvailablePrompts] = useState<Array<{ id: string; name: string; isSystem: boolean }>>([]);
   // ⭐ Subscribe vào shared prompt store → nếu admin tạo prompt mới ở /admin/prompts
   // thì dropdown ở đây sẽ tự cập nhật, KHÔNG cần F5.
@@ -194,13 +200,16 @@ export function AdminAgents() {
     try {
       setLoading(true);
       setError(null);
+      console.log('[AdminAgents] Fetching agents from /api/admin/agents...');
       const res = await adminApi.getAgents();
+      console.log('[AdminAgents] Agents response:', res.success ? `${res.data?.length} agents` : res.error);
       if (res.success && res.data) {
         setAgents(res.data as unknown as Agent[]);
       } else {
         setError(res.error || 'Failed to load agents');
       }
     } catch (err: any) {
+      console.error('[AdminAgents] Load agents error:', err);
       setError(err.message);
     } finally {
       setLoading(false);
@@ -278,11 +287,12 @@ export function AdminAgents() {
       prompt_id: '',
       capabilities: [],
       knowledge_url: '',
-      product_url: '',
+      product_urls: [],
       crawl_follow_links: false,
       crawl_max_depth: 1,
       crawl_max_pages: 5,
     });
+    setNewProductUrl('');
     setCrawlResult(null);
   };
 
@@ -299,7 +309,7 @@ export function AdminAgents() {
         prompt_id: formData.prompt_id || null,
         capabilities: formData.capabilities,
         knowledge_url: formData.knowledge_url || null,
-        product_url: formData.product_url || null,
+        product_urls: formData.product_urls.length > 0 ? formData.product_urls : null,
         crawl_follow_links: formData.crawl_follow_links ? 1 : 0,
         crawl_max_depth: Number(formData.crawl_max_depth) || 1,
         crawl_max_pages: Number(formData.crawl_max_pages) || 5,
@@ -313,26 +323,52 @@ export function AdminAgents() {
           return;
         }
       } else {
-        const res = await adminApi.createAgent(agentData);
+        // ⭐ Agent mới luôn được bật mặc định để xuất hiện ở trang chat
+        const res = await adminApi.createAgent({ ...agentData, is_active: true });
         if (!res.success) {
           alert(res.error);
           return;
         }
         savedAgentId = res.data?.id || null;
+
+        // ⭐ Thêm agent vào local store NGAY LẬP TỨC để ChatPage hiển thị không cần chờ reload
+        if (savedAgentId) {
+          const newAgentForStore = {
+            id: savedAgentId,
+            name: formData.name,
+            description: formData.description,
+            avatar: formData.avatar,
+            avatarUrl: formData.avatar_url || undefined,
+            systemPrompt: formData.system_prompt,
+            capabilities: formData.capabilities,
+            isActive: true,
+            createdBy: 'user' as const,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+            madaCategory: undefined,
+            botId: undefined,
+            promptId: formData.prompt_id || undefined,
+            knowledgeUrl: formData.knowledge_url || undefined,
+            productUrl: undefined,
+          };
+          useAgentStore.getState().upsertAgent(newAgentForStore);
+        }
       }
 
       // Nếu có URL knowledge/product → cào ngay sau khi lưu
       const hasUrl =
         /^https?:\/\//i.test(formData.knowledge_url.trim()) ||
-        /^https?:\/\//i.test(formData.product_url.trim());
+        formData.product_urls.some(u => /^https?:\/\//i.test(u.trim()));
       if (savedAgentId && hasUrl) {
         await handleCrawl(savedAgentId, {
           knowledge_url: formData.knowledge_url.trim(),
-          product_url: formData.product_url.trim(),
+          product_urls: formData.product_urls,
         }, /* silent */ false);
       }
 
       await loadAgents();
+      // ⭐ Broadcast ngay để ChatPage ở tab khác cập nhật tức thì
+      broadcastAgentChange({ type: editingId ? 'agent-updated' : 'agent-created', agentId: savedAgentId || '' });
       // Đồng bộ sang global store để ChatPage thấy ngay (kể cả khi user đang mở chat tab khác)
       void loadAgentsForChat();
       resetForm();
@@ -346,7 +382,7 @@ export function AdminAgents() {
 
   const handleCrawl = async (
     agentId: string,
-    payload: { knowledge_url?: string; product_url?: string },
+    payload: { knowledge_url?: string; product_urls?: string[] },
     silent = true,
   ) => {
     setCrawling(true);
@@ -379,7 +415,7 @@ export function AdminAgents() {
   };
 
   const handleEdit = (agent: Agent) => {
-    if (!isAdmin) {
+    if (!isSuperAdmin) {
       alert('Chỉ admin mới có quyền chỉnh sửa Agent.');
       return;
     }
@@ -392,18 +428,19 @@ export function AdminAgents() {
       prompt_id: (agent as any).prompt_id || (agent as any).promptId || '',
       capabilities: agent.capabilities,
       knowledge_url: agent.knowledge_url || '',
-      product_url: agent.product_url || '',
+      product_urls: agent.product_url ? [agent.product_url] : [],
       crawl_follow_links: !!(agent as any).crawl_follow_links,
       crawl_max_depth: (agent as any).crawl_max_depth || 1,
       crawl_max_pages: (agent as any).crawl_max_pages || 5,
     });
+    setNewProductUrl('');
     setEditingId(agent.id);
     setCrawlResult(null);
     setShowForm(true);
   };
 
   const handleDelete = async (id: string) => {
-    if (!isAdmin) {
+    if (!isSuperAdmin) {
       alert('Chỉ admin mới có quyền xoá Agent.');
       return;
     }
@@ -412,6 +449,8 @@ export function AdminAgents() {
       const res = await adminApi.deleteAgent(id);
       if (res.success) {
         removeAgentForChat(id);
+        // ⭐ Broadcast để ChatPage ở tab khác cập nhật tức thì
+        broadcastAgentChange({ type: 'agent-deleted', agentId: id });
         await loadAgents();
         void loadAgentsForChat();
         save();
@@ -424,7 +463,7 @@ export function AdminAgents() {
   };
 
   const toggleAgentActive = async (id: string) => {
-    if (!isAdmin) {
+    if (!isSuperAdmin) {
       alert('Chỉ admin mới có quyền bật/tắt Agent.');
       return;
     }
@@ -435,6 +474,8 @@ export function AdminAgents() {
       const res = await adminApi.updateAgent(id, { is_active: newActive });
       if (res.success) {
         await loadAgents();
+        // ⭐ Broadcast để ChatPage ở tab khác cập nhật tức thì
+        broadcastAgentChange({ type: 'agent-toggled', agentId: id });
         void loadAgentsForChat();
         save();
       } else {
@@ -490,6 +531,10 @@ export function AdminAgents() {
     try {
       const res = await adminApi.testAgent({ agentId: testAgentId, message: inputSnapshot });
       if (res.success && res.data && res.data.response) {
+        // Always use the agent name from the server response (authoritative source)
+        if (res.data.agentName) {
+          setTestAgentObj(prev => prev ? { ...prev, name: res.data.agentName } : null);
+        }
         setTestMessages(prev => [...prev, {
           role: 'assistant',
           content: res.data!.response || '(empty response)',
@@ -531,11 +576,40 @@ export function AdminAgents() {
     }));
   };
 
-  // ============== IMPORT MADA BOTS ==============
+  // ============== IMPORT AGENTS ==============
+  // ⭐ Lấy tất cả agents từ DB (bao gồm cả MADA_BOTS và custom bots)
+  // để hiển thị trong modal import - không giới hạn ở 7 bots MADA
+  const getImportableAgents = () => {
+    // Lấy MADA bots (từ madaBots.ts)
+    const madaBotItems = MADA_BOTS.map(bot => ({
+      id: bot.id,
+      name: bot.name,
+      description: bot.description,
+      avatar: bot.avatar,
+      isMada: true,
+      madaCategory: bot.madaCategory,
+      source: 'mada' as const,
+    }));
+
+    // Lấy custom agents (từ DB) - những agent không phải từ MADA_BOTS
+    const customAgents = agents
+      .filter(a => !MADA_BOTS.some(m => m.id === a.id))
+      .map(a => ({
+        id: a.id,
+        name: a.name,
+        description: a.description || '',
+        avatar: a.avatar,
+        isMada: false,
+        madaCategory: a.mada_category,
+        source: 'custom' as const,
+      }));
+
+    return [...madaBotItems, ...customAgents];
+  };
+
   const handleImportSelected = async () => {
-    if (!isAdmin) return;
-    const selectedBots = MADA_BOTS.filter(b => importSelected.has(b.id));
-    if (selectedBots.length === 0) {
+    if (!isSuperAdmin) return;
+    if (importSelected.size === 0) {
       alert('Vui lòng chọn ít nhất 1 bot để import.');
       return;
     }
@@ -543,36 +617,74 @@ export function AdminAgents() {
     let imported = 0;
     let skipped = 0;
     let crawledDocs = 0;
+    // ⭐ Track các agent đã import để broadcast
+    const importedAgentIds: string[] = [];
 
-    for (const bot of selectedBots) {
-      const exists = agents.some(a => a.id === bot.id);
+    // Xử lý từng agent được chọn
+    for (const botId of importSelected) {
+      const exists = agents.some(a => a.id === botId);
       if (exists) { skipped++; continue; }
-      try {
-        const res = await adminApi.createAgent({
-          id: bot.id,
-          name: bot.name,
-          description: `${bot.description} (ISO: ${bot.isoCodes.join(', ') || 'general'})`,
-          avatar: bot.avatar,
-          avatar_url: null,
-          system_prompt: `Bạn là ${bot.nameVi} của MADA AI Assistant.\n\nChuyên môn: ${bot.description}\n\nURL MADA: ${bot.madaUrl}\n\nTiêu chuẩn ISO: ${bot.isoCodes.join(', ') || 'general'}\n\nKhi user hỏi ngoài domain, lịch sự hướng dẫn chọn bot phù hợp khác.`,
-          capabilities: ['chat', 'device_recommendation', ...bot.isoCodes.slice(0, 2).map(c => `iso_${c.replace(/\./g, '_')}`)],
-          is_active: true,
-          mada_category: bot.madaCategory,
-          bot_id: bot.id,
-          knowledge_url: bot.madaUrl || null,
-        });
-        if (!res.success) { skipped++; continue; }
-        imported++;
-        if (bot.madaUrl && /^https?:\/\//i.test(bot.madaUrl)) {
+
+      // Tìm trong MADA_BOTS trước
+      const madaBot = MADA_BOTS.find(b => b.id === botId);
+      if (madaBot) {
+        // Agent từ MADA - tạo với dữ liệu predefined
+        try {
+          const res = await adminApi.createAgent({
+            id: madaBot.id,
+            name: madaBot.name,
+            description: `${madaBot.description} (ISO: ${madaBot.isoCodes.join(', ') || 'general'})`,
+            avatar: madaBot.avatar,
+            avatar_url: null,
+            system_prompt: `Bạn là ${madaBot.nameVi} của MADA AI Assistant.\n\nChuyên môn: ${madaBot.description}\n\nURL MADA: ${madaBot.madaUrl}\n\nTiêu chuẩn ISO: ${madaBot.isoCodes.join(', ') || 'general'}\n\nKhi user hỏi ngoài domain, lịch sự hướng dẫn chọn bot phù hợp khác.`,
+            capabilities: ['chat', 'device_recommendation', ...madaBot.isoCodes.slice(0, 2).map(c => `iso_${c.replace(/\./g, '_')}`)],
+            is_active: true,
+            mada_category: madaBot.madaCategory,
+            bot_id: madaBot.id,
+            knowledge_url: madaBot.madaUrl || null,
+          });
+          if (!res.success) { skipped++; continue; }
+          imported++;
+          importedAgentIds.push(madaBot.id); // ⭐ Track ID đã import
+          if (madaBot.madaUrl && /^https?:\/\//i.test(madaBot.madaUrl)) {
+            try {
+              const crawlRes = await adminApi.crawlAgentSources(madaBot.id, { knowledge_url: madaBot.madaUrl });
+              if (crawlRes.success && crawlRes.data) crawledDocs += crawlRes.data.totalDocs || 0;
+            } catch {}
+          }
+        } catch { skipped++; }
+      } else {
+        // Custom agent - lấy dữ liệu từ agents array trong state
+        const customAgent = agents.find(a => a.id === botId);
+        if (customAgent) {
           try {
-            const crawlRes = await adminApi.crawlAgentSources(bot.id, { knowledge_url: bot.madaUrl });
-            if (crawlRes.success && crawlRes.data) crawledDocs += crawlRes.data.totalDocs || 0;
-          } catch {}
+            const res = await adminApi.createAgent({
+              id: customAgent.id,
+              name: customAgent.name,
+              description: customAgent.description,
+              avatar: customAgent.avatar,
+              avatar_url: customAgent.avatar_url,
+              system_prompt: customAgent.system_prompt || customAgent.systemPrompt || '',
+              capabilities: customAgent.capabilities || [],
+              is_active: true,
+              mada_category: customAgent.mada_category,
+              knowledge_url: customAgent.knowledge_url,
+            });
+            if (!res.success) { skipped++; continue; }
+            imported++;
+            importedAgentIds.push(customAgent.id); // ⭐ Track ID đã import
+          } catch { skipped++; }
+        } else {
+          skipped++;
         }
-      } catch { skipped++; }
+      }
     }
 
     await loadAgents();
+    // ⭐ Broadcast để ChatPage ở tab khác cập nhật tức thì
+    if (importedAgentIds.length > 0) {
+      broadcastAgentChange({ type: 'agents-imported', agentIds: importedAgentIds });
+    }
     void loadAgentsForChat();
     save();
     setShowImportModal(false);
@@ -595,9 +707,12 @@ export function AdminAgents() {
   };
 
   const openImportModal = () => {
-    // Pre-select only MADA bots not yet in agents
-    const available = new Set(MADA_BOTS.filter(b => !agents.some(a => a.id === b.id)).map(b => b.id));
-    setImportSelected(available);
+    // ⭐ Pre-select MADA bots chưa có trong agents
+    // Custom agents cũng có thể được chọn nếu cần
+    const madaAvailable = new Set(
+      MADA_BOTS.filter(b => !agents.some(a => a.id === b.id)).map(b => b.id)
+    );
+    setImportSelected(madaAvailable);
     setShowImportModal(true);
   };
 
@@ -605,14 +720,14 @@ export function AdminAgents() {
   const isValidUrl = (s: string) => /^https?:\/\/.+/i.test(s.trim());
 
   const formHasValidUrl = useMemo(
-    () => isValidUrl(formData.knowledge_url) || isValidUrl(formData.product_url),
-    [formData.knowledge_url, formData.product_url],
+    () => isValidUrl(formData.knowledge_url) || formData.product_urls.some(u => isValidUrl(u)),
+    [formData.knowledge_url, formData.product_urls],
   );
 
   const editingAgent = editingId ? agents.find(a => a.id === editingId) : null;
 
   const openCreateForm = () => {
-    if (!isAdmin) return;
+    if (!isSuperAdmin) return;
     resetForm();
     setEditingId(null);
     setShowForm(true);
@@ -648,10 +763,10 @@ export function AdminAgents() {
         </div>
       </section>
 
-      {!isAdmin && (
+      {!isSuperAdmin && (
         <div className="mb-4 p-3 bg-amber-50 border-2 border-amber-300 rounded-xl text-amber-800 text-sm flex items-center gap-2">
           <span className="material-symbols-outlined text-base">lock</span>
-          Bạn đang xem với quyền <b>{user?.role || 'guest'}</b>. Chỉ <b>admin</b> mới có thể tạo / sửa / xoá Agent.
+          Bạn đang xem với quyền <b>{user?.role || 'guest'}</b>. Chỉ <b>SuperAdmin</b> mới có thể tạo / sửa / xoá Agent.
         </div>
       )}
 
@@ -662,7 +777,7 @@ export function AdminAgents() {
             <span className="material-symbols-outlined text-primary text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>smart_toy</span>
           </div>
           <div>
-            <p className="text-[9px] font-bold text-gray-500 uppercase tracking-wider">TỔNG</p>
+            <p className="text-[9px] font-bold text-gray-500 uppercase tracking-wider">{t('admin.overview.totalUsers').split(' ')[0].toUpperCase()}</p>
             <h3 className="text-lg font-black text-on-surface">{agents.length}</h3>
           </div>
         </div>
@@ -672,7 +787,7 @@ export function AdminAgents() {
             <span className="material-symbols-outlined text-green-600 text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
           </div>
           <div>
-            <p className="text-[9px] font-bold text-green-700 uppercase tracking-wider">HOẠT ĐỘNG</p>
+            <p className="text-[9px] font-bold text-green-700 uppercase tracking-wider">{t('admin.common.active').split(' ')[0].toUpperCase()}</p>
             <h3 className="text-lg font-black text-green-700">{agents.filter(a => a.isActive).length}</h3>
           </div>
         </div>
@@ -682,7 +797,7 @@ export function AdminAgents() {
             <span className="material-symbols-outlined text-gray-600 text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>pause_circle</span>
           </div>
           <div>
-            <p className="text-[9px] font-bold text-gray-700 uppercase tracking-wider">TẠM DỪNG</p>
+            <p className="text-[9px] font-bold text-gray-700 uppercase tracking-wider">{t('admin.common.disabled').split(' ')[0].toUpperCase()}</p>
             <h3 className="text-lg font-black text-gray-700">{agents.filter(a => !a.isActive).length}</h3>
           </div>
         </div>
@@ -696,13 +811,13 @@ export function AdminAgents() {
         <div className="flex items-center gap-2">
           <button
             onClick={() => { loadAgents(); loadPrompts(); }}
-            title={t('admin.common.refresh') || 'Làm mới'}
+            title={t('admin.common.refresh')}
             className="flex items-center gap-1 bg-white text-on-surface px-3 py-2 rounded-full font-bold text-xs border-2 border-black shadow-[2px_2px_0px_0px_#000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[3px_3px_0px_0px_#000] transition-all"
           >
             <span className="material-symbols-outlined text-sm">refresh</span>
-            Làm mới
+            {t('admin.common.refresh')}
           </button>
-          {isAdmin && (
+          {isSuperAdmin && (
             <>
               <button
                 onClick={openImportModal}
@@ -906,17 +1021,92 @@ export function AdminAgents() {
               <div className="p-3 rounded-xl bg-gradient-to-br from-emerald-50 to-green-50/40 border-2 border-emerald-200 space-y-2">
                 <div className="flex items-center gap-1.5">
                   <span className="material-symbols-outlined text-emerald-600 text-base">inventory_2</span>
-                  <label className="block text-[10px] font-bold text-emerald-700 uppercase tracking-wider">Product URL (sản phẩm cụ thể)</label>
+                  <label className="block text-[10px] font-bold text-emerald-700 uppercase tracking-wider">Product URLs (nhiều sản phẩm)</label>
                 </div>
-                <input
-                  type="url"
-                  value={formData.product_url}
-                  onChange={e => setFormData(prev => ({ ...prev, product_url: e.target.value }))}
-                  placeholder="https://example.com/san-pham/abc-123"
-                  className="w-full px-3 py-2 rounded-lg bg-white border-2 border-black text-sm focus:outline-none focus:ring-2 focus:ring-emerald-300"
-                />
+                
+                {/* Danh sách URL đã thêm */}
+                {formData.product_urls.length > 0 && (
+                  <div className="space-y-1.5 mb-2">
+                    {formData.product_urls.map((url, idx) => (
+                      <div key={idx} className="flex items-center gap-1.5 bg-white rounded-lg border border-emerald-300 px-2 py-1">
+                        <span className="flex-1 text-xs truncate text-emerald-800" title={url}>{url}</span>
+                        <button
+                          type="button"
+                          onClick={() => setFormData(prev => ({ 
+                            ...prev, 
+                            product_urls: prev.product_urls.filter((_, i) => i !== idx) 
+                          }))}
+                          className="flex-shrink-0 w-5 h-5 rounded-full bg-red-100 hover:bg-red-200 flex items-center justify-center text-red-600 font-bold text-xs"
+                          title="Xóa URL"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                
+                {/* Input thêm URL mới */}
+                <div className="flex gap-1.5">
+                  <input
+                    type="url"
+                    value={newProductUrl}
+                    onChange={e => { setNewProductUrl(e.target.value); setProductUrlError(''); }}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        const trimmed = newProductUrl.trim();
+                        if (!trimmed) {
+                          setProductUrlError('Vui lòng nhập URL sản phẩm.');
+                          return;
+                        }
+                        if (!/^https?:\/\//i.test(trimmed)) {
+                          setProductUrlError('URL phải bắt đầu bằng http:// hoặc https://');
+                          return;
+                        }
+                        setFormData(prev => ({
+                          ...prev,
+                          product_urls: [...prev.product_urls, trimmed]
+                        }));
+                        setNewProductUrl('');
+                        setProductUrlError('');
+                      }
+                    }}
+                    placeholder="https://example.com/san-pham/abc-123 (Enter để thêm)"
+                    className="flex-1 px-3 py-2 rounded-lg bg-white border-2 border-black text-sm focus:outline-none focus:ring-2 focus:ring-emerald-300"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const trimmed = newProductUrl.trim();
+                      if (!trimmed) {
+                        setProductUrlError('Vui lòng nhập URL sản phẩm.');
+                        return;
+                      }
+                      if (!/^https?:\/\//i.test(trimmed)) {
+                        setProductUrlError('URL phải bắt đầu bằng http:// hoặc https://');
+                        return;
+                      }
+                      setFormData(prev => ({
+                        ...prev,
+                        product_urls: [...prev.product_urls, trimmed]
+                      }));
+                      setNewProductUrl('');
+                      setProductUrlError('');
+                    }}
+                    className="px-3 py-2 rounded-lg bg-emerald-500 text-white font-bold text-sm border-2 border-black hover:bg-emerald-600"
+                    title="Thêm URL"
+                  >
+                    +
+                  </button>
+                </div>
+                {productUrlError && (
+                  <p className="text-[10px] text-red-600 font-medium mt-1">
+                    ⚠ {productUrlError}
+                  </p>
+                )}
                 <p className="text-[10px] text-emerald-700/80">
-                  Trang sản phẩm cụ thể. Sẽ được extract metadata + ingest vào KB ngay.
+                  Thêm nhiều URL sản phẩm. Mỗi URL sẽ được cào và ingest vào KB ngay khi lưu.
                 </p>
               </div>
 
@@ -986,7 +1176,7 @@ export function AdminAgents() {
                       disabled={crawling}
                       onClick={() => handleCrawl(editingId, {
                         knowledge_url: formData.knowledge_url.trim(),
-                        product_url: formData.product_url.trim(),
+                        product_urls: formData.product_urls,
                       }, false)}
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500 text-white font-bold text-xs border-2 border-black shadow-[2px_2px_0px_0px_#000] hover:shadow-[3px_3px_0px_0px_#000] disabled:opacity-50"
                     >
@@ -1037,6 +1227,31 @@ export function AdminAgents() {
                   ))}
                 </div>
               </div>
+
+              {/* Suggested Questions Section */}
+              <details className="p-3 rounded-xl bg-gradient-to-br from-indigo-50 to-violet-50/40 border-2 border-indigo-200">
+                <summary className="cursor-pointer text-[10px] font-bold text-indigo-700 uppercase tracking-wider flex items-center gap-1.5 select-none">
+                  <span className="material-symbols-outlined text-indigo-600 text-base">quiz</span>
+                  Câu hỏi gợi ý
+                  <span className="ml-auto text-[9px] font-normal normal-case">Quản lý trong trang riêng</span>
+                </summary>
+                <div className="mt-3 space-y-2">
+                  <p className="text-[10px] text-indigo-700/80 bg-white/60 rounded-lg p-2 border border-indigo-200">
+                    💡 Để quản lý câu hỏi gợi ý cho Agent này, vui lòng truy cập trang <a href="/admin/suggested-questions" target="_blank" className="font-bold underline hover:text-indigo-900">Câu hỏi gợi ý</a>.
+                  </p>
+                  <p className="text-[10px] text-indigo-600/70">
+                    Bạn có thể thêm câu hỏi riêng cho Agent này bằng cách filter theo Agent ID: <code className="bg-indigo-100 px-1 rounded">{editingId || 'agent_id_khi_tao'}</code>
+                  </p>
+                  <a
+                    href="/admin/suggested-questions"
+                    target="_blank"
+                    className="flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-indigo-500 text-white font-bold text-xs border-2 border-black shadow-[2px_2px_0px_0px_#000] hover:shadow-[3px_3px_0px_0px_#000] transition-all"
+                  >
+                    <span className="material-symbols-outlined text-sm">open_in_new</span>
+                    Mở trang quản lý câu hỏi
+                  </a>
+                </div>
+              </details>
             </form>
 
             {/* Modal Footer */}
@@ -1077,17 +1292,17 @@ export function AdminAgents() {
             <div className="w-16 h-16 rounded-xl bg-gray-100 border-2 border-black flex items-center justify-center mb-4 text-gray-400 shadow-[4px_4px_0px_0px_#000]">
               <span className="material-symbols-outlined text-3xl">smart_toy</span>
             </div>
-            <h4 className="text-lg font-black text-on-surface mb-1">Chưa có Agent nào</h4>
+            <h4 className="text-lg font-black text-on-surface mb-1">{t('admin.agents.empty').split('.')[0]}</h4>
             <p className="text-sm text-on-surface-variant text-center mb-4">
-              Tạo Agent đầu tiên hoặc import 7 bot MADA mẫu.
+              {t('admin.agents.emptyHint')}
             </p>
-            {isAdmin && (
+            {isSuperAdmin && (
               <button
                 onClick={() => setShowImportModal(true)}
                 className="px-4 py-2 rounded-full bg-secondary text-white font-bold text-xs border-2 border-black shadow-[3px_3px_0px_0px_#000] hover:-translate-y-0.5 hover:shadow-[4px_4px_0px_0px_#000] transition-all"
               >
                 <span className="material-symbols-outlined text-xs mr-1">download</span>
-                Import 7 bot MADA
+                {t('admin.agents.importMada')}
               </button>
             )}
           </div>
@@ -1186,33 +1401,34 @@ export function AdminAgents() {
                 <div className="flex items-center gap-1.5 pt-2 border-t border-black/10">
                   <button
                     onClick={() => toggleAgentActive(agent.id)}
-                    disabled={!isAdmin}
+                    disabled={!isSuperAdmin}
                     className={clsx(
                       'flex-1 py-1.5 rounded-lg font-bold text-xs border border-black transition-all shadow-[2px_2px_0px_0px_#000]',
                       (agent.is_active || agent.isActive)
                         ? 'bg-yellow-100 text-yellow-700 hover:shadow-[3px_3px_0px_0px_#000] disabled:opacity-50'
                         : 'bg-green-100 text-green-700 hover:shadow-[3px_3px_0px_0px_#000] disabled:opacity-50'
                     )}
-                    title={isAdmin ? '' : 'Chỉ admin mới có quyền'}
+                    title={isSuperAdmin ? '' : t('admin.common.noPermission')}
                   >
-                    {(agent.is_active || agent.isActive) ? 'Tắt' : 'Bật'}
+                    {(agent.is_active || agent.isActive) ? t('admin.common.off') : t('admin.common.on')}
                   </button>
                   <button
                     onClick={() => handleEdit(agent)}
-                    disabled={!isAdmin}
+                    disabled={!isSuperAdmin}
                     className="flex-1 py-1.5 rounded-lg bg-primary text-white font-bold text-xs border border-black shadow-[2px_2px_0px_0px_#000] hover:shadow-[3px_3px_0px_0px_#000] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                    title={isAdmin ? 'Sửa agent' : 'Chỉ admin mới có quyền sửa'}
+                    title={isSuperAdmin ? t('admin.common.edit') : t('admin.common.noPermission')}
                   >
-                    {isAdmin ? 'Sửa' : (
+                    {isSuperAdmin ? t('admin.common.edit') : (
                       <span className="inline-flex items-center gap-1 justify-center">
                         <span className="material-symbols-outlined text-xs">lock</span>
-                        Khoá
+                        {t('admin.common.disabled')}
                       </span>
                     )}
                   </button>
                   <button
                     onClick={() => {
                       setTestAgentId(agent.id);
+                      setTestAgentObj(agent);
                       setTestMessages([]);
                     }}
                     title="Test agent này"
@@ -1222,22 +1438,22 @@ export function AdminAgents() {
                   </button>
                   <button
                     onClick={() => openKbModal({ id: agent.id, name: agent.name })}
-                    title="Xem Knowledge Base"
+                    title={t('admin.agents.viewKb')}
                     className="w-8 h-8 rounded-lg bg-violet-100 text-violet-700 flex items-center justify-center border border-black shadow-[2px_2px_0px_0px_#000] hover:shadow-[3px_3px_0px_0px_#000]"
                   >
                     <span className="material-symbols-outlined text-xs">database</span>
                   </button>
-                  {isAdmin ? (
+                  {isSuperAdmin ? (
                     <button
                       onClick={() => handleDelete(agent.id)}
-                      title="Xoá agent"
+                      title={t('admin.common.delete')}
                       className="w-8 h-8 rounded-lg bg-red-100 text-red-600 flex items-center justify-center border border-black shadow-[2px_2px_0px_0px_#000] hover:shadow-[3px_3px_0px_0px_#000]"
                     >
                       <span className="material-symbols-outlined text-xs">delete</span>
                     </button>
                   ) : (
                     <div
-                      title="Chỉ admin mới có quyền xoá"
+                      title={t('admin.common.noPermission')}
                       className="w-8 h-8 rounded-lg bg-gray-100 text-gray-400 flex items-center justify-center border border-gray-300 cursor-not-allowed"
                     >
                       <span className="material-symbols-outlined text-xs">lock</span>
@@ -1258,11 +1474,11 @@ export function AdminAgents() {
               <div>
                 <h2 className="text-lg font-bold">Test Agent</h2>
                 <p className="text-xs text-on-surface-variant mt-0.5">
-                  Agent: <span className="font-mono font-bold">{testAgentId}</span>
+                  Agent: <span className="font-bold">{testAgentObj?.name || 'Unknown'}</span>
                 </p>
               </div>
               <button
-                onClick={() => { setTestAgentId(null); setTestMessages([]); }}
+                onClick={() => { setTestAgentId(null); setTestAgentObj(null); setTestMessages([]); }}
                 className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center"
               >
                 <span className="material-symbols-outlined">close</span>
@@ -1481,14 +1697,16 @@ export function AdminAgents() {
       {/* ============== IMPORT MODAL ============== */}
       {showImportModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
-          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl border-2 border-black">
-            <div className="px-5 py-4 border-b-2 border-black flex items-center justify-between bg-gradient-to-r from-indigo-50 to-purple-50">
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl border-2 border-black max-h-[85vh] flex flex-col">
+            <div className="px-5 py-4 border-b-2 border-black flex items-center justify-between bg-gradient-to-r from-indigo-50 to-purple-50 flex-shrink-0">
               <div>
                 <h2 className="text-lg font-black flex items-center gap-2">
                   <span className="material-symbols-outlined text-indigo-600">download</span>
                   {t('admin.agents.importModalTitle')}
                 </h2>
-                <p className="text-xs text-on-surface-variant mt-0.5">Tick chọn bot MADA muốn import. Bot đã tồn tại sẽ bị bỏ qua.</p>
+                <p className="text-xs text-on-surface-variant mt-0.5">
+                  ⭐ Tự động nhận bot mới khi Super Admin tạo thêm
+                </p>
               </div>
               <button
                 onClick={() => setShowImportModal(false)}
@@ -1498,8 +1716,24 @@ export function AdminAgents() {
               </button>
             </div>
 
-            <div className="p-4 max-h-[400px] overflow-y-auto space-y-1">
-              {MADA_BOTS.map((bot) => {
+            {/* Nguồn bot info */}
+            <div className="px-4 pt-3 flex gap-2 flex-shrink-0">
+              <span className="text-[10px] font-bold bg-indigo-100 text-indigo-700 px-2 py-1 rounded-full">
+                🤖 MADA: {MADA_BOTS.length} bots
+              </span>
+              <span className="text-[10px] font-bold bg-purple-100 text-purple-700 px-2 py-1 rounded-full">
+                ✨ Custom: {agents.filter(a => !MADA_BOTS.some(m => m.id === a.id)).length} bots
+              </span>
+            </div>
+
+            <div className="p-4 max-h-[400px] overflow-y-auto space-y-1 flex-1">
+              {/* ⭐ Hiển thị MADA BOTS trước */}
+              <div className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2 px-1">
+                🤖 Bots MADA (mặc định)
+              </div>
+              {getImportableAgents()
+                .filter(item => item.source === 'mada')
+                .map((bot) => {
                 const exists = agents.some(a => a.id === bot.id);
                 const checked = importSelected.has(bot.id);
                 return (
@@ -1522,15 +1756,67 @@ export function AdminAgents() {
                       <div className="font-bold text-sm text-on-surface">{bot.name}</div>
                       <div className="text-xs text-on-surface-variant truncate">{bot.description}</div>
                     </div>
-                    {exists && (
+                    {exists ? (
                       <span className="text-[10px] font-bold bg-gray-200 text-gray-500 px-2 py-0.5 rounded-full">Đã có</span>
+                    ) : (
+                      <span className="text-[10px] font-bold bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded-full">MADA</span>
                     )}
                   </label>
                 );
               })}
+
+              {/* ⭐ Hiển thị CUSTOM BOTS (nếu có) */}
+              {getImportableAgents().filter(item => item.source === 'custom').length > 0 && (
+                <>
+                  <div className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2 mt-4 px-1 pt-3 border-t border-gray-200">
+                    ✨ Bots Tùy chỉnh (Super Admin)
+                  </div>
+                  {getImportableAgents()
+                    .filter(item => item.source === 'custom')
+                    .map((bot) => {
+                    const exists = agents.some(a => a.id === bot.id);
+                    const checked = importSelected.has(bot.id);
+                    return (
+                      <label
+                        key={bot.id}
+                        className={clsx(
+                          'flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all',
+                          exists ? 'border-gray-200 bg-gray-50 opacity-50' : checked ? 'border-purple-400 bg-purple-50' : 'border-gray-200 bg-white hover:border-purple-300'
+                        )}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => !exists && toggleImportBot(bot.id)}
+                          disabled={exists}
+                          className="w-4 h-4 accent-purple-600"
+                        />
+                        <span className="text-2xl">{bot.avatar}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-bold text-sm text-on-surface">{bot.name}</div>
+                          <div className="text-xs text-on-surface-variant truncate">{bot.description || 'Không có mô tả'}</div>
+                        </div>
+                        {exists ? (
+                          <span className="text-[10px] font-bold bg-gray-200 text-gray-500 px-2 py-0.5 rounded-full">Đã có</span>
+                        ) : (
+                          <span className="text-[10px] font-bold bg-purple-100 text-purple-600 px-2 py-0.5 rounded-full">Custom</span>
+                        )}
+                      </label>
+                    );
+                  })}
+                </>
+              )}
+
+              {/* Empty state */}
+              {getImportableAgents().filter(item => !agents.some(a => a.id === item.id)).length === 0 && (
+                <div className="text-center py-8 text-on-surface-variant">
+                  <span className="material-symbols-outlined text-4xl text-gray-300 mb-2">check_circle</span>
+                  <p className="text-sm font-medium">Tất cả bots đã được import!</p>
+                </div>
+              )}
             </div>
 
-            <div className="px-5 py-4 border-t-2 border-black bg-slate-50 flex items-center justify-between">
+            <div className="px-5 py-4 border-t-2 border-black bg-slate-50 flex items-center justify-between flex-shrink-0">
               <span className="text-xs text-on-surface-variant">
                 {importSelected.size} bot được chọn
               </span>
@@ -1565,7 +1851,7 @@ export function AdminAgents() {
       )}
 
       {/* FAB (chỉ admin) */}
-      {isAdmin && (
+      {isSuperAdmin && (
         <div className="fixed bottom-6 right-6 z-50">
           <button
             onClick={openCreateForm}

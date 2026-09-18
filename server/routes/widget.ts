@@ -23,32 +23,51 @@ const WIDGET_CONFIG_KEYS = [
   'widget_custom_css',
   'widget_api_key_required',
   'widget_allowed_domains',
+  // New widget settings
+  'widget_widget_type',
+  'widget_chat_bubble_enabled',
+  'widget_chat_bubble_icon',
+  'widget_show_label',
+  'widget_label_position',
+  'widget_label_name',
+  'widget_label_color',
+  'widget_allow_faq',
 ];
+
+// Helper: convert snake_case to camelCase
+function snakeToCamel(str: string): string {
+  return str.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+}
 
 // GET /api/widget/config — get widget configuration (public)
 router.get('/config', (_req, res) => {
   try {
     const placeholders = WIDGET_CONFIG_KEYS.map(() => '?').join(',');
     const settings = db.prepare(`SELECT \`key\`, value FROM system_settings WHERE \`key\` IN (${placeholders})`).all(...WIDGET_CONFIG_KEYS) as any[];
-    
+
     const result: Record<string, any> = {};
     for (const s of settings) {
-      // Parse value based on key type
-      if (s.key === 'widget_primary_color') {
-        result[s.key.replace('widget_', '')] = s.value || '#0891b2';
-      } else if (s.key === 'widget_show_branding' || s.key === 'widget_allow_file_upload' || s.key === 'widget_allow_language_switch' || s.key === 'widget_api_key_required') {
-        result[s.key.replace('widget_', '')] = s.value === 'true';
-      } else if (s.key === 'widget_allowed_domains') {
+      // Strip widget_ prefix, then convert snake_case to camelCase
+      const key = snakeToCamel(s.key.replace(/^widget_/, ''));
+      const value = s.value;
+
+      // Parse booleans
+      if (key === 'showBranding' || key === 'allowFileUpload' || key === 'allowLanguageSwitch' ||
+          key === 'apiKeyRequired' || key === 'chatBubbleEnabled' || key === 'showLabel' || key === 'allowFaq') {
+        result[key] = value === 'true';
+      } else if (key === 'primaryColor') {
+        result[key] = value || '#0891b2';
+      } else if (key === 'allowedDomains') {
         try {
-          result[s.key.replace('widget_', '')] = JSON.parse(s.value || '[]');
+          result[key] = JSON.parse(value || '[]');
         } catch {
-          result[s.key.replace('widget_', '')] = [];
+          result[key] = [];
         }
       } else {
-        result[s.key.replace('widget_', '')] = s.value;
+        result[key] = value;
       }
     }
-    
+
     // Apply defaults
     const defaults: Record<string, any> = {
       botName: 'MADA AI',
@@ -58,10 +77,18 @@ router.get('/config', (_req, res) => {
       defaultLanguage: 'vi',
       allowFileUpload: true,
       allowLanguageSwitch: true,
+      widgetType: 'popup',
+      chatBubbleEnabled: true,
+      chatBubbleIcon: '💬',
+      showLabel: true,
+      labelPosition: 'bottom',
+      labelName: 'Chat với MADA',
+      labelColor: '#0891b2',
+      allowFaq: true,
     };
-    
+
     const config = { ...defaults, ...result };
-    
+
     res.json({ success: true, data: config });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });

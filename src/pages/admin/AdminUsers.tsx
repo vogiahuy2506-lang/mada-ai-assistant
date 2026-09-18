@@ -49,6 +49,8 @@ export default function AdminUsers() {
   const currentUser = useAuthStore((s) => s.user);
   const isSuperAdmin = currentUser?.role === 'super_admin';
 
+  const { t } = useTranslation();
+
   // ─── Auth helper with auto-refresh + friendly error ───
   const adminFetch = useCallback(async (path: string, init: RequestInit = {}, retry = true): Promise<any> => {
     const headers: Record<string, string> = {
@@ -58,15 +60,29 @@ export default function AdminUsers() {
     const token = getAccessToken();
     if (token) headers['Authorization'] = `Bearer ${token}`;
 
-    const res = await fetch(`/api${path}`, { ...init, headers });
+    let res: Response;
+    try {
+      res = await fetch(`/api${path}`, { ...init, headers });
+    } catch (err: any) {
+      if (err?.name === 'AbortError' || err?.message === 'Failed to fetch' || err instanceof TypeError) {
+        throw new Error(t('admin.users.requestInterrupted'));
+      }
+      throw err;
+    }
 
     if (res.status === 401 && retry && getRefreshToken()) {
-      // Fallback: hit /api/auth/refresh directly to swap the access token
-      const refreshRes = await fetch('/api/auth/refresh', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refreshToken: getRefreshToken() }),
-      });
+      let refreshRes: Response;
+      try {
+        refreshRes = await fetch('/api/auth/refresh', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refreshToken: getRefreshToken() }),
+        });
+      } catch (err: any) {
+        localStorage.removeItem('mada-access-token');
+        localStorage.removeItem('mada-refresh-token');
+        throw new Error(t('admin.users.sessionExpired'));
+      }
       if (refreshRes.ok) {
         const data = await refreshRes.json();
         if (data.success) {
@@ -78,20 +94,20 @@ export default function AdminUsers() {
       // Refresh failed → logout
       localStorage.removeItem('mada-access-token');
       localStorage.removeItem('mada-refresh-token');
-      throw new Error('Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.');
+      throw new Error(t('admin.users.sessionExpired'));
     }
 
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       // Make Vietnamese error messages friendly
-      let msg = data.error || `Lỗi ${res.status}`;
-      if (res.status === 401) msg = 'Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.';
-      if (res.status === 403) msg = 'Bạn không có quyền thực hiện hành động này (yêu cầu quyền admin).';
-      if (res.status === 409) msg = data.error || 'Email đã tồn tại.';
+      let msg = data.error || `${t('admin.users.error')} ${res.status}`;
+      if (res.status === 401) msg = t('admin.users.sessionExpired');
+      if (res.status === 403) msg = t('admin.users.noPermission');
+      if (res.status === 409) msg = data.error || t('admin.users.emailExists');
       throw new Error(msg);
     }
     return data;
-  }, []);
+  }, [t]);
 
   // ─── Create user modal ───
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -153,25 +169,25 @@ export default function AdminUsers() {
       });
       await loadUsers();
     } catch (e: any) {
-      alert(e.message || 'Lỗi cập nhật trạng thái');
+      alert(e.message || t('admin.common.error'));
     } finally { setActionLoading(null); }
   };
 
   const handleDelete = async (user: User) => {
-    if (!confirm(`Xóa user "${user.name}" (${user.email})?\n\n⚠️ Hành động này không thể hoàn tác!`)) return;
-    if (user.role === 'admin' && !confirm('⚠️ Đây là tài khoản admin. Bạn có chắc muốn xóa?')) return;
+    if (!confirm(t('admin.users.confirmDeleteUser', { name: user.name, email: user.email }))) return;
+    if (user.role === 'admin' && !confirm(t('admin.users.confirmDeleteAdmin'))) return;
 
     setActionLoading(user.id);
     try {
       await adminFetch(`/admin/users/${user.id}`, { method: 'DELETE' });
       await loadUsers();
     } catch (e: any) {
-      alert(e.message || 'Lỗi xóa user');
+      alert(e.message || t('admin.common.error'));
     } finally { setActionLoading(null); }
   };
 
   const handleUpdateRole = async (userId: string, role: 'admin' | 'user') => {
-    if (!confirm(`Thay đổi role thành "${role}"?`)) return;
+    if (!confirm(t('admin.users.confirmRoleChange', { role }))) return;
     setActionLoading(userId);
     try {
       await adminFetch(`/admin/users/${userId}/role`, {
@@ -180,7 +196,7 @@ export default function AdminUsers() {
       });
       await loadUsers();
     } catch (e: any) {
-      alert(e.message || 'Lỗi đổi role');
+      alert(e.message || t('admin.common.error'));
     } finally { setActionLoading(null); }
   };
 
@@ -206,11 +222,11 @@ export default function AdminUsers() {
     setCreateError('');
 
     if (!createForm.name.trim() || !createForm.email.trim()) {
-      setCreateError('Vui lòng nhập tên và email');
+      setCreateError(t('admin.users.nameRequired'));
       return;
     }
     if (!autoGenPassword && createForm.password.length < 6) {
-      setCreateError('Mật khẩu phải tối thiểu 6 ký tự');
+      setCreateError(t('admin.users.pwdMinChars'));
       return;
     }
 
@@ -240,10 +256,10 @@ export default function AdminUsers() {
         setAutoGenPassword(true);
         await loadUsers();
       } else {
-        setCreateError(data.error || 'Tạo tài khoản thất bại');
+        setCreateError(data.error || t('admin.users.createFailed'));
       }
     } catch (err: any) {
-      setCreateError(err.message || 'Lỗi kết nối');
+      setCreateError(err.message || t('admin.users.connectionError'));
     } finally {
       setCreateLoading(false);
     }
@@ -251,7 +267,7 @@ export default function AdminUsers() {
 
   // ─── Reset password ───
   const handleResetPassword = async (user: User) => {
-    if (!confirm(`Reset mật khẩu cho "${user.name}" (${user.email})?\n\nMật khẩu mới sẽ được tạo tự động và hiển thị 1 lần.`)) return;
+    if (!confirm(t('admin.users.confirmResetPwd', { name: user.name, email: user.email }))) return;
     setResetTarget(user);
     setResetResult(null);
     setResetLoading(true);
@@ -260,11 +276,11 @@ export default function AdminUsers() {
       if (data.success) {
         setResetResult({ email: data.data.email, tempPassword: data.data.tempPassword });
       } else {
-        alert(data.error || 'Reset thất bại');
+        alert(data.error || t('admin.users.resetFail'));
         setResetTarget(null);
       }
     } catch (err: any) {
-      alert(err.message || 'Lỗi kết nối');
+      alert(err.message || t('admin.users.connectionError'));
       setResetTarget(null);
     } finally {
       setResetLoading(false);
@@ -319,7 +335,7 @@ export default function AdminUsers() {
         ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white'
         : 'bg-slate-100 text-slate-600'
     )}>
-      {role === 'super_admin' ? `⭐ Super Admin` : role === 'admin' ? `👑 ${t('admin.users.admin')}` : `👤 ${t('admin.users.staff')}`}
+      {role === 'super_admin' ? t('admin.users.superAdminBadge') : role === 'admin' ? `👑 ${t('admin.users.admin')}` : `👤 ${t('admin.users.staff')}`}
     </span>
   );
 
@@ -329,9 +345,14 @@ export default function AdminUsers() {
       pro: 'bg-blue-100 text-blue-700',
       enterprise: 'bg-gradient-to-r from-amber-400 to-orange-500 text-white',
     };
+    const planLabels = {
+      free: t('admin.users.planFree'),
+      pro: t('admin.users.planPro'),
+      enterprise: t('admin.users.planEnterprise'),
+    };
     return (
       <span className={clsx('px-2 py-0.5 rounded-full text-[10px] font-bold whitespace-nowrap shrink-0', styles[plan])}>
-        {plan.toUpperCase()}
+        {planLabels[plan]}
       </span>
     );
   };
@@ -342,8 +363,6 @@ export default function AdminUsers() {
       day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
     });
   };
-
-  const { t } = useTranslation();
 
   return (
     <AdminLayout
@@ -365,11 +384,11 @@ export default function AdminUsers() {
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-primary/10 via-transparent to-transparent rounded-3xl"></div>
           <div className="max-w-2xl relative z-10 py-6 px-6">
             <h2 className="text-3xl md:text-4xl font-black text-on-surface mb-2 tracking-tight">
-              Quản lý Người dùng
+              {t('admin.users.heroTitle')}
             </h2>
-            <p className="text-sm md:text-base font-medium text-on-surface-variant border-l-4 border-primary pl-4 py-1 bg-white/40 backdrop-blur-sm rounded-r-xl">
-              Xem, khóa, xóa và <b>tạo tài khoản cho nhân viên</b> trong hệ thống.
-            </p>
+            <p className="text-sm md:text-base font-medium text-on-surface-variant border-l-4 border-primary pl-4 py-1 bg-white/40 backdrop-blur-sm rounded-r-xl"
+               dangerouslySetInnerHTML={{ __html: t('admin.users.heroSubtitle') }}
+            />
           </div>
           {/* Role Badge + Create User Button */}
           <div className="relative z-10 py-6 px-6 flex items-center gap-3">
@@ -377,13 +396,13 @@ export default function AdminUsers() {
             {isSuperAdmin ? (
               <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gradient-to-r from-amber-400 to-orange-500 text-white shadow">
                 <ShieldCheck className="w-4 h-4" />
-                <span className="font-bold text-sm">Super Admin</span>
+                <span className="font-bold text-sm">{t('admin.users.superAdmin')}</span>
               </div>
             ) : (
               <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-primary/10 border border-primary/30 text-primary">
                 <Shield className="w-4 h-4" />
-                <span className="font-bold text-sm">Admin</span>
-                <span className="text-xs opacity-70">(Limited)</span>
+                <span className="font-bold text-sm">{t('admin.users.admin')}</span>
+                <span className="text-xs opacity-70">{t('admin.users.limited')}</span>
               </div>
             )}
             <button
@@ -394,7 +413,7 @@ export default function AdminUsers() {
               className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-gradient-to-r from-violet-500 to-blue-500 text-white font-bold text-sm border-2 border-black shadow-[3px_3px_0px_0px_#000] hover:shadow-[5px_5px_0px_0px_#000] hover:-translate-x-[1px] hover:-translate-y-[1px] transition-all"
             >
               <UserPlus className="w-4 h-4" />
-              Tạo nhân viên mới
+              {t('admin.users.createUser')}
             </button>
           </div>
         </div>
@@ -402,21 +421,21 @@ export default function AdminUsers() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <StatCard label="Tổng user" value={totalUsers} icon={<Users className="w-5 h-5" />} color="bg-indigo-500" />
+        <StatCard label={t('admin.users.totalUsers')} value={totalUsers} icon={<Users className="w-5 h-5" />} color="bg-indigo-500" />
         <StatCard
-          label="Đang hoạt động"
+          label={t('admin.users.activeUsers')}
           value={users.filter(u => u.status === 'active').length}
           icon={<CheckCircle2 className="w-5 h-5" />}
           color="bg-emerald-500"
         />
         <StatCard
-          label="Chờ duyệt"
+          label={t('admin.users.pendingUsers')}
           value={users.filter(u => u.status === 'pending').length}
           icon={<Clock className="w-5 h-5" />}
           color="bg-amber-500"
         />
         <StatCard
-          label="Bị khóa"
+          label={t('admin.users.lockedUsers')}
           value={users.filter(u => u.status === 'suspended').length}
           icon={<XCircle className="w-5 h-5" />}
           color="bg-red-500"
@@ -430,7 +449,7 @@ export default function AdminUsers() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input
               type="text"
-              placeholder="Tìm theo tên, email..."
+              placeholder={t('admin.users.searchPlaceholder')}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full pl-10 pr-4 py-2 rounded-lg border-2 border-black font-medium text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
@@ -442,10 +461,10 @@ export default function AdminUsers() {
             onChange={(e) => setFilterStatus(e.target.value as FilterStatus)}
             className="px-3 py-2 rounded-lg border-2 border-black font-medium text-sm bg-white"
           >
-            <option value="all">Tất cả trạng thái</option>
-            <option value="active">Hoạt động</option>
-            <option value="pending">Chờ duyệt</option>
-            <option value="suspended">Bị khóa</option>
+            <option value="all">{t('admin.users.allStatus')}</option>
+            <option value="active">{t('admin.users.active')}</option>
+            <option value="pending">{t('admin.users.pending')}</option>
+            <option value="suspended">{t('admin.users.locked')}</option>
           </select>
 
           <select
@@ -453,9 +472,9 @@ export default function AdminUsers() {
             onChange={(e) => setFilterRole(e.target.value as FilterRole)}
             className="px-3 py-2 rounded-lg border-2 border-black font-medium text-sm bg-white"
           >
-            <option value="all">Tất cả role</option>
-            <option value="admin">Admin</option>
-            <option value="user">User</option>
+            <option value="all">{t('admin.users.allRoles')}</option>
+            <option value="admin">{t('admin.users.admin')}</option>
+            <option value="user">{t('admin.users.user')}</option>
           </select>
         </div>
       </div>
@@ -468,7 +487,7 @@ export default function AdminUsers() {
       ) : users.length === 0 ? (
         <div className="text-center py-20 bg-white rounded-xl border-2 border-black">
           <Users className="w-16 h-16 mx-auto mb-4 text-slate-300" />
-          <p className="text-slate-500 font-medium">Không tìm thấy người dùng nào</p>
+          <p className="text-slate-500 font-medium">{t('admin.users.noUsers')}</p>
         </div>
       ) : (
         <>
@@ -477,13 +496,13 @@ export default function AdminUsers() {
               <table className="w-full">
                 <thead className="bg-slate-50 border-b-2 border-black">
                   <tr>
-                    <th className="text-left px-4 py-3 font-black text-xs uppercase tracking-wider text-slate-600">Người dùng</th>
-                    <th className="text-left px-4 py-3 font-black text-xs uppercase tracking-wider text-slate-600">Trạng thái</th>
-                    <th className="text-left px-4 py-3 font-black text-xs uppercase tracking-wider text-slate-600">Role</th>
-                    <th className="text-left px-4 py-3 font-black text-xs uppercase tracking-wider text-slate-600">Plan</th>
-                    <th className="text-left px-4 py-3 font-black text-xs uppercase tracking-wider text-slate-600">Đăng nhập</th>
-                    <th className="text-left px-4 py-3 font-black text-xs uppercase tracking-wider text-slate-600">Ngày tạo</th>
-                    <th className="text-right px-4 py-3 font-black text-xs uppercase tracking-wider text-slate-600">Hành động</th>
+                    <th className="text-left px-4 py-3 font-black text-xs uppercase tracking-wider text-slate-600">{t('admin.users.userCol')}</th>
+                    <th className="text-left px-4 py-3 font-black text-xs uppercase tracking-wider text-slate-600">{t('admin.users.statusCol')}</th>
+                    <th className="text-left px-4 py-3 font-black text-xs uppercase tracking-wider text-slate-600">{t('admin.users.roleCol')}</th>
+                    <th className="text-left px-4 py-3 font-black text-xs uppercase tracking-wider text-slate-600">{t('admin.users.planCol')}</th>
+                    <th className="text-left px-4 py-3 font-black text-xs uppercase tracking-wider text-slate-600">{t('admin.users.loginCol')}</th>
+                    <th className="text-left px-4 py-3 font-black text-xs uppercase tracking-wider text-slate-600">{t('admin.users.createdCol')}</th>
+                    <th className="text-right px-4 py-3 font-black text-xs uppercase tracking-wider text-slate-600">{t('admin.users.actionsCol')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -525,7 +544,7 @@ export default function AdminUsers() {
                               onClick={() => handleUpdateStatus(user.id, 'suspended')}
                               disabled={actionLoading === user.id}
                               className="p-2 rounded-lg bg-amber-100 text-amber-700 hover:bg-amber-200 transition-all border-2 border-black disabled:opacity-50"
-                              title="Khóa tài khoản"
+                              title={t('admin.users.lockAccount')}
                             >
                               <ShieldOff className="w-4 h-4" />
                             </button>
@@ -534,7 +553,7 @@ export default function AdminUsers() {
                               onClick={() => handleUpdateStatus(user.id, 'active')}
                               disabled={actionLoading === user.id}
                               className="p-2 rounded-lg bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-all border-2 border-black disabled:opacity-50"
-                              title={user.status === 'suspended' ? 'Mở khóa tài khoản' : 'Duyệt tài khoản'}
+                              title={user.status === 'suspended' ? t('admin.users.unlockAccount') : t('admin.users.approveAccount')}
                             >
                               <Shield className="w-4 h-4" />
                             </button>
@@ -545,7 +564,7 @@ export default function AdminUsers() {
                               onClick={() => handleUpdateRole(user.id, 'admin')}
                               disabled={actionLoading === user.id}
                               className="p-2 rounded-lg bg-purple-100 text-purple-700 hover:bg-purple-200 transition-all border-2 border-black disabled:opacity-50"
-                              title="Nâng cấp thành Admin"
+                              title={t('admin.users.promoteToAdmin')}
                             >
                               <Shield className="w-4 h-4" />
                             </button>
@@ -554,7 +573,7 @@ export default function AdminUsers() {
                               onClick={() => handleUpdateRole(user.id, 'user')}
                               disabled={actionLoading === user.id}
                               className="p-2 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all border-2 border-black disabled:opacity-50"
-                              title="Hạ cấp thành User"
+                              title={t('admin.users.demoteToUser')}
                             >
                               <ShieldOff className="w-4 h-4" />
                             </button>
@@ -565,7 +584,7 @@ export default function AdminUsers() {
                             onClick={() => handleResetPassword(user)}
                             disabled={actionLoading === user.id}
                             className="p-2 rounded-lg bg-blue-100 text-blue-700 hover:bg-blue-200 transition-all border-2 border-black disabled:opacity-50"
-                            title="Reset mật khẩu"
+                            title={t('admin.users.resetPassword')}
                           >
                             <KeyRound className="w-4 h-4" />
                           </button>
@@ -574,7 +593,7 @@ export default function AdminUsers() {
                             onClick={() => handleDelete(user)}
                             disabled={actionLoading === user.id}
                             className="p-2 rounded-lg bg-red-100 text-red-700 hover:bg-red-200 transition-all border-2 border-black disabled:opacity-50"
-                            title="Xóa tài khoản"
+                            title={t('admin.users.deleteAccount')}
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -595,17 +614,17 @@ export default function AdminUsers() {
                 disabled={page === 0}
                 className="px-5 py-2.5 rounded-xl border-2 border-black bg-white text-black font-bold shadow-[2px_2px_0px_0px_#000] hover:shadow-[3px_3px_0px_0px_#000] hover:-translate-x-[1px] hover:-translate-y-[1px] transition-all disabled:opacity-30 disabled:shadow-none"
               >
-                ← Trước
+                ← {t('admin.users.prev')}
               </button>
               <span className="px-5 py-2.5 rounded-xl border-2 border-black bg-white text-black font-bold">
-                Trang {page + 1} / {totalPages}
+                {t('admin.users.page')} {page + 1} / {totalPages}
               </span>
               <button
                 onClick={() => setPage(Math.min(totalPages - 1, page + 1))}
                 disabled={page >= totalPages - 1}
                 className="px-5 py-2.5 rounded-xl border-2 border-black bg-white text-black font-bold shadow-[2px_2px_0px_0px_#000] hover:shadow-[3px_3px_0px_0px_#000] hover:-translate-x-[1px] hover:-translate-y-[1px] transition-all disabled:opacity-30 disabled:shadow-none"
               >
-                Sau →
+                {t('admin.users.next')} →
               </button>
             </div>
           )}
@@ -622,7 +641,7 @@ export default function AdminUsers() {
             <div className="sticky top-0 bg-gradient-to-r from-violet-500 to-blue-500 text-white px-6 py-4 border-b-2 border-black flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <UserPlus className="w-5 h-5" />
-                <h3 className="font-black text-lg">Tạo tài khoản nhân viên</h3>
+                <h3 className="font-black text-lg">{t('admin.users.createAccountTitle')}</h3>
               </div>
               <button
                 onClick={() => setShowCreateModal(false)}
@@ -636,14 +655,14 @@ export default function AdminUsers() {
               {/* Name */}
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-                  Họ và tên <span className="text-red-500">*</span>
+                  {t('admin.users.fullName')} <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
                   required
                   value={createForm.name}
                   onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}
-                  placeholder="Nguyễn Văn A"
+                  placeholder={t('admin.users.namePlaceholder')}
                   className="w-full px-4 py-2.5 rounded-lg border-2 border-black font-medium text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
@@ -651,14 +670,14 @@ export default function AdminUsers() {
               {/* Email */}
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-                  Email <span className="text-red-500">*</span>
+                  {t('admin.users.email')} <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="email"
                   required
                   value={createForm.email}
                   onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })}
-                  placeholder="nhanvien@congty.com"
+                  placeholder={t('admin.users.emailPlaceholder')}
                   className="w-full px-4 py-2.5 rounded-lg border-2 border-black font-medium text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
@@ -667,7 +686,7 @@ export default function AdminUsers() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-                    Role {!isSuperAdmin && <span className="text-amber-500 text-[10px]">(Super Admin only)</span>}
+                    Role {!isSuperAdmin && <span className="text-amber-500 text-[10px]">{t('admin.users.superAdminOnly')}</span>}
                   </label>
                   <select
                     value={createForm.role}
@@ -684,7 +703,7 @@ export default function AdminUsers() {
                 </div>
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-                    Gói dịch vụ
+                    {t('admin.users.plan')}
                   </label>
                   <select
                     value={createForm.plan}
@@ -702,7 +721,7 @@ export default function AdminUsers() {
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-600">
-                    Mật khẩu
+                    {t('admin.users.password')}
                   </label>
                   <label className="flex items-center gap-1.5 cursor-pointer">
                     <input
@@ -721,7 +740,7 @@ export default function AdminUsers() {
                       className="w-3.5 h-3.5 accent-violet-500"
                     />
                     <span className="text-[10px] font-bold text-violet-700 uppercase tracking-wider">
-                      Auto-generate
+                      {t('admin.users.autoGenerate')}
                     </span>
                   </label>
                 </div>
@@ -732,8 +751,8 @@ export default function AdminUsers() {
                     onChange={(e) => setCreateForm({ ...createForm, password: e.target.value })}
                     placeholder={
                       autoGenPassword
-                        ? 'Mật khẩu tự sinh (có thể tạo lại bằng nút ⟳)'
-                        : 'Nhập mật khẩu cho nhân viên (tối thiểu 6 ký tự)'
+                        ? t('admin.users.autoGenPlaceholder')
+                        : t('admin.users.enterManually')
                     }
                     disabled={autoGenPassword}
                     className="w-full px-4 py-2.5 pr-20 rounded-lg border-2 border-black font-mono text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-slate-50 disabled:text-slate-700"
@@ -744,7 +763,7 @@ export default function AdminUsers() {
                       onClick={() => setShowCreatePassword(!showCreatePassword)}
                       className="p-1.5 rounded hover:bg-slate-100"
                       tabIndex={-1}
-                      title={showCreatePassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                      title={showCreatePassword ? t('admin.users.hidePassword') : t('admin.users.showPassword')}
                     >
                       {showCreatePassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                     </button>
@@ -754,7 +773,7 @@ export default function AdminUsers() {
                         onClick={() => setCreateForm({ ...createForm, password: generatePassword() })}
                         className="p-1.5 rounded hover:bg-slate-100"
                         tabIndex={-1}
-                        title="Tạo mật khẩu khác"
+                        title={t('admin.users.generateNew')}
                       >
                         <RefreshCw className="w-3.5 h-3.5" />
                       </button>
@@ -764,12 +783,12 @@ export default function AdminUsers() {
                 {autoGenPassword ? (
                   <p className="mt-1.5 text-[11px] text-slate-500 flex items-center gap-1">
                     <ShieldCheck className="w-3 h-3 text-emerald-500" />
-                    Tự sinh 12 ký tự (hoa + thường + số). Bỏ tick để nhân viên tự đặt.
+                    {t('admin.users.autoGenDesc')}
                   </p>
                 ) : (
                   <p className="mt-1.5 text-[11px] text-blue-600 flex items-center gap-1">
                     <KeyRound className="w-3 h-3" />
-                    Bạn đang nhập thủ công. Nhân viên sẽ nhận đúng mật khẩu này.
+                    {t('admin.users.manualEntryDesc')}
                   </p>
                 )}
               </div>
@@ -787,7 +806,7 @@ export default function AdminUsers() {
                   onClick={() => setShowCreateModal(false)}
                   className="flex-1 py-2.5 rounded-lg border-2 border-black bg-white text-black font-bold text-sm hover:bg-slate-50"
                 >
-                  Hủy
+                  {t('admin.users.cancel')}
                 </button>
                 <button
                   type="submit"
@@ -797,12 +816,12 @@ export default function AdminUsers() {
                   {createLoading ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      Đang tạo...
+                      {t('admin.users.creating')}
                     </>
                   ) : (
                     <>
                       <Sparkles className="w-4 h-4" />
-                      Tạo tài khoản
+                      {t('admin.users.create')}
                     </>
                   )}
                 </button>
@@ -819,7 +838,7 @@ export default function AdminUsers() {
             <div className="bg-gradient-to-r from-emerald-500 to-teal-500 text-white px-6 py-4 border-b-2 border-black flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="w-5 h-5" />
-                <h3 className="font-black text-lg">Tạo tài khoản thành công!</h3>
+                <h3 className="font-black text-lg">{t('admin.users.accountCreatedSuccess')}</h3>
               </div>
               <button
                 onClick={() => setCreatedResult(null)}
@@ -839,7 +858,7 @@ export default function AdminUsers() {
               {/* Email + Password blocks */}
               <div>
                 <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1.5">
-                  Email đăng nhập
+                  {t('admin.users.loginEmail')}
                 </label>
                 <div className="flex items-center gap-2">
                   <div className="flex-1 px-3 py-2.5 rounded-lg border-2 border-black bg-slate-50 font-mono text-sm font-bold">
@@ -848,7 +867,7 @@ export default function AdminUsers() {
                   <button
                     onClick={() => copyToClipboard(createdResult.user.email, 'email')}
                     className="p-2.5 rounded-lg border-2 border-black bg-white hover:bg-slate-50"
-                    title="Copy email"
+                    title={t('admin.users.titleCopyEmail')}
                   >
                     {copiedField === 'email' ? (
                       <Check className="w-4 h-4 text-emerald-500" />
@@ -861,7 +880,7 @@ export default function AdminUsers() {
 
               <div>
                 <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1.5">
-                  Mật khẩu tạm
+                  {t('admin.users.tempPassword')}
                 </label>
                 <div className="flex items-center gap-2">
                   <div className="flex-1 px-3 py-2.5 rounded-lg border-2 border-black bg-amber-50 font-mono text-sm font-bold text-amber-900">
@@ -870,7 +889,7 @@ export default function AdminUsers() {
                   <button
                     onClick={() => copyToClipboard(createdResult.tempPassword, 'password')}
                     className="p-2.5 rounded-lg border-2 border-black bg-white hover:bg-slate-50"
-                    title="Copy mật khẩu"
+                    title={t('admin.users.titleCopyPassword')}
                   >
                     {copiedField === 'password' ? (
                       <Check className="w-4 h-4 text-emerald-500" />
@@ -881,7 +900,7 @@ export default function AdminUsers() {
                 </div>
                 <p className="mt-2 text-[11px] text-amber-700 font-medium flex items-center gap-1">
                   <AlertTriangle className="w-3 h-3" />
-                  Mật khẩu chỉ hiển thị 1 lần. Vui lòng copy và gửi cho nhân viên qua kênh bảo mật.
+                  {t('admin.users.passwordShownOnce')}
                 </p>
               </div>
 
@@ -889,7 +908,7 @@ export default function AdminUsers() {
               <button
                 onClick={() =>
                   copyToClipboard(
-                    `Tài khoản MADA AI của bạn:\nEmail: ${createdResult.user.email}\nMật khẩu: ${createdResult.tempPassword}\n\nVui lòng đăng nhập tại ${window.location.origin} và đổi mật khẩu ngay.`,
+                    t('admin.users.chatTemplate', { email: createdResult.user.email, password: createdResult.tempPassword, url: window.location.origin }),
                     'all'
                   )
                 }
@@ -898,12 +917,12 @@ export default function AdminUsers() {
                 {copiedField === 'all' ? (
                   <>
                     <Check className="w-4 h-4 text-emerald-500" />
-                    Đã copy toàn bộ thông tin
+                    {t('admin.users.copiedAllInfo')}
                   </>
                 ) : (
                   <>
                     <Copy className="w-4 h-4" />
-                    Copy tất cả (gửi qua Zalo/Telegram)
+                    {t('admin.users.copyForChat')}
                   </>
                 )}
               </button>
@@ -912,7 +931,7 @@ export default function AdminUsers() {
                 onClick={() => setCreatedResult(null)}
                 className="w-full py-2.5 rounded-lg bg-slate-900 text-white font-bold text-sm hover:bg-slate-700"
               >
-                Đóng
+                {t('admin.users.close')}
               </button>
             </div>
           </div>
@@ -926,7 +945,7 @@ export default function AdminUsers() {
             <div className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white px-6 py-4 border-b-2 border-black flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <KeyRound className="w-5 h-5" />
-                <h3 className="font-black text-lg">Reset mật khẩu</h3>
+                <h3 className="font-black text-lg">{t('admin.users.resetPasswordTitle')}</h3>
               </div>
               <button
                 onClick={() => { setResetTarget(null); setResetResult(null); }}
@@ -945,13 +964,13 @@ export default function AdminUsers() {
                 <>
                   <div className="p-4 rounded-xl bg-blue-50 border-2 border-blue-200">
                     <p className="text-sm text-blue-800 font-medium">
-                      Mật khẩu mới cho <b>{resetResult.email}</b> đã được tạo.
+                      {t('admin.users.newPasswordCreated')} <b>{resetResult.email}</b>.
                     </p>
                   </div>
 
                   <div>
                     <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1.5">
-                      Mật khẩu mới (tạm thời)
+                      {t('admin.users.newPassword')}
                     </label>
                     <div className="flex items-center gap-2">
                       <div className="flex-1 px-3 py-2.5 rounded-lg border-2 border-black bg-amber-50 font-mono text-sm font-bold text-amber-900">
@@ -974,7 +993,7 @@ export default function AdminUsers() {
                     onClick={() => { setResetTarget(null); setResetResult(null); }}
                     className="w-full py-2.5 rounded-lg bg-slate-900 text-white font-bold text-sm"
                   >
-                    Đóng
+                    {t('admin.users.close')}
                   </button>
                 </>
               ) : null}

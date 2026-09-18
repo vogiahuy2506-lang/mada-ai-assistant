@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import multer from 'multer';
 import path from 'path';
@@ -6,52 +6,20 @@ import fs from 'fs';
 import db from '../lib/db';
 import { syncProductToKnowledge, syncAllPublishedProducts } from '../lib/syncKbProducts';
 import { syncItemToVector } from '../lib/syncItemToVector';
+import { authenticate, requireRole } from '../lib/auth';
 
 const router = Router();
 
-// Middleware: require admin authentication
-function requireAdmin(req: any, res: any, next: any) {
-  const auth = req.headers.authorization;
-  if (!auth || !auth.startsWith('Bearer ')) {
-    return res.status(401).json({ success: false, error: 'Unauthorized' });
-  }
-  try {
-    const token = auth.split(' ')[1];
-    const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
-    // Allow both admin and super_admin to access admin routes
-    if (!['admin', 'super_admin'].includes(payload.role)) {
-      return res.status(403).json({ success: false, error: 'Admin access required' });
-    }
-    req.user = payload;
-    next();
-  } catch {
-    return res.status(401).json({ success: false, error: 'Invalid token' });
-  }
-}
+// Middleware: require admin authentication (uses proper JWT verification via lib/auth)
+const requireAdmin = [authenticate, requireRole('admin', 'super_admin')];
 
 // Middleware: require super_admin authentication (highest privilege)
-function requireSuperAdmin(req: any, res: any, next: any) {
-  const auth = req.headers.authorization;
-  if (!auth || !auth.startsWith('Bearer ')) {
-    return res.status(401).json({ success: false, error: 'Unauthorized' });
-  }
-  try {
-    const token = auth.split(' ')[1];
-    const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
-    if (payload.role !== 'super_admin') {
-      return res.status(403).json({ success: false, error: 'Super Admin access required' });
-    }
-    req.user = payload;
-    next();
-  } catch {
-    return res.status(401).json({ success: false, error: 'Invalid token' });
-  }
-}
+const requireSuperAdmin = [authenticate, requireRole('super_admin')];
 
 // ============== CATEGORIES ==============
 
 // GET /api/admin/categories
-router.get('/categories', (_req, res) => {
+router.get('/categories', (_req: Request, res: Response) => {
   try {
     const categories = db.prepare('SELECT * FROM kb_categories ORDER BY sort_order ASC').all();
     res.json({ success: true, data: categories });
@@ -61,7 +29,7 @@ router.get('/categories', (_req, res) => {
 });
 
 // POST /api/admin/categories
-router.post('/categories', requireAdmin, (req, res) => {
+router.post('/categories', requireAdmin, (req: Request, res: Response) => {
   try {
     const { id, name_vi, name_en, icon, sort_order, description_vi, description_en, related_url, product_link } = req.body;
     
@@ -96,7 +64,7 @@ router.post('/categories', requireAdmin, (req, res) => {
 });
 
 // PATCH /api/admin/categories/:id
-router.patch('/categories/:id', requireAdmin, (req, res) => {
+router.patch('/categories/:id', requireAdmin, (req: Request, res: Response) => {
   try {
     const { name_vi, name_en, icon, sort_order, description_vi, description_en, related_url, product_link } = req.body;
     
@@ -130,7 +98,7 @@ router.patch('/categories/:id', requireAdmin, (req, res) => {
 });
 
 // DELETE /api/admin/categories/:id
-router.delete('/categories/:id', requireAdmin, (req, res) => {
+router.delete('/categories/:id', requireAdmin, (req: Request, res: Response) => {
   try {
     const category = db.prepare('SELECT * FROM kb_categories WHERE id = ?').get(req.params.id);
     if (!category) {
@@ -156,7 +124,7 @@ router.delete('/categories/:id', requireAdmin, (req, res) => {
 // ============== PRODUCTS ==============
 
 // GET /api/admin/products
-router.get('/products', (req, res) => {
+router.get('/products', (req: Request, res: Response) => {
   try {
     const { q, category, featured, status, limit = 50, offset = 0 } = req.query;
     
@@ -215,7 +183,7 @@ router.get('/products', (req, res) => {
 });
 
 // POST /api/admin/products
-router.post('/products', requireAdmin, (req, res) => {
+router.post('/products', requireAdmin, (req: Request, res: Response) => {
   try {
     const {
       title, title_en, description, description_en, content, category,
@@ -271,7 +239,7 @@ router.post('/products', requireAdmin, (req, res) => {
 });
 
 // PATCH /api/admin/products/:id
-router.patch('/products/:id', requireAdmin, (req, res) => {
+router.patch('/products/:id', requireAdmin, (req: Request, res: Response) => {
   try {
     const updates: string[] = [];
     const params: any[] = [];
@@ -314,7 +282,7 @@ router.patch('/products/:id', requireAdmin, (req, res) => {
 });
 
 // DELETE /api/admin/products/:id
-router.delete('/products/:id', requireAdmin, (req, res) => {
+router.delete('/products/:id', requireAdmin, (req: Request, res: Response) => {
   try {
     const product = db.prepare('SELECT * FROM kb_products WHERE id = ?').get(req.params.id);
     if (!product) {
@@ -329,7 +297,7 @@ router.delete('/products/:id', requireAdmin, (req, res) => {
 });
 
 // POST /api/admin/products/:id/publish
-router.post('/products/:id/publish', requireAdmin, async (req, res) => {
+router.post('/products/:id/publish', requireAdmin, async (req: Request, res: Response) => {
   try {
     const { status } = req.body;
 
@@ -380,7 +348,7 @@ router.post('/products/:id/publish', requireAdmin, async (req, res) => {
 // - Nếu scope='selected' → publish theo ids[]
 // ⭐ Tối ưu: UPDATE + sync knowledge_items chạy song song (Promise.all),
 //   vector embedding chạy nền (fire-and-forget) → response trả về ngay trong <1s
-router.post('/products/bulk-publish', requireAdmin, async (req, res) => {
+router.post('/products/bulk-publish', requireAdmin, async (req: Request, res: Response) => {
   try {
     const { ids, scope = 'selected' } = req.body || {};
     const now = new Date().toISOString();
@@ -443,7 +411,7 @@ router.post('/products/bulk-publish', requireAdmin, async (req, res) => {
 
 // POST /api/admin/products/bulk-unpublish
 // Body: { ids?: string[], scope?: 'all_published' | 'selected' }
-router.post('/products/bulk-unpublish', requireAdmin, (req, res) => {
+router.post('/products/bulk-unpublish', requireAdmin, (req: Request, res: Response) => {
   try {
     const { ids, scope = 'selected' } = req.body || {};
     const now = new Date().toISOString();
@@ -481,7 +449,7 @@ router.post('/products/bulk-unpublish', requireAdmin, (req, res) => {
 // ============== ADMIN AGENTS ==============
 
 // GET /api/admin/agents
-router.get('/agents', (_req, res) => {
+router.get('/agents', (_req: Request, res: Response) => {
   try {
     const rows = db.prepare('SELECT * FROM admin_agents ORDER BY created_at DESC').all() as any[];
     const parsed = rows.map((a: any) => {
@@ -502,12 +470,12 @@ router.get('/agents', (_req, res) => {
 });
 
 // POST /api/admin/agents
-router.post('/agents', requireAdmin, (req, res) => {
+router.post('/agents', requireAdmin, (req: Request, res: Response) => {
   try {
     const {
       id, name, description, avatar, system_prompt, capabilities,
       is_active, mada_category, bot_id, prompt_id,
-      avatar_url, knowledge_url, product_url,
+      avatar_url, knowledge_url, product_urls,
     } = req.body;
 
     if (!name || !system_prompt) {
@@ -516,6 +484,10 @@ router.post('/agents', requireAdmin, (req, res) => {
 
     const now = new Date().toISOString();
     const agentId = id || `agent-${uuidv4()}`;
+    
+    // Support both single product_url and product_urls array
+    const productUrlList = Array.isArray(product_urls) ? product_urls : [];
+    const firstProductUrl = productUrlList[0] || null;
 
     db.prepare(`
       INSERT INTO admin_agents (
@@ -540,7 +512,7 @@ router.post('/agents', requireAdmin, (req, res) => {
       prompt_id || null,
       avatar_url || null,
       knowledge_url || null,
-      product_url || null,
+      firstProductUrl,
       null, // last_crawl_at
       null, // last_crawl_status
       0,    // last_crawl_count
@@ -559,7 +531,7 @@ router.post('/agents', requireAdmin, (req, res) => {
 });
 
 // PATCH /api/admin/agents/:id
-router.patch('/agents/:id', requireAdmin, (req, res) => {
+router.patch('/agents/:id', requireAdmin, (req: Request, res: Response) => {
   try {
     const updates: string[] = [];
     const params: any[] = [];
@@ -582,6 +554,14 @@ router.patch('/agents/:id', requireAdmin, (req, res) => {
         }
         params.push(value);
       }
+    }
+    
+    // Special handling for product_urls array - save first URL to product_url
+    if (req.body.product_urls !== undefined) {
+      const productUrlList = Array.isArray(req.body.product_urls) ? req.body.product_urls : [];
+      const firstProductUrl = productUrlList[0] || null;
+      updates.push('product_url = ?');
+      params.push(firstProductUrl);
     }
 
     if (updates.length === 0) {
@@ -608,7 +588,7 @@ router.patch('/agents/:id', requireAdmin, (req, res) => {
 });
 
 // DELETE /api/admin/agents/:id
-router.delete('/agents/:id', requireAdmin, (req, res) => {
+router.delete('/agents/:id', requireAdmin, (req: Request, res: Response) => {
   try {
     db.prepare('DELETE FROM admin_agents WHERE id = ?').run(req.params.id);
     res.json({ success: true, message: 'Agent deleted successfully' });
@@ -620,7 +600,7 @@ router.delete('/agents/:id', requireAdmin, (req, res) => {
 // ============== ADMIN SYSTEM PROMPTS CRUD (admin_prompts table) ==============
 
 // GET /api/admin/system-prompts — list all prompts (public for agent store)
-router.get('/system-prompts', (req, res) => {
+router.get('/system-prompts', (req: Request, res: Response) => {
   try {
     const { active, category, language } = req.query;
     let query = 'SELECT * FROM admin_prompts WHERE 1=1';
@@ -642,7 +622,7 @@ router.get('/system-prompts', (req, res) => {
 });
 
 // POST /api/admin/system-prompts — create prompt
-router.post('/system-prompts', requireAdmin, (req, res) => {
+router.post('/system-prompts', requireAdmin, (req: Request, res: Response) => {
   try {
     const { id, name, description, prompt, category, language, is_active } = req.body;
     if (!id || !name || !prompt) {
@@ -663,7 +643,7 @@ router.post('/system-prompts', requireAdmin, (req, res) => {
 });
 
 // GET /api/admin/system-prompts/:id — get single prompt
-router.get('/system-prompts/:id', (req, res) => {
+router.get('/system-prompts/:id', (req: Request, res: Response) => {
   try {
     const p = db.prepare('SELECT * FROM admin_prompts WHERE id = ?').get(req.params.id) as any;
     if (!p) return res.status(404).json({ success: false, error: 'Prompt not found' });
@@ -677,7 +657,7 @@ router.get('/system-prompts/:id', (req, res) => {
 });
 
 // PATCH /api/admin/system-prompts/:id — update prompt
-router.patch('/system-prompts/:id', requireAdmin, (req, res) => {
+router.patch('/system-prompts/:id', requireAdmin, (req: Request, res: Response) => {
   try {
     const fields = ['name', 'description', 'prompt', 'category', 'language', 'is_active'];
     const updates: string[] = [];
@@ -707,7 +687,7 @@ router.patch('/system-prompts/:id', requireAdmin, (req, res) => {
 });
 
 // DELETE /api/admin/system-prompts/:id — delete prompt (warn if agents use it)
-router.delete('/system-prompts/:id', requireAdmin, (req, res) => {
+router.delete('/system-prompts/:id', requireAdmin, (req: Request, res: Response) => {
   try {
     const p = db.prepare('SELECT * FROM admin_prompts WHERE id = ?').get(req.params.id) as any;
     if (!p) return res.status(404).json({ success: false, error: 'Prompt not found' });
@@ -757,7 +737,7 @@ const avatarUpload = multer({
   },
 });
 
-router.post('/agents/upload-avatar', requireAdmin, avatarUpload.single('avatar'), (req, res) => {
+router.post('/agents/upload-avatar', requireAdmin, avatarUpload.single('avatar'), (req: Request, res: Response) => {
   try {
     if (!req.file) {
       return res.status(400).json({ success: false, error: 'Không có file nào được upload' });
@@ -778,7 +758,7 @@ router.post('/agents/upload-avatar', requireAdmin, avatarUpload.single('avatar')
 });
 
 // GET /api/admin/agents/avatars/:filename — serve static avatar (public)
-router.get('/agents/avatars/:filename', (req, res) => {
+router.get('/agents/avatars/:filename', (req: Request, res: Response) => {
   const safeName = path.basename(req.params.filename); // chống path traversal
   const filePath = path.join(AVATAR_DIR, safeName);
   if (!fs.existsSync(filePath)) {
@@ -788,7 +768,7 @@ router.get('/agents/avatars/:filename', (req, res) => {
 });
 
 // GET /api/admin/agents/:id/documents — liệt kê documents trong KB của agent
-router.get('/agents/:id/documents', requireAdmin, async (req, res) => {
+router.get('/agents/:id/documents', requireAdmin, async (req: Request, res: Response) => {
   try {
     const agent = db.prepare('SELECT id, name FROM admin_agents WHERE id = ?').get(req.params.id) as any;
     if (!agent) return res.status(404).json({ success: false, error: 'Agent không tồn tại' });
@@ -813,7 +793,7 @@ router.get('/agents/:id/documents', requireAdmin, async (req, res) => {
 });
 
 // PATCH /api/admin/agents/:id/documents/:docId — cập nhật metadata (title) của 1 document
-router.patch('/agents/:id/documents/:docId', requireAdmin, async (req, res) => {
+router.patch('/agents/:id/documents/:docId', requireAdmin, async (req: Request, res: Response) => {
   try {
     const agent = db.prepare('SELECT id FROM admin_agents WHERE id = ?').get(req.params.id) as any;
     if (!agent) return res.status(404).json({ success: false, error: 'Agent không tồn tại' });
@@ -839,7 +819,7 @@ router.patch('/agents/:id/documents/:docId', requireAdmin, async (req, res) => {
 // ============== POST /api/admin/agents/:id/crawl-sources ==============
 // Cào ngay 2 URL (knowledge_url tổng quát + product_url) → ingest vào KB gắn với agent.
 // Trả về jobId + số doc đã ingest + status.
-router.post('/agents/:id/crawl-sources', requireAdmin, async (req, res) => {
+router.post('/agents/:id/crawl-sources', requireAdmin, async (req: Request, res: Response) => {
   const { id } = req.params;
 
   try {
@@ -848,13 +828,22 @@ router.post('/agents/:id/crawl-sources', requireAdmin, async (req, res) => {
       return res.status(404).json({ success: false, error: 'Agent không tồn tại' });
     }
 
-    const { knowledge_url, product_url, crawl_follow_links, crawl_max_depth, crawl_max_pages } = req.body || {};
+    const { knowledge_url, product_urls, crawl_follow_links, crawl_max_depth, crawl_max_pages } = req.body || {};
+    
+    // Support both single product_url and product_urls array
+    const productUrlList = Array.isArray(product_urls) 
+      ? product_urls 
+      : (product_urls ? [product_urls] : []);
+    
     const sources: Array<{ url: string; kind: 'knowledge' | 'product' }> = [];
     if (knowledge_url && /^https?:\/\//i.test(knowledge_url)) {
       sources.push({ url: knowledge_url, kind: 'knowledge' });
     }
-    if (product_url && /^https?:\/\//i.test(product_url)) {
-      sources.push({ url: product_url, kind: 'product' });
+    // Add all product URLs
+    for (const url of productUrlList) {
+      if (url && /^https?:\/\//i.test(url)) {
+        sources.push({ url, kind: 'product' });
+      }
     }
 
     if (sources.length === 0) {
@@ -864,7 +853,8 @@ router.post('/agents/:id/crawl-sources', requireAdmin, async (req, res) => {
       });
     }
 
-    // Lưu URL vào DB trước (ngay cả khi crawl fail sau đó)
+    // Lưu URL đầu tiên vào DB (backward compatibility)
+    const firstProductUrl = productUrlList[0] || null;
     db.prepare(`
       UPDATE admin_agents
       SET knowledge_url = COALESCE(?, knowledge_url),
@@ -872,7 +862,7 @@ router.post('/agents/:id/crawl-sources', requireAdmin, async (req, res) => {
           last_crawl_status = 'running',
           updated_at = ?
       WHERE id = ?
-    `).run(knowledge_url || null, product_url || null, new Date().toISOString(), id);
+    `).run(knowledge_url || null, firstProductUrl, new Date().toISOString(), id);
 
     // ⭐ Detect botId + madaCategory từ agent để RAG filter chính xác khi user chat.
     // Ưu tiên: agent.bot_id/mada_category (lưu trong DB) → fallback tên MADA chuẩn theo `AGENT_TO_MADA`.
@@ -963,7 +953,7 @@ router.post('/agents/:id/crawl-sources', requireAdmin, async (req, res) => {
 // ============== SYSTEM LOGS ==============
 
 // GET /api/admin/logs
-router.get('/logs', requireAdmin, (req, res) => {
+router.get('/logs', requireAdmin, (req: Request, res: Response) => {
   try {
     const { level, source, limit = 100, offset = 0 } = req.query;
     
@@ -990,10 +980,10 @@ router.get('/logs', requireAdmin, (req, res) => {
 });
 
 // DELETE /api/admin/logs - Only Super Admin can delete logs
-router.delete('/logs', requireAdmin, (req, res) => {
+router.delete('/logs', requireAdmin, (req: Request, res: Response) => {
   try {
     // Only super_admin can delete logs
-    if (req.user.role !== 'super_admin') {
+    if ((req as any).user?.role !== 'super_admin') {
       return res.status(403).json({ 
         success: false, 
         error: 'Chỉ Super Admin mới có quyền xóa logs' 
@@ -1009,7 +999,7 @@ router.delete('/logs', requireAdmin, (req, res) => {
 // ============== ANALYTICS ==============
 
 // GET /api/admin/analytics
-router.get('/analytics', requireAdmin, (_req, res) => {
+router.get('/analytics', requireAdmin, (_req: Request, res: Response) => {
   try {
     // Get KB stats
     const kbStats = {
@@ -1074,7 +1064,7 @@ router.get('/analytics', requireAdmin, (_req, res) => {
 });
 
 // GET /api/admin/analytics/chat-metrics
-router.get('/analytics/chat-metrics', requireAdmin, (_req, res) => {
+router.get('/analytics/chat-metrics', requireAdmin, (_req: Request, res: Response) => {
   try {
     const { range: _range = '7d' } = _req.query;
     
@@ -1122,7 +1112,7 @@ router.get('/analytics/chat-metrics', requireAdmin, (_req, res) => {
 // ============== USER STATS ==============
 
 // GET /api/admin/user-stats
-router.get('/user-stats', (_req, res) => {
+router.get('/user-stats', (_req: Request, res: Response) => {
   try {
     const stats = {
       total: db.prepare('SELECT COUNT(*) as count FROM users').get() as { count: number },
@@ -1154,7 +1144,7 @@ router.get('/user-stats', (_req, res) => {
 });
 
 // GET /api/admin/knowledge-stats
-router.get('/knowledge-stats', (req, res) => {
+router.get('/knowledge-stats', (req: Request, res: Response) => {
   try {
     const { botId, category } = req.query;
 
@@ -1199,7 +1189,7 @@ router.get('/knowledge-stats', (req, res) => {
 // ============== SYSTEM SETTINGS ==============
 
 // GET /api/admin/settings
-router.get('/settings', requireAdmin, (_req, res) => {
+router.get('/settings', requireAdmin, (_req: Request, res: Response) => {
   try {
     const settings = db.prepare('SELECT * FROM system_settings').all() as any[];
 
@@ -1247,7 +1237,7 @@ router.get('/settings', requireAdmin, (_req, res) => {
 });
 
 // PATCH /api/admin/settings
-router.patch('/settings', requireAdmin, (req, res) => {
+router.patch('/settings', requireAdmin, (req: Request, res: Response) => {
   try {
     const updates = req.body;
     const now = new Date().toISOString();
@@ -1268,7 +1258,7 @@ router.patch('/settings', requireAdmin, (req, res) => {
     // Check if any sensitive settings are being updated
     const sensitiveUpdates = Object.keys(updates).filter(key => sensitiveSettings.includes(key));
     
-    if (sensitiveUpdates.length > 0 && req.user.role !== 'super_admin') {
+    if (sensitiveUpdates.length > 0 && (req as any).user?.role !== 'super_admin') {
       return res.status(403).json({ 
         success: false, 
         error: 'Chỉ Super Admin mới có quyền thay đổi cài đặt hệ thống nhạy cảm' 
@@ -1307,35 +1297,124 @@ router.patch('/settings', requireAdmin, (req, res) => {
   }
 });
 
-// POST /api/admin/products/sync-all
-// Bulk sync tất cả kb_products → knowledge_items để AI/RAG biết đến
-router.post('/products/sync-all', requireAdmin, (_req, res) => {
+// POST /api/admin/products/sync-and-index
+// ⭐ Complete sync: kb_products → knowledge_items AND vector store
+// Chạy đầy đủ trong 1 endpoint để admin chỉ cần 1 click
+router.post('/products/sync-and-index', requireAdmin, async (_req: Request, res: Response) => {
   try {
-    const result = syncAllPublishedProducts();
+    // 1) Sync kb_products → knowledge_items
+    const syncResult = syncAllPublishedProducts();
     console.log(
-      `📦 [admin/sync-all] kb_products → knowledge_items: ` +
-      `inserted=${result.inserted}, updated=${result.updated}, archived=${result.archived}, errors=${result.errors.length}`
+      `📦 [sync-and-index] Step 1 - kb_products → knowledge_items: ` +
+      `inserted=${syncResult.inserted}, updated=${syncResult.updated}, archived=${syncResult.archived}, errors=${syncResult.errors.length}`
     );
+
+    // 2) Find all knowledge_items with indexed=0 (these need vector indexing)
+    const unindexedItems = db.prepare(`
+      SELECT id, title, content FROM knowledge_items
+      WHERE indexed = 0 AND status = 'published'
+        AND content IS NOT NULL AND length(content) > 20
+      ORDER BY updated_at DESC
+    `).all() as any[];
+
+    console.log(`🔍 [sync-and-index] Step 2 - Found ${unindexedItems.length} unindexed items`);
+
+    // 3) Index in vector store (fire-and-forget for each, batch for speed)
+    let indexedCount = 0;
+    let indexErrors = 0;
+
+    if (unindexedItems.length > 0) {
+      const { vectorStore } = await import('../lib/rag/vectorStore');
+      const { chunkText, generateId } = await import('../lib/rag/vectorStore');
+
+      // Process in chunks of 10 for rate limit safety
+      const CHUNK_SIZE = 10;
+      for (let i = 0; i < unindexedItems.length; i += CHUNK_SIZE) {
+        const chunk = unindexedItems.slice(i, i + CHUNK_SIZE);
+        const documents = [];
+
+        for (const item of chunk) {
+          let meta: any = {};
+          try {
+            const row = db.prepare('SELECT metadata FROM knowledge_items WHERE id = ?').get(item.id) as any;
+            if (row?.metadata) {
+              meta = typeof row.metadata === 'string' ? JSON.parse(row.metadata) : row.metadata;
+            }
+          } catch { /* ignore */ }
+
+          const content = `${item.title}\n\n${(item.content || '').slice(0, 3500)}`;
+          const chunks = chunkText(content, 800, 150);
+
+          for (const c of chunks) {
+            documents.push({
+              id: generateId(),
+              content: c,
+              metadata: {
+                source: meta.productUrl || meta.source || item.id,
+                type: 'manual',
+                title: item.title || '',
+                category: meta.category || 'general',
+                itemId: item.id,
+                thumbnailUrl: meta.thumbnailUrl || '',
+                ...meta,
+              },
+            });
+          }
+        }
+
+        try {
+          await vectorStore.addDocuments(documents);
+
+          // Mark items as indexed
+          for (const item of chunk) {
+            db.prepare('UPDATE knowledge_items SET indexed = 1, indexed_at = ? WHERE id = ?')
+              .run(new Date().toISOString(), item.id);
+            indexedCount++;
+          }
+        } catch (err: any) {
+          console.warn(`⚠️ [sync-and-index] Chunk ${i}-${i + CHUNK_SIZE} failed:`, err.message);
+          indexErrors += chunk.length;
+        }
+      }
+    }
+
+    const vectorStats = await (await import('../lib/rag/vectorStore')).vectorStore.getStats();
+
+    console.log(
+      `✅ [sync-and-index] Done! ` +
+      `kb_products synced: ${syncResult.inserted} new + ${syncResult.updated} updated. ` +
+      `Vector indexed: ${indexedCount} items. Total in vector store: ${vectorStats.totalDocuments}`
+    );
+
     res.json({
       success: true,
       data: {
-        inserted: result.inserted,
-        updated: result.updated,
-        archived: result.archived,
-        errors: result.errors,
+        kbSync: {
+          inserted: syncResult.inserted,
+          updated: syncResult.updated,
+          archived: syncResult.archived,
+          errors: syncResult.errors,
+        },
+        vectorIndex: {
+          indexed: indexedCount,
+          skipped: indexErrors,
+          totalInVectorStore: vectorStats.totalDocuments,
+        },
       },
       message:
-        `Synced ${result.inserted} new + ${result.updated} updated + ${result.archived} archived. ` +
-        `Run "Sync to Vector Store" (npx tsx server/scripts/sync-kb-to-vectors.ts) to make them searchable by AI.`,
+        `✅ Hoàn tất! Đã sync ${syncResult.inserted + syncResult.updated} sản phẩm vào Knowledge Base, ` +
+        `và index ${indexedCount} items vào Vector Store. ` +
+        `Tổng ${vectorStats.totalDocuments} documents trong Vector Store. Bot giờ có thể tìm được sản phẩm!`,
     });
   } catch (error: any) {
+    console.error('❌ [sync-and-index] Error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
 // ============== AUDIT LOGS ==============
 
-router.get('/audit', requireAdmin, (req, res) => {
+router.get('/audit', requireAdmin, (req: Request, res: Response) => {
   try {
     const { action, user_id, limit = 100, offset = 0 } = req.query;
     let sql = 'SELECT * FROM audit_logs WHERE 1=1';
@@ -1359,7 +1438,7 @@ router.get('/audit', requireAdmin, (req, res) => {
   }
 });
 
-router.get('/audit/actions', requireAdmin, (_req, res) => {
+router.get('/audit/actions', requireAdmin, (_req: Request, res: Response) => {
   try {
     const rows = db.prepare(
       'SELECT DISTINCT action FROM audit_logs ORDER BY action ASC'
@@ -1372,7 +1451,7 @@ router.get('/audit/actions', requireAdmin, (_req, res) => {
 
 // ============== POST /api/admin/chat-metrics ==============
 
-router.post('/chat-metrics', requireAdmin, (req, res) => {
+router.post('/chat-metrics', requireAdmin, (req: Request, res: Response) => {
   try {
     const { latencyMs, confidence } = req.body || {};
     if (typeof latencyMs !== 'number' || typeof confidence !== 'number') {
@@ -1422,7 +1501,7 @@ router.post('/chat-metrics', requireAdmin, (req, res) => {
 
 // ============== POST /api/admin/agents/test ==============
 
-router.post('/agents/test', requireAdmin, async (req, res) => {
+router.post('/agents/test', requireAdmin, async (req: Request, res: Response) => {
   try {
     const { agentId, message } = req.body || {};
     if (!agentId || !message) {
@@ -1436,7 +1515,8 @@ router.post('/agents/test', requireAdmin, async (req, res) => {
 
     const start = Date.now();
     // Proxy tới /api/chat nội bộ
-    const chatRes = await fetch(`http://127.0.0.1:${process.env.PORT || 3001}/api/chat`, {
+    const chatPort = process.env.PORT || 3002;
+    const chatRes = await fetch(`http://127.0.0.1:${chatPort}/api/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -1472,7 +1552,7 @@ router.post('/agents/test', requireAdmin, async (req, res) => {
 // ============== USERS MANAGEMENT ==============
 
 // GET /api/admin/users - Get all users
-router.get('/users', requireAdmin, (_req, res) => {
+router.get('/users', requireAdmin, (_req: Request, res: Response) => {
   try {
     const users = db.prepare(`
       SELECT id, email, name, role, plan, status, provider, quota_used, quota_limit, 
@@ -1487,7 +1567,7 @@ router.get('/users', requireAdmin, (_req, res) => {
 });
 
 // GET /api/admin/users/:id - Get single user
-router.get('/users/:id', requireAdmin, (req, res) => {
+router.get('/users/:id', requireAdmin, (req: Request, res: Response) => {
   try {
     const user = db.prepare(`
       SELECT id, email, name, role, plan, status, provider, quota_used, quota_limit, 
@@ -1505,7 +1585,7 @@ router.get('/users/:id', requireAdmin, (req, res) => {
 });
 
 // PUT /api/admin/users/:id/status - Update user status
-router.put('/users/:id/status', requireAdmin, (req, res) => {
+router.put('/users/:id/status', requireAdmin, (req: Request, res: Response) => {
   try {
     const { status } = req.body;
     if (!['active', 'suspended', 'pending'].includes(status)) {
@@ -1527,12 +1607,12 @@ router.put('/users/:id/status', requireAdmin, (req, res) => {
 });
 
 // PUT /api/admin/users/:id/role - Update user role
-router.put('/users/:id/role', requireAdmin, (req, res) => {
+router.put('/users/:id/role', requireAdmin, (req: Request, res: Response) => {
   try {
     const { role } = req.body;
     
     // Only super_admin can promote user to admin
-    if (role === 'admin' && req.user.role !== 'super_admin') {
+    if (role === 'admin' && (req as any).user?.role !== 'super_admin') {
       return res.status(403).json({ 
         success: false, 
         error: 'Chỉ Super Admin mới có quyền thăng cấp User thành Admin' 
@@ -1557,7 +1637,7 @@ router.put('/users/:id/role', requireAdmin, (req, res) => {
     }
     
     // Cannot demote self
-    if (req.params.id === req.user.id) {
+    if (req.params.id === (req as any).user?.id) {
       return res.status(403).json({ 
         success: false, 
         error: 'Không thể tự thay đổi role của chính mình' 
@@ -1574,7 +1654,7 @@ router.put('/users/:id/role', requireAdmin, (req, res) => {
 });
 
 // DELETE /api/admin/users/:id - Delete user
-router.delete('/users/:id', requireAdmin, (req, res) => {
+router.delete('/users/:id', requireAdmin, (req: Request, res: Response) => {
   try {
     const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.params.id) as any;
     if (!user) {
@@ -1593,7 +1673,7 @@ router.delete('/users/:id', requireAdmin, (req, res) => {
 });
 
 // POST /api/admin/users/:id/reset-password - Reset password & return new temp password
-router.post('/users/:id/reset-password', requireAdmin, (req, res) => {
+router.post('/users/:id/reset-password', requireAdmin, (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const user = db.prepare('SELECT id, email FROM users WHERE id = ?').get(id);
@@ -1640,7 +1720,7 @@ router.post('/users/:id/reset-password', requireAdmin, (req, res) => {
 });
 
 // POST /api/admin/users - Create new user manually (returns temp password)
-router.post('/users', requireAdmin, (req, res) => {
+router.post('/users', requireAdmin, (req: Request, res: Response) => {
   try {
     const { email, name, password, role = 'user', plan = 'free' } = req.body;
 
@@ -1677,9 +1757,9 @@ router.post('/users', requireAdmin, (req, res) => {
     const quotaLimit = plan === 'enterprise' ? 999999 : plan === 'pro' ? 1000 : 10;
 
     db.prepare(`
-      INSERT INTO users (id, email, name, password_hash, role, plan, status, provider, quota_used, quota_limit, must_reset_password, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, 'active', 'email', 0, ?, ?, ?, ?)
-    `).run(id, normalizedEmail, name.trim(), passwordHash, role, plan, quotaLimit, isGenerated ? 1 : 0, now, now);
+      INSERT INTO users (id, email, name, password_hash, role, plan, status, provider, avatar, quota_used, quota_limit, last_login_at, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, 'active', 'email', NULL, 0, ?, NULL, ?, ?)
+    `).run(id, normalizedEmail, name.trim(), passwordHash, role, plan, quotaLimit, now, now);
 
     const user = db.prepare('SELECT id, email, name, role, plan, status FROM users WHERE id = ?').get(id);
     res.status(201).json({
@@ -1702,7 +1782,7 @@ router.post('/users', requireAdmin, (req, res) => {
 // ============== CHAT CUSTOMIZATION SETTINGS ==============
 
 // GET /api/admin/chat-settings
-router.get('/chat-settings', requireAdmin, (_req, res) => {
+router.get('/chat-settings', requireAdmin, (_req: Request, res: Response) => {
   try {
     const keys = [
       'chat_greeting_vi', 'chat_greeting_en', 'chat_greeting_ar', 'chat_greeting_fr',
@@ -1732,7 +1812,7 @@ router.get('/chat-settings', requireAdmin, (_req, res) => {
 });
 
 // PUT /api/admin/chat-settings
-router.put('/chat-settings', requireAdmin, (req, res) => {
+router.put('/chat-settings', requireAdmin, (req: Request, res: Response) => {
   try {
     const updates = req.body;
     const now = new Date().toISOString();
@@ -1769,7 +1849,7 @@ router.put('/chat-settings', requireAdmin, (req, res) => {
 });
 
 // GET /api/admin/chat-settings/public - Public endpoint for chat page
-router.get('/chat-settings/public', (_req, res) => {
+router.get('/chat-settings/public', (_req: Request, res: Response) => {
   try {
     const keys = [
       'chat_greeting_vi', 'chat_greeting_en', 'chat_greeting_ar', 'chat_greeting_fr',
@@ -1801,7 +1881,7 @@ router.get('/chat-settings/public', (_req, res) => {
 
 // ============== AI SYSTEM INSTRUCTIONS (Super Admin only) ==============
 // GET /api/admin/ai-instructions — lấy AI system instructions
-router.get('/ai-instructions', requireAdmin, (req, res) => {
+router.get('/ai-instructions', requireAdmin, (_req: Request, res: Response) => {
   try {
     const rows = db.prepare("SELECT * FROM system_settings WHERE `key` LIKE 'ai_instruction_%' ORDER BY `key` ASC").all() as any[];
     const result: Record<string, any> = {};
@@ -1821,7 +1901,7 @@ router.get('/ai-instructions', requireAdmin, (req, res) => {
 });
 
 // PUT /api/admin/ai-instructions — cập nhật AI system instructions (super admin only)
-router.put('/ai-instructions', requireAdmin, (req, res) => {
+router.put('/ai-instructions', requireAdmin, (req: Request, res: Response) => {
   try {
     const { user } = req as any;
     
@@ -1878,7 +1958,7 @@ router.put('/ai-instructions', requireAdmin, (req, res) => {
 });
 
 // GET /api/admin/ai-instructions/public — public endpoint cho chat page đọc AI instructions
-router.get('/ai-instructions/public', (_req, res) => {
+router.get('/ai-instructions/public', (_req: Request, res: Response) => {
   try {
     const rows = db.prepare("SELECT key, value, type FROM system_settings WHERE `key` LIKE 'ai_instruction_%'").all() as any[];
     const result: Record<string, any> = {};
@@ -1899,7 +1979,7 @@ router.get('/ai-instructions/public', (_req, res) => {
 
 // ⭐ ============== EMOTION SETTINGS (Super Admin only) ==============
 // GET /api/admin/emotion-settings — lấy emotion settings
-router.get('/emotion-settings', requireAdmin, (req, res) => {
+router.get('/emotion-settings', requireAdmin, (_req: Request, res: Response) => {
   try {
     const rows = db.prepare("SELECT * FROM system_settings WHERE `key` LIKE 'emotion_%' ORDER BY `key` ASC").all() as any[];
     const result: Record<string, any> = {};
@@ -1919,7 +1999,7 @@ router.get('/emotion-settings', requireAdmin, (req, res) => {
 });
 
 // PUT /api/admin/emotion-settings — cập nhật emotion settings (super admin only)
-router.put('/emotion-settings', requireAdmin, (req, res) => {
+router.put('/emotion-settings', requireAdmin, (req: Request, res: Response) => {
   try {
     const { user } = req as any;
 
@@ -1974,7 +2054,7 @@ router.put('/emotion-settings', requireAdmin, (req, res) => {
 });
 
 // GET /api/admin/emotion-settings/public — public endpoint cho chat page đọc emotion settings
-router.get('/emotion-settings/public', (_req, res) => {
+router.get('/emotion-settings/public', (_req: Request, res: Response) => {
   try {
     const rows = db.prepare("SELECT key, value, type FROM system_settings WHERE `key` LIKE 'emotion_%'").all() as any[];
     const result: Record<string, any> = {};
@@ -1996,7 +2076,7 @@ router.get('/emotion-settings/public', (_req, res) => {
 // ============== FILE UPLOAD SETTINGS (SuperAdmin only) ==============
 
 // GET /api/admin/file-settings — get file upload settings
-router.get('/file-settings', requireAdmin, (_req, res) => {
+router.get('/file-settings', requireAdmin, (_req: Request, res: Response) => {
   try {
     const keys = [
       'feature_file_attachment_enabled',
@@ -2041,7 +2121,7 @@ router.get('/file-settings', requireAdmin, (_req, res) => {
 });
 
 // PUT /api/admin/file-settings — update file upload settings (SuperAdmin only)
-router.put('/file-settings', requireSuperAdmin, (req, res) => {
+router.put('/file-settings', requireSuperAdmin, (req: Request, res: Response) => {
   try {
     const updates = req.body;
     const now = new Date().toISOString();
@@ -2098,7 +2178,7 @@ router.put('/file-settings', requireSuperAdmin, (req, res) => {
 });
 
 // GET /api/admin/file-settings/public — public endpoint for file upload validation
-router.get('/file-settings/public', (_req, res) => {
+router.get('/file-settings/public', (_req: Request, res: Response) => {
   try {
     const keys = [
       'feature_file_attachment_enabled',

@@ -100,25 +100,41 @@ export function AdminAnalytics() {
 
   // Load analytics data
   useEffect(() => {
+    let cancelled = false;
     const load = async () => {
       // Skip when not authenticated to avoid 401 spam in console
       if (!getAccessToken()) {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
         return;
       }
-      const [us, an, cm] = await Promise.all([
-        adminApi.getUserStats(),
-        adminApi.getAnalytics(),
-        adminApi.getChatMetrics(range),
-      ]);
-      if (us.success && us.data) setUserStats(us.data);
-      if (an.success && an.data) setAnalytics(an.data);
-      if (cm.success && cm.data) setChatMetrics(cm.data as ChatMetrics);
-      setLoading(false);
+      try {
+        const [us, an, cm] = await Promise.all([
+          adminApi.getUserStats(),
+          adminApi.getAnalytics(),
+          adminApi.getChatMetrics(range),
+        ]);
+        if (cancelled) return;
+        if (us.success && us.data) setUserStats(us.data);
+        if (an.success && an.data) setAnalytics(an.data);
+        if (cm.success && cm.data) setChatMetrics(cm.data as ChatMetrics);
+      } catch (err: unknown) {
+        if (cancelled) return;
+        // Ignore AbortError (timeout)
+        if (err instanceof Error && err.name === 'AbortError') {
+          console.warn('AdminAnalytics: Request timed out');
+        } else {
+          console.error('AdminAnalytics: Failed to load data', err);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
     };
-    load();
+    void load();
     const id = setInterval(() => { void load(); }, 10000);
-    return () => clearInterval(id);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
   }, [range]);
 
   const kb = analytics?.kb;

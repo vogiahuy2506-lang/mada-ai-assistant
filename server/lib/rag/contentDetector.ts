@@ -2,6 +2,47 @@
 
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
+// ============ PROXY BYPASS ============
+async function callGeminiNoProxy(apiKey: string, modelName: string, prompt: string, tools?: any): Promise<any> {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+  
+  // Clear proxy env vars for this call
+  const savedEnv: Record<string, string | undefined> = {
+    HTTP_PROXY: process.env.HTTP_PROXY,
+    HTTPS_PROXY: process.env.HTTPS_PROXY,
+    http_proxy: process.env.http_proxy,
+    https_proxy: process.env.https_proxy,
+  };
+  delete process.env.HTTP_PROXY;
+  delete process.env.HTTPS_PROXY;
+  delete process.env.http_proxy;
+  delete process.env.https_proxy;
+  
+  try {
+    const body: any = {
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { temperature: 0.1, maxOutputTokens: 512 },
+    };
+    if (tools?.length > 0) body.tools = tools;
+    
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Gemini API error: ${response.status}`);
+    }
+    
+    return response.json();
+  } finally {
+    for (const [key, val] of Object.entries(savedEnv)) {
+      if (val !== undefined) process.env[key] = val;
+    }
+  }
+}
+
 // ============ SCHEMA DEFINITIONS ============
 
 /**
@@ -87,6 +128,7 @@ const USER_PROMPT = `Phân tích nội dung sau và trả về JSON:
 class ContentDetector {
   private genAI: GoogleGenerativeAI | null = null;
   private model: any = null;
+  private apiKey: string | null = null;
 
   async initialize(): Promise<void> {
     const apiKey = process.env.GEMINI_API_KEY;
@@ -95,6 +137,7 @@ class ContentDetector {
       return;
     }
 
+    this.apiKey = apiKey;
     this.genAI = new GoogleGenerativeAI(apiKey);
     this.model = this.genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
     console.log('✅ Content Detector initialized with Gemini');
@@ -102,35 +145,25 @@ class ContentDetector {
 
   async detect(content: string, title?: string): Promise<DetectionResult> {
     // Fallback detection if Gemini not available
-    if (!this.model) {
+    if (!this.apiKey) {
       return this.fallbackDetection(content, title);
     }
 
     try {
       const prompt = SYSTEM_PROMPT + '\n\n' + USER_PROMPT.replace('{content}', content.slice(0, 2000));
 
-      // Try structured output first
+      // Call Gemini directly (bypasses proxy)
       let parsed: any = null;
 
       try {
-        const result = await this.model.generateContent({
-          contents: [{ role: 'user', parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 0.1,
-            maxOutputTokens: 512,
-          },
-          tools: [{
-            functionDeclarations: [CONTENT_DETECTION_SCHEMA]
-          }]
-        });
-
-        const response = result.response;
-
-        if (response.functionCalls?.length > 0) {
-          const fnCall = response.functionCalls()[0];
-          if (fnCall.name === 'content_detection') {
-            parsed = fnCall.args;
-          }
+        const result = await callGeminiNoProxy(this.apiKey, 'gemini-2.5-flash', prompt, [{ functionDeclarations: [CONTENT_DETECTION_SCHEMA] }]);
+        
+        // Parse the response
+        const parts = result?.candidates?.[0]?.content?.parts || [];
+        const functionCallPart = parts.find((p: any) => p.functionCall);
+        
+        if (functionCallPart?.functionCall?.name === 'content_detection') {
+          parsed = functionCallPart.functionCall.args;
         }
       } catch (schemaError: any) {
         console.warn('⚠️ Content detector schema failed, using text fallback:', schemaError.message?.slice(0, 80));
@@ -138,9 +171,10 @@ class ContentDetector {
 
       // Fallback: parse text if schema didn't work
       if (!parsed) {
-        const result = await this.model.generateContent(prompt);
-        const response = await result.response;
-        const text = response.text();
+        const result = await callGeminiNoProxy(this.apiKey, 'gemini-2.5-flash', prompt, undefined);
+        const parts = result?.candidates?.[0]?.content?.parts || [];
+        const textParts = parts.filter((p: any) => p.text);
+        const text = textParts.map((p: any) => p.text).join('\n');
 
         const jsonMatch = text.match(/\{[\s\S]*\}/);
         if (jsonMatch) {

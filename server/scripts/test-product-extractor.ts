@@ -82,13 +82,13 @@ async function testJsonLdExtraction() {
   console.log('─'.repeat(60));
 
   // Mock the fetch by directly testing layer 1
-  const $ = await import('cheerio');
-  const cheerio = $.default || $;
-  const loaded = cheerio.load(FIXTURE_HTML);
+  const cheerioModule = await import('cheerio');
+  const loadFn = (cheerioModule as any).default?.load || cheerioModule.load;
+  const loaded = loadFn(FIXTURE_HTML);
 
   const products: any[] = [];
-  loaded('script[type="application/ld+json"]').each((_, el) => {
-    const raw = loaded(el).html();
+  loaded('script[type="application/ld+json"]').each((_: unknown, el: unknown) => {
+    const raw = loaded(el as Parameters<typeof loaded>[0]).html();
     if (!raw) return;
     try {
       const data = JSON.parse(raw);

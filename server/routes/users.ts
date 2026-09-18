@@ -92,8 +92,8 @@ router.post('/', (req: Request, res: Response) => {
     const limits: Record<string, number> = { free: 10, pro: 100, enterprise: -1 };
 
     db.prepare(`
-      INSERT INTO users (id, email, name, password_hash, role, plan, status, provider, quota_used, quota_limit, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, 'active', 'email', 0, ?, ?, ?)
+      INSERT INTO users (id, email, name, password_hash, role, plan, status, provider, avatar, quota_used, quota_limit, last_login_at, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, 'active', 'email', NULL, 0, ?, NULL, ?, ?)
     `).run(id, normalizedEmail, name, hashPassword(password), role, plan, limits[plan], now, now);
 
     const user = db.prepare('SELECT * FROM users WHERE id = ?').get(id) as UserRow;

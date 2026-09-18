@@ -3,6 +3,7 @@ import { CheckCircle, Loader2, AlertCircle, RotateCcw, Save, Edit3, History, X, 
 import { PromptValidator } from './PromptValidator';
 import { PromptHistory } from './PromptHistory';
 import { PromptTemplates } from './PromptTemplates';
+import { getAccessToken } from '@/lib/api';
 
 interface Prompt {
   key: string;
@@ -39,7 +40,7 @@ export function PromptsEditor({ onClose }: PromptsEditorProps) {
     setLoading(true);
     setError(null);
     try {
-      const token = localStorage.getItem('mada-access-token');
+      const token = getAccessToken();
       const res = await fetch('/api/admin/system-prompts', {
         headers: { 
           Authorization: `Bearer ${token}`,
@@ -80,7 +81,7 @@ export function PromptsEditor({ onClose }: PromptsEditorProps) {
     setSaving(key);
     setSaveSuccess(null);
     try {
-      const token = localStorage.getItem('mada-access-token');
+      const token = getAccessToken();
       const res = await fetch(`/api/admin/system-prompts/${key}`, {
         method: 'PUT',
         headers: {
@@ -119,7 +120,7 @@ export function PromptsEditor({ onClose }: PromptsEditorProps) {
     try {
       const res = await fetch(`/api/admin/system-prompts/${key}`, {
         method: 'DELETE',
-        headers: { Authorization: `Bearer ${localStorage.getItem('mada-access-token')}` }
+        headers: { Authorization: `Bearer ${getAccessToken()}` }
       });
       const data = await res.json();
       if (data.success) {
@@ -142,7 +143,7 @@ export function PromptsEditor({ onClose }: PromptsEditorProps) {
     try {
       const res = await fetch('/api/admin/prompts', {
         method: 'DELETE',
-        headers: { Authorization: `Bearer ${localStorage.getItem('mada-access-token')}` }
+        headers: { Authorization: `Bearer ${getAccessToken()}` }
       });
       const data = await res.json();
       if (data.success) {

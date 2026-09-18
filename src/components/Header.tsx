@@ -53,7 +53,7 @@ export function Header() {
               {user.name.charAt(0).toUpperCase()}
             </div>
             <span className="text-xs font-mono uppercase tracking-widest max-w-[100px] truncate">
-              {user.name.split(' ')[0]}
+              {user.name.split(' ')[0] || user.name}
             </span>
             {(user.plan === 'pro' || user.plan === 'enterprise') && (
               <Sparkles className="w-3 h-3 text-violet-500" fill="currentColor" />

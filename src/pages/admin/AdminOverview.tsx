@@ -1,19 +1,19 @@
 import { useEffect, useState, useCallback } from 'react';
 import { AdminLayout } from './AdminLayout';
 import { adminApi, AdminUser, KnowledgeStats, UserStats } from './adminApi';
-import { useTranslation } from '@/lib/translations';
+import { useTranslation, TranslationKey } from '@/lib/translations';
 
-function timeAgo(iso: string | null): string {
-  if (!iso) return 'Chưa đăng nhập';
+function timeAgo(iso: string | null, t: (key: TranslationKey) => string): string {
+  if (!iso) return t('admin.users.neverLogin');
   const diff = Date.now() - new Date(iso).getTime();
   const s = Math.floor(diff / 1000);
-  if (s < 60) return `${s} giây trước`;
+  if (s < 60) return `${s} ${t('time.secondsAgo')}`;
   const m = Math.floor(s / 60);
-  if (m < 60) return `${m} phút trước`;
+  if (m < 60) return `${m} ${t('time.minutesAgo')}`;
   const h = Math.floor(m / 60);
-  if (h < 24) return `${h} giờ trước`;
+  if (h < 24) return `${h} ${t('time.hoursAgo')}`;
   const d = Math.floor(h / 24);
-  return `${d} ngày trước`;
+  return `${d} ${t('time.daysAgo')}`;
 }
 
 export function AdminOverview() {
@@ -39,6 +39,13 @@ export function AdminOverview() {
             .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
             .slice(0, 5)
         );
+      }
+    } catch (err: unknown) {
+      // Ignore AbortError (timeout) - user will see stale/empty data
+      if (err instanceof Error && err.name === 'AbortError') {
+        console.warn('AdminOverview: Request timed out');
+      } else {
+        console.error('AdminOverview: Failed to load data', err);
       }
     } finally {
       setLoading(false);
@@ -83,9 +90,9 @@ export function AdminOverview() {
             <span className="material-symbols-outlined text-primary text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>group</span>
           </div>
           <div>
-            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">TỔNG NGƯỜI DÙNG</p>
+            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">{t('admin.overview.totalUsers').toUpperCase()}</p>
             <h3 className="text-xl font-black text-on-surface">{userStats?.total ?? '—'}</h3>
-            <p className="text-[10px] text-on-surface-variant mt-1">{userStats?.active ?? 0} đang hoạt động</p>
+            <p className="text-[10px] text-on-surface-variant mt-1">{userStats?.active ?? 0} {t('admin.overview.active')}</p>
           </div>
         </div>
 
@@ -94,10 +101,10 @@ export function AdminOverview() {
             <span className="material-symbols-outlined text-secondary text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>description</span>
           </div>
           <div>
-            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">TÀI LIỆU KB</p>
+            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">{t('admin.overview.kbDocs').toUpperCase()}</p>
             <h3 className="text-xl font-black text-on-surface">{kbStats?.totalDocuments ?? '—'}</h3>
             <p className="text-[10px] text-on-surface-variant mt-1">
-              {filterBotId ? `Bot: ${filterBotId}` : `${kbStats?.totalCategories ?? 0} danh mục`}
+              {filterBotId ? `${t('admin.overview.bot')}: ${filterBotId}` : `${kbStats?.totalCategories ?? 0} ${t('admin.overview.categories')}`}
             </p>
           </div>
         </div>
@@ -107,9 +114,9 @@ export function AdminOverview() {
             <span className="material-symbols-outlined text-tertiary text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>workspace_premium</span>
           </div>
           <div>
-            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">GÓI ENTERPRISE</p>
+            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">{t('admin.overview.enterprisePlans').toUpperCase()}</p>
             <h3 className="text-xl font-black text-on-surface">{userStats?.enterprise ?? '—'}</h3>
-            <p className="text-[10px] text-on-surface-variant mt-1">Khách hàng cao cấp</p>
+            <p className="text-[10px] text-on-surface-variant mt-1">{t('admin.overview.premiumCustomers')}</p>
           </div>
         </div>
 
@@ -118,9 +125,9 @@ export function AdminOverview() {
             <span className="material-symbols-outlined text-error text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>block</span>
           </div>
           <div>
-            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">TÀI KHOẢN TREO</p>
+            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">{t('admin.overview.suspendedAccounts').toUpperCase()}</p>
             <h3 className="text-xl font-black text-on-surface">{userStats?.suspended ?? '—'}</h3>
-            <p className="text-[10px] text-on-surface-variant mt-1">Cần xử lý</p>
+            <p className="text-[10px] text-on-surface-variant mt-1">{t('admin.overview.needsAction')}</p>
           </div>
         </div>
       </section>
@@ -129,17 +136,17 @@ export function AdminOverview() {
       <section className="relative bg-gradient-to-br from-white/80 to-white/40 backdrop-blur-xl rounded-3xl border-3 border-black p-8 md:p-12 shadow-[12px_12px_0px_0px_#000] mb-12">
         <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
           <div>
-            <h3 className="text-2xl font-black text-on-surface">Kho tri thức theo Bot</h3>
-            <p className="text-sm text-on-surface-variant">Lọc theo 7 bot MADA chuyên biệt</p>
+            <h3 className="text-2xl font-black text-on-surface">{t('admin.overview.kbByBot')}</h3>
+            <p className="text-sm text-on-surface-variant">{t('admin.overview.filterByBots')}</p>
           </div>
           <div className="flex items-center gap-2">
-            <label className="text-xs font-bold text-gray-500 uppercase">Bot ID:</label>
+            <label className="text-xs font-bold text-gray-500 uppercase">{t('admin.overview.botId')}:</label>
             <select
               value={filterBotId}
               onChange={(e) => setFilterBotId(e.target.value)}
               className="h-10 px-3 rounded-lg border-2 border-black font-label-md bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
             >
-              <option value="">Tất cả 7 bot</option>
+              <option value="">{t('admin.overview.allBots')}</option>
               <option value="bot-hearing">Bot 1: Hearing</option>
               <option value="bot-vision">Bot 2: Vision</option>
               <option value="bot-speech">Bot 3: Speech</option>
@@ -160,12 +167,12 @@ export function AdminOverview() {
               >
                 <div className="text-[10px] font-bold uppercase opacity-70">{row.botId.replace('bot-', '')}</div>
                 <div className="text-2xl font-black mt-1">{row.count}</div>
-                <div className="text-[10px] mt-1 opacity-60">tài liệu</div>
+                <div className="text-[10px] mt-1 opacity-60">{t('admin.overview.documents')}</div>
               </button>
             ))
           ) : (
             <div className="col-span-7 text-sm text-on-surface-variant text-center py-8">
-              Chưa có dữ liệu knowledge items theo bot. Chạy crawl + ingest trong /admin/scraper.
+              {t('admin.overview.noKbData')}
             </div>
           )}
         </div>
@@ -177,29 +184,29 @@ export function AdminOverview() {
         <div className="relative z-10">
           <div className="flex justify-between items-center mb-6">
             <div>
-              <h3 className="text-2xl font-black text-on-surface">Người dùng mới nhất</h3>
-              <p className="text-sm text-on-surface-variant">5 tài khoản đăng ký gần đây</p>
+              <h3 className="text-2xl font-black text-on-surface">{t('admin.overview.newestUsers')}</h3>
+              <p className="text-sm text-on-surface-variant">{t('admin.overview.recentAccounts')}</p>
             </div>
             <a href="/admin/users" className="px-5 py-2.5 rounded-full bg-primary text-white text-sm font-bold border-2 border-black shadow-[3px_3px_0px_0px_#000] hover:-translate-x-1 hover:-translate-y-1 hover:shadow-[4px_4px_0px_0px_#000] transition-all">
-              Xem tất cả →
+              {t('admin.common.view')} tất cả →
             </a>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead>
                 <tr className="border-b-2 border-black">
-                  <th className="py-3 px-4 text-xs font-bold text-gray-500 uppercase tracking-widest">Người dùng</th>
-                  <th className="py-3 px-4 text-xs font-bold text-gray-500 uppercase tracking-widest">Vai trò</th>
-                  <th className="py-3 px-4 text-xs font-bold text-gray-500 uppercase tracking-widest">Gói</th>
-                  <th className="py-3 px-4 text-xs font-bold text-gray-500 uppercase tracking-widest">Trạng thái</th>
-                  <th className="py-3 px-4 text-xs font-bold text-gray-500 uppercase tracking-widest">Đăng nhập cuối</th>
+                  <th className="py-3 px-4 text-xs font-bold text-gray-500 uppercase tracking-widest">{t('admin.overview.user')}</th>
+                  <th className="py-3 px-4 text-xs font-bold text-gray-500 uppercase tracking-widest">{t('admin.overview.role')}</th>
+                  <th className="py-3 px-4 text-xs font-bold text-gray-500 uppercase tracking-widest">{t('admin.overview.plan')}</th>
+                  <th className="py-3 px-4 text-xs font-bold text-gray-500 uppercase tracking-widest">{t('admin.overview.status')}</th>
+                  <th className="py-3 px-4 text-xs font-bold text-gray-500 uppercase tracking-widest">{t('admin.overview.lastLogin')}</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={5} className="py-6 text-center text-on-surface-variant">Đang tải...</td></tr>
+                  <tr><td colSpan={5} className="py-6 text-center text-on-surface-variant">{t('admin.common.loading')}</td></tr>
                 ) : recentUsers.length === 0 ? (
-                  <tr><td colSpan={5} className="py-6 text-center text-on-surface-variant">Chưa có người dùng</td></tr>
+                  <tr><td colSpan={5} className="py-6 text-center text-on-surface-variant">{t('admin.overview.noUsers')}</td></tr>
                 ) : recentUsers.map((u) => (
                   <tr key={u.id} className="border-b border-black/10 hover:bg-gray-50/50 transition-colors">
                     <td className="py-4 px-4">
@@ -215,7 +222,7 @@ export function AdminOverview() {
                     </td>
                     <td className="py-4 px-4">
                       <span className="px-3 py-1 rounded-full text-xs font-bold border-2 border-black bg-gray-100">
-                        {u.role === 'admin' ? 'Quản trị' : u.role === 'expert' ? 'Chuyên gia' : u.role === 'data_manager' ? 'QL Dữ liệu' : 'Người dùng'}
+                        {u.role === 'admin' ? t('admin.users.admin') : u.role === 'expert' ? t('admin.overview.expert') : u.role === 'data_manager' ? t('admin.overview.dataManager') : t('admin.overview.user')}
                       </span>
                     </td>
                     <td className="py-4 px-4">
@@ -234,10 +241,10 @@ export function AdminOverview() {
                         <span className={`w-2 h-2 rounded-full ${
                           u.status === 'active' ? 'bg-green-500' : u.status === 'suspended' ? 'bg-red-500' : 'bg-gray-400'
                         }`} />
-                        {u.status === 'active' ? 'Hoạt động' : u.status === 'suspended' ? 'Tạm khóa' : 'Chờ duyệt'}
+                        {u.status === 'active' ? t('admin.common.active') : u.status === 'suspended' ? t('admin.overview.suspended') : t('admin.users.pending')}
                       </span>
                     </td>
-                    <td className="py-4 px-4 text-sm text-on-surface-variant">{timeAgo(u.lastLogin)}</td>
+                    <td className="py-4 px-4 text-sm text-on-surface-variant">{timeAgo(u.lastLogin, t)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -250,28 +257,28 @@ export function AdminOverview() {
       <section className="relative bg-gradient-to-br from-white/80 to-white/40 backdrop-blur-xl rounded-3xl border-3 border-black p-8 md:p-12 shadow-[12px_12px_0px_0px_#000]">
         <div className="absolute inset-0 bg-gradient-to-b from-white/40 to-transparent rounded-3xl"></div>
         <div className="relative z-10">
-          <h3 className="text-2xl font-black text-on-surface mb-6">Thao tác nhanh</h3>
+          <h3 className="text-2xl font-black text-on-surface mb-6">{t('admin.overview.quickActions')}</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <a href="/admin/users" className="p-6 rounded-2xl bg-white/60 border-2 border-black hover:shadow-[6px_6px_0px_0px_#000] hover:-translate-x-1 hover:-translate-y-1 transition-all group">
               <div className="w-12 h-12 rounded-xl bg-primary/20 border-2 border-black flex items-center justify-center mb-4 shadow-[3px_3px_0px_0px_#000]">
                 <span className="material-symbols-outlined text-primary text-xl">person_add</span>
               </div>
-              <h4 className="font-bold text-on-surface mb-1">Quản lý người dùng</h4>
-              <p className="text-sm text-on-surface-variant">Thêm, sửa, phân quyền người dùng</p>
+              <h4 className="font-bold text-on-surface mb-1">{t('admin.overview.manageUsers')}</h4>
+              <p className="text-sm text-on-surface-variant">{t('admin.overview.manageUsersDesc')}</p>
             </a>
             <a href="/admin/logs" className="p-6 rounded-2xl bg-white/60 border-2 border-black hover:shadow-[6px_6px_0px_0px_#000] hover:-translate-x-1 hover:-translate-y-1 transition-all group">
               <div className="w-12 h-12 rounded-xl bg-secondary/20 border-2 border-black flex items-center justify-center mb-4 shadow-[3px_3px_0px_0px_#000]">
                 <span className="material-symbols-outlined text-secondary text-xl">receipt_long</span>
               </div>
-              <h4 className="font-bold text-on-surface mb-1">Nhật ký hệ thống</h4>
-              <p className="text-sm text-on-surface-variant">Theo dõi hoạt động và lỗi</p>
+              <h4 className="font-bold text-on-surface mb-1">{t('admin.overview.systemLogs')}</h4>
+              <p className="text-sm text-on-surface-variant">{t('admin.overview.systemLogsDesc')}</p>
             </a>
             <a href="/admin/settings" className="p-6 rounded-2xl bg-white/60 border-2 border-black hover:shadow-[6px_6px_0px_0px_#000] hover:-translate-x-1 hover:-translate-y-1 transition-all group">
               <div className="w-12 h-12 rounded-xl bg-tertiary/20 border-2 border-black flex items-center justify-center mb-4 shadow-[3px_3px_0px_0px_#000]">
                 <span className="material-symbols-outlined text-tertiary text-xl">settings_suggest</span>
               </div>
-              <h4 className="font-bold text-on-surface mb-1">Cấu hình hệ thống</h4>
-              <p className="text-sm text-on-surface-variant">Tinh chỉnh AI và bảo mật</p>
+              <h4 className="font-bold text-on-surface mb-1">{t('admin.overview.systemConfig')}</h4>
+              <p className="text-sm text-on-surface-variant">{t('admin.overview.systemConfigDesc')}</p>
             </a>
           </div>
         </div>

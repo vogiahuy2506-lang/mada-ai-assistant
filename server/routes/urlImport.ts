@@ -574,7 +574,7 @@ router.post('/import-url/save', async (req, res) => {
         continue;
       }
       const row = mapProductToRow(p, defaultCategory);
-      const detectedLang = detectTextLang(row.title, row.description || '');
+      const detectedLang = detectTextLang(row.title + ' ' + (row.description || ''));
       const translations = await translateProduct({
         title: row.title,
         description: row.description,

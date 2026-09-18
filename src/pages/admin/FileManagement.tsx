@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { 
-  Upload, Image, FileText, Video, Music, File, 
-  Save, RefreshCw, CheckCircle, XCircle, Info, 
-  ArrowLeft, Loader2, AlertTriangle
+import {
+  Upload, Image, FileText, Video, Music, File,
+  Save, RefreshCw, CheckCircle, XCircle, Info,
+  Loader2
 } from 'lucide-react';
 import { AdminLayout } from './AdminLayout';
+import { getAccessToken } from '@/lib/api';
 import clsx from 'clsx';
 
 interface FileSettings {
@@ -29,7 +29,6 @@ interface FileSettings {
 }
 
 const FileManagement: React.FC = () => {
-  const navigate = useNavigate();
   const [settings, setSettings] = useState<FileSettings>({
     fileAttachmentEnabled: true,
     imageUploadEnabled: true,
@@ -59,7 +58,7 @@ const FileManagement: React.FC = () => {
 
   const loadSettings = async () => {
     try {
-      const token = localStorage.getItem('mada-access-token') || localStorage.getItem('token');
+      const token = getAccessToken() || localStorage.getItem('token');
       const res = await fetch('/api/admin/file-settings', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -78,7 +77,7 @@ const FileManagement: React.FC = () => {
     setSaving(true);
     setMessage(null);
     try {
-      const token = localStorage.getItem('mada-access-token') || localStorage.getItem('token');
+      const token = getAccessToken() || localStorage.getItem('token');
       const res = await fetch('/api/admin/file-settings', {
         method: 'PUT',
         headers: {

@@ -31,6 +31,7 @@ export interface WidgetConfig {
   defaultLanguage: Language;
   allowFileUpload: boolean;
   allowLanguageSwitch: boolean;
+  allowFaq: boolean;
   
   // Welcome message
   welcomeTitle: string;
@@ -84,6 +85,7 @@ const DEFAULT_WIDGET_CONFIG: WidgetConfig = {
   defaultLanguage: 'vi',
   allowFileUpload: true,
   allowLanguageSwitch: true,
+  allowFaq: true,
   
   welcomeTitle: 'Xin chào! Mình là MADA AI.',
   welcomeTitleEn: 'Hello! I am MADA AI.',

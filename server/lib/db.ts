@@ -450,6 +450,80 @@ addColumnIfMissing('admin_agents', 'crawl_follow_links', 'crawl_follow_links INT
 addColumnIfMissing('admin_agents', 'crawl_max_depth', 'crawl_max_depth INTEGER NOT NULL DEFAULT 1');
 addColumnIfMissing('admin_agents', 'crawl_max_pages', 'crawl_max_pages INTEGER NOT NULL DEFAULT 5');
 
+// ============== SUGGESTED QUESTIONS SCHEMA ==============
+// Bảng lưu câu hỏi gợi ý cho từng agent, category, view mode và ngôn ngữ
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS suggested_questions (
+    id TEXT PRIMARY KEY,
+    agent_id TEXT,
+    category TEXT NOT NULL CHECK (category IN ('vision', 'hearing', 'mobility', 'cognition', 'communication', 'daily_living', 'education', 'general')),
+    view_mode TEXT NOT NULL DEFAULT 'end_user' CHECK (view_mode IN ('end_user', 'at_specialist')),
+    language TEXT NOT NULL DEFAULT 'vi' CHECK (language IN ('vi', 'en', 'ar', 'fr')),
+    question TEXT NOT NULL,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    is_active INTEGER NOT NULL DEFAULT 1,
+    created_by TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY (agent_id) REFERENCES admin_agents(id) ON DELETE SET NULL,
+    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_sq_agent_id ON suggested_questions(agent_id);
+  CREATE INDEX IF NOT EXISTS idx_sq_category ON suggested_questions(category);
+  CREATE INDEX IF NOT EXISTS idx_sq_view_mode ON suggested_questions(view_mode);
+  CREATE INDEX IF NOT EXISTS idx_sq_language ON suggested_questions(language);
+  CREATE INDEX IF NOT EXISTS idx_sq_active ON suggested_questions(is_active);
+`);
+
+// Seed default suggested questions from SAMPLE_QUESTIONS hardcoded data
+function seedSuggestedQuestions() {
+  const existing = db.prepare('SELECT COUNT(*) as count FROM suggested_questions').get() as { count: number };
+  if (existing.count > 0) {
+    console.log(`📋 suggested_questions already has ${existing.count} rows — skipping seed`);
+    return;
+  }
+
+  // Import SAMPLE_QUESTIONS from server-side module (avoids cross-directory import that breaks esbuild)
+  const { SAMPLE_QUESTIONS } = require('./seedQuestions');
+  
+  const now = new Date().toISOString();
+  const stmt = db.prepare(`
+    INSERT INTO suggested_questions (id, category, view_mode, language, question, sort_order, is_active, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)
+  `);
+
+  let count = 0;
+  for (const [category, viewModes] of Object.entries(SAMPLE_QUESTIONS)) {
+    for (const [viewMode, languages] of Object.entries(viewModes as Record<string, Record<string, string[]>>)) {
+      for (const [language, questions] of Object.entries(languages)) {
+        questions.forEach((q: string, idx: number) => {
+          stmt.run(
+            `sq_${category}_${viewMode}_${language}_${idx + 1}`,
+            category,
+            viewMode,
+            language,
+            q,
+            idx,
+            now,
+            now
+          );
+          count++;
+        });
+      }
+    }
+  }
+  console.log(`🌱 Seeded ${count} suggested questions from SAMPLE_QUESTIONS`);
+}
+
+// Try to seed, but don't fail if the import fails
+try {
+  seedSuggestedQuestions();
+} catch (e) {
+  console.log('📋 Seed suggested_questions skipped (SAMPLE_QUESTIONS import failed, will use empty table)');
+}
+
 // ============== ADMIN PROMPTS SCHEMA ==============
 
 db.exec(`
@@ -1508,15 +1582,16 @@ seedAdmin();
 seedSuperAdmin();
 seedDemoUsers();
 
-// ============== EXPORT DB FIRST (before permissions import) ==============
-export default db;
-
 // ============== PERMISSIONS INITIALIZATION ==============
-
 // Import and initialize permissions schema
-import { initPermissionsSchema, seedDefaultPermissions } from './permissions';
-initPermissionsSchema();
-seedDefaultPermissions();
+// NOTE: Must be imported dynamically AFTER db is created to avoid circular dependency issues
+import('./permissions').then(({ initPermissionsSchema, seedDefaultPermissions }) => {
+  initPermissionsSchema();
+  seedDefaultPermissions();
+}).catch(console.error);
+
+// ============== EXPORT DB ==============
+export default db;
 
 // ============== TYPES ==============
 
@@ -1676,4 +1751,45 @@ export function trackFileUpload(input: TrackFileUploadInput): TrackFileUploadRes
   );
 
   return { ok: true, quota: { ...quota, used: quota.used + 1, remaining: quota.remaining - 1 } };
+}
+
+// ============== SYSTEM SETTINGS ==============
+
+export interface SystemSettings {
+  anonymousLimit: number;      // -1 = unlimited
+  defaultPlanLimit: number;    // -1 = unlimited for default free plan
+  maxFilesPerSession: number;  // max files per chat session
+  maxFilesTotal?: number;
+  maxFileSizeMB?: number;
+  websiteUrl?: string;
+}
+
+// In-memory system settings (mirrors server/index.ts)
+let systemSettings: SystemSettings = {
+  anonymousLimit: -1,        // Mặc định không giới hạn
+  defaultPlanLimit: -1,
+  maxFilesPerSession: 10,
+  maxFilesTotal: 100,
+  maxFileSizeMB: 50,
+  websiteUrl: '',
+};
+
+/**
+ * Get current system settings
+ */
+export function getSystemSettings(): SystemSettings {
+  return systemSettings;
+}
+
+/**
+ * Update system settings (called from index.ts API)
+ */
+export function updateSystemSettings(settings: Partial<SystemSettings>): SystemSettings {
+  if (settings.anonymousLimit !== undefined) systemSettings.anonymousLimit = settings.anonymousLimit;
+  if (settings.defaultPlanLimit !== undefined) systemSettings.defaultPlanLimit = settings.defaultPlanLimit;
+  if (settings.maxFilesPerSession !== undefined) systemSettings.maxFilesPerSession = settings.maxFilesPerSession;
+  if (settings.maxFilesTotal !== undefined) systemSettings.maxFilesTotal = settings.maxFilesTotal;
+  if (settings.maxFileSizeMB !== undefined) systemSettings.maxFileSizeMB = settings.maxFileSizeMB;
+  if (settings.websiteUrl !== undefined) systemSettings.websiteUrl = settings.websiteUrl;
+  return systemSettings;
 }

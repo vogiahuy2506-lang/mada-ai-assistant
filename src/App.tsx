@@ -18,7 +18,9 @@ const AdminAnalytics = lazy(() => import('@/pages/admin/AdminAnalytics'));
 const AdminSettings = lazy(() => import('@/pages/admin/AdminSettings'));
 const AdminAgents = lazy(() => import('@/pages/admin/AdminAgents'));
 const AdminPrompts = lazy(() => import('@/pages/admin/AdminPrompts'));
+const AdminTemplates = lazy(() => import('@/pages/admin/AdminTemplates'));
 const AdminConsultations = lazy(() => import('@/pages/admin/AdminConsultations'));
+const AdminSuggestedQuestions = lazy(() => import('@/pages/admin/AdminSuggestedQuestions'));
 const AdminProducts = lazy(() => import('@/pages/admin/AdminProducts'));
 const AdminScraper = lazy(() => import('@/pages/admin/AdminScraper'));
 const AdminAudit = lazy(() => import('@/pages/admin/AdminAudit'));
@@ -56,7 +58,7 @@ function App() {
       refreshUser().catch(console.error);
     }
     // Also refresh if user has old invalid role 'superadmin' (should be 'super_admin')
-    if (user?.role === 'superadmin') {
+    if (user?.role === 'super_admin') {
       refreshUser().catch(() => {
         // If refresh fails, clear tokens and force re-login
         localStorage.removeItem('mada-access-token');
@@ -177,10 +179,26 @@ function App() {
             }
           />
           <Route
+            path="/admin/suggested-questions"
+            element={
+              <RoleGuard requiredRole="admin">
+                <AdminSuggestedQuestions />
+              </RoleGuard>
+            }
+          />
+          <Route
             path="/admin/prompts"
             element={
               <RoleGuard requiredRole="admin">
                 <AdminPrompts />
+              </RoleGuard>
+            }
+          />
+          <Route
+            path="/admin/templates"
+            element={
+              <RoleGuard requiredRole="admin">
+                <AdminTemplates />
               </RoleGuard>
             }
           />

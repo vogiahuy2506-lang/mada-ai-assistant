@@ -40,7 +40,6 @@ const CATEGORY_CONFIG: Record<string, { bg: string; text: string; border: string
 };
 
 export function AdminPrompts() {
-  // Shared store (same instance used by /admin/agents dropdown)
   const upsertPromptStore = usePromptStore((s) => s.upsertPrompt);
   const removePromptStore = usePromptStore((s) => s.removePrompt);
   const setStorePrompts = usePromptStore((s) => s.setPrompts);
@@ -65,7 +64,6 @@ export function AdminPrompts() {
   const [searchQuery, setSearchQuery] = useState('');
   const [deleteWarning, setDeleteWarning] = useState<{ usingAgents: Array<{ id: string; name: string }> } | null>(null);
 
-  // Get current user role for ChatCustomization
   const user = useAuthStore((s) => s.user);
   const userRole = user?.role || 'admin';
 
@@ -90,7 +88,6 @@ export function AdminPrompts() {
           updatedAt: p.updatedAt || p.updated_at || '',
         }));
         setPrompts(list);
-        // ⭐ Push lên shared store để /admin/agents dropdown thấy ngay
         setStorePrompts(list);
       }
     } catch (error) {
@@ -135,7 +132,7 @@ export function AdminPrompts() {
           updatedAt: (res.data as any).updatedAt || '',
         };
         setPrompts([created, ...prompts]);
-        upsertPromptStore(created); // ⭐ Đẩy lên shared store → /admin/agents thấy ngay
+        upsertPromptStore(created);
         setShowCreate(false);
         setNewPrompt({ id: '', name: '', description: '', prompt: '', category: 'general', language: 'vi' });
       }
@@ -177,7 +174,7 @@ export function AdminPrompts() {
         };
         setPrompts(prompts.map((p) => p.id === selectedPrompt.id ? updated : p));
         setSelectedPrompt(updated);
-        upsertPromptStore(updated); // ⭐ sync shared store
+        upsertPromptStore(updated);
         setIsEditing(false);
       }
     } catch (error) {
@@ -200,24 +197,26 @@ export function AdminPrompts() {
     const res = await adminApi.deletePrompt(id);
     if (res.success) {
       setPrompts(prompts.filter(p => p.id !== id));
-      removePromptStore(id); // ⭐ sync shared store
+      removePromptStore(id);
       if (selectedPrompt?.id === id) {
         setSelectedPrompt(null);
         setIsEditing(false);
       }
     } else if (res.success === false) {
-      // Backend may return { success: false, usingAgents, warning } on 409 — read raw
-      // The `request` helper wraps everything in { success, data, error } so we need a second fetch
       const token = getAccessToken();
-      const raw = await fetch(`/api/admin/system-prompts/${id}`, {
-        method: 'DELETE',
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-      const rawJson = await raw.json();
-      if (rawJson.usingAgents && rawJson.usingAgents.length > 0) {
-        setDeleteWarning({ usingAgents: rawJson.usingAgents });
-      } else {
-        alert(rawJson.error || res.error || 'Xóa thất bại');
+      try {
+        const raw = await fetch(`/api/admin/system-prompts/${id}`, {
+          method: 'DELETE',
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        const rawJson = await raw.json();
+        if (rawJson.usingAgents && rawJson.usingAgents.length > 0) {
+          setDeleteWarning({ usingAgents: rawJson.usingAgents });
+        } else {
+          alert(rawJson.error || res.error || 'Xóa thất bại');
+        }
+      } catch (e) {
+        alert(res.error || 'Xóa thất bại');
       }
     } else {
       alert(res.error || 'Xóa thất bại');
@@ -236,7 +235,7 @@ export function AdminPrompts() {
       };
       setPrompts(prompts.map(p => p.id === id ? updated : p));
       if (selectedPrompt?.id === id) setSelectedPrompt(updated);
-      upsertPromptStore(updated); // ⭐ sync shared store (giữ/cắt khỏi dropdown theo isActive)
+      upsertPromptStore(updated);
     }
   };
 
@@ -263,7 +262,86 @@ export function AdminPrompts() {
       subtitleEn="Manage system prompts used for AI Agents and RAG."
       subtitleAr="إدارة التعليمات النظامية المستخدمة للوكلاء و RAG."
       subtitleFr="Gérer les prompts système utilisés pour les agents IA et RAG."
+      showLayoutTitle={false}
     >
+      {/* Beautiful Banner */}
+      <div className="relative overflow-hidden rounded-2xl mb-6 border border-slate-200 shadow-sm">
+        {/* Background */}
+        <div className="absolute inset-0 bg-gradient-to-br from-slate-50 via-white to-primary/5" />
+        
+        {/* Content */}
+        <div className="relative p-8 md:p-10">
+          <div className="flex flex-col lg:flex-row lg:items-center gap-8">
+            {/* Left: Title & Stats */}
+            <div className="flex-1">
+              <div className="flex items-center gap-4 mb-4">
+                {/* Icon Container */}
+                <div className="w-16 h-16 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center">
+                  <span className="material-symbols-outlined text-3xl text-primary">edit_note</span>
+                </div>
+                
+                <div>
+                  <h1 className="text-3xl md:text-4xl font-black text-slate-800 tracking-tight">
+                    {t('admin.prompts.title')}
+                  </h1>
+                  <p className="text-slate-500 text-sm mt-1">
+                    {t('admin.prompts.subtitle')}
+                  </p>
+                </div>
+              </div>
+              
+              {/* Stats Row */}
+              <div className="flex flex-wrap gap-4 mt-6">
+                <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 shadow-sm">
+                  <span className="material-symbols-outlined text-xl text-primary">format_list_bulleted</span>
+                  <div>
+                    <p className="text-slate-400 text-xs">{t('admin.prompts.totalPrompts')}</p>
+                    <p className="text-slate-800 font-bold text-lg">{prompts.length}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 shadow-sm">
+                  <span className="material-symbols-outlined text-xl text-green-500">check_circle</span>
+                  <div>
+                    <p className="text-slate-400 text-xs">{t('admin.prompts.active')}</p>
+                    <p className="text-slate-800 font-bold text-lg">{prompts.filter(p => p.isActive).length}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 shadow-sm">
+                  <span className="material-symbols-outlined text-xl text-amber-500">smart_toy</span>
+                  <div>
+                    <p className="text-slate-400 text-xs">{t('admin.prompts.systemPrompts')}</p>
+                    <p className="text-slate-800 font-bold text-lg">{prompts.filter(p => p.isSystem).length}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            {/* Right: Quick Actions */}
+            <div className="flex flex-col gap-3 lg:items-end">
+              <button
+                onClick={() => setShowCreate(true)}
+                className="group flex items-center gap-3 px-6 py-3.5 bg-primary text-white rounded-xl font-bold shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-200"
+              >
+                <span className="material-symbols-outlined text-xl">add</span>
+                {t('admin.prompts.createNew')}
+                <span className="material-symbols-outlined text-xl opacity-0 group-hover:opacity-100 transition-opacity">arrow_forward</span>
+              </button>
+              <button
+                onClick={() => navigate('/admin/settings?tab=templates')}
+                className="flex items-center gap-2 px-5 py-2.5 text-slate-600 hover:text-primary hover:bg-slate-100 rounded-lg transition-all"
+              >
+                <span className="material-symbols-outlined text-xl">auto_awesome</span>
+                {t('admin.prompts.promptTemplates')}
+                <span className="material-symbols-outlined text-lg">chevron_right</span>
+              </button>
+            </div>
+          </div>
+        </div>
+        
+        {/* Bottom Decorative Line */}
+        <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-primary via-primary/70 to-primary/50" />
+      </div>
+
       {/* Delete Warning Modal */}
       {deleteWarning && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
@@ -272,10 +350,10 @@ export function AdminPrompts() {
               <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
                 <AlertTriangle className="w-5 h-5 text-amber-600" />
               </div>
-              <h3 className="text-lg font-bold text-slate-800">Không thể xóa Prompt</h3>
+              <h3 className="text-lg font-bold text-slate-800">{t('admin.prompts.cannotDeleteSystem')}</h3>
             </div>
             <p className="text-slate-600 mb-3">
-              Prompt này đang được sử dụng bởi <strong>{deleteWarning.usingAgents.length} agent(s)</strong>:
+              {t('admin.prompts.usedByAgents')} <strong>{deleteWarning.usingAgents.length} {t('admin.prompts.agents')}</strong>:
             </p>
             <ul className="space-y-1 mb-4">
               {deleteWarning.usingAgents.map(a => (
@@ -283,13 +361,13 @@ export function AdminPrompts() {
               ))}
             </ul>
             <p className="text-sm text-slate-500 mb-4">
-              Vui lòng gỡ prompt khỏi các agents trước khi xóa, hoặc xóa/deactivate agents liên quan.
+              {t('admin.prompts.removeFirst')}
             </p>
             <button
               onClick={() => setDeleteWarning(null)}
               className="w-full px-4 py-2 bg-primary text-white rounded-xl hover:bg-primary/90 transition-colors text-sm font-medium"
             >
-              Đã hiểu
+              {t('admin.prompts.understood')}
             </button>
           </div>
         </div>
@@ -306,12 +384,12 @@ export function AdminPrompts() {
             <span className="material-symbols-outlined text-2xl text-amber-500">storage</span>
           </div>
           <div>
-            <p className="font-bold text-sm text-slate-800">System DB</p>
-            <p className="text-xs text-slate-400 mt-0.5">Cấu hình hệ thống</p>
+            <p className="font-bold text-sm text-slate-800">{t('admin.prompts.systemDb')}</p>
+            <p className="text-xs text-slate-400 mt-0.5">{t('admin.prompts.systemDbDesc')}</p>
           </div>
         </button>
 
-        {/* System Prompts — clickable to toggle inline editor */}
+        {/* System Prompts */}
         <button
           onClick={() => setShowPromptsEditor(!showPromptsEditor)}
           className="relative group flex items-center gap-4 p-4 rounded-2xl border-2 text-left transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
@@ -329,10 +407,10 @@ export function AdminPrompts() {
           </div>
           <div>
             <p className="font-bold text-sm" style={{ color: showPromptsEditor ? '#6366f1' : '#1e293b' }}>
-              System Prompts
+              {t('admin.prompts.systemPromptsBtn')}
             </p>
             <p className="text-xs mt-0.5" style={{ color: showPromptsEditor ? 'rgba(99,102,241,0.6)' : '#94a3b8' }}>
-              {showPromptsEditor ? 'Đang chỉnh sửa...' : 'Quản lý prompts'}
+              {showPromptsEditor ? t('admin.prompts.editing') : t('admin.prompts.systemPromptsBtnDesc')}
             </p>
           </div>
           <div className="absolute top-3 right-3 w-2 h-2 rounded-full" style={{
@@ -341,7 +419,7 @@ export function AdminPrompts() {
           }}></div>
         </button>
 
-        {/* Tùy chỉnh Chat — clickable to toggle inline editor */}
+        {/* Tùy chỉnh Chat */}
         <button
           onClick={() => setShowChatCustomization(!showChatCustomization)}
           className="relative group flex items-center gap-4 p-4 rounded-2xl border-2 text-left transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
@@ -359,10 +437,10 @@ export function AdminPrompts() {
           </div>
           <div>
             <p className="font-bold text-sm" style={{ color: showChatCustomization ? '#0ea5e9' : '#1e293b' }}>
-              Tùy chỉnh Chat
+              {t('admin.prompts.chatCustomization')}
             </p>
             <p className="text-xs mt-0.5" style={{ color: showChatCustomization ? 'rgba(14,165,233,0.6)' : '#94a3b8' }}>
-              {showChatCustomization ? 'Đang chỉnh sửa...' : 'Giao diện & hành vi'}
+              {showChatCustomization ? t('admin.prompts.editing') : t('admin.prompts.chatCustomizationDesc')}
             </p>
           </div>
           <div className="absolute top-3 right-3 w-2 h-2 rounded-full" style={{
@@ -373,7 +451,6 @@ export function AdminPrompts() {
       </div>
 
       {showPromptsEditor ? (
-        /* Inline PromptsEditor */
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="p-5 border-b border-slate-100 flex items-center justify-between">
             <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
@@ -393,19 +470,18 @@ export function AdminPrompts() {
           </div>
         </div>
       ) : showChatCustomization ? (
-        /* Inline ChatCustomization */
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="p-5 border-b border-slate-100 flex items-center justify-between">
             <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
               <span className="material-symbols-outlined text-xl" style={{ color: '#0ea5e9' }}>chat</span>
-              Tùy chỉnh Chat — Giao diện &amp; hành vi
+              {t('admin.prompts.chatCustomization')}
             </h2>
             <button
               onClick={() => setShowChatCustomization(false)}
               className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
             >
               <X className="w-4 h-4" />
-              Đóng
+              {t('admin.prompts.cancel')}
             </button>
           </div>
           <div className="p-5">
@@ -413,429 +489,429 @@ export function AdminPrompts() {
           </div>
         </div>
       ) : (
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 mb-4">
-        <div className="flex items-center gap-3 mb-3">
-          <h2 className="text-base font-bold text-slate-800 shrink-0">Prompts</h2>
-          {/* Search */}
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Tìm kiếm..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:bg-white transition-colors"
-            />
-          </div>
-          <button
-            onClick={() => setShowCreate(true)}
-            className="flex items-center gap-1.5 px-3 py-2 bg-primary text-white rounded-xl text-sm font-medium hover:bg-primary/90 transition-colors shrink-0"
-          >
-            <Plus className="w-4 h-4" />
-            Tạo mới
-          </button>
-        </div>
-
-        {/* Filters row 1: Danh mục */}
-        <div className="flex flex-wrap gap-2 items-center">
-          <span className="text-xs font-medium text-slate-400 shrink-0">Danh mục:</span>
-          <button
-            onClick={() => setFilterCategory('all')}
-            className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-              filterCategory === 'all'
-                ? 'bg-primary text-white'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-            }`}
-          >
-            Tất cả
-          </button>
-          {CATEGORIES.map((cat) => (
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 mb-4 flex flex-col" style={{ height: 'calc(100vh - 340px)' }}>
+          <div className="flex items-center gap-3 mb-3">
+            <h2 className="text-base font-bold text-slate-800 shrink-0">Prompts</h2>
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input
+                type="text"
+                placeholder={t('admin.prompts.search')}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:bg-white transition-colors"
+              />
+            </div>
             <button
-              key={cat}
-              onClick={() => setFilterCategory(cat)}
+              onClick={() => setShowCreate(true)}
+              className="flex items-center gap-1.5 px-3 py-2 bg-primary text-white rounded-xl text-sm font-medium hover:bg-primary/90 transition-colors shrink-0"
+            >
+              <Plus className="w-4 h-4" />
+              {t('admin.prompts.createNew')}
+            </button>
+          </div>
+
+          <div className="flex flex-wrap gap-2 items-center shrink-0">
+            <span className="text-xs font-medium text-slate-400 shrink-0">{t('admin.prompts.category')}:</span>
+            <button
+              onClick={() => setFilterCategory('all')}
               className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-                filterCategory === cat
+                filterCategory === 'all'
                   ? 'bg-primary text-white'
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
-              {CATEGORY_LABELS[cat]}
+              {t('admin.prompts.all')}
             </button>
-          ))}
-        </div>
+            {CATEGORIES.map((cat) => (
+              <button
+                key={cat}
+                onClick={() => setFilterCategory(cat)}
+                className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                  filterCategory === cat
+                    ? 'bg-primary text-white'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                {CATEGORY_LABELS[cat]}
+              </button>
+            ))}
+          </div>
 
-        {/* Filters row 2: Ngôn ngữ */}
-        <div className="flex flex-wrap gap-2 items-center mt-2">
-          <span className="text-xs font-medium text-slate-400 shrink-0">Ngôn ngữ:</span>
-          <button
-            onClick={() => setFilterLanguage('all')}
-            className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-              filterLanguage === 'all'
-                ? 'bg-slate-700 text-white'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-            }`}
-          >
-            Tất cả
-          </button>
-          {LANGUAGES.map((lang) => (
+          <div className="flex flex-wrap gap-2 items-center mt-2 shrink-0">
+            <span className="text-xs font-medium text-slate-400 shrink-0">{t('admin.prompts.language')}:</span>
             <button
-              key={lang.value}
-              onClick={() => setFilterLanguage(lang.value)}
+              onClick={() => setFilterLanguage('all')}
               className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-                filterLanguage === lang.value
+                filterLanguage === 'all'
                   ? 'bg-slate-700 text-white'
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
-              {lang.label}
+              {t('admin.prompts.all')}
             </button>
-          ))}
-        </div>
+            {LANGUAGES.map((lang) => (
+              <button
+                key={lang.value}
+                onClick={() => setFilterLanguage(lang.value)}
+                className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                  filterLanguage === lang.value
+                    ? 'bg-slate-700 text-white'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                {lang.label}
+              </button>
+            ))}
+          </div>
 
-        <div className="flex gap-5 h-[calc(100vh-220px)]">
-          {/* Left Panel - List */}
-          <div className="w-[420px] flex flex-col bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-            {/* List */}
-            <div className="flex-1 overflow-y-auto p-3">
-            {loading ? (
-              <div className="flex items-center justify-center h-32">
-                <Loader2 className="w-6 h-6 animate-spin text-primary" />
-              </div>
-            ) : filteredPrompts.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-32 text-slate-400">
-                <FileText className="w-8 h-8 mb-2 opacity-50" />
-                <p className="text-sm">Không có prompts nào</p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {filteredPrompts.map((prompt) => {
-                  const catConfig = CATEGORY_CONFIG[prompt.category] || CATEGORY_CONFIG.general;
-                  const langLabel = LANGUAGES.find(l => l.value === prompt.language)?.label || prompt.language;
-                  return (
-                    <div
-                      key={prompt.id}
-                      onClick={() => { setSelectedPrompt(prompt); setIsEditing(false); setDeleteWarning(null); }}
-                      className={`group p-4 rounded-xl cursor-pointer transition-all border ${
-                        selectedPrompt?.id === prompt.id
-                          ? 'bg-primary/5 border-primary/30 shadow-sm'
-                          : 'bg-white border-transparent hover:bg-slate-50 hover:border-slate-200'
-                      }`}
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                            <h3 className="font-semibold text-slate-800 text-sm truncate">{prompt.name}</h3>
-                            {prompt.isSystem && (
-                              <span className="shrink-0 px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded text-[10px] font-medium">
-                                SYSTEM
-                              </span>
-                            )}
-                            <span className={`shrink-0 px-2 py-0.5 rounded text-[10px] font-medium ${catConfig.bg} ${catConfig.text}`}>
-                              {CATEGORY_LABELS[prompt.category]}
-                            </span>
-                          </div>
-                          <p className="text-xs text-slate-500 line-clamp-1">
-                            {langLabel} • {prompt.description || 'Không có mô tả'}
-                          </p>
-                        </div>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); handleToggleActive(prompt.id); }}
-                          className={`shrink-0 p-1 rounded transition-colors ${
-                            prompt.isActive
-                              ? 'text-emerald-500 hover:bg-emerald-50'
-                              : 'text-slate-400 hover:bg-slate-100'
+          {/* Separator */}
+          <div className="border-t border-slate-100 my-3" />
+
+          {/* Split View */}
+          <div className="flex gap-5 flex-1 min-h-0 items-stretch overflow-hidden">
+            {/* Left Panel - List */}
+            <div className="w-[420px] shrink-0 flex flex-col bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="flex-1 overflow-y-auto p-3">
+                {loading ? (
+                  <div className="flex items-center justify-center h-32">
+                    <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                  </div>
+                ) : filteredPrompts.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-32 text-slate-400">
+                    <FileText className="w-8 h-8 mb-2 opacity-50" />
+                    <p className="text-sm">{t('admin.prompts.empty')}</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {filteredPrompts.map((prompt) => {
+                      const catConfig = CATEGORY_CONFIG[prompt.category] || CATEGORY_CONFIG.general;
+                      const langLabel = LANGUAGES.find(l => l.value === prompt.language)?.label || prompt.language;
+                      return (
+                        <div
+                          key={prompt.id}
+                          onClick={() => { setSelectedPrompt(prompt); setIsEditing(false); setDeleteWarning(null); }}
+                          className={`group p-4 rounded-xl cursor-pointer transition-all border ${
+                            selectedPrompt?.id === prompt.id
+                              ? 'bg-primary/5 border-primary/30 shadow-sm'
+                              : 'bg-white border-transparent hover:bg-slate-50 hover:border-slate-200'
                           }`}
                         >
-                          {prompt.isActive ? <ToggleRight className="w-5 h-5" /> : <ToggleLeft className="w-5 h-5" />}
-                        </button>
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                                <h3 className="font-semibold text-slate-800 text-sm truncate">{prompt.name}</h3>
+                                {prompt.isSystem && (
+                                  <span className="shrink-0 px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded text-[10px] font-medium">
+                                    {t('admin.prompts.systemPrompt')}
+                                  </span>
+                                )}
+                                <span className={`shrink-0 px-2 py-0.5 rounded text-[10px] font-medium ${catConfig.bg} ${catConfig.text}`}>
+                                  {CATEGORY_LABELS[prompt.category]}
+                                </span>
+                              </div>
+                              <p className="text-xs text-slate-500 line-clamp-1">
+                                {langLabel} • {prompt.description || t('admin.prompts.noDescription')}
+                              </p>
+                            </div>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleToggleActive(prompt.id); }}
+                              className={`shrink-0 p-1 rounded transition-colors ${
+                                prompt.isActive
+                                  ? 'text-emerald-500 hover:bg-emerald-50'
+                                  : 'text-slate-400 hover:bg-slate-100'
+                              }`}
+                            >
+                              {prompt.isActive ? <ToggleRight className="w-5 h-5" /> : <ToggleLeft className="w-5 h-5" />}
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Right Panel - Detail/Edit */}
+            <div className="flex-1 bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col overflow-hidden">
+              {showCreate ? (
+                <div className="flex-1 flex flex-col">
+                  <div className="p-5 border-b border-slate-100 flex items-center justify-between">
+                    <h2 className="text-lg font-bold text-slate-800">{t('admin.prompts.createNew')}</h2>
+                    <button onClick={() => setShowCreate(false)} className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors">
+                      <X className="w-5 h-5 text-slate-400" />
+                    </button>
+                  </div>
+                  <div className="flex-1 overflow-y-auto p-5 space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                        {t('admin.prompts.id')} <span className="text-red-500">*</span>
+                        <span className="text-xs text-slate-400 font-normal ml-2">({t('admin.prompts.idSlug')})</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={newPrompt.id}
+                        onChange={(e) => setNewPrompt({ ...newPrompt, id: e.target.value })}
+                        className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 font-mono"
+                        placeholder="vd: my-custom-prompt"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                        {t('admin.prompts.promptName')} <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={newPrompt.name}
+                        onChange={(e) => setNewPrompt({ ...newPrompt, name: e.target.value })}
+                        className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                        placeholder="VD: Trợ lý Y tế"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1.5">{t('admin.prompts.description')}</label>
+                      <input
+                        type="text"
+                        value={newPrompt.description}
+                        onChange={(e) => setNewPrompt({ ...newPrompt, description: e.target.value })}
+                        className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                        placeholder="Mô tả ngắn về prompt này"
+                      />
+                    </div>
+                    <div className="flex gap-3">
+                      <div className="flex-1">
+                        <label className="block text-sm font-medium text-slate-700 mb-1.5">{t('admin.prompts.category')}</label>
+                        <select
+                          value={newPrompt.category}
+                          onChange={(e) => setNewPrompt({ ...newPrompt, category: e.target.value })}
+                          className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 bg-white"
+                        >
+                          {CATEGORIES.map((cat) => (
+                            <option key={cat} value={cat}>{CATEGORY_LABELS[cat]}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="flex-1">
+                        <label className="block text-sm font-medium text-slate-700 mb-1.5">{t('admin.prompts.language')}</label>
+                        <select
+                          value={newPrompt.language}
+                          onChange={(e) => setNewPrompt({ ...newPrompt, language: e.target.value })}
+                          className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 bg-white"
+                        >
+                          {LANGUAGES.map((lang) => (
+                            <option key={lang.value} value={lang.value}>{lang.label}</option>
+                          ))}
+                        </select>
                       </div>
                     </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* Right Panel - Detail/Edit */}
-          <div className="flex-1 bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col overflow-hidden">
-            {showCreate ? (
-              <div className="flex-1 flex flex-col">
-                <div className="p-5 border-b border-slate-100 flex items-center justify-between">
-                <h2 className="text-lg font-bold text-slate-800">Tạo System Prompt mới</h2>
-                <button onClick={() => setShowCreate(false)} className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors">
-                  <X className="w-5 h-5 text-slate-400" />
-                </button>
-              </div>
-              <div className="flex-1 overflow-y-auto p-5 space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                    ID <span className="text-red-500">*</span>
-                    <span className="text-xs text-slate-400 font-normal ml-2">(slug, không trùng)</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={newPrompt.id}
-                    onChange={(e) => setNewPrompt({ ...newPrompt, id: e.target.value })}
-                    className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 font-mono"
-                    placeholder="vd: my-custom-prompt"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                    Tên Prompt <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={newPrompt.name}
-                    onChange={(e) => setNewPrompt({ ...newPrompt, name: e.target.value })}
-                    className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-                    placeholder="VD: Trợ lý Y tế"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Mô tả</label>
-                  <input
-                    type="text"
-                    value={newPrompt.description}
-                    onChange={(e) => setNewPrompt({ ...newPrompt, description: e.target.value })}
-                    className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-                    placeholder="Mô tả ngắn về prompt này"
-                  />
-                </div>
-                <div className="flex gap-3">
-                  <div className="flex-1">
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Danh mục</label>
-                    <select
-                      value={newPrompt.category}
-                      onChange={(e) => setNewPrompt({ ...newPrompt, category: e.target.value })}
-                      className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 bg-white"
-                    >
-                      {CATEGORIES.map((cat) => (
-                        <option key={cat} value={cat}>{CATEGORY_LABELS[cat]}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="flex-1">
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Ngôn ngữ</label>
-                    <select
-                      value={newPrompt.language}
-                      onChange={(e) => setNewPrompt({ ...newPrompt, language: e.target.value })}
-                      className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 bg-white"
-                    >
-                      {LANGUAGES.map((lang) => (
-                        <option key={lang.value} value={lang.value}>{lang.label}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                <div className="flex-1">
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                    Nội dung Prompt <span className="text-red-500">*</span>
-                  </label>
-                  <textarea
-                    value={newPrompt.prompt}
-                    onChange={(e) => setNewPrompt({ ...newPrompt, prompt: e.target.value })}
-                    className="w-full h-56 px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none font-mono bg-slate-50"
-                    placeholder="Nhập nội dung system prompt..."
-                  />
-                </div>
-              </div>
-              <div className="p-5 border-t border-slate-100 flex justify-end gap-3">
-                <button
-                  onClick={() => setShowCreate(false)}
-                  className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl transition-colors text-sm font-medium"
-                >
-                  Hủy
-                </button>
-                <button
-                  onClick={handleCreate}
-                  disabled={saving || !newPrompt.id || !newPrompt.name || !newPrompt.prompt}
-                  className="px-5 py-2 bg-primary text-white rounded-xl hover:bg-primary/90 transition-colors text-sm font-medium disabled:opacity-50"
-                >
-                  {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Tạo mới'}
-                </button>
-              </div>
-            </div>
-          ) : selectedPrompt ? (
-            isEditing ? (
-              <div className="flex-1 flex flex-col">
-                <div className="p-5 border-b border-slate-100 flex items-center justify-between">
-                  <h2 className="text-lg font-bold text-slate-800">Chỉnh sửa Prompt</h2>
-                  <button onClick={() => setIsEditing(false)} className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors">
-                    <X className="w-5 h-5 text-slate-400" />
-                  </button>
-                </div>
-                <div className="flex-1 overflow-y-auto p-5 space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">ID</label>
-                    <input
-                      type="text"
-                      value={selectedPrompt.id}
-                      disabled
-                      className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm bg-slate-50 text-slate-400 font-mono"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                      Tên Prompt <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={editForm.name || ''}
-                      onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                      className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Mô tả</label>
-                    <input
-                      type="text"
-                      value={editForm.description || ''}
-                      onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-                      className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-                    />
-                  </div>
-                  <div className="flex gap-3">
                     <div className="flex-1">
-                      <label className="block text-sm font-medium text-slate-700 mb-1.5">Danh mục</label>
-                      <select
-                        value={editForm.category || 'general'}
-                        onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
-                        className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 bg-white"
-                      >
-                        {CATEGORIES.map((cat) => (
-                          <option key={cat} value={cat}>{CATEGORY_LABELS[cat]}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="flex-1">
-                      <label className="block text-sm font-medium text-slate-700 mb-1.5">Ngôn ngữ</label>
-                      <select
-                        value={editForm.language || 'vi'}
-                        onChange={(e) => setEditForm({ ...editForm, language: e.target.value })}
-                        className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 bg-white"
-                      >
-                        {LANGUAGES.map((lang) => (
-                          <option key={lang.value} value={lang.value}>{lang.label}</option>
-                        ))}
-                      </select>
+                      <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                        {t('admin.prompts.promptContentReq')} <span className="text-red-500">*</span>
+                      </label>
+                      <textarea
+                        value={newPrompt.prompt}
+                        onChange={(e) => setNewPrompt({ ...newPrompt, prompt: e.target.value })}
+                        className="w-full h-56 px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none font-mono bg-slate-50"
+                        placeholder="Nhập nội dung system prompt..."
+                      />
                     </div>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                      Nội dung Prompt <span className="text-red-500">*</span>
-                    </label>
-                    <textarea
-                      value={editForm.prompt || ''}
-                      onChange={(e) => setEditForm({ ...editForm, prompt: e.target.value })}
-                      className="w-full h-56 px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none font-mono bg-slate-50"
-                    />
+                  <div className="p-5 border-t border-slate-100 flex justify-end gap-3">
+                    <button
+                      onClick={() => setShowCreate(false)}
+                      className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl transition-colors text-sm font-medium"
+                    >
+                      {t('admin.prompts.cancel')}
+                    </button>
+                    <button
+                      onClick={handleCreate}
+                      disabled={saving || !newPrompt.id || !newPrompt.name || !newPrompt.prompt}
+                      className="px-5 py-2 bg-primary text-white rounded-xl hover:bg-primary/90 transition-colors text-sm font-medium disabled:opacity-50"
+                    >
+                      {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : t('admin.prompts.create')}
+                    </button>
                   </div>
                 </div>
-                <div className="p-5 border-t border-slate-100 flex justify-end gap-3">
-                  <button
-                    onClick={() => setIsEditing(false)}
-                    className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl transition-colors text-sm font-medium"
-                  >
-                    Hủy
-                  </button>
-                  <button
-                    onClick={handleSave}
-                    disabled={saving || !editForm.name || !editForm.prompt}
-                    className="px-5 py-2 bg-primary text-white rounded-xl hover:bg-primary/90 transition-colors text-sm font-medium disabled:opacity-50"
-                  >
-                    {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Lưu thay đổi'}
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="flex-1 flex flex-col">
-                <div className="p-5 border-b border-slate-100">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex items-center gap-3 flex-wrap">
-                      <h2 className="text-xl font-bold text-slate-800">{selectedPrompt.name}</h2>
-                      {selectedPrompt.isSystem && (
-                        <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
-                          SYSTEM
-                        </span>
-                      )}
-                      <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${CATEGORY_CONFIG[selectedPrompt.category]?.bg || 'bg-slate-100'} ${CATEGORY_CONFIG[selectedPrompt.category]?.text || 'text-slate-600'}`}>
-                        {CATEGORY_LABELS[selectedPrompt.category]}
-                      </span>
-                      <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-600">
-                        {LANGUAGES.find(l => l.value === selectedPrompt.language)?.label || selectedPrompt.language}
-                      </span>
-                      <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${
-                        selectedPrompt.isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-500'
-                      }`}>
-                        {selectedPrompt.isActive ? 'Đang bật' : 'Đã tắt'}
-                      </span>
+              ) : selectedPrompt ? (
+                isEditing ? (
+                  <div className="flex-1 flex flex-col">
+                    <div className="p-5 border-b border-slate-100 flex items-center justify-between">
+                      <h2 className="text-lg font-bold text-slate-800">{t('admin.prompts.edit')}</h2>
+                      <button onClick={() => setIsEditing(false)} className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors">
+                        <X className="w-5 h-5 text-slate-400" />
+                      </button>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex-1 overflow-y-auto p-5 space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1.5">{t('admin.prompts.id')}</label>
+                        <input
+                          type="text"
+                          value={selectedPrompt.id}
+                          disabled
+                          className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm bg-slate-50 text-slate-400 font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                          {t('admin.prompts.promptName')} <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={editForm.name || ''}
+                          onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                          className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1.5">{t('admin.prompts.description')}</label>
+                        <input
+                          type="text"
+                          value={editForm.description || ''}
+                          onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                          className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                        />
+                      </div>
+                      <div className="flex gap-3">
+                        <div className="flex-1">
+                          <label className="block text-sm font-medium text-slate-700 mb-1.5">{t('admin.prompts.category')}</label>
+                          <select
+                            value={editForm.category || 'general'}
+                            onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
+                            className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 bg-white"
+                          >
+                            {CATEGORIES.map((cat) => (
+                              <option key={cat} value={cat}>{CATEGORY_LABELS[cat]}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="flex-1">
+                          <label className="block text-sm font-medium text-slate-700 mb-1.5">{t('admin.prompts.language')}</label>
+                          <select
+                            value={editForm.language || 'vi'}
+                            onChange={(e) => setEditForm({ ...editForm, language: e.target.value })}
+                            className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 bg-white"
+                          >
+                            {LANGUAGES.map((lang) => (
+                              <option key={lang.value} value={lang.value}>{lang.label}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                          {t('admin.prompts.promptContentReq')} <span className="text-red-500">*</span>
+                        </label>
+                        <textarea
+                          value={editForm.prompt || ''}
+                          onChange={(e) => setEditForm({ ...editForm, prompt: e.target.value })}
+                          className="w-full h-56 px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none font-mono bg-slate-50"
+                        />
+                      </div>
+                    </div>
+                    <div className="p-5 border-t border-slate-100 flex justify-end gap-3">
                       <button
-                        onClick={() => handleEdit(selectedPrompt)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-primary hover:bg-primary/10 rounded-lg transition-colors"
+                        onClick={() => setIsEditing(false)}
+                        className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl transition-colors text-sm font-medium"
                       >
-                        <Edit2 className="w-4 h-4" />
-                        Chỉnh sửa
+                        {t('admin.prompts.cancel')}
                       </button>
                       <button
-                        onClick={() => handleDelete(selectedPrompt.id)}
-                        disabled={selectedPrompt.isSystem}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                        title={selectedPrompt.isSystem ? 'Không thể xóa prompt hệ thống' : 'Xóa prompt'}
+                        onClick={handleSave}
+                        disabled={saving || !editForm.name || !editForm.prompt}
+                        className="px-5 py-2 bg-primary text-white rounded-xl hover:bg-primary/90 transition-colors text-sm font-medium disabled:opacity-50"
                       >
-                        <Trash2 className="w-4 h-4" />
-                        Xóa
+                        {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : t('admin.prompts.save')}
                       </button>
                     </div>
                   </div>
-                  <p className="text-sm text-slate-500 mt-1 font-mono">{selectedPrompt.id}</p>
-                </div>
-                <div className="flex-1 overflow-y-auto p-5">
-                  <div className="mb-5">
-                    <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Mô tả</h3>
-                    <p className="text-slate-700">{selectedPrompt.description || 'Không có mô tả'}</p>
-                  </div>
-                  <div className="mb-5">
-                    <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Nội dung Prompt</h3>
-                    <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 max-h-64 overflow-y-auto">
-                      <pre className="whitespace-pre-wrap font-mono text-sm text-slate-700 leading-relaxed">
-                        {selectedPrompt.prompt}
-                      </pre>
+                ) : (
+                  <div className="flex-1 flex flex-col">
+                    <div className="p-5 border-b border-slate-100">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex items-center gap-3 flex-wrap">
+                          <h2 className="text-xl font-bold text-slate-800">{selectedPrompt.name}</h2>
+                          {selectedPrompt.isSystem && (
+                            <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
+                              {t('admin.prompts.systemPrompt')}
+                            </span>
+                          )}
+                          <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${CATEGORY_CONFIG[selectedPrompt.category]?.bg || 'bg-slate-100'} ${CATEGORY_CONFIG[selectedPrompt.category]?.text || 'text-slate-600'}`}>
+                            {CATEGORY_LABELS[selectedPrompt.category]}
+                          </span>
+                          <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-600">
+                            {LANGUAGES.find(l => l.value === selectedPrompt.language)?.label || selectedPrompt.language}
+                          </span>
+                          <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${
+                            selectedPrompt.isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-500'
+                          }`}>
+                            {selectedPrompt.isActive ? t('admin.prompts.enabled') : t('admin.prompts.disabled')}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleEdit(selectedPrompt)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-primary hover:bg-primary/10 rounded-lg transition-colors"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                            {t('admin.prompts.edit')}
+                          </button>
+                          <button
+                            onClick={() => handleDelete(selectedPrompt.id)}
+                            disabled={selectedPrompt.isSystem}
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                            title={selectedPrompt.isSystem ? t('admin.prompts.systemCannotDelete') : t('admin.prompts.deleteConfirm')}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                            {t('admin.prompts.deleteConfirm')}
+                          </button>
+                        </div>
+                      </div>
+                      <p className="text-sm text-slate-500 mt-1 font-mono">{selectedPrompt.id}</p>
+                    </div>
+                    <div className="flex-1 overflow-y-auto p-5">
+                      <div className="mb-5">
+                        <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">{t('admin.prompts.description')}</h3>
+                        <p className="text-slate-700">{selectedPrompt.description || t('admin.prompts.noDescription')}</p>
+                      </div>
+                      <div className="mb-5">
+                        <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">{t('admin.prompts.promptContent')}</h3>
+                        <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 max-h-64 overflow-y-auto">
+                          <pre className="whitespace-pre-wrap font-mono text-sm text-slate-700 leading-relaxed">
+                            {selectedPrompt.prompt}
+                          </pre>
+                        </div>
+                      </div>
+                      <div className="flex gap-6 text-xs text-slate-400 pt-2">
+                        <span>{t('admin.prompts.created')}: {formatDate(selectedPrompt.createdAt)}</span>
+                        <span>{t('admin.prompts.updated')}: {formatDate(selectedPrompt.updatedAt)}</span>
+                      </div>
                     </div>
                   </div>
-                  <div className="flex gap-6 text-xs text-slate-400 pt-2">
-                    <span>Tạo: {formatDate(selectedPrompt.createdAt)}</span>
-                    <span>Cập nhật: {formatDate(selectedPrompt.updatedAt)}</span>
+                )
+              ) : (
+                <div className="flex-1 flex items-center justify-center">
+                  <div className="text-center max-w-xs">
+                    <div className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-slate-100 flex items-center justify-center">
+                      <FileText className="w-10 h-10 text-slate-400" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-slate-700 mb-2">{t('admin.prompts.selectPrompt')}</h3>
+                    <p className="text-sm text-slate-500 mb-4">
+                      {t('admin.prompts.selectPromptDesc')}
+                    </p>
+                    <button
+                      onClick={() => setShowCreate(true)}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary text-white rounded-xl hover:bg-primary/90 transition-colors text-sm font-medium"
+                    >
+                      <Plus className="w-4 h-4" />
+                      {t('admin.prompts.createNew')}
+                    </button>
                   </div>
                 </div>
-              </div>
-            )
-          ) : (
-            <div className="flex-1 flex items-center justify-center">
-              <div className="text-center max-w-xs">
-                <div className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-slate-100 flex items-center justify-center">
-                  <FileText className="w-10 h-10 text-slate-400" />
-                </div>
-                <h3 className="text-lg font-semibold text-slate-700 mb-2">Chưa chọn Prompt nào</h3>
-                <p className="text-sm text-slate-500 mb-4">
-                  Chọn một prompt từ danh sách bên trái để xem chi tiết
-                </p>
-                <button
-                  onClick={() => setShowCreate(true)}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary text-white rounded-xl hover:bg-primary/90 transition-colors text-sm font-medium"
-                >
-                  <Plus className="w-4 h-4" />
-                  Tạo Prompt mới
-                </button>
-              </div>
+              )}
             </div>
-          )}
           </div>
         </div>
-          </div>
-      </div>
       )}
     </AdminLayout>
   );

@@ -1,8 +1,8 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { AdminLayout } from './AdminLayout';
 import { getAccessToken, getRefreshToken } from '../../lib/api';
-import { useAuthStore } from '@/stores';
-import { useTranslation } from '@/lib/translations';
+import { useAuthStore, useLanguageStore } from '@/stores';
+import { useTranslation, Language } from '@/lib/translations';
 import clsx from 'clsx';
 import {
   Users, Search, Shield, ShieldOff, Trash2,
@@ -34,6 +34,38 @@ interface CreatedUserResult {
   message: string;
 }
 
+// ─── Translation helper function ───
+function useAdminUsersTranslation() {
+  const language = useLanguageStore((state) => state.language);
+  const { t } = useTranslation();
+
+  // Get locale code for date formatting
+  const getLocale = (): string => {
+    switch (language) {
+      case 'vi': return 'vi-VN';
+      case 'en': return 'en-US';
+      case 'ar': return 'ar-SA';
+      case 'fr': return 'fr-FR';
+      default: return 'en-US';
+    }
+  };
+
+  // Format date based on current language
+  const formatDate = (date: string | null): string => {
+    if (!date) return '—';
+    return new Date(date).toLocaleDateString(getLocale(), {
+      day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
+    });
+  };
+
+  return {
+    t,
+    language,
+    formatDate,
+    getLocale,
+  };
+}
+
 export default function AdminUsers() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -49,7 +81,7 @@ export default function AdminUsers() {
   const currentUser = useAuthStore((s) => s.user);
   const isSuperAdmin = currentUser?.role === 'super_admin';
 
-  const { t } = useTranslation();
+  const { t, language, formatDate } = useAdminUsersTranslation();
 
   // ─── Auth helper with auto-refresh + friendly error ───
   const adminFetch = useCallback(async (path: string, init: RequestInit = {}, retry = true): Promise<any> => {

@@ -1,19 +1,49 @@
 import { ReactNode, useState, useRef, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore, useLanguageStore } from '@/stores';
+import { translations, Language } from '@/lib/translations';
 import clsx from 'clsx';
 import madaLogo from '@/assets/mada-logo.png';
 
+// ============== TRANSLATION HELPER ==============
+function useTranslation() {
+  const { language } = useLanguageStore();
+  const t = (key: string): string => {
+    const lang = language as Language;
+    const keys = key.split('.');
+    let value: unknown = translations[lang];
+    for (const k of keys) {
+      if (value && typeof value === 'object' && k in value) {
+        value = (value as Record<string, unknown>)[k];
+      } else {
+        // Fallback to Vietnamese if key not found
+        let fallback: unknown = translations['vi'];
+        for (const fk of keys) {
+          if (fallback && typeof fallback === 'object' && fk in fallback) {
+            fallback = (fallback as Record<string, unknown>)[fk];
+          } else {
+            return key; // Return key if not found
+          }
+        }
+        return typeof fallback === 'string' ? fallback : key;
+      }
+    }
+    return typeof value === 'string' ? value : key;
+  };
+  return { t, language };
+}
+
 // ============== LANGUAGE SWITCHER (top bar) ==============
-const LANGUAGES: Array<{ code: 'vi' | 'en' | 'ar' | 'fr'; label: string; flag: string }> = [
-  { code: 'vi', label: 'Tiếng Việt', flag: '🇻🇳' },
-  { code: 'en', label: 'English', flag: '🇬🇧' },
-  { code: 'ar', label: 'العربية', flag: '🇸🇦' },
-  { code: 'fr', label: 'Français', flag: '🇫🇷' },
+const LANGUAGES: Array<{ code: 'vi' | 'en' | 'ar' | 'fr'; labelKey: string; flag: string }> = [
+  { code: 'vi', labelKey: 'admin.layout.langVi', flag: '🇻🇳' },
+  { code: 'en', labelKey: 'admin.layout.langEn', flag: '🇬🇧' },
+  { code: 'ar', labelKey: 'admin.layout.langAr', flag: '🇸🇦' },
+  { code: 'fr', labelKey: 'admin.layout.langFr', flag: '🇫🇷' },
 ];
 
 function LanguageSwitcher() {
-  const { language, setLanguage } = useLanguageStore();
+  const { t, language } = useTranslation();
+  const { setLanguage } = useLanguageStore();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const current = LANGUAGES.find((l) => l.code === language) || LANGUAGES[0];
@@ -39,7 +69,7 @@ function LanguageSwitcher() {
         type="button"
         onClick={() => setOpen((v) => !v)}
         className="flex items-center gap-2 px-3 py-2 rounded-xl border border-outline-variant/40 bg-white/60 hover:bg-white/90 transition-all shadow-sm"
-        title="Switch language"
+        title={t('admin.layout.switchLanguage')}
       >
         <span className="text-base leading-none">{current.flag}</span>
         <span className="font-label-sm font-semibold text-on-surface">{current.code.toUpperCase()}</span>
@@ -61,7 +91,7 @@ function LanguageSwitcher() {
               )}
             >
               <span className="text-base leading-none">{l.flag}</span>
-              <span className="font-label-md">{l.label}</span>
+              <span className="font-label-md">{t(l.labelKey)}</span>
               {language === l.code && (
                 <span className="material-symbols-outlined text-[18px] ml-auto text-primary">check</span>
               )}
@@ -74,31 +104,28 @@ function LanguageSwitcher() {
 }
 
 interface NavItem {
-  label: string;
-  labelEn: string;
-  labelAr: string;
-  labelFr: string;
+  labelKey: string;
   href: string;
   icon: string;
-  superAdminOnly?: boolean; // Chỉ Super Admin mới thấy
-  adminOnly?: boolean; // Chỉ Admin trở lên mới thấy
+  superAdminOnly?: boolean;
+  adminOnly?: boolean;
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { label: 'Tổng quan', labelEn: 'Overview', labelAr: 'نظرة عامة', labelFr: 'Aperçu', href: '/admin', icon: 'dashboard' },
-  { label: 'AI chatbox', labelEn: 'AI chatbox', labelAr: 'مربع الدردشة', labelFr: 'Chatbot IA', href: '/admin/widget', icon: 'smart_toy' },
-  { label: 'Người dùng', labelEn: 'Users', labelAr: 'المستخدمين', labelFr: 'Utilisateurs', href: '/admin/users', icon: 'group' },
-  { label: 'Sản phẩm', labelEn: 'Products', labelAr: 'المنتجات', labelFr: 'Produits', href: '/admin/products', icon: 'inventory_2' },
-  { label: 'Scraper & KB', labelEn: 'Scraper & KB', labelAr: 'الكاشطة', labelFr: 'Scraper', href: '/admin/scraper', icon: 'cloud_download' },
-  { label: 'Nhật ký Hoạt động', labelEn: 'Activity Logs', labelAr: 'سجل النشاط', labelFr: 'Journal d\'activité', href: '/admin/logs', icon: 'history_edu' },
-  { label: 'Phân tích', labelEn: 'Analytics', labelAr: 'التحليلات', labelFr: 'Analytique', href: '/admin/analytics', icon: 'analytics' },
-  { label: 'Agents', labelEn: 'Agents', labelAr: 'الوكلاء', labelFr: 'Agents', href: '/admin/agents', icon: 'smart_toy' },
-  { label: 'Câu hỏi gợi ý', labelEn: 'Suggested Questions', labelAr: 'الأسئلة المقترحة', labelFr: 'Questions suggérées', href: '/admin/suggested-questions', icon: 'quiz', superAdminOnly: true },
-  { label: 'System Prompts', labelEn: 'System Prompts', labelAr: 'التعليمات', labelFr: 'Prompts Système', href: '/admin/prompts', icon: 'edit_note' },
-  { label: 'Tư vấn', labelEn: 'Consultations', labelAr: 'الاستشارات', labelFr: 'Consultations', href: '/admin/consultations', icon: 'support_agent' },
-  { label: 'Upload File', labelEn: 'File Upload', labelAr: 'رفع الملفات', labelFr: 'Upload de fichiers', href: '/admin/file-management', icon: 'upload_file', superAdminOnly: true },
-  { label: 'Cấu hình', labelEn: 'Settings', labelAr: 'الإعدادات', labelFr: 'Paramètres', href: '/admin/settings', icon: 'settings_suggest', superAdminOnly: true },
-  { label: 'Phân quyền', labelEn: 'Permissions', labelAr: 'الأذونات', labelFr: 'Permissions', href: '/admin/permissions', icon: 'admin_panel_settings', superAdminOnly: true },
+  { labelKey: 'admin.layout.navOverview', href: '/admin', icon: 'dashboard' },
+  { labelKey: 'admin.layout.navAiChatbox', href: '/admin/widget', icon: 'smart_toy' },
+  { labelKey: 'admin.layout.navUsers', href: '/admin/users', icon: 'group' },
+  { labelKey: 'admin.layout.navProducts', href: '/admin/products', icon: 'inventory_2' },
+  { labelKey: 'admin.layout.navScraper', href: '/admin/scraper', icon: 'cloud_download' },
+  { labelKey: 'admin.layout.navActivityLogs', href: '/admin/logs', icon: 'history_edu' },
+  { labelKey: 'admin.layout.navAnalytics', href: '/admin/analytics', icon: 'analytics' },
+  { labelKey: 'admin.layout.navAgents', href: '/admin/agents', icon: 'smart_toy' },
+  { labelKey: 'admin.layout.navSuggestedQuestions', href: '/admin/suggested-questions', icon: 'quiz', superAdminOnly: true },
+  { labelKey: 'admin.layout.navSystemPrompts', href: '/admin/prompts', icon: 'edit_note' },
+  { labelKey: 'admin.layout.navConsultations', href: '/admin/consultations', icon: 'support_agent' },
+  { labelKey: 'admin.layout.navFileUpload', href: '/admin/file-management', icon: 'upload_file', superAdminOnly: true },
+  { labelKey: 'admin.layout.navSettings', href: '/admin/settings', icon: 'settings_suggest', superAdminOnly: true },
+  { labelKey: 'admin.layout.navPermissions', href: '/admin/permissions', icon: 'admin_panel_settings', superAdminOnly: true },
 ];
 
 interface AdminLayoutProps {
@@ -117,8 +144,8 @@ interface AdminLayoutProps {
 
 export function AdminLayout({
   children,
-  title = 'Trung tâm Điều khiển',
-  titleEn = 'Control Center',
+  title,
+  titleEn,
   titleAr,
   titleFr,
   subtitle,
@@ -128,31 +155,28 @@ export function AdminLayout({
   showFab: _showFab = false,
   showLayoutTitle = true,
 }: AdminLayoutProps) {
+  const { t, language } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout, isSuperAdmin } = useAuthStore();
-  const { language } = useLanguageStore();
   const isRtl = language === 'ar';
   const isUserSuperAdmin = isSuperAdmin();
 
-  const getNavLabel = (item: NavItem) => {
-    if (language === 'en') return item.labelEn;
-    if (language === 'ar') return item.labelAr;
-    if (language === 'fr') return item.labelFr;
-    return item.label;
-  };
+  // Default title/subtitle from translations
+  const defaultTitle = t('admin.layout.controlCenter');
+  const defaultSubtitle = t('admin.layout.controlCenterSub');
 
   // Pick title/subtitle theo ngôn ngữ hiện tại
   const currentTitle =
-    language === 'en' ? (titleEn || title) :
-    language === 'ar' ? (titleAr || title) :
-    language === 'fr' ? (titleFr || title) :
-    title;
+    language === 'en' ? (titleEn || title || defaultTitle) :
+    language === 'ar' ? (titleAr || title || defaultTitle) :
+    language === 'fr' ? (titleFr || title || defaultTitle) :
+    (title || defaultTitle);
   const currentSubtitle =
-    language === 'en' ? (subtitleEn || subtitle) :
-    language === 'ar' ? (subtitleAr || subtitle) :
-    language === 'fr' ? (subtitleFr || subtitle) :
-    subtitle;
+    language === 'en' ? (subtitleEn || subtitle || defaultSubtitle) :
+    language === 'ar' ? (subtitleAr || subtitle || defaultSubtitle) :
+    language === 'fr' ? (subtitleFr || subtitle || defaultSubtitle) :
+    (subtitle || defaultSubtitle);
 
   const handleLogout = () => {
     logout();
@@ -222,9 +246,9 @@ export function AdminLayout({
                 )}
               >
                 <span className="material-symbols-outlined">{item.icon}</span>
-                <span className="font-label-md">{getNavLabel(item)}</span>
+                <span className="font-label-md">{t(item.labelKey)}</span>
                 {item.superAdminOnly && (
-                  <span className="material-symbols-outlined text-xs text-warning ml-auto" title={language === 'vi' ? 'Chỉ Super Admin' : 'Super Admin Only'}>lock</span>
+                  <span className="material-symbols-outlined text-xs text-warning ml-auto" title={t('admin.layout.superAdminOnly')}>lock</span>
                 )}
               </Link>
             );

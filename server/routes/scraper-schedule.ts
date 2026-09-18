@@ -6,6 +6,7 @@
 
 import { Router, Request, Response } from 'express';
 import { authenticate, requireRole } from '../lib/auth';
+import cron from 'node-cron';
 import { 
   getSchedulerStatus, 
   addScrapingJob, 
@@ -52,7 +53,6 @@ router.post('/schedule/jobs', (req: Request, res: Response) => {
     }
     
     // Validate cron expression
-    const cron = require('node-cron');
     if (!cron.validate(schedule)) {
       return res.status(400).json({
         success: false,
@@ -87,7 +87,6 @@ router.put('/schedule/jobs/:jobId', (req: Request, res: Response) => {
     
     // Validate cron if provided
     if (updates.schedule) {
-      const cron = require('node-cron');
       if (!cron.validate(updates.schedule)) {
         return res.status(400).json({
           success: false,

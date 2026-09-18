@@ -15,6 +15,10 @@
  */
 
 import type { MadaCategory } from '../../lib/data/seed-products';
+import Database from 'better-sqlite3';
+import path from 'path';
+import fs from 'fs';
+
 
 // ============== CORE IDENTITY ==============
 
@@ -390,9 +394,7 @@ function loadDbPrompts(): Map<string, string> {
   }
   try {
     // Lazy import tránh circular dependency (db.ts → systemPrompts.ts)
-    const Database = require('better-sqlite3');
-    const path = require('path');
-    const fs = require('fs');
+    // Modules imported at top level
     const DATA_DIR = path.join(process.cwd(), 'data');
     const DB_PATH = path.join(DATA_DIR, 'mada.db');
     if (!fs.existsSync(DB_PATH)) return new Map();
@@ -586,9 +588,7 @@ function loadAiInstructions(): AIInstructionsData {
   }
   
   try {
-    const Database = require('better-sqlite3');
-    const path = require('path');
-    const fs = require('fs');
+    // Modules imported at top level
     const DATA_DIR = path.join(process.cwd(), 'data');
     const DB_PATH = path.join(DATA_DIR, 'mada.db');
     if (!fs.existsSync(DB_PATH)) {
@@ -666,9 +666,7 @@ function loadEmotionSettings(): EmotionSettingsData {
   }
 
   try {
-    const Database = require('better-sqlite3');
-    const path = require('path');
-    const fs = require('fs');
+    // Modules imported at top level
     const DATA_DIR = path.join(process.cwd(), 'data');
     const DB_PATH = path.join(DATA_DIR, 'mada.db');
     if (!fs.existsSync(DB_PATH)) {

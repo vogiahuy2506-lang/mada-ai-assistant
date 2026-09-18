@@ -10,6 +10,7 @@ import {
   SAFETY_RULES,
   RESPONSE_FORMAT,
 } from './prompts/systemPrompts';
+import { SAMPLE_QUESTIONS } from './seedQuestions';
 
 const DATA_DIR = path.join(process.cwd(), 'data');
 if (!fs.existsSync(DATA_DIR)) {
@@ -485,9 +486,7 @@ function seedSuggestedQuestions() {
     return;
   }
 
-  // Import SAMPLE_QUESTIONS from server-side module (avoids cross-directory import that breaks esbuild)
-  const { SAMPLE_QUESTIONS } = require('./seedQuestions');
-  
+  // SAMPLE_QUESTIONS is imported at top level
   const now = new Date().toISOString();
   const stmt = db.prepare(`
     INSERT INTO suggested_questions (id, category, view_mode, language, question, sort_order, is_active, created_at, updated_at)

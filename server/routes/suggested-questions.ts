@@ -367,9 +367,9 @@ router.delete('/bulk/delete', requireAdmin, (req: Request, res: Response) => {
 });
 
 // POST /api/admin/suggested-questions/import-defaults - Import SAMPLE_QUESTIONS from types as defaults
-router.post('/import-defaults', requireAdmin, (_req: Request, res: Response) => {
+router.post('/import-defaults', requireAdmin, async (_req: Request, res: Response) => {
   try {
-    const { SAMPLE_QUESTIONS } = require('../../src/types/index.ts');
+    const { SAMPLE_QUESTIONS } = await import('../lib/seedQuestions.js');
     
     const now = new Date().toISOString();
     const stmt = db.prepare(`

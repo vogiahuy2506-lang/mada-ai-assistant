@@ -16,6 +16,7 @@
 
 // @ts-nocheck
 import Stripe from 'stripe';
+import db from '../db';
 
 // Initialize Stripe
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_placeholder', {
@@ -30,7 +31,6 @@ const customers = new Map();
 
 function getDb() {
   try {
-    const db = require('../db').default;
     return db;
   } catch {
     return null;
@@ -127,7 +127,7 @@ function saveCustomer(userId, stripeCustomerId, email, name) {
   customers.set(userId, { stripeCustomerId, email, name });
 }
 
-function getStripeCustomerIdByUserId(userId) {
+export function getStripeCustomerIdByUserId(userId) {
   const db = getDb();
   if (db) {
     try {

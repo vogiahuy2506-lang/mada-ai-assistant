@@ -1,49 +1,28 @@
 📦 SQLite database initialized at /Users/vohuy/Downloads/MADA AI ASSISTANT/mada-ai-assistant/data/mada.db
 ✅ Knowledge items translation columns added
+✅ KB Products translation columns added
 🌱 Seeded 9 KB categories (4 languages: VI/EN/AR/FR)
+📋 suggested_questions already has 224 rows — skipping seed
 📋 admin_prompts already has 10 rows — skipping seed
-📋 prompt_templates already has 10 rows — skipping seed
+📋 prompt_templates already has 25 rows — skipping seed
 🌱 Seeded 51 system settings
 ✅ Schema created
 ✅ Users table schema is up-to-date
 👤 Admin already exists: admin@mada.vn
 🔑 SuperAdmin password verified: superadmin@mada.vn
-✅ Permissions schema initialized
-📋 Permissions already seeded (48 rows) — skipping
 ⚠️  Using default JWT_SECRET. Set JWT_SECRET env var in production!
-ℹ️ [System] MADA AI Server started on port 3001
+ℹ️ [System] MADA AI Server started on port 3005
 ℹ️ [RAG Engine] Vector store initialized with 65 documents
 ✅ [Auth Service] Auth service configured (SQLite + JWT + bcrypt)
 ℹ️ [Security] CORS policy: any localhost port allowed (dev)
 🔧 Initializing services...
 ✅ Using Gemini embeddings: AQ.Ab8RN6I...
-📚 Loaded 0 documents from disk
-📦 Serving frontend from /Users/vohuy/Downloads/MADA AI ASSISTANT/mada-ai-assistant/dist/client
-✅ Connected to Pinecone index: mada-knowledge-base
-✅ Vector store initialized (pinecone)
-✅ RAG Engine initialized with Gemini
-🛡️ Guardrails system initialized
-🚀 RAG system ready
-🛡️ Guardrails system ready
-📚 [Sync KB] Syncing 60 items to vector store...
-⚠️ Failed to embed doc kbprod_prod_c303eaa9-314_1789361698700: [GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent: fetch failed
-node:events:486
-      throw er; // Unhandled 'error' event
-      ^
-
-Error: listen EADDRINUSE: address already in use 0.0.0.0:3001
-    at Server.setupListenHandle [as _listen2] (node:net:1940:16)
-    at listenInCluster (node:net:1997:12)
-    at node:net:2206:7
-    at process.processTicksAndRejections (node:internal/process/task_queues:90:21)
-Emitted 'error' event on Server instance at:
-    at emitErrorNT (node:net:1976:8)
-    at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
-  code: 'EADDRINUSE',
-  errno: -48,
-  syscall: 'listen',
-  address: '0.0.0.0',
-  port: 3001
-}
-
-Node.js v25.4.0
+✅ Permissions schema initialized
+📋 Permissions already seeded (48 rows) — skipping
+🚀 MADA AI Server running on http://0.0.0.0:3005
+📚 API Documentation: http://localhost:3005/api/health
+🌐 Frontend: http://localhost:3005/
+⚡ RAG Enabled: false
+🤖 Gemini Configured: true
+🛡️  Guardrails: Active
+🔐 Auth: SQLite + bcrypt + JWT (admin: admin@mada.vn)

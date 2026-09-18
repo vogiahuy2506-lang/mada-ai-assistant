@@ -18,6 +18,7 @@ import {
   getOrCreateCustomer,
   stripe,
   getPlanById,
+  getStripeCustomerIdByUserId,
 } from '../lib/payments/stripe';
 
 const router = express.Router();
@@ -201,7 +202,6 @@ router.get('/subscription/:userId', async (req, res) => {
     }
 
     // Get customer ID
-    const { getStripeCustomerIdByUserId } = require('../lib/payments/stripe');
     const customerId = getStripeCustomerIdByUserId(userId);
     
     if (!customerId) {

@@ -6,7 +6,8 @@ import fs from 'fs';
 import db from '../lib/db';
 import { syncProductToKnowledge, syncAllPublishedProducts } from '../lib/syncKbProducts';
 import { syncItemToVector } from '../lib/syncItemToVector';
-import { authenticate, requireRole } from '../lib/auth';
+import { authenticate, requireRole, hashPassword } from '../lib/auth';
+import { invalidateAiInstructionsCache, invalidateEmotionSettingsCache } from '../lib/prompts/systemPrompts';
 
 const router = Router();
 
@@ -1698,7 +1699,6 @@ router.post('/users/:id/reset-password', requireAdmin, (req: Request, res: Respo
     };
     const tempPassword = generateTempPassword();
 
-    const { hashPassword } = require('../lib/auth');
     const passwordHash = hashPassword(tempPassword);
     const now = new Date().toISOString();
 
@@ -1748,7 +1748,6 @@ router.post('/users', requireAdmin, (req: Request, res: Response) => {
       return res.status(400).json({ success: false, error: 'Mật khẩu phải tối thiểu 6 ký tự' });
     }
 
-    const { hashPassword } = require('../lib/auth');
     const id = `user-${uuidv4()}`;
     const passwordHash = hashPassword(tempPassword);
     const now = new Date().toISOString();
@@ -1945,7 +1944,6 @@ router.put('/ai-instructions', requireAdmin, (req: Request, res: Response) => {
     
     // ⭐ Invalidate AI instructions cache để thay đổi có hiệu lực ngay
     try {
-      const { invalidateAiInstructionsCache } = require('../lib/prompts/systemPrompts');
       invalidateAiInstructionsCache();
     } catch (e) {
       console.warn('[admin/ai-instructions] Failed to invalidate cache:', e);
@@ -2041,7 +2039,6 @@ router.put('/emotion-settings', requireAdmin, (req: Request, res: Response) => {
 
     // ⭐ Invalidate emotion settings cache
     try {
-      const { invalidateEmotionSettingsCache } = require('../lib/prompts/systemPrompts');
       invalidateEmotionSettingsCache();
     } catch (e) {
       console.warn('[admin/emotion-settings] Failed to invalidate cache:', e);

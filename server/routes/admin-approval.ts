@@ -12,6 +12,7 @@ import {
   getPendingUsers, 
   getPendingUsersCount 
 } from '../lib/user-approval';
+import db from '../lib/db';
 
 const router = Router();
 
@@ -59,7 +60,7 @@ router.get('/stats', (_req: Request, res: Response) => {
       total: 0,
     };
     
-    const statusCounts = require('../lib/db').default.prepare(`
+    const statusCounts = db.prepare(`
       SELECT status, COUNT(*) as count FROM users GROUP BY status
     `).all() as Array<{ status: string; count: number }>;
     

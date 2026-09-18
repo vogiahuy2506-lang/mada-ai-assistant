@@ -118,6 +118,19 @@ const t = {
       endpoints: 'Endpoints',
       loading: 'Đang tải...',
     },
+    system: {
+      dbTitle: 'System Settings (DB)',
+      dbDescription: 'Toàn bộ cấu hình hệ thống được lưu trong {table} table.',
+      accessDenied: 'Truy cập bị hạn chế',
+      accessDeniedDesc: 'System DB chỉ dành cho Super Admin. Bạn không có quyền xem hoặc chỉnh sửa các cấu hình này.',
+      limitedAccess: 'Limited Access',
+      loading: 'Đang tải...',
+    },
+    templates: {
+      sectionTitle: 'Prompt Templates',
+      sectionDesc: 'Quản lý và áp dụng các template prompt có sẵn theo ngành.',
+      bannerDesc: 'Template có sẵn theo ngành',
+    },
     languages: ['Tiếng Việt', 'English', 'Français', 'العربية'],
   },
   en: {
@@ -224,6 +237,19 @@ const t = {
       storageSize: 'Storage Size',
       endpoints: 'Endpoints',
       loading: 'Loading...',
+    },
+    system: {
+      dbTitle: 'System Settings (DB)',
+      dbDescription: 'All system configurations are stored in the {table} table.',
+      accessDenied: 'Access Restricted',
+      accessDeniedDesc: 'System DB is for Super Admin only. You do not have permission to view or edit these configurations.',
+      limitedAccess: 'Limited Access',
+      loading: 'Loading...',
+    },
+    templates: {
+      sectionTitle: 'Prompt Templates',
+      sectionDesc: 'Manage and apply pre-built industry prompt templates.',
+      bannerDesc: 'Pre-built industry templates',
     },
     languages: ['Tiếng Việt', 'English', 'Français', 'العربية'],
   },
@@ -332,6 +358,19 @@ const t = {
       endpoints: 'نقاط النهاية',
       loading: 'جاري التحميل...',
     },
+    system: {
+      dbTitle: 'إعدادات النظام (قاعدة البيانات)',
+      dbDescription: 'يتم تخزين جميع إعدادات النظام في جدول {table}.',
+      accessDenied: 'الوصول مقيد',
+      accessDeniedDesc: 'قاعدة بيانات النظام مخصصة للمدير الأعلى فقط. ليس لديك صلاحية عرض أو تعديل هذه الإعدادات.',
+      limitedAccess: 'وصول محدود',
+      loading: 'جاري التحميل...',
+    },
+    templates: {
+      sectionTitle: 'قوالب الطلبات',
+      sectionDesc: 'إدارة وتطبيق قوالب الطلبات الجاهزة حسب الصناعة.',
+      bannerDesc: 'قوالب جاهزة حسب الصناعة',
+    },
     languages: ['Tiếng Việt', 'English', 'Français', 'العربية'],
   },
   fr: {
@@ -438,6 +477,19 @@ const t = {
       storageSize: 'Taille Stockage',
       endpoints: 'Points de Terminaison',
       loading: 'Chargement...',
+    },
+    system: {
+      dbTitle: 'Paramètres Système (BD)',
+      dbDescription: 'Toutes les configurations système sont stockées dans la table {table}.',
+      accessDenied: 'Accès Restreint',
+      accessDeniedDesc: 'La base de données système est réservée aux Super Admins. Vous n\'avez pas la permission de voir ou modifier ces configurations.',
+      limitedAccess: 'Accès Limité',
+      loading: 'Chargement...',
+    },
+    templates: {
+      sectionTitle: 'Modèles de Prompts',
+      sectionDesc: 'Gérez et appliquez des modèles de prompts prédéfinis par secteur.',
+      bannerDesc: 'Modèles prédéfinis par secteur',
     },
     languages: ['Tiếng Việt', 'English', 'Français', 'العربية'],
   },
@@ -564,7 +616,7 @@ export function AdminSettings() {
                 </div>
                 <div className="text-left flex-1">
                   <h3 className="font-bold text-slate-800">Prompt Templates</h3>
-                  <p className="text-xs text-slate-500 mt-0.5">Template có sẵn theo ngành</p>
+                  <p className="text-xs text-slate-500 mt-0.5">{lang.templates.bannerDesc}</p>
                 </div>
                 <ArrowRight className="w-5 h-5 text-indigo-400 group-hover:translate-x-1 transition-transform" />
               </button>
@@ -581,7 +633,7 @@ export function AdminSettings() {
                 <div className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary/5 border border-primary/20">
                   <Lock className="w-4 h-4 text-primary" />
                   <span className="text-sm font-semibold text-primary">Admin</span>
-                  <span className="text-xs text-on-surface-variant">(Limited Access)</span>
+                  <span className="text-xs text-on-surface-variant">({lang.system.limitedAccess})</span>
                 </div>
               )}
             </div>
@@ -599,7 +651,7 @@ export function AdminSettings() {
             { id: 'ai', label: lang.tabs.ai, icon: Sparkles },
             { id: 'integrations', label: lang.tabs.integrations, icon: Cloud },
             { id: 'live', label: lang.tabs.live, icon: AlertCircle },
-            { id: 'system', label: 'System DB', icon: Lock },
+            { id: 'system', label: lang.tabs.system, icon: Lock },
             { id: 'templates', label: lang.tabs.templates, icon: FileText },
           ] as { id: Tab; label: string; icon: any }[]
         ).map((t) => (
@@ -1229,9 +1281,9 @@ export function AdminSettings() {
           <div className="px-8 py-6 border-b border-outline-variant">
             <div className="flex items-center justify-between flex-wrap gap-4">
               <div>
-                <h3 className="text-lg font-black text-on-surface">System Settings (DB)</h3>
+                <h3 className="text-lg font-black text-on-surface">{lang.system.dbTitle}</h3>
                 <p className="text-sm text-on-surface-variant mt-1">
-                  Toàn bộ cấu hình hệ thống được lưu trong <code className="text-xs bg-surface-variant px-1.5 py-0.5 rounded">system_settings</code> table.
+                  {lang.system.dbDescription.replace('{table}', <code className="text-xs bg-surface-variant px-1.5 py-0.5 rounded">system_settings</code>)}
                 </p>
               </div>
               {!isSuperAdmin && (
@@ -1247,14 +1299,14 @@ export function AdminSettings() {
           {!isSuperAdmin ? (
             <div className="p-12 text-center">
               <Shield className="w-12 h-12 mx-auto text-amber-500 mb-4" />
-              <h4 className="text-lg font-bold text-amber-800 mb-2">Truy cập bị hạn chế</h4>
+              <h4 className="text-lg font-bold text-amber-800 mb-2">{lang.system.accessDenied}</h4>
               <p className="text-sm text-amber-600">
-                System DB chỉ dành cho Super Admin. Bạn không có quyền xem hoặc chỉnh sửa các cấu hình này.
+                {lang.system.accessDeniedDesc}
               </p>
             </div>
           ) : Object.keys(dbGrouped).length === 0 ? (
             <div className="p-8 text-center">
-              <p className="text-sm text-on-surface-variant">Đang tải...</p>
+              <p className="text-sm text-on-surface-variant">{lang.system.loading}</p>
             </div>
           ) : (
             <div className="p-8">
@@ -1303,9 +1355,9 @@ export function AdminSettings() {
         <div className="space-y-6">
           <div className="bg-white rounded-2xl border border-outline-variant overflow-hidden">
             <div className="px-8 py-6 border-b border-outline-variant">
-              <h3 className="text-lg font-black text-on-surface">Prompt Templates</h3>
+              <h3 className="text-lg font-black text-on-surface">{lang.templates.sectionTitle}</h3>
               <p className="text-sm text-on-surface-variant mt-1">
-                Quản lý và áp dụng các template prompt có sẵn theo ngành.
+                {lang.templates.sectionDesc}
               </p>
             </div>
             <div className="p-6">

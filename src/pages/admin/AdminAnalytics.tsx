@@ -2,8 +2,24 @@ import { useState, useEffect } from 'react';
 import { AdminLayout } from './AdminLayout';
 import { adminApi, UserStats, KnowledgeStats } from './adminApi';
 import { getAccessToken } from '@/lib/api';
-import { useTranslation } from '@/lib/translations';
+import { translations, type Language } from '@/lib/translations';
+import { useLanguageStore } from '@/stores';
 import clsx from 'clsx';
+
+// Translation helper function using useLanguageStore
+function useAnalyticsTranslation() {
+  const language = useLanguageStore((state) => state.language) as Language;
+  const t = (key: string, params?: Record<string, string>) => {
+    let text = translations[language]?.[key as keyof typeof translations[typeof language]] as string || key;
+    if (params) {
+      Object.entries(params).forEach(([k, v]) => {
+        text = text.replace(`{${k}}`, v);
+      });
+    }
+    return text;
+  };
+  return { t, language };
+}
 
 type TimeRange = '24h' | '7d' | '30d' | '90d';
 
@@ -98,6 +114,9 @@ export function AdminAnalytics() {
   const [chatMetrics, setChatMetrics] = useState<ChatMetrics | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Translation hook
+  const { t } = useAnalyticsTranslation();
+
   // Load analytics data
   useEffect(() => {
     let cancelled = false;
@@ -149,7 +168,6 @@ export function AdminAnalytics() {
   ];
   const maxLog = Math.max(...logLevelBars.map((l) => l.count), 1);
 
-  const { t } = useTranslation();
   const rangeLabel = (r: TimeRange) => t(`admin.analytics.range.${r}`);
   return (
     <AdminLayout
@@ -201,30 +219,30 @@ export function AdminAnalytics() {
       <section className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 mb-8">
         {/* Total Chats */}
         <div className="bg-gradient-to-br from-violet-50 to-violet-100 rounded-2xl p-3 border-2 border-violet-200">
-          <p className="text-[10px] font-bold text-violet-600 uppercase">Tổng chat</p>
+          <p className="text-[10px] font-bold text-violet-600 uppercase">{t('analytics.totalChat')}</p>
           <p className="text-xl font-black text-violet-700">{chatMetrics?.totalChats?.toLocaleString() || '—'}</p>
-          <p className="text-[10px] text-violet-500">Hội thoại</p>
+          <p className="text-[10px] text-violet-500">{t('analytics.conversations')}</p>
         </div>
 
         {/* Avg Response Time */}
         <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl p-3 border-2 border-blue-200">
-          <p className="text-[10px] font-bold text-blue-600 uppercase">Phản hồi TB</p>
+          <p className="text-[10px] font-bold text-blue-600 uppercase">{t('analytics.avgResponseTime')}</p>
           <p className="text-xl font-black text-blue-700">{chatMetrics?.avgResponseTime != null ? (Math.round(chatMetrics.avgResponseTime / 100) / 10) + 's' : '—'}</p>
-          <p className="text-[10px] text-blue-500">Mili giây</p>
+          <p className="text-[10px] text-blue-500">{t('analytics.milliseconds')}</p>
         </div>
 
         {/* Avg Confidence */}
         <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-2xl p-3 border-2 border-green-200">
-          <p className="text-[10px] font-bold text-green-600 uppercase">Độ tin cậy TB</p>
+          <p className="text-[10px] font-bold text-green-600 uppercase">{t('analytics.avgConfidence')}</p>
           <p className="text-xl font-black text-green-700">{chatMetrics?.avgConfidence != null ? chatMetrics.avgConfidence.toFixed(0) + '%' : '—'}</p>
-          <p className="text-[10px] text-green-500">Confidence</p>
+          <p className="text-[10px] text-green-500">{t('analytics.confidence')}</p>
         </div>
 
         {/* Error Rate */}
         <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-2xl p-3 border-2 border-red-200">
-          <p className="text-[10px] font-bold text-red-600 uppercase">Tỷ lệ lỗi</p>
+          <p className="text-[10px] font-bold text-red-600 uppercase">{t('analytics.errorRate')}</p>
           <p className="text-xl font-black text-red-700">{chatMetrics?.errorRate != null ? chatMetrics.errorRate.toFixed(1) + '%' : '—'}</p>
-          <p className="text-[10px] text-red-500">Thất bại</p>
+          <p className="text-[10px] text-red-500">{t('analytics.failures')}</p>
         </div>
 
         {/* Total Users */}
@@ -246,7 +264,7 @@ export function AdminAnalytics() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         {/* Hourly Activity Chart */}
         <div className="bg-white rounded-2xl border-2 border-black p-6 shadow-[4px_4px_0px_0px_#000]">
-          <h3 className="text-lg font-bold mb-4">Hoạt động theo giờ</h3>
+          <h3 className="text-lg font-bold mb-4">{t('analytics.hourlyActivity')}</h3>
           <BarChart
             data={(chatMetrics?.chatsByHour ?? []).map(h => ({
               label: h.hour.toString().padStart(2, '0') + 'h',
@@ -258,7 +276,7 @@ export function AdminAnalytics() {
 
         {/* Category Distribution */}
         <div className="bg-white rounded-2xl border-2 border-black p-6 shadow-[4px_4px_0px_0px_#000]">
-          <h3 className="text-lg font-bold mb-4">Phân bố danh mục AT</h3>
+          <h3 className="text-lg font-bold mb-4">{t('analytics.categoryDistribution')}</h3>
           <PieChart
             data={(chatMetrics?.categoryUsage ?? []).map((c, i) => ({
               label: c.category,
@@ -273,7 +291,7 @@ export function AdminAnalytics() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
         {/* Top Queries */}
         <div className="lg:col-span-2 bg-white rounded-2xl border-2 border-black p-6 shadow-[4px_4px_0px_0px_#000]">
-          <h3 className="text-lg font-bold mb-4">Câu hỏi phổ biến nhất</h3>
+          <h3 className="text-lg font-bold mb-4">{t('analytics.topQueries')}</h3>
           <div className="space-y-2">
             {(chatMetrics?.topQueries ?? []).map((q, i) => (
               <div key={i} className="flex items-center gap-3 p-2 bg-gray-50 rounded-lg">
@@ -292,7 +310,7 @@ export function AdminAnalytics() {
 
         {/* Language Distribution */}
         <div className="bg-white rounded-2xl border-2 border-black p-6 shadow-[4px_4px_0px_0px_#000]">
-          <h3 className="text-lg font-bold mb-4">Ngôn ngữ sử dụng</h3>
+          <h3 className="text-lg font-bold mb-4">{t('analytics.languageDistribution')}</h3>
           <div className="space-y-3">
             {(chatMetrics?.languageDistribution ?? []).map((l, i) => (
               <div key={i}>
@@ -322,9 +340,9 @@ export function AdminAnalytics() {
             <span className="material-symbols-outlined text-primary text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>group</span>
           </div>
           <div>
-            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">TỔNG NGƯỜI DÙNG</p>
+            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">{t('analytics.totalUsersUpper')}</p>
             <h3 className="text-xl font-black text-on-surface">{userStats?.total ?? '—'}</h3>
-            <p className="text-[10px] text-on-surface-variant mt-1">{userStats?.active ?? 0} đang hoạt động</p>
+            <p className="text-[10px] text-on-surface-variant mt-1">{userStats?.active ?? 0} {t('analytics.active')}</p>
           </div>
         </div>
 
@@ -333,9 +351,9 @@ export function AdminAnalytics() {
             <span className="material-symbols-outlined text-secondary text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>description</span>
           </div>
           <div>
-            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">TÀI LIỆU KB</p>
+            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">{t('analytics.kbDocuments')}</p>
             <h3 className="text-xl font-black text-on-surface">{kb?.totalDocuments ?? '—'}</h3>
-            <p className="text-[10px] text-on-surface-variant mt-1">{kb?.totalCategories ?? 0} danh mục</p>
+            <p className="text-[10px] text-on-surface-variant mt-1">{kb?.totalCategories ?? 0} {t('analytics.categories')}</p>
           </div>
         </div>
 
@@ -344,9 +362,9 @@ export function AdminAnalytics() {
             <span className="material-symbols-outlined text-tertiary text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>list_alt</span>
           </div>
           <div>
-            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">SỰ KIỆN LOG</p>
+            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">{t('analytics.logEvents')}</p>
             <h3 className="text-xl font-black text-on-surface">{logs?.total ?? '—'}</h3>
-            <p className="text-[10px] text-on-surface-variant mt-1">Tổng cộng</p>
+            <p className="text-[10px] text-on-surface-variant mt-1">{t('analytics.total')}</p>
           </div>
         </div>
 
@@ -368,9 +386,9 @@ export function AdminAnalytics() {
         <div className="relative bg-gradient-to-br from-white/80 to-white/40 backdrop-blur-xl rounded-3xl border-3 border-black p-8 shadow-[12px_12px_0px_0px_#000]">
           <div className="absolute inset-0 bg-gradient-to-b from-white/40 to-transparent rounded-3xl"></div>
           <div className="relative z-10">
-            <h3 className="text-xl font-black text-on-surface mb-6">Phân bổ hoạt động log</h3>
+            <h3 className="text-xl font-black text-on-surface mb-6">{t('analytics.logActivity')}</h3>
             {loading ? (
-              <div className="py-10 text-center text-on-surface-variant">Đang tải...</div>
+              <div className="py-10 text-center text-on-surface-variant">{t('common.loading')}</div>
             ) : (
               <div className="space-y-4">
                 {logLevelBars.map((b) => (
@@ -396,9 +414,9 @@ export function AdminAnalytics() {
         <div className="relative bg-gradient-to-br from-white/80 to-white/40 backdrop-blur-xl rounded-3xl border-3 border-black p-8 shadow-[12px_12px_0px_0px_#000]">
           <div className="absolute inset-0 bg-gradient-to-b from-white/40 to-transparent rounded-3xl"></div>
           <div className="relative z-10">
-            <h3 className="text-xl font-black text-on-surface mb-6">Thông tin server</h3>
+            <h3 className="text-xl font-black text-on-surface mb-6">{t('analytics.serverInfo')}</h3>
             {loading || !srv ? (
-              <div className="py-10 text-center text-on-surface-variant">Đang tải...</div>
+              <div className="py-10 text-center text-on-surface-variant">{t('common.loading')}</div>
             ) : (
               <div className="space-y-3">
                 {[
@@ -425,13 +443,13 @@ export function AdminAnalytics() {
         <div className="lg:col-span-2 relative bg-gradient-to-br from-white/80 to-white/40 backdrop-blur-xl rounded-3xl border-3 border-black p-8 shadow-[12px_12px_0px_0px_#000]">
           <div className="absolute inset-0 bg-gradient-to-b from-white/40 to-transparent rounded-3xl"></div>
           <div className="relative z-10">
-            <h3 className="text-xl font-black text-on-surface mb-6">Thống kê người dùng</h3>
+            <h3 className="text-xl font-black text-on-surface mb-6">{t('analytics.userStats')}</h3>
             {loading || !userStats ? (
-              <div className="py-10 text-center text-on-surface-variant">Đang tải...</div>
+              <div className="py-10 text-center text-on-surface-variant">{t('common.loading')}</div>
             ) : (
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {[
-                  { label: 'Tổng', value: userStats.total, color: 'primary' },
+                  { label: t('analytics.total'), value: userStats.total, color: 'primary' },
                   { label: 'Active', value: userStats.active, color: 'secondary' },
                   { label: 'Suspended', value: userStats.suspended, color: 'error' },
                   { label: 'Pending', value: userStats.pending, color: 'tertiary' },
@@ -454,27 +472,27 @@ export function AdminAnalytics() {
         <div className="relative bg-gradient-to-br from-white/80 to-white/40 backdrop-blur-xl rounded-3xl border-3 border-black p-8 shadow-[12px_12px_0px_0px_#000]">
           <div className="absolute inset-0 bg-gradient-to-b from-white/40 to-transparent rounded-3xl"></div>
           <div className="relative z-10">
-            <h3 className="text-xl font-black text-on-surface mb-6">Knowledge Base</h3>
+            <h3 className="text-xl font-black text-on-surface mb-6">{t('analytics.knowledgeBase')}</h3>
             {loading || !kb ? (
-              <div className="py-10 text-center text-on-surface-variant">Đang tải...</div>
+              <div className="py-10 text-center text-on-surface-variant">{t('common.loading')}</div>
             ) : (
               <div className="space-y-3">
                 <div className="flex justify-between p-4 bg-primary/10 rounded-xl border-2 border-primary/30">
-                  <span className="text-sm font-medium">Tổng tài liệu</span>
+                  <span className="text-sm font-medium">{t('analytics.totalDocs')}</span>
                   <span className="text-lg font-black text-primary">{kb.totalDocuments}</span>
                 </div>
                 <div className="flex justify-between p-4 bg-secondary/10 rounded-xl border-2 border-secondary/30">
-                  <span className="text-sm font-medium">Danh mục</span>
+                  <span className="text-sm font-medium">{t('analytics.categories')}</span>
                   <span className="text-lg font-black text-secondary">{kb.totalCategories}</span>
                 </div>
                 {kb.totalSize !== undefined && (
                   <div className="flex justify-between p-4 bg-tertiary/10 rounded-xl border-2 border-tertiary/30">
-                    <span className="text-sm font-medium">Dung lượng</span>
+                    <span className="text-sm font-medium">{t('analytics.storage')}</span>
                     <span className="text-lg font-black text-tertiary">{(kb.totalSize / 1024).toFixed(2)} KB</span>
                   </div>
                 )}
                 <a href="/data" className="block mt-4 text-center py-3 bg-primary text-white rounded-xl font-bold text-sm border-2 border-black shadow-[3px_3px_0px_0px_#000] hover:-translate-x-1 hover:-translate-y-1 hover:shadow-[4px_4px_0px_0px_#000] transition-all">
-                  Mở trang QL Tri thức →
+                  {t('analytics.openKbPage')} →
                 </a>
               </div>
             )}

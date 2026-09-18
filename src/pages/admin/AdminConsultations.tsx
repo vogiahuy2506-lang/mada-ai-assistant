@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { AdminLayout } from './AdminLayout';
 import { adminApi, type Consultation } from './adminApi';
 import { useTranslation } from '@/lib/translations';
+import { useLanguageStore } from '@/stores';
 import clsx from 'clsx';
 
 export function AdminConsultations() {
@@ -9,6 +10,9 @@ export function AdminConsultations() {
   const [loading, setLoading] = useState(true);
   const [selectedRequest, setSelectedRequest] = useState<Consultation | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('all');
+
+  const { t } = useTranslation();
+  const language = useLanguageStore((s) => s.language);
 
   const fetchRequests = async () => {
     try {
@@ -54,8 +58,6 @@ export function AdminConsultations() {
     contacted: 'bg-green-100 text-green-800 border-green-300',
   };
 
-  const { t } = useTranslation();
-
   const statusLabels = {
     pending: t('admin.consult.status.pending'),
     reviewed: t('admin.consult.status.reviewed'),
@@ -98,7 +100,7 @@ export function AdminConsultations() {
             <span className="material-symbols-outlined text-on-surface text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>inbox</span>
           </div>
           <div>
-            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">TỔNG YÊU CẦU</p>
+            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">{t('admin.consult.totalRequests')}</p>
             <h3 className="text-xl font-black text-on-surface">{requests.length}</h3>
           </div>
         </div>
@@ -109,7 +111,7 @@ export function AdminConsultations() {
             <span className="material-symbols-outlined text-yellow-600 text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>pending_actions</span>
           </div>
           <div>
-            <p className="text-[10px] font-bold text-yellow-700 uppercase tracking-wider mb-1">CHỜ XỬ LÝ</p>
+            <p className="text-[10px] font-bold text-yellow-700 uppercase tracking-wider mb-1">{t('admin.consult.pending')}</p>
             <h3 className="text-xl font-black text-yellow-700">{requests.filter(r => r.status === 'pending').length}</h3>
           </div>
         </div>
@@ -120,7 +122,7 @@ export function AdminConsultations() {
             <span className="material-symbols-outlined text-blue-600 text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>visibility</span>
           </div>
           <div>
-            <p className="text-[10px] font-bold text-blue-700 uppercase tracking-wider mb-1">ĐÃ XEM</p>
+            <p className="text-[10px] font-bold text-blue-700 uppercase tracking-wider mb-1">{t('admin.consult.reviewed')}</p>
             <h3 className="text-xl font-black text-blue-700">{requests.filter(r => r.status === 'reviewed').length}</h3>
           </div>
         </div>
@@ -131,7 +133,7 @@ export function AdminConsultations() {
             <span className="material-symbols-outlined text-green-600 text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
           </div>
           <div>
-            <p className="text-[10px] font-bold text-green-700 uppercase tracking-wider mb-1">ĐÃ LIÊN HỆ</p>
+            <p className="text-[10px] font-bold text-green-700 uppercase tracking-wider mb-1">{t('admin.consult.contacted')}</p>
             <h3 className="text-xl font-black text-green-700">{requests.filter(r => r.status === 'contacted').length}</h3>
           </div>
         </div>
@@ -140,7 +142,7 @@ export function AdminConsultations() {
       {/* Filter & Action Row */}
       <div className="flex items-center justify-between mb-8 flex-wrap gap-4">
         <div className="flex items-center gap-3 p-1.5 bg-white/60 backdrop-blur-xl rounded-full border-2 border-black">
-          <span className="text-on-surface-variant font-medium text-sm ml-4 mr-2">Lọc:</span>
+          <span className="text-on-surface-variant font-medium text-sm ml-4 mr-2">{t('admin.consult.filter')}</span>
           <button
             onClick={() => setStatusFilter('all')}
             className={clsx(
@@ -150,7 +152,7 @@ export function AdminConsultations() {
                 : 'bg-transparent text-on-surface-variant hover:bg-white/80 border-transparent hover:border-black transition-colors'
             )}
           >
-            Tất cả
+            {t('admin.consult.all')}
           </button>
           <button
             onClick={() => setStatusFilter('pending')}
@@ -189,7 +191,7 @@ export function AdminConsultations() {
         <div>
           <button className="flex items-center gap-2 bg-white text-primary px-6 py-2.5 rounded-full font-bold text-sm border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] transition-all group">
             <span className="material-symbols-outlined text-sm transition-transform group-hover:-translate-y-1">cloud_download</span>
-            Xuất báo cáo hệ thống
+            {t('admin.consult.exportReport')}
           </button>
         </div>
       </div>
@@ -203,16 +205,16 @@ export function AdminConsultations() {
             <div className="w-16 h-16 rounded-2xl bg-gray-100 border-2 border-black flex items-center justify-center mb-4 shadow-[4px_4px_0px_0px_#000] animate-pulse">
               <span className="material-symbols-outlined text-gray-400 text-3xl">hourglass_empty</span>
             </div>
-            <p className="text-lg font-bold text-gray-500">Đang tải dữ liệu...</p>
+            <p className="text-lg font-bold text-gray-500">{t('admin.consult.loading')}</p>
           </div>
         ) : filteredRequests.length === 0 ? (
           <div className="relative z-10 flex flex-col items-center justify-center min-h-[400px]">
             <div className="w-24 h-24 rounded-2xl bg-gray-100 border-2 border-black flex items-center justify-center mb-6 text-gray-400 transform rotate-[-3deg] hover:rotate-0 transition-all duration-300 shadow-[8px_8px_0px_0px_#000]">
               <span className="material-symbols-outlined text-5xl">inbox</span>
             </div>
-            <h4 className="text-2xl font-black text-on-surface mb-2">Không có yêu cầu nào</h4>
+            <h4 className="text-2xl font-black text-on-surface mb-2">{t('admin.consult.noRequests')}</h4>
             <p className="text-base font-medium text-on-surface-variant text-center max-w-sm">
-              Hiện tại chưa có yêu cầu tư vấn mới nào cần xử lý trong hệ thống.
+              {t('admin.consult.noRequestsHint')}
             </p>
           </div>
         ) : (
@@ -245,7 +247,7 @@ export function AdminConsultations() {
                   
                   <div className="flex items-center gap-3 flex-wrap">
                     <span className="px-3 py-1.5 rounded-full text-xs font-bold uppercase border-2 bg-gray-50 border-black">
-                      {new Date(request.created_at).toLocaleDateString('vi-VN', {
+                      {new Date(request.created_at).toLocaleDateString(language === 'ar' ? 'ar-SA' : language === 'fr' ? 'fr-FR' : language === 'en' ? 'en-US' : 'vi-VN', {
                         day: '2-digit',
                         month: '2-digit',
                         year: 'numeric',
@@ -258,7 +260,7 @@ export function AdminConsultations() {
                       {statusLabels[request.status]}
                     </span>
                     <button className="px-4 py-2 rounded-full bg-primary text-white text-sm font-bold border-2 border-black shadow-[2px_2px_0px_0px_#000] hover:translate-x-[-1px] hover:-translate-y-[1px] hover:shadow-[3px_3px_0px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all">
-                      Xem chi tiết
+                      {t('admin.consult.viewDetails')}
                     </button>
                   </div>
                 </div>
@@ -298,8 +300,8 @@ export function AdminConsultations() {
                     <span className="material-symbols-outlined text-white text-2xl" style={{ fontVariationSettings: "'FILL' 1" }}>clinical_notes</span>
                   </div>
                   <div>
-                    <h3 className="text-2xl font-black text-on-surface">Chi tiết yêu cầu</h3>
-                    <p className="text-sm text-on-surface-variant">Mã: #{selectedRequest.id.slice(0, 8)}</p>
+                    <h3 className="text-2xl font-black text-on-surface">{t('admin.consult.requestDetails')}</h3>
+                    <p className="text-sm text-on-surface-variant">{t('admin.consult.code')} #{selectedRequest.id.slice(0, 8)}</p>
                   </div>
                 </div>
                 <button
@@ -316,18 +318,18 @@ export function AdminConsultations() {
               {/* Info Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="bg-white/60 backdrop-blur-xl rounded-2xl p-4 border-2 border-black shadow-[3px_3px_0px_0px_#000]">
-                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Họ tên</label>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">{t('admin.consult.fullName')}</label>
                   <p className="font-bold text-on-surface text-lg">{selectedRequest.name}</p>
                 </div>
                 <div className="bg-white/60 backdrop-blur-xl rounded-2xl p-4 border-2 border-black shadow-[3px_3px_0px_0px_#000]">
-                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Email</label>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">{t('admin.common.email')}</label>
                   <a href={`mailto:${selectedRequest.email}`} className="font-bold text-primary hover:underline">
                     {selectedRequest.email}
                   </a>
                 </div>
                 {selectedRequest.phone && (
                   <div className="bg-white/60 backdrop-blur-xl rounded-2xl p-4 border-2 border-black shadow-[3px_3px_0px_0px_#000]">
-                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Điện thoại</label>
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">{t('admin.consult.phone')}</label>
                     <a href={`tel:${selectedRequest.phone}`} className="font-bold text-primary hover:underline flex items-center gap-2">
                       <span className="material-symbols-outlined text-sm">phone</span>
                       {selectedRequest.phone}
@@ -335,9 +337,9 @@ export function AdminConsultations() {
                   </div>
                 )}
                 <div className="bg-white/60 backdrop-blur-xl rounded-2xl p-4 border-2 border-black shadow-[3px_3px_0px_0px_#000]">
-                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Ngày gửi</label>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">{t('admin.consult.dateSent')}</label>
                   <p className="font-bold text-on-surface">
-                    {new Date(selectedRequest.created_at).toLocaleString('vi-VN', {
+                    {new Date(selectedRequest.created_at).toLocaleString(language === 'ar' ? 'ar-SA' : language === 'fr' ? 'fr-FR' : language === 'en' ? 'en-US' : 'vi-VN', {
                       day: '2-digit',
                       month: '2-digit',
                       year: 'numeric',
@@ -350,7 +352,7 @@ export function AdminConsultations() {
 
               {/* Message Content */}
               <div className="bg-white/60 backdrop-blur-xl rounded-2xl p-6 border-2 border-black shadow-[3px_3px_0px_0px_#000]">
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">Nội dung yêu cầu</label>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">{t('admin.consult.requestContent')}</label>
                 <div className="p-4 bg-gray-50/60 rounded-xl border border-black/20">
                   <p className="whitespace-pre-wrap text-on-surface leading-relaxed">{selectedRequest.message}</p>
                 </div>
@@ -358,7 +360,7 @@ export function AdminConsultations() {
 
               {/* Status Update */}
               <div className="bg-white/60 backdrop-blur-xl rounded-2xl p-6 border-2 border-black shadow-[3px_3px_0px_0px_#000]">
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-4">Cập nhật trạng thái</label>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-4">{t('admin.consult.updateStatus')}</label>
                 <div className="flex flex-wrap gap-3">
                   {(['pending', 'reviewed', 'contacted'] as const).map((status) => (
                     <button
@@ -386,18 +388,18 @@ export function AdminConsultations() {
             {/* Modal Footer */}
             <div className="p-6 border-t-2 border-black bg-white/80 backdrop-blur-xl flex flex-col sm:flex-row justify-end gap-3">
               <a
-                href={`mailto:${selectedRequest.email}?subject=Re: Yêu cầu tư vấn MADA&body=Xin chào ${selectedRequest.name},`}
+                href={`mailto:${selectedRequest.email}?subject=Re: ${t('admin.topBar.consultations')}&body=${t('consult.title')}, ${selectedRequest.name},`}
                 className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-primary text-white font-bold text-sm border-2 border-black shadow-[4px_4px_0px_0px_#000] hover:-translate-x-1 hover:-translate-y-1 hover:shadow-[5px_5px_0px_0px_#000] active:translate-x-0 active:translate-y-0 active:shadow-none transition-all"
               >
                 <span className="material-symbols-outlined">email</span>
-                Trả lời qua Email
+                {t('admin.consult.replyEmail')}
               </a>
               <button
                 onClick={() => setSelectedRequest(null)}
                 className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-white text-on-surface font-bold text-sm border-2 border-black shadow-[4px_4px_0px_0px_#000] hover:-translate-x-1 hover:-translate-y-1 hover:shadow-[5px_5px_0px_0px_#000] active:translate-x-0 active:translate-y-0 active:shadow-none transition-all"
               >
                 <span className="material-symbols-outlined">close</span>
-                Đóng
+                {t('admin.consult.close')}
               </button>
             </div>
           </div>

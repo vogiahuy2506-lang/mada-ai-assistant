@@ -2,6 +2,29 @@ import { useEffect, useState, useCallback } from 'react';
 import { AdminLayout } from './AdminLayout';
 import { adminApi, AdminUser, KnowledgeStats, UserStats } from './adminApi';
 import { useTranslation, TranslationKey } from '@/lib/translations';
+import { useLanguageStore } from '@/stores';
+
+// Translation helper hook that uses useLanguageStore
+function useAdminOverviewTranslation() {
+  const { language } = useLanguageStore();
+  const { t } = useTranslation();
+  
+  // Helper to get bot name by ID
+  const getBotName = (botId: string): string => {
+    const botKeyMap: Record<string, string> = {
+      'bot-hearing': 'admin.overview.bot1',
+      'bot-vision': 'admin.overview.bot2',
+      'bot-speech': 'admin.overview.bot3',
+      'bot-cognitive': 'admin.overview.bot4',
+      'bot-neuro': 'admin.overview.bot5',
+      'bot-mobility': 'admin.overview.bot6',
+      'bot-regulatory': 'admin.overview.bot7',
+    };
+    return t(botKeyMap[botId] || botId);
+  };
+
+  return { t, language, getBotName };
+}
 
 function timeAgo(iso: string | null, t: (key: TranslationKey) => string): string {
   if (!iso) return t('admin.users.neverLogin');
@@ -22,6 +45,8 @@ export function AdminOverview() {
   const [recentUsers, setRecentUsers] = useState<AdminUser[]>([]);
   const [filterBotId, setFilterBotId] = useState<string>('');
   const [loading, setLoading] = useState(true);
+
+  const { t, language, getBotName } = useAdminOverviewTranslation();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -54,7 +79,6 @@ export function AdminOverview() {
 
   useEffect(() => { load(); }, [load]);
 
-  const { t } = useTranslation();
   return (
     <AdminLayout
       title={t('admin.topBar.overview')}
@@ -147,13 +171,13 @@ export function AdminOverview() {
               className="h-10 px-3 rounded-lg border-2 border-black font-label-md bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
             >
               <option value="">{t('admin.overview.allBots')}</option>
-              <option value="bot-hearing">Bot 1: Hearing</option>
-              <option value="bot-vision">Bot 2: Vision</option>
-              <option value="bot-speech">Bot 3: Speech</option>
-              <option value="bot-cognitive">Bot 4: Cognitive</option>
-              <option value="bot-neuro">Bot 5: Neuro-Movement</option>
-              <option value="bot-mobility">Bot 6: Mobility</option>
-              <option value="bot-regulatory">Bot 7: Regulatory</option>
+              <option value="bot-hearing">{getBotName('bot-hearing')}</option>
+              <option value="bot-vision">{getBotName('bot-vision')}</option>
+              <option value="bot-speech">{getBotName('bot-speech')}</option>
+              <option value="bot-cognitive">{getBotName('bot-cognitive')}</option>
+              <option value="bot-neuro">{getBotName('bot-neuro')}</option>
+              <option value="bot-mobility">{getBotName('bot-mobility')}</option>
+              <option value="bot-regulatory">{getBotName('bot-regulatory')}</option>
             </select>
           </div>
         </div>
@@ -188,7 +212,7 @@ export function AdminOverview() {
               <p className="text-sm text-on-surface-variant">{t('admin.overview.recentAccounts')}</p>
             </div>
             <a href="/admin/users" className="px-5 py-2.5 rounded-full bg-primary text-white text-sm font-bold border-2 border-black shadow-[3px_3px_0px_0px_#000] hover:-translate-x-1 hover:-translate-y-1 hover:shadow-[4px_4px_0px_0px_#000] transition-all">
-              {t('admin.common.view')} tất cả →
+              {t('admin.overview.viewAll')} →
             </a>
           </div>
           <div className="overflow-x-auto">

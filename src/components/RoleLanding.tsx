@@ -1,8 +1,18 @@
 import { useEffect, useState } from 'react';
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
-import { useAuthStore } from '@/stores';
+import { useAuthStore, useLanguageStore } from '@/stores';
+import { translations, type Language } from '@/lib/translations';
+
+// Translation helper function using useLanguageStore
+const useTranslation = () => {
+  const language = useLanguageStore((state) => state.language) as Language;
+  return (key: string): string => {
+    return translations[language]?.[key] || translations.vi[key] || key;
+  };
+};
 
 export function RoleLanding() {
+  const t = useTranslation();
   const user = useAuthStore((s) => s.user);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const loginWithGoogle = useAuthStore((s) => s.loginWithGoogle);
@@ -58,7 +68,7 @@ export function RoleLanding() {
           }} />
           <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
           <p style={{ marginTop: 16, color: '#64748b', fontFamily: 'Inter, sans-serif', fontSize: 14 }}>
-            Đang tải...
+            {t('roleLanding.loading')}
           </p>
         </div>
       </div>

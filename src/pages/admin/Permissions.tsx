@@ -7,7 +7,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { AdminLayout } from './AdminLayout';
 import { getAccessToken, getRefreshToken, type Permission, type UserPermissions } from '../../lib/api';
-import { useAuthStore } from '@/stores';
+import { useAuthStore, useLanguageStore } from '@/stores';
 import clsx from 'clsx';
 import {
   Shield, ShieldCheck, Key, Users, Package, 
@@ -16,6 +16,66 @@ import {
 } from 'lucide-react';
 
 type TabType = 'users' | 'roles' | 'plans';
+type Language = 'vi' | 'en' | 'ar' | 'fr';
+
+// ============== TRANSLATIONS ==============
+const permissionsTranslations: Record<string, Record<Language, string>> = {
+  // Header
+  'permissions.title': { vi: 'Quản lý Phân quyền', en: 'Permissions Management', ar: 'إدارة الأذونات', fr: 'Gestion des autorisations' },
+  'permissions.subtitle': { vi: 'Cấu hình permissions cho roles, plans và users', en: 'Configure permissions for roles, plans and users', ar: 'تكوين الأذونات للأدوار والخطط والمستخدمين', fr: 'Configurer les autorisations pour les rôles, plans et utilisateurs' },
+
+  // Tabs
+  'permissions.tab.users': { vi: 'User Permissions', en: 'User Permissions', ar: 'أذونات المستخدم', fr: 'Autorisations utilisateur' },
+  'permissions.tab.roles': { vi: 'Role Permissions', en: 'Role Permissions', ar: 'أذونات الدور', fr: 'Autorisations de rôle' },
+  'permissions.tab.plans': { vi: 'Plan Permissions', en: 'Plan Permissions', ar: 'أذونات الخطة', fr: 'Autorisations du plan' },
+
+  // User Permissions Tab
+  'permissions.selectUser': { vi: 'Chọn User', en: 'Select User', ar: 'اختر المستخدم', fr: 'Sélectionner un utilisateur' },
+  'permissions.enterUserId': { vi: 'Nhập user ID...', en: 'Enter user ID...', ar: 'أدخل معرف المستخدم...', fr: 'Entrez l\'ID utilisateur...' },
+  'permissions.userInfo': { vi: 'Thông tin User', en: 'User Info', ar: 'معلومات المستخدم', fr: 'Info utilisateur' },
+  'permissions.role': { vi: 'Role', en: 'Role', ar: 'الدور', fr: 'Rôle' },
+  'permissions.plan': { vi: 'Plan', en: 'Plan', ar: 'الخطة', fr: 'Plan' },
+  'permissions.rolePermissions': { vi: 'Role Permissions', en: 'Role Permissions', ar: 'أذونات الدور', fr: 'Autorisations de rôle' },
+  'permissions.customPermissions': { vi: 'Custom Permissions', en: 'Custom Permissions', ar: 'أذونات مخصصة', fr: 'Autorisations personnalisées' },
+  'permissions.saveChanges': { vi: 'Lưu thay đổi', en: 'Save changes', ar: 'حفظ التغييرات', fr: 'Enregistrer les modifications' },
+  'permissions.default': { vi: 'Default', en: 'Default', ar: 'افتراضي', fr: 'Par défaut' },
+  'permissions.granted': { vi: 'Granted', en: 'Granted', ar: 'ممنوح', fr: 'Accordé' },
+  'permissions.denied': { vi: 'Denied', en: 'Denied', ar: 'مرفوض', fr: 'Refusé' },
+  'permissions.permissions': { vi: 'permissions', en: 'permissions', ar: 'أذونات', fr: 'autorisations' },
+
+  // Super Admin Warning
+  'permissions.superAdminRequired': { vi: 'Cần quyền Super Admin', en: 'Super Admin Required', ar: 'مطلوب مشرف أعلى', fr: 'Super Admin requis' },
+  'permissions.superAdminEditRoles': { vi: 'Chỉ Super Admin mới có thể chỉnh sửa role permissions.', en: 'Only Super Admin can edit role permissions.', ar: 'فقط المشرف الأعلى يمكنه تحرير أذونات الدور.', fr: 'Seul le Super Admin peut modifier les autorisations de rôle.' },
+  'permissions.superAdminEditPlans': { vi: 'Chỉ Super Admin mới có thể chỉnh sửa plan permissions.', en: 'Only Super Admin can edit plan permissions.', ar: 'فقط المشرف الأعلى يمكنه تحرير أذونات الخطة.', fr: 'Seul le Super Admin peut modifier les autorisations du plan.' },
+
+  // Actions
+  'permissions.reset': { vi: 'Reset', en: 'Reset', ar: 'إعادة تعيين', fr: 'Réinitialiser' },
+  'permissions.save': { vi: 'Lưu', en: 'Save', ar: 'حفظ', fr: 'Enregistrer' },
+
+  // Error messages
+  'permissions.error.requestInterrupted': { vi: 'Yêu cầu bị gián đoạn. Vui lòng thử lại.', en: 'Request interrupted. Please try again.', ar: 'انقطع الطلب. يرجى المحاولة مرة أخرى.', fr: 'Demande interrompue. Veuillez réessayer.' },
+  'permissions.error.sessionExpired': { vi: 'Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.', en: 'Session expired. Please login again.', ar: 'انتهت الجلسة. يرجى تسجيل الدخول مرة أخرى.', fr: 'Session expirée. Veuillez vous reconnecter.' },
+  'permissions.error.noPermission': { vi: 'Bạn không có quyền thực hiện hành động này.', en: 'You do not have permission to perform this action.', ar: 'ليس لديك إذن لتنفيذ هذا الإجراء.', fr: 'Vous n\'avez pas la permission d\'effectuer cette action.' },
+  'permissions.error.server': { vi: 'Lỗi máy chủ', en: 'Server error', ar: 'خطأ الخادم', fr: 'Erreur serveur' },
+
+  // Success messages
+  'permissions.success.roleSaved': { vi: 'Đã lưu permissions cho role "{role}"', en: 'Saved permissions for role "{role}"', ar: 'تم حفظ الأذونات للدور "{role}"', fr: 'Autorisations enregistrées pour le rôle "{role}"' },
+  'permissions.success.planSaved': { vi: 'Đã lưu permissions cho plan "{plan}"', en: 'Saved permissions for plan "{plan}"', ar: 'تم حفظ الأذونات للخطة "{plan}"', fr: 'Autorisations enregistrées pour le plan "{plan}"' },
+  'permissions.success.userSaved': { vi: 'Đã lưu permissions cho user', en: 'Saved permissions for user', ar: 'تم حفظ الأذونات للمستخدم', fr: 'Autorisations enregistrées pour l\'utilisateur' },
+  'permissions.success.roleReset': { vi: 'Đã reset role "{role}" về mặc định', en: 'Reset role "{role}" to default', ar: 'تمت إعادة تعيين الدور "{role}" إلى الافتراضي', fr: 'Rôle "{role}" réinitialisé par défaut' },
+  'permissions.success.planReset': { vi: 'Đã reset plan "{plan}" về mặc định', en: 'Reset plan "{plan}" to default', ar: 'تمت إعادة تعيين الخطة "{plan}" إلى الافتراضي', fr: 'Plan "{plan}" réinitialisé par défaut' },
+};
+
+// ============== TRANSLATION HELPER ==============
+const tPerm = (key: string, lang: Language = 'vi', replacements?: Record<string, string>): string => {
+  let text = permissionsTranslations[key]?.[lang] || permissionsTranslations[key]?.['vi'] || key;
+  if (replacements) {
+    Object.entries(replacements).forEach(([k, v]) => {
+      text = text.replace(`{${k}}`, v);
+    });
+  }
+  return text;
+};
 
 export default function PermissionsPage() {
   const [loading, setLoading] = useState(true);
@@ -33,6 +93,7 @@ export default function PermissionsPage() {
 
   const currentUser = useAuthStore((s) => s.user);
   const isSuperAdmin = currentUser?.role === 'super_admin';
+  const { language } = useLanguageStore();
 
   // ─── Auth helper ───
   const adminFetch = useCallback(async (path: string, init: RequestInit = {}, retry = true): Promise<any> => {
@@ -48,7 +109,7 @@ export default function PermissionsPage() {
       res = await fetch(`/api${path}`, { ...init, headers });
     } catch (err: any) {
       if (err?.name === 'AbortError' || err?.message === 'Failed to fetch' || err instanceof TypeError) {
-        throw new Error('Yêu cầu bị gián đoạn. Vui lòng thử lại.');
+        throw new Error(tPerm('permissions.error.requestInterrupted', language as Language));
       }
       throw err;
     }
@@ -64,7 +125,7 @@ export default function PermissionsPage() {
       } catch (err: any) {
         localStorage.removeItem('mada-access-token');
         localStorage.removeItem('mada-refresh-token');
-        throw new Error('Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.');
+        throw new Error(tPerm('permissions.error.sessionExpired', language as Language));
       }
       if (refreshRes.ok) {
         const data = await refreshRes.json();
@@ -76,17 +137,17 @@ export default function PermissionsPage() {
       }
       localStorage.removeItem('mada-access-token');
       localStorage.removeItem('mada-refresh-token');
-      throw new Error('Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.');
+      throw new Error(tPerm('permissions.error.sessionExpired', language as Language));
     }
 
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      let msg = data.error || `Lỗi ${res.status}`;
-      if (res.status === 403) msg = 'Bạn không có quyền thực hiện hành động này.';
+      let msg = data.error || `${tPerm('permissions.error.server', language as Language)} ${res.status}`;
+      if (res.status === 403) msg = tPerm('permissions.error.noPermission', language as Language);
       throw new Error(msg);
     }
     return data;
-  }, []);
+  }, [language]);
 
   // ─── Load permissions data ───
   const loadData = useCallback(async () => {
@@ -185,7 +246,7 @@ export default function PermissionsPage() {
         method: 'PUT',
         body: JSON.stringify({ permissions: rolePermissions[role] || [] }),
       });
-      setMessage({ type: 'success', text: `Đã lưu permissions cho role "${role}"` });
+      setMessage({ type: 'success', text: tPerm('permissions.success.roleSaved', language as Language, { role }) });
     } catch (e: any) {
       setMessage({ type: 'error', text: e.message });
     } finally {
@@ -200,7 +261,7 @@ export default function PermissionsPage() {
         method: 'PUT',
         body: JSON.stringify({ permissions: planPermissions[plan] || [] }),
       });
-      setMessage({ type: 'success', text: `Đã lưu permissions cho plan "${plan}"` });
+      setMessage({ type: 'success', text: tPerm('permissions.success.planSaved', language as Language, { plan }) });
     } catch (e: any) {
       setMessage({ type: 'error', text: e.message });
     } finally {
@@ -219,7 +280,7 @@ export default function PermissionsPage() {
           remove: [],
         }),
       });
-      setMessage({ type: 'success', text: 'Đã lưu permissions cho user' });
+      setMessage({ type: 'success', text: tPerm('permissions.success.userSaved', language as Language) });
       loadUserPermissions(userId);
     } catch (e: any) {
       setMessage({ type: 'error', text: e.message });
@@ -233,7 +294,7 @@ export default function PermissionsPage() {
     try {
       await adminFetch(`/permissions/roles/${role}/reset`, { method: 'POST' });
       await loadData();
-      setMessage({ type: 'success', text: `Đã reset role "${role}" về mặc định` });
+      setMessage({ type: 'success', text: tPerm('permissions.success.roleReset', language as Language, { role }) });
     } catch (e: any) {
       setMessage({ type: 'error', text: e.message });
     } finally {
@@ -246,7 +307,7 @@ export default function PermissionsPage() {
     try {
       await adminFetch(`/permissions/plans/${plan}/reset`, { method: 'POST' });
       await loadData();
-      setMessage({ type: 'success', text: `Đã reset plan "${plan}" về mặc định` });
+      setMessage({ type: 'success', text: tPerm('permissions.success.planReset', language as Language, { plan }) });
     } catch (e: any) {
       setMessage({ type: 'error', text: e.message });
     } finally {
@@ -322,8 +383,8 @@ export default function PermissionsPage() {
               <Shield className="w-6 h-6 text-primary" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-on-surface">Quản lý Phân quyền</h1>
-              <p className="text-sm text-on-surface-variant">Cấu hình permissions cho roles, plans và users</p>
+              <h1 className="text-2xl font-bold text-on-surface">{tPerm('permissions.title', language as Language)}</h1>
+              <p className="text-sm text-on-surface-variant">{tPerm('permissions.subtitle', language as Language)}</p>
             </div>
           </div>
         </div>
@@ -352,7 +413,7 @@ export default function PermissionsPage() {
             )}
           >
             <Users className="w-4 h-4" />
-            User Permissions
+            {tPerm('permissions.tab.users', language as Language)}
           </button>
           <button
             onClick={() => setActiveTab('roles')}
@@ -362,7 +423,7 @@ export default function PermissionsPage() {
             )}
           >
             <Shield className="w-4 h-4" />
-            Role Permissions
+            {tPerm('permissions.tab.roles', language as Language)}
           </button>
           <button
             onClick={() => setActiveTab('plans')}
@@ -372,7 +433,7 @@ export default function PermissionsPage() {
             )}
           >
             <Package className="w-4 h-4" />
-            Plan Permissions
+            {tPerm('permissions.tab.plans', language as Language)}
           </button>
         </div>
 
@@ -382,11 +443,11 @@ export default function PermissionsPage() {
             <div className="bg-surface-variant/30 rounded-2xl p-6">
               <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                 <Users className="w-5 h-5" />
-                Chọn User
+                {tPerm('permissions.selectUser', language as Language)}
               </h3>
               <input
                 type="text"
-                placeholder="Nhập user ID..."
+                placeholder={tPerm('permissions.enterUserId', language as Language)}
                 value={selectedUserId}
                 onChange={(e) => setSelectedUserId(e.target.value)}
                 className="w-full max-w-md px-4 py-3 rounded-xl border border-outline bg-surface text-on-surface"
@@ -397,30 +458,30 @@ export default function PermissionsPage() {
               <div className="space-y-6">
                 {/* User Info */}
                 <div className="bg-surface-variant/30 rounded-2xl p-6">
-                  <h3 className="text-lg font-semibold mb-4">Thông tin User</h3>
+                  <h3 className="text-lg font-semibold mb-4">{tPerm('permissions.userInfo', language as Language)}</h3>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div>
-                      <p className="text-sm text-on-surface-variant">Role</p>
+                      <p className="text-sm text-on-surface-variant">{tPerm('permissions.role', language as Language)}</p>
                       <span className={clsx('inline-block mt-1 px-3 py-1 rounded-full text-sm font-medium border', roleColors[userPermissions.role])}>
                         {roleLabels[userPermissions.role] || userPermissions.role}
                       </span>
                     </div>
                     <div>
-                      <p className="text-sm text-on-surface-variant">Plan</p>
+                      <p className="text-sm text-on-surface-variant">{tPerm('permissions.plan', language as Language)}</p>
                       <span className={clsx('inline-block mt-1 px-3 py-1 rounded-full text-sm font-medium border', planColors[userPermissions.plan])}>
                         {planLabels[userPermissions.plan] || userPermissions.plan}
                       </span>
                     </div>
                     <div>
-                      <p className="text-sm text-on-surface-variant">Role Permissions</p>
-                      <p className="mt-1 font-semibold">{userPermissions.effectivePermissions?.length || 0} permissions</p>
+                      <p className="text-sm text-on-surface-variant">{tPerm('permissions.rolePermissions', language as Language)}</p>
+                      <p className="mt-1 font-semibold">{userPermissions.effectivePermissions?.length || 0} {tPerm('permissions.permissions', language as Language)}</p>
                     </div>
                     <div>
-                      <p className="text-sm text-on-surface-variant">Custom Permissions</p>
+                      <p className="text-sm text-on-surface-variant">{tPerm('permissions.customPermissions', language as Language)}</p>
                       <p className="mt-1 font-semibold">
-                        <span className="text-green-600">{userCustomPerms.granted.length} granted</span>
+                        <span className="text-green-600">{userCustomPerms.granted.length} {tPerm('permissions.granted', language as Language)}</span>
                         {' / '}
-                        <span className="text-red-600">{userCustomPerms.denied.length} denied</span>
+                        <span className="text-red-600">{userCustomPerms.denied.length} {tPerm('permissions.denied', language as Language)}</span>
                       </p>
                     </div>
                   </div>
@@ -431,7 +492,7 @@ export default function PermissionsPage() {
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-semibold flex items-center gap-2">
                       <Key className="w-5 h-5" />
-                      Custom Permissions
+                      {tPerm('permissions.customPermissions', language as Language)}
                     </h3>
                     <button
                       onClick={() => saveUserPermissions(selectedUserId)}
@@ -439,7 +500,7 @@ export default function PermissionsPage() {
                       className="px-4 py-2 rounded-xl bg-primary text-white font-medium flex items-center gap-2 hover:bg-primary/90 disabled:opacity-50"
                     >
                       {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                      Lưu thay đổi
+                      {tPerm('permissions.saveChanges', language as Language)}
                     </button>
                   </div>
 
@@ -475,13 +536,13 @@ export default function PermissionsPage() {
                                   </div>
                                   <div className="flex items-center gap-2">
                                     {isDefault && !isGranted && !isDenied && (
-                                      <span className="text-xs text-blue-600 bg-blue-100 px-2 py-0.5 rounded">Default</span>
+                                      <span className="text-xs text-blue-600 bg-blue-100 px-2 py-0.5 rounded">{tPerm('permissions.default', language as Language)}</span>
                                     )}
                                     {isGranted && (
-                                      <span className="text-xs text-green-600 bg-green-100 px-2 py-0.5 rounded">Granted</span>
+                                      <span className="text-xs text-green-600 bg-green-100 px-2 py-0.5 rounded">{tPerm('permissions.granted', language as Language)}</span>
                                     )}
                                     {isDenied && (
-                                      <span className="text-xs text-red-600 bg-red-100 px-2 py-0.5 rounded">Denied</span>
+                                      <span className="text-xs text-red-600 bg-red-100 px-2 py-0.5 rounded">{tPerm('permissions.denied', language as Language)}</span>
                                     )}
                                     <ShieldCheck className={clsx('w-4 h-4', isGranted ? 'text-green-600' : isDenied ? 'text-red-600' : 'text-gray-400')} />
                                   </div>
@@ -506,8 +567,8 @@ export default function PermissionsPage() {
               <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 flex items-start gap-3">
                 <AlertTriangle className="w-5 h-5 text-yellow-600 mt-0.5" />
                 <div>
-                  <p className="font-medium text-yellow-800">Cần quyền Super Admin</p>
-                  <p className="text-sm text-yellow-700">Chỉ Super Admin mới có thể chỉnh sửa role permissions.</p>
+                  <p className="font-medium text-yellow-800">{tPerm('permissions.superAdminRequired', language as Language)}</p>
+                  <p className="text-sm text-yellow-700">{tPerm('permissions.superAdminEditRoles', language as Language)}</p>
                 </div>
               </div>
             )}
@@ -519,7 +580,7 @@ export default function PermissionsPage() {
                     <span className={clsx('px-3 py-1 rounded-full text-sm font-medium border', roleColors[role])}>
                       {roleLabels[role] || role}
                     </span>
-                    <span className="text-sm text-on-surface-variant">{perms?.length || 0} permissions</span>
+                    <span className="text-sm text-on-surface-variant">{perms?.length || 0} {tPerm('permissions.permissions', language as Language)}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <button
@@ -528,7 +589,7 @@ export default function PermissionsPage() {
                       className="px-3 py-1.5 rounded-lg border border-outline text-sm font-medium flex items-center gap-1 hover:bg-surface-variant disabled:opacity-50"
                     >
                       <RotateCcw className="w-3 h-3" />
-                      Reset
+                      {tPerm('permissions.reset', language as Language)}
                     </button>
                     <button
                       onClick={() => saveRolePermissions(role)}
@@ -536,7 +597,7 @@ export default function PermissionsPage() {
                       className="px-4 py-1.5 rounded-lg bg-primary text-white text-sm font-medium flex items-center gap-1 hover:bg-primary/90 disabled:opacity-50"
                     >
                       {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
-                      Lưu
+                      {tPerm('permissions.save', language as Language)}
                     </button>
                   </div>
                 </div>
@@ -579,8 +640,8 @@ export default function PermissionsPage() {
               <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 flex items-start gap-3">
                 <AlertTriangle className="w-5 h-5 text-yellow-600 mt-0.5" />
                 <div>
-                  <p className="font-medium text-yellow-800">Cần quyền Super Admin</p>
-                  <p className="text-sm text-yellow-700">Chỉ Super Admin mới có thể chỉnh sửa plan permissions.</p>
+                  <p className="font-medium text-yellow-800">{tPerm('permissions.superAdminRequired', language as Language)}</p>
+                  <p className="text-sm text-yellow-700">{tPerm('permissions.superAdminEditPlans', language as Language)}</p>
                 </div>
               </div>
             )}
@@ -592,7 +653,7 @@ export default function PermissionsPage() {
                     <span className={clsx('px-3 py-1 rounded-full text-sm font-medium border', planColors[plan])}>
                       {planLabels[plan] || plan}
                     </span>
-                    <span className="text-sm text-on-surface-variant">{perms?.length || 0} permissions</span>
+                    <span className="text-sm text-on-surface-variant">{perms?.length || 0} {tPerm('permissions.permissions', language as Language)}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <button
@@ -601,7 +662,7 @@ export default function PermissionsPage() {
                       className="px-3 py-1.5 rounded-lg border border-outline text-sm font-medium flex items-center gap-1 hover:bg-surface-variant disabled:opacity-50"
                     >
                       <RotateCcw className="w-3 h-3" />
-                      Reset
+                      {tPerm('permissions.reset', language as Language)}
                     </button>
                     <button
                       onClick={() => savePlanPermissions(plan)}
@@ -609,7 +670,7 @@ export default function PermissionsPage() {
                       className="px-4 py-1.5 rounded-lg bg-primary text-white text-sm font-medium flex items-center gap-1 hover:bg-primary/90 disabled:opacity-50"
                     >
                       {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
-                      Lưu
+                      {tPerm('permissions.save', language as Language)}
                     </button>
                   </div>
                 </div>

@@ -1,11 +1,12 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useEffect, lazy, Suspense } from 'react';
-import { useThemeStore, useAuthStore } from '@/stores';
+import { useThemeStore, useAuthStore, useLanguageStore } from '@/stores';
 import { RoleGuard } from '@/components/auth/RoleGuard';
 import { RoleLanding } from '@/components/RoleLanding';
 import { Loader2 } from 'lucide-react';
 import { AuthModal } from '@/components/auth/AuthModal';
 import { PaywallModal } from '@/components/auth/PaywallModal';
+import { translations } from '@/lib/translations';
 
 // Import ChatPage directly to avoid lazy loading issues
 import { ChatPage } from '@/pages/ChatPage';
@@ -33,13 +34,22 @@ const ProductsPage = lazy(() => import('@/pages/ProductsPage'));
 const ProductDetailPage = lazy(() => import('@/pages/ProductDetailPage'));
 const CategoryPage = lazy(() => import('@/pages/CategoryPage'));
 
+// Translation helper hook for App component
+function useAppTranslations() {
+  const language = useLanguageStore((s) => s.language) as 'vi' | 'en' | 'ar' | 'fr';
+  const t = (key: string) => {
+    return translations[language]?.[key] || translations.vi[key] || key;
+  };
+  return { language, t };
+}
+
 // Loading fallback component
-function PageLoader() {
+function PageLoader({ t }: { t: (key: string) => string }) {
   return (
     <div className="flex items-center justify-center min-h-screen bg-background">
       <div className="flex flex-col items-center gap-4">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
-        <span className="text-sm text-muted-foreground">Loading...</span>
+        <span className="text-sm text-muted-foreground">{t('app.loading')}</span>
       </div>
     </div>
   );
@@ -49,6 +59,7 @@ function App() {
   const { isDark } = useThemeStore();
   const refreshUser = useAuthStore((s) => s.refreshUser);
   const user = useAuthStore((s) => s.user);
+  const { t } = useAppTranslations();
 
   // Refresh user data from server on mount to ensure role is correct
   useEffect(() => {
@@ -78,7 +89,7 @@ function App() {
 
   return (
     <BrowserRouter>
-      <Suspense fallback={<PageLoader />}>
+      <Suspense fallback={<PageLoader t={t} />}>
         <Routes>
           {/* Trang chính: redirect theo vai trò */}
           <Route path="/" element={<RoleLanding />} />

@@ -10,12 +10,87 @@
  */
 
 import { useState } from 'react';
-import { useAuthStore } from '@/stores';
+import { useAuthStore, useLanguageStore } from '@/stores';
 import { getAccessToken } from '@/lib/api';
 import { Category } from './adminApi';
 import clsx from 'clsx';
 import { getImageUrl } from '../../lib/imageProxy';
 import { Sparkles, ExternalLink, CheckCircle2, AlertTriangle, Loader2, Save } from 'lucide-react';
+import type { Language } from '@/types';
+
+// ============== TYPES ==============
+type TranslationKey = 'vi' | 'en' | 'ar' | 'fr';
+
+// ============== TRANSLATIONS ==============
+const translations: Record<string, Record<Language, string>> = {
+  // Card trigger
+  'aiImport.title': { vi: 'AI Import từ Website', en: 'AI Import from Website', ar: 'استيراد AI من الموقع', fr: 'Importation AI depuis Site Web' },
+  'aiImport.beta': { vi: 'BETA', en: 'BETA', ar: 'تجريبي', fr: 'BÊTA' },
+  'aiImport.subtitle': { vi: 'Paste URL sản phẩm → AI tự động trích xuất tên, giá, ảnh', en: 'Paste product URL → AI auto-extracts name, price, image', ar: 'الصق رابط المنتج → يستخرج الذكاء الاصطناعي تلقائيًا الاسم والسعر والصورة', fr: 'Collez URL produit → IA extrait automatiquement nom, prix, image' },
+  'aiImport.openTool': { vi: 'Mở công cụ', en: 'Open Tool', ar: 'فتح الأداة', fr: 'Ouvrir l\'outil' },
+
+  // Modal header
+  'aiImport.modalTitle': { vi: 'AI Import từ Website', en: 'AI Import from Website', ar: 'استيراد AI من الموقع', fr: 'Importation AI depuis Site Web' },
+  'aiImport.modalSubtitle': { vi: 'Paste URL sản phẩm bất kỳ → AI tự động trích xuất', en: 'Paste any product URL → AI auto-extracts', ar: 'الصق أي رابط منتج → يستخرج الذكاء الاصطناعي تلقائيًا', fr: 'Collez n\'importe quel URL produit → IA extrait automatiquement' },
+
+  // Step 1
+  'aiImport.step1Title': { vi: 'Nhập URL sản phẩm', en: 'Enter Product URL', ar: 'أدخل رابط المنتج', fr: 'Entrer URL du produit' },
+  'aiImport.step1Sub': { vi: 'Bước 1/2: Quét trang web', en: 'Step 1/2: Scan webpage', ar: 'الخطوة 1/2: فحص صفحة الويب', fr: 'Étape 1/2: Scanner la page web' },
+  'aiImport.urlPlaceholder': { vi: 'https://shopabc.com/products/iphone-15', en: 'https://shopabc.com/products/iphone-15', ar: 'https://shopabc.com/products/iphone-15', fr: 'https://shopabc.com/products/iphone-15' },
+  'aiImport.selectCategory': { vi: '-- Danh mục --', en: '-- Category --', ar: '-- الفئة --', fr: '-- Catégorie --' },
+  'aiImport.scanning': { vi: 'Đang quét...', en: 'Scanning...', ar: 'جارٍ الفحص...', fr: 'Numérisation...' },
+  'aiImport.scanUrl': { vi: 'Quét URL', en: 'Scan URL', ar: 'فحص الرابط', fr: 'Scanner URL' },
+
+  // Progress messages
+  'aiImport.loadingPage': { vi: '⏳ Đang tải trang web...', en: '⏳ Loading webpage...', ar: '⏳ جارٍ تحميل صفحة الويب...', fr: '⏳ Chargement de la page web...' },
+  'aiImport.findingProducts': { vi: '🔍 Đang tìm sản phẩm trong HTML/JSON-LD...', en: '🔍 Searching for products in HTML/JSON-LD...', ar: '🔍 جارٍ البحث عن المنتجات في HTML/JSON-LD...', fr: '🔍 Recherche de produits dans HTML/JSON-LD...' },
+  'aiImport.aiAnalyzing': { vi: '🤖 Đang dùng AI phân tích nội dung... (có thể mất 10-20 giây)', en: '🤖 Using AI to analyze content... (may take 10-20 seconds)', ar: '🤖 استخدام الذكاء الاصطناعي لتحليل المحتوى... (قد يستغرق 10-20 ثانية)', fr: '🤖 Utilisation de l\'IA pour analyser le contenu... (peut prendre 10-20 secondes)' },
+
+  // Examples
+  'aiImport.quickExamples': { vi: 'Ví dụ nhanh:', en: 'Quick examples:', ar: 'أمثلة سريعة:', fr: 'Exemples rapides:' },
+  'aiImport.phone': { vi: '📱 Điện thoại', en: '📱 Phone', ar: '📱 هاتف', fr: '📱 Téléphone' },
+  'aiImport.laptop': { vi: '💻 Laptop', en: '💻 Laptop', ar: '💻 حاسوب محمول', fr: '💻 Ordinateur portable' },
+
+  // Error
+  'aiImport.error': { vi: 'Lỗi', en: 'Error', ar: 'خطأ', fr: 'Erreur' },
+  'aiImport.enterUrl': { vi: 'Vui lòng nhập URL', en: 'Please enter URL', ar: 'الرجاء إدخال الرابط', fr: 'Veuillez entrer l\'URL' },
+  'aiImport.invalidUrl': { vi: 'URL không hợp lệ (ví dụ: https://shop.com/products)', en: 'Invalid URL (example: https://shop.com/products)', ar: 'رابط غير صالح (مثال: https://shop.com/products)', fr: 'URL invalide (exemple: https://shop.com/products)' },
+  'aiImport.noProductsFound': { vi: '⚠️ URL này không có sản phẩm nào (đã thử 3 phương pháp: JSON-LD, HTML selectors, AI).\n\n🔍 Nguyên nhân có thể:\n• Trang không phải shop bán hàng (wiki, blog, tin tức)\n• Trang cần đăng nhập/cookie\n• Trang chặn bot/scraper\n\n✅ Thử các URL kiểu này:\n• Trang danh mục: https://www.thegioididong.com/laptop\n• Trang SP đơn: https://www.thegioididong.com/dtdd/iphone-15-pro-max\n• Shop VN: cellphones.com.vn/mobile.html, fptshop.com.vn/dien-thoai', en: '⚠️ This URL has no products (tried 3 methods: JSON-LD, HTML selectors, AI).\n\n🔍 Possible reasons:\n• Page is not a shop (wiki, blog, news)\n• Page requires login/cookie\n• Page blocks bot/scraper\n\n✅ Try these types of URLs:\n• Category page: https://www.thegioididong.com/laptop\n• Product page: https://www.thegioididong.com/dtdd/iphone-15-pro-max\n• VN Shop: cellphones.com.vn/mobile.html, fptshop.com.vn/dien-thoai', ar: '⚠️ لا يحتوي هذا الرابط على منتجات (جرى تجربة 3 طرق: JSON-LD، محددات HTML، الذكاء الاصطناعي).\n\n🔍 الأسباب المحتملة:\n• الصفحة ليست متجرًا (ويكي، مدونة، أخبار)\n• تتطلب الصفحة تسجيل الدخول/ملفات تعريف الارتباط\n• تحظر الصفحة الروبوت/المكتشف\n\n✅ جرّب أنواع الروابط هذه:\n• صفحة الفئة: https://www.thegioididong.com/laptop\n• صفحة المنتج: https://www.thegioididong.com/dtdd/iphone-15-pro-max', fr: '⚠️ Cette URL n\'a pas de produits (3 méthodes essayées: JSON-LD, sélecteurs HTML, IA).\n\n🔍 Raisons possibles:\n• La page n\'est pas une boutique (wiki, blog, actualités)\n• La page nécessite une connexion/cookie\n• La page bloque le bot/scraper\n\n✅ Essayez ces types d\'URL:\n• Page catégorie: https://www.thegioididong.com/laptop\n• Page produit: https://www.thegioididong.com/dtdd/iphone-15-pro-max' },
+  'aiImport.scrapeFailed': { vi: 'Không thể scrape URL này', en: 'Cannot scrape this URL', ar: 'لا يمكن استكشاف هذا الرابط', fr: 'Impossible de scraper cette URL' },
+  'aiImport.networkError': { vi: '❌ Không thể kết nối server. Kiểm tra mạng hoặc server có đang chạy không.', en: '❌ Cannot connect to server. Check network or if server is running.', ar: '❌ لا يمكن الاتصال بالخادم. تحقق من الشبكة أو إذا كان الخادم يعمل.', fr: '❌ Impossible de se connecter au serveur. Vérifiez le réseau ou si le serveur fonctionne.' },
+  'aiImport.timeout': { vi: '⏱️ Hết thời gian chờ (timeout). URL có thể chặn scraper hoặc server quá chậm.', en: '⏱️ Request timed out. URL may block scrapers or server is too slow.', ar: '⏱️ انتهت مهلة الطلب. قد يحظر الرابط أدوات الاستكشاف أو الخادم بطيء جدًا.', fr: '⏱️ Délai d\'attente dépassé. L\'URL peut bloquer les scrapers ou le serveur est trop lent.' },
+  'aiImport.unknownError': { vi: 'Lỗi không xác định', en: 'Unknown error', ar: 'خطأ غير معروف', fr: 'Erreur inconnue' },
+
+  // Step 2 - Preview header
+  'aiImport.successExtract': { vi: 'Đã trích xuất thành công {count} sản phẩm', en: 'Successfully extracted {count} products', ar: 'تم استخراج {count} منتج بنجاح', fr: '{count} produits extraits avec succès' },
+
+  // Stats
+  'aiImport.hasPrice': { vi: 'Có giá', en: 'Has Price', ar: 'له سعر', fr: 'Avec prix' },
+  'aiImport.hasImage': { vi: 'Có ảnh', en: 'Has Image', ar: 'له صورة', fr: 'Avec image' },
+  'aiImport.inStock': { vi: 'Còn hàng', en: 'In Stock', ar: 'متوفر', fr: 'En stock' },
+  'aiImport.hasBrand': { vi: 'Có thương hiệu', en: 'Has Brand', ar: 'له علامة تجارية', fr: 'Avec marque' },
+  'aiImport.contactForPrice': { vi: 'Liên hệ', en: 'Contact', ar: 'اتصل', fr: 'Contact' },
+  'aiImport.inStock2': { vi: '✓ Còn hàng', en: '✓ In Stock', ar: '✓ متوفر', fr: '✓ En stock' },
+  'aiImport.outOfStock': { vi: '✗ Hết hàng', en: '✗ Out of Stock', ar: '✗ غير متوفر', fr: '✗ Rupture de stock' },
+
+  // Preview list
+  'aiImport.preview': { vi: 'Preview', en: 'Preview', ar: 'معاينة', fr: 'Aperçu' },
+  'aiImport.openProduct': { vi: 'Mở sản phẩm', en: 'Open product', ar: 'فتح المنتج', fr: 'Ouvrir le produit' },
+
+  // Footer
+  'aiImport.readyToSave': { vi: 'Sẵn sàng lưu {count} sản phẩm', en: 'Ready to save {count} products', ar: 'جاهز لحفظ {count} منتج', fr: 'Prêt à sauvegarder {count} produits' },
+  'aiImport.enterUrlToStart': { vi: 'Nhập URL để bắt đầu quét', en: 'Enter URL to start scanning', ar: 'أدخل الرابط لبدء الفحص', fr: 'Entrez l\'URL pour commencer' },
+  'aiImport.onlySaveWithPrice': { vi: 'Chỉ lưu SP có giá', en: 'Only save products with price', ar: 'حفظ المنتجات ذات السعر فقط', fr: 'Sauvegarder uniquement les produits avec prix' },
+  'aiImport.cancel': { vi: 'Hủy', en: 'Cancel', ar: 'إلغاء', fr: 'Annuler' },
+  'aiImport.saving': { vi: 'Đang lưu...', en: 'Saving...', ar: 'جارٍ الحفظ...', fr: 'Enregistrement...' },
+  'aiImport.saveToKnowledge': { vi: 'Lưu vào kho tri thức', en: 'Save to Knowledge Base', ar: 'حفظ في قاعدة المعرفة', fr: 'Sauvegarder dans la base de connaissances' },
+
+  // Save confirm
+  'aiImport.saveConfirm': { vi: 'Lưu {count} sản phẩm vào kho tri thức?', en: 'Save {count} products to Knowledge Base?', ar: 'حفظ {count} منتج في قاعدة المعرفة؟', fr: 'Sauvegarder {count} produits dans la base de connaissances?' },
+  'aiImport.saveFailed': { vi: 'Lưu thất bại', en: 'Save failed', ar: 'فشل الحفظ', fr: 'Échec de la sauvegarde' },
+  'aiImport.saved': { vi: 'Đã lưu: {saved} SP', en: 'Saved: {saved} products', ar: 'تم الحفظ: {saved} منتج', fr: 'Sauvegardé: {saved} produits' },
+  'aiImport.skipped': { vi: 'Bỏ qua trùng: {skipped} SP', en: 'Skipped duplicates: {skipped}', ar: 'تم تخطي التكرارات: {skipped}', fr: 'Doublons ignorés: {skipped}' },
+};
 
 interface ImportPreviewProduct {
   id: string;
@@ -65,6 +140,21 @@ interface AIImportCardProps {
 
 export function AIImportCard({ categories, onImportSuccess }: AIImportCardProps) {
   const { user } = useAuthStore();
+  const language = useLanguageStore((state) => state.language) as Language;
+
+  // Translation helper
+  const t = (key: string, params?: Record<string, string | number>): string => {
+    const text = translations[key]?.[language] || translations[key]?.vi || key;
+    if (params) {
+      let result = text;
+      Object.entries(params).forEach(([k, v]) => {
+        result = result.replace(new RegExp(`\\{${k}\\}`, 'g'), String(v));
+      });
+      return result;
+    }
+    return text;
+  };
+
   const [open, setOpen] = useState(false);
   const [url, setUrl] = useState('');
   const [category, setCategory] = useState('');
@@ -90,29 +180,29 @@ export function AIImportCard({ categories, onImportSuccess }: AIImportCardProps)
 
   const handlePreview = async () => {
     if (!url.trim()) {
-      setError('Vui lòng nhập URL');
+      setError(t('aiImport.enterUrl'));
       return;
     }
     try {
       new URL(url);
     } catch {
-      setError('URL không hợp lệ (ví dụ: https://shop.com/products)');
+      setError(t('aiImport.invalidUrl'));
       return;
     }
 
     setLoading(true);
     setError(null);
     setPreview(null);
-    setProgressMessage('⏳ Đang tải trang web...');
+    setProgressMessage(t('aiImport.loadingPage'));
     try {
       const token = getAccessToken() || '';
 
       // Update progress sau 2s để user biết đang chờ
       const progressTimer1 = setTimeout(() => {
-        setProgressMessage('🔍 Đang tìm sản ph�m trong HTML/JSON-LD...');
+        setProgressMessage(t('aiImport.findingProducts'));
       }, 2000);
       const progressTimer2 = setTimeout(() => {
-        setProgressMessage('🤖 Đang dùng AI phân tích nội dung... (có thể mất 10-20 giây)');
+        setProgressMessage(t('aiImport.aiAnalyzing'));
       }, 6000);
 
       const res = await fetch('/api/scraper/import-url', {
@@ -127,29 +217,17 @@ export function AIImportCard({ categories, onImportSuccess }: AIImportCardProps)
       clearTimeout(progressTimer1);
       clearTimeout(progressTimer2);
       if (!res.ok || !json.success) {
-        throw new Error(json.error || 'Không thể scrape URL này');
+        throw new Error(json.error || t('aiImport.scrapeFailed'));
       }
       setPreview(json.data);
 
       // Gợi ý nếu 0 sản phẩm
       if (json.data?.totalFound === 0) {
-        const url = json.data?.url || '';
-        const isHomepage = /\/$|home|index/.test(url);
-        setError(
-          '⚠️ URL này không có sản ph�m nào (đã thử 3 phương pháp: JSON-LD, HTML selectors, AI).\n\n' +
-          '🔍 Nguyên nhân có thể:\n' +
-          (isHomepage ? '• Đây là trang chủ/homepage (chỉ có banner)\n' : '• Trang không phải shop bán hàng (wiki, blog, tin tức)\n') +
-          '• Trang cần đăng nhập/cookie\n' +
-          '• Trang chặn bot/scraper\n\n' +
-          '✅ Thử các URL kiểu này:\n' +
-          '• Trang danh mục: https://www.thegioididong.com/laptop\n' +
-          '• Trang SP đơn: https://www.thegioididong.com/dtdd/iphone-15-pro-max\n' +
-          '• Shop VN: cellphones.com.vn/mobile.html, fptshop.com.vn/dien-thoai'
-        );
+        setError(t('aiImport.noProductsFound'));
       }
     } catch (err: any) {
       // Distinguish network errors from server errors
-      const msg = err?.message || 'Lỗi không xác định';
+      const msg = err?.message || t('aiImport.unknownError');
       let displayMsg = msg;
       if (
         msg.includes('Failed to fetch') ||
@@ -158,9 +236,9 @@ export function AIImportCard({ categories, onImportSuccess }: AIImportCardProps)
         msg.includes('fetch') ||
         !navigator.onLine
       ) {
-        displayMsg = '❌ Không thể kết nối server. Kiểm tra mạng hoặc server có đang chạy không.';
+        displayMsg = t('aiImport.networkError');
       } else if (msg.includes('timeout') || msg.includes('Timeout')) {
-        displayMsg = '⏱️ Hết thời gian chờ (timeout). URL có thể chặn scraper hoặc server quá chậm.';
+        displayMsg = t('aiImport.timeout');
       }
       setError(displayMsg);
     } finally {
@@ -171,7 +249,7 @@ export function AIImportCard({ categories, onImportSuccess }: AIImportCardProps)
 
   const handleSave = async () => {
     if (!preview) return;
-    if (!confirm(`Lưu ${preview.totalFound} sản phẩm vào kho tri thức?`)) return;
+    if (!confirm(t('aiImport.saveConfirm', { count: preview.totalFound }))) return;
 
     setSaving(true);
     setError(null);
@@ -191,18 +269,22 @@ export function AIImportCard({ categories, onImportSuccess }: AIImportCardProps)
       });
       const json = await res.json();
       if (!res.ok || !json.success) {
-        throw new Error(json.error || 'Lưu thất bại');
+        throw new Error(json.error || t('aiImport.saveFailed'));
       }
       const { saved, skipped } = json.data || {};
-      alert(`✅ ${json.message}\n\nĐã lưu: ${saved || 0} SP${skipped ? ` | Bỏ qua trùng: ${skipped} SP` : ''}`);
+      let savedMsg = t('aiImport.saved', { saved: saved || 0 });
+      if (skipped) {
+        savedMsg += '\n' + t('aiImport.skipped', { skipped });
+      }
+      alert(`✅ ${json.message}\n\n${savedMsg}`);
       reset();
       setOpen(false);
       onImportSuccess?.();
     } catch (err: any) {
-      const msg = err?.message || 'Lỗi không xác định';
+      const msg = err?.message || t('aiImport.unknownError');
       let displayMsg = msg;
       if (msg.includes('Failed to fetch') || msg.includes('Network request failed') || msg.includes('NetworkError') || !navigator.onLine) {
-        displayMsg = '❌ Không thể kết nối server. Kiểm tra mạng hoặc server có đang chạy không.';
+        displayMsg = t('aiImport.networkError');
       }
       setError(displayMsg);
     } finally {
@@ -211,7 +293,7 @@ export function AIImportCard({ categories, onImportSuccess }: AIImportCardProps)
   };
 
   const formatPrice = (price: number, currency: string) => {
-    if (!price) return 'Liên hệ';
+    if (!price) return t('aiImport.contactForPrice');
     return `${price.toLocaleString('vi-VN')} ${currency}`;
   };
 
@@ -233,14 +315,14 @@ export function AIImportCard({ categories, onImportSuccess }: AIImportCardProps)
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-0.5">
               <h3 className="font-semibold text-sm text-gray-800 flex items-center gap-2">
-                AI Import từ Website
+                {t('aiImport.title')}
               </h3>
               <span className="px-1.5 py-0.5 rounded text-[9px] font-medium uppercase tracking-wider bg-blue-100 text-blue-600">
-                BETA
+                {t('aiImport.beta')}
               </span>
             </div>
             <p className="text-xs text-gray-500">
-              Paste URL sản phẩm → AI tự động trích xuất tên, giá, ảnh
+              {t('aiImport.subtitle')}
             </p>
           </div>
           <button
@@ -248,7 +330,7 @@ export function AIImportCard({ categories, onImportSuccess }: AIImportCardProps)
             className="px-4 py-2 rounded-lg bg-blue-600 text-white font-medium text-xs hover:bg-blue-700 transition-colors flex items-center gap-1.5"
           >
             <Sparkles className="w-3.5 h-3.5" />
-            Mở công cụ
+            {t('aiImport.openTool')}
           </button>
         </div>
       </div>
@@ -265,9 +347,9 @@ export function AIImportCard({ categories, onImportSuccess }: AIImportCardProps)
                     <Sparkles className="w-6 h-6 text-blue-600" />
                   </div>
                   <div>
-                    <h2 className="text-lg font-bold text-gray-800">AI Import từ Website</h2>
+                    <h2 className="text-lg font-bold text-gray-800">{t('aiImport.modalTitle')}</h2>
                     <p className="text-xs text-gray-500 mt-0.5">
-                      Paste URL sản phẩm bất kỳ → AI tự động trích xuất
+                      {t('aiImport.modalSubtitle')}
                     </p>
                   </div>
                 </div>
@@ -289,8 +371,8 @@ export function AIImportCard({ categories, onImportSuccess }: AIImportCardProps)
                     <span className="material-symbols-outlined text-blue-600 text-base" style={{ fontVariationSettings: "'FILL' 1" }}>link</span>
                   </div>
                   <div>
-                    <h3 className="font-semibold text-sm text-gray-800">Nhập URL sản phẩm</h3>
-                    <span className="text-xs text-gray-400">Bước 1/2: Quét trang web</span>
+                    <h3 className="font-semibold text-sm text-gray-800">{t('aiImport.step1Title')}</h3>
+                    <span className="text-xs text-gray-400">{t('aiImport.step1Sub')}</span>
                   </div>
                 </div>
                 <div className="flex flex-col md:flex-row gap-2">
@@ -300,7 +382,7 @@ export function AIImportCard({ categories, onImportSuccess }: AIImportCardProps)
                       type="url"
                       value={url}
                       onChange={(e) => setUrl(e.target.value)}
-                      placeholder="https://shopabc.com/products/iphone-15"
+                      placeholder={t('aiImport.urlPlaceholder')}
                       disabled={loading || saving}
                       className="w-full h-10 pl-9 pr-3 rounded-lg border border-gray-200 bg-white text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100 transition-colors"
                     />
@@ -311,7 +393,7 @@ export function AIImportCard({ categories, onImportSuccess }: AIImportCardProps)
                     disabled={loading || saving}
                     className="h-10 px-3 rounded-lg border border-gray-200 bg-white text-sm text-gray-800 focus:outline-none focus:border-blue-400 min-w-[150px]"
                   >
-                    <option value="">-- Danh mục --</option>
+                    <option value="">{t('aiImport.selectCategory')}</option>
                     {categories.map((c) => (
                       <option key={c.id} value={c.id}>{c.name_vi}</option>
                     ))}
@@ -324,12 +406,12 @@ export function AIImportCard({ categories, onImportSuccess }: AIImportCardProps)
                     {loading ? (
                       <>
                         <Loader2 className="w-4 h-4 animate-spin" />
-                        Đang quét...
+                        {t('aiImport.scanning')}
                       </>
                     ) : (
                       <>
                         <Sparkles className="w-4 h-4" />
-                        Quét URL
+                        {t('aiImport.scanUrl')}
                       </>
                     )}
                   </button>
@@ -342,10 +424,10 @@ export function AIImportCard({ categories, onImportSuccess }: AIImportCardProps)
                   </div>
                 )}
                 <div className="flex flex-wrap gap-2 mt-3">
-                  <span className="text-xs text-gray-500">Ví dụ nhanh:</span>
+                  <span className="text-xs text-gray-500">{t('aiImport.quickExamples')}</span>
                   {[
-                    { label: '📱 Điện thoại', url: 'https://cellphones.com.vn/mobile.html' },
-                    { label: '💻 Laptop', url: 'https://www.thegioididong.com/laptop' },
+                    { label: t('aiImport.phone'), url: 'https://cellphones.com.vn/mobile.html' },
+                    { label: t('aiImport.laptop'), url: 'https://www.thegioididong.com/laptop' },
                   ].map((ex) => (
                     <button
                       key={ex.url}
@@ -364,7 +446,7 @@ export function AIImportCard({ categories, onImportSuccess }: AIImportCardProps)
                 <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-lg">
                   <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
                   <div className="flex-1">
-                    <p className="font-medium text-red-700">Lỗi</p>
+                    <p className="font-medium text-red-700">{t('aiImport.error')}</p>
                     <p className="text-sm text-red-600 mt-0.5">{error}</p>
                   </div>
                 </div>
@@ -378,7 +460,7 @@ export function AIImportCard({ categories, onImportSuccess }: AIImportCardProps)
                       <CheckCircle2 className="w-5 h-5 text-white" />
                       <div className="flex-1">
                         <h3 className="font-semibold text-sm text-white">
-                          Đã trích xuất thành công {preview.totalFound} sản phẩm
+                          {t('aiImport.successExtract', { count: preview.totalFound })}
                         </h3>
                       </div>
                       <span className={clsx(
@@ -393,10 +475,10 @@ export function AIImportCard({ categories, onImportSuccess }: AIImportCardProps)
                     </div>
                     <div className="p-4">
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                        <StatBox label="Có giá" value={`${preview.stats.withPrice}/${preview.totalFound}`} color="blue" />
-                        <StatBox label="Có ảnh" value={`${preview.stats.withImage}/${preview.totalFound}`} color="indigo" />
-                        <StatBox label="Còn hàng" value={`${preview.stats.inStock}/${preview.totalFound}`} color="green" />
-                        <StatBox label="Có thương hiệu" value={`${preview.stats.withBrand}/${preview.totalFound}`} color="gray" />
+                        <StatBox label={t('aiImport.hasPrice')} value={`${preview.stats.withPrice}/${preview.totalFound}`} color="blue" />
+                        <StatBox label={t('aiImport.hasImage')} value={`${preview.stats.withImage}/${preview.totalFound}`} color="indigo" />
+                        <StatBox label={t('aiImport.inStock')} value={`${preview.stats.inStock}/${preview.totalFound}`} color="green" />
+                        <StatBox label={t('aiImport.hasBrand')} value={`${preview.stats.withBrand}/${preview.totalFound}`} color="gray" />
                       </div>
                     </div>
                   </div>
@@ -406,7 +488,7 @@ export function AIImportCard({ categories, onImportSuccess }: AIImportCardProps)
                     <div className="px-4 py-3 border-b border-blue-100 bg-gray-50">
                       <h3 className="font-semibold text-sm text-gray-700 flex items-center gap-2">
                         <span className="material-symbols-outlined text-blue-600 text-base">inventory_2</span>
-                        Preview ({Math.min(preview.products.length, 20)}/{preview.totalFound})
+                        {t('aiImport.preview')} ({Math.min(preview.products.length, 20)}/{preview.totalFound})
                       </h3>
                     </div>
                     <div className="space-y-2 p-3 max-h-80 overflow-y-auto">
@@ -440,11 +522,11 @@ export function AIImportCard({ categories, onImportSuccess }: AIImportCardProps)
                               )}
                               {p.inStock ? (
                                 <span className="text-xs px-2 py-0.5 rounded bg-green-50 text-green-700 font-medium border border-green-100">
-                                  ✓ Còn hàng
+                                  {t('aiImport.inStock2')}
                                 </span>
                               ) : (
                                 <span className="text-xs px-2 py-0.5 rounded bg-red-50 text-red-700 font-medium border border-red-100">
-                                  ✗ Hết hàng
+                                  {t('aiImport.outOfStock')}
                                 </span>
                               )}
                               {/* MADA Category Badge */}
@@ -464,7 +546,7 @@ export function AIImportCard({ categories, onImportSuccess }: AIImportCardProps)
                             target="_blank"
                             rel="noopener noreferrer"
                             className="w-8 h-8 rounded-lg bg-gray-100 border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-colors"
-                            title="Mở sản phẩm"
+                            title={t('aiImport.openProduct')}
                           >
                             <ExternalLink className="w-4 h-4" />
                           </a>
@@ -481,8 +563,8 @@ export function AIImportCard({ categories, onImportSuccess }: AIImportCardProps)
               <div className="flex items-center justify-between mb-3 text-sm">
                 <span className="text-gray-600 font-medium">
                   {preview
-                    ? `Sẵn sàng lưu ${preview.totalFound} sản phẩm`
-                    : 'Nhập URL để bắt đầu quét'}
+                    ? t('aiImport.readyToSave', { count: preview.totalFound })
+                    : t('aiImport.enterUrlToStart')}
                 </span>
                 <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-600">
                   <input
@@ -492,7 +574,7 @@ export function AIImportCard({ categories, onImportSuccess }: AIImportCardProps)
                     disabled={saving}
                     className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                   />
-                  <span>Chỉ lưu SP có giá</span>
+                  <span>{t('aiImport.onlySaveWithPrice')}</span>
                 </label>
               </div>
               <div className="flex items-center justify-end gap-2">
@@ -500,7 +582,7 @@ export function AIImportCard({ categories, onImportSuccess }: AIImportCardProps)
                   onClick={() => { setOpen(false); reset(); }}
                   className="px-4 py-2 rounded-lg border border-gray-200 font-medium text-gray-600 bg-white hover:bg-gray-50 transition-colors"
                 >
-                  Hủy
+                  {t('aiImport.cancel')}
                 </button>
                 <button
                   onClick={handleSave}
@@ -510,12 +592,12 @@ export function AIImportCard({ categories, onImportSuccess }: AIImportCardProps)
                   {saving ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      Đang lưu...
+                      {t('aiImport.saving')}
                     </>
                   ) : (
                     <>
                       <Save className="w-4 h-4" />
-                      Lưu vào kho tri thức
+                      {t('aiImport.saveToKnowledge')}
                     </>
                   )}
                 </button>

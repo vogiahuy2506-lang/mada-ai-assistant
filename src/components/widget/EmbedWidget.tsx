@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useChatSettingsStore } from '@/stores';
+import { useChatSettingsStore, useLanguageStore } from '@/stores';
 import {
   Send, Paperclip, X, Minimize2, Loader2, ImageIcon, FileText, Copy, Check, Bot
 } from 'lucide-react';
@@ -9,6 +9,15 @@ import remarkGfm from 'remark-gfm';
 import type { Language } from '@/types';
 import { t } from '@/lib/translations';
 import { getAccessToken } from '@/lib/api';
+
+// Translation helper for EmbedWidget
+const useWidgetTranslation = (lang: Language) => ({
+  chatWithMada: t('embedWidget.chatWithMada', lang),
+  online: t('embedWidget.online', lang),
+  changeLanguage: t('embedWidget.changeLanguage', lang),
+  embeddedPlaceholder: t('embedWidget.embeddedPlaceholder', lang),
+  copy: t('embedWidget.copy', lang),
+});
 
 interface Message {
   id: string;
@@ -40,11 +49,43 @@ interface EmbedWidgetProps {
   labelColor?: string;
 }
 
-const LANGUAGES: { code: Language; name: string; flag: string }[] = [
-  { code: 'vi', name: 'Tiếng Việt', flag: '🇻🇳' },
-  { code: 'en', name: 'English', flag: '🇺🇸' },
-  { code: 'ar', name: 'العربية', flag: '🇸🇦' },
-  { code: 'fr', name: 'Français', flag: '🇫🇷' },
+// Get language name translations based on current language
+const getLanguageName = (code: Language, currentLang: Language): string => {
+  const names: Record<Language, string> = {
+    vi: {
+      vi: 'Tiếng Việt',
+      en: 'English',
+      ar: 'العربية',
+      fr: 'Français',
+    },
+    en: {
+      vi: 'Vietnamese',
+      en: 'English',
+      ar: 'Arabic',
+      fr: 'French',
+    },
+    ar: {
+      vi: 'الفيتنامية',
+      en: 'الإنجليزية',
+      ar: 'العربية',
+      fr: 'الفرنسية',
+    },
+    fr: {
+      vi: 'Vietnamien',
+      en: 'Anglais',
+      ar: 'Arabe',
+      fr: 'Français',
+    },
+  };
+  return names[currentLang][code];
+};
+
+// Language options with flags (always show same flags regardless of language)
+const LANGUAGES_FLAGS: { code: Language; flag: string }[] = [
+  { code: 'vi', flag: '🇻🇳' },
+  { code: 'en', flag: '🇺🇸' },
+  { code: 'ar', flag: '🇸🇦' },
+  { code: 'fr', flag: '🇫🇷' },
 ];
 
 export function EmbedWidget({
@@ -90,11 +131,23 @@ export function EmbedWidget({
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [language, setLanguage] = useState<Language>(defaultLanguageProp);
+  // Get language from store for translations
+  const { language: storeLanguage } = useLanguageStore();
+  const [language, setLanguage] = useState<Language>(defaultLanguageProp || storeLanguage || 'vi');
   const [selectedFiles, setSelectedFiles] = useState<{ fileId: string; name: string; type: string; size: number; content?: string; originalFile?: File }[]>([]);
   const [showLanguageMenu, setShowLanguageMenu] = useState(false);
   const [showAttachmentMenu, setShowAttachmentMenu] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  // Get widget translations
+  const translations = useWidgetTranslation(language);
+
+  // Update language when store language changes
+  useEffect(() => {
+    if (storeLanguage && storeLanguage !== language) {
+      setLanguage(storeLanguage);
+    }
+  }, [storeLanguage]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -381,7 +434,7 @@ export function EmbedWidget({
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const currentLang = LANGUAGES.find(l => l.code === language) || LANGUAGES[0];
+  const currentLangFlag = LANGUAGES_FLAGS.find(l => l.code === language) || LANGUAGES_FLAGS[0];
 
   // Determine if we should show the chat button (only for popup type)
   const shouldShowChatButton = chatBubbleEnabledProp && widgetTypeProp === 'popup' && !isOpen;
@@ -434,7 +487,7 @@ export function EmbedWidget({
           style={{ backgroundColor: `${configPrimaryColor}10` }}
         >
           <span className="text-5xl">{chatBubbleIconProp}</span>
-          <span className="text-sm font-medium">{labelNameProp}</span>
+          <span className="text-sm font-medium">{labelNameProp || translations.chatWithMada}</span>
         </button>
       )}
 
@@ -477,7 +530,7 @@ export function EmbedWidget({
                 </div>
                 <div>
                   <h3 className="font-bold text-sm">{configBotName}</h3>
-                  <p className="text-xs text-white/80">Online</p>
+                  <p className="text-xs text-white/80">{translations.online}</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -485,9 +538,9 @@ export function EmbedWidget({
                   <button
                     onClick={() => setShowLanguageMenu(!showLanguageMenu)}
                     className="p-1.5 rounded-full hover:bg-white/20 transition-colors"
-                    title="Change language"
+                    title={translations.changeLanguage}
                   >
-                    <span className="text-sm">{currentLang.flag}</span>
+                    <span className="text-sm">{currentLangFlag.flag}</span>
                   </button>
                 )}
                 {/* Only show minimize for popup type */}
@@ -515,7 +568,7 @@ export function EmbedWidget({
               ref={languageMenuRef}
               className="absolute right-16 top-14 bg-white rounded-xl shadow-lg border border-gray-200 p-2 z-10"
             >
-              {LANGUAGES.map((lang) => (
+              {LANGUAGES_FLAGS.map((lang) => (
                 <button
                   key={lang.code}
                   onClick={() => {
@@ -528,7 +581,7 @@ export function EmbedWidget({
                   )}
                 >
                   <span>{lang.flag}</span>
-                  <span>{lang.name}</span>
+                  <span>{getLanguageName(lang.code, language)}</span>
                 </button>
               ))}
             </div>
@@ -604,7 +657,7 @@ export function EmbedWidget({
                         <button
                           onClick={() => handleCopy(msg.content, msg.id)}
                           className="mt-2 p-1 rounded hover:bg-gray-100 transition-colors"
-                          title="Copy"
+                          title={translations.copy}
                         >
                           {copiedId === msg.id ? (
                             <Check className="w-3 h-3 text-green-500" />

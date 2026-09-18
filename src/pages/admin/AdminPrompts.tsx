@@ -4,8 +4,8 @@ import { AdminLayout } from './AdminLayout';
 import { Loader2, Search, Plus, Edit2, Trash2, ToggleLeft, ToggleRight, FileText, X, AlertTriangle } from 'lucide-react';
 import { adminApi } from './adminApi';
 import { getAccessToken } from '@/lib/api';
-import { usePromptStore, useAuthStore, type SystemPromptRow } from '@/stores';
-import { useTranslation } from '@/lib/translations';
+import { usePromptStore, useAuthStore, useLanguageStore, type SystemPromptRow } from '@/stores';
+import { useTranslation, type Language } from '@/lib/translations';
 import { PromptsEditor } from './PromptsEditor';
 import { ChatCustomization } from './ChatCustomization';
 
@@ -19,15 +19,7 @@ const LANGUAGES = [
   { value: 'fr', label: 'Français' },
 ];
 
-const CATEGORY_LABELS: Record<string, string> = {
-  general: 'Tổng quát',
-  medical: 'Y tế',
-  legal: 'Pháp lý',
-  finance: 'Tài chính',
-  support: 'Hỗ trợ',
-  sales: 'Bán hàng',
-  technical: 'Kỹ thuật',
-};
+// Category labels are now dynamically generated using translation helper
 
 const CATEGORY_CONFIG: Record<string, { bg: string; text: string; border: string }> = {
   medical: { bg: 'bg-rose-50', text: 'text-rose-600', border: 'border-rose-200' },
@@ -43,6 +35,21 @@ export function AdminPrompts() {
   const upsertPromptStore = usePromptStore((s) => s.upsertPrompt);
   const removePromptStore = usePromptStore((s) => s.removePrompt);
   const setStorePrompts = usePromptStore((s) => s.setPrompts);
+
+  // Get current language from store
+  const language = useLanguageStore((s) => s.language);
+  const { t } = useTranslation();
+
+  // Category labels based on language
+  const CATEGORY_LABELS: Record<string, string> = {
+    general: t('admin.prompts.categoryGeneral'),
+    medical: t('admin.prompts.categoryMedical'),
+    legal: t('admin.prompts.categoryLegal'),
+    finance: t('admin.prompts.categoryFinance'),
+    support: t('admin.prompts.categorySupport'),
+    sales: t('admin.prompts.categorySales'),
+    technical: t('admin.prompts.categoryTechnical'),
+  };
 
   const [prompts, setPrompts] = useState<SystemPrompt[]>([]);
   const [loading, setLoading] = useState(true);
@@ -189,7 +196,7 @@ export function AdminPrompts() {
     if (!prompt) return;
 
     if (prompt.isSystem) {
-      alert('Không thể xóa prompt hệ thống (system prompt).');
+      alert(t('admin.prompts.alertCannotDeleteSystem'));
       return;
     }
 
@@ -213,13 +220,13 @@ export function AdminPrompts() {
         if (rawJson.usingAgents && rawJson.usingAgents.length > 0) {
           setDeleteWarning({ usingAgents: rawJson.usingAgents });
         } else {
-          alert(rawJson.error || res.error || 'Xóa thất bại');
+          alert(rawJson.error || res.error || t('admin.prompts.alertDeleteFailed'));
         }
       } catch (e) {
-        alert(res.error || 'Xóa thất bại');
+        alert(res.error || t('admin.prompts.alertDeleteFailed'));
       }
     } else {
-      alert(res.error || 'Xóa thất bại');
+      alert(res.error || t('admin.prompts.alertDeleteFailed'));
     }
   };
 
@@ -250,7 +257,6 @@ export function AdminPrompts() {
   const navigate = useNavigate();
   const [showPromptsEditor, setShowPromptsEditor] = useState(false);
   const [showChatCustomization, setShowChatCustomization] = useState(false);
-  const { t } = useTranslation();
 
   return (
     <AdminLayout
@@ -455,14 +461,14 @@ export function AdminPrompts() {
           <div className="p-5 border-b border-slate-100 flex items-center justify-between">
             <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
               <span className="material-symbols-outlined text-xl text-primary">edit_note</span>
-              System Prompts — Chỉnh sửa nhanh
+              {t('admin.prompts.quickEditTitle')}
             </h2>
             <button
               onClick={() => setShowPromptsEditor(false)}
               className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
             >
               <X className="w-4 h-4" />
-              Đóng
+              {t('admin.prompts.close')}
             </button>
           </div>
           <div className="p-5">
@@ -491,7 +497,7 @@ export function AdminPrompts() {
       ) : (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 mb-4 flex flex-col" style={{ height: 'calc(100vh - 340px)' }}>
           <div className="flex items-center gap-3 mb-3">
-            <h2 className="text-base font-bold text-slate-800 shrink-0">Prompts</h2>
+            <h2 className="text-base font-bold text-slate-800 shrink-0">{t('admin.prompts.prompts')}</h2>
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input
@@ -654,7 +660,7 @@ export function AdminPrompts() {
                         value={newPrompt.id}
                         onChange={(e) => setNewPrompt({ ...newPrompt, id: e.target.value })}
                         className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 font-mono"
-                        placeholder="vd: my-custom-prompt"
+                        placeholder={t('admin.prompts.idPlaceholder')}
                       />
                     </div>
                     <div>
@@ -666,7 +672,7 @@ export function AdminPrompts() {
                         value={newPrompt.name}
                         onChange={(e) => setNewPrompt({ ...newPrompt, name: e.target.value })}
                         className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-                        placeholder="VD: Trợ lý Y tế"
+                        placeholder={t('admin.prompts.namePlaceholder')}
                       />
                     </div>
                     <div>
@@ -676,7 +682,7 @@ export function AdminPrompts() {
                         value={newPrompt.description}
                         onChange={(e) => setNewPrompt({ ...newPrompt, description: e.target.value })}
                         className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-                        placeholder="Mô tả ngắn về prompt này"
+                        placeholder={t('admin.prompts.descPlaceholder')}
                       />
                     </div>
                     <div className="flex gap-3">
@@ -713,7 +719,7 @@ export function AdminPrompts() {
                         value={newPrompt.prompt}
                         onChange={(e) => setNewPrompt({ ...newPrompt, prompt: e.target.value })}
                         className="w-full h-56 px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none font-mono bg-slate-50"
-                        placeholder="Nhập nội dung system prompt..."
+                        placeholder={t('admin.prompts.contentPlaceholder')}
                       />
                     </div>
                   </div>

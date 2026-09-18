@@ -524,7 +524,7 @@ export function DataManagerPage() {
                   type="url"
                   value={websiteUrl}
                   onChange={(e) => setWebsiteUrl(e.target.value)}
-                  placeholder="https://example.com"
+                  placeholder={t('dataManager.placeholderUrl')}
                   className="w-full px-4 py-3 pl-12 rounded-xl border-2 border-outline bg-transparent focus:border-primary focus:outline-none transition-colors"
                 />
                 <Globe className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-on-surface-variant" />
@@ -766,7 +766,7 @@ export function DataManagerPage() {
                           </div>
                           {item.documentsAdded && (
                             <span className="text-xs text-on-surface-variant ml-8">
-                              {item.documentsAdded} chunks
+                              {item.documentsAdded} {t('dataManager.chunks')}
                             </span>
                           )}
                         </td>
@@ -904,12 +904,12 @@ export function DataManagerPage() {
               {addMode === 'url' && (
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium mb-2">URL</label>
+                    <label className="block text-sm font-medium mb-2">{t('dataManager.urlLabel')}</label>
                     <input
                       type="url"
                       value={websiteUrl}
                       onChange={(e) => setWebsiteUrl(e.target.value)}
-                      placeholder="https://example.com"
+                      placeholder={t('dataManager.placeholderUrl')}
                       className="w-full px-4 py-3 rounded-xl border-2 border-outline bg-transparent focus:border-primary focus:outline-none"
                     />
                   </div>

@@ -1,6 +1,23 @@
 import { useState, useEffect } from 'react';
 import { Loader2, History, RotateCcw, ChevronDown, ChevronUp, Clock, User } from 'lucide-react';
 import { adminApi } from './adminApi';
+import { useLanguageStore } from '@/stores';
+import { translations, type Language } from '@/lib/translations';
+
+// Translation helper hook
+function usePromptHistoryTranslation() {
+  const language = useLanguageStore((state) => state.language) as Language;
+  const t = (key: string, params?: Record<string, string | number>) => {
+    let text = translations[language]?.[key as keyof typeof translations[typeof language]] as string || key;
+    if (params) {
+      Object.entries(params).forEach(([k, v]) => {
+        text = text.replace(`{${k}}`, String(v));
+      });
+    }
+    return text;
+  };
+  return { t, language };
+}
 
 interface PromptVersion {
   id: string;
@@ -26,6 +43,7 @@ export function PromptHistory({ promptId, onRestore, compact = false }: Props) {
   const [loading, setLoading] = useState(true);
   const [expandedVersion, setExpandedVersion] = useState<string | null>(null);
   const [restoring, setRestoring] = useState<string | null>(null);
+  const { t } = usePromptHistoryTranslation();
 
   useEffect(() => {
     loadVersions();
@@ -46,7 +64,7 @@ export function PromptHistory({ promptId, onRestore, compact = false }: Props) {
   };
 
   const handleRestore = async (version: PromptVersion) => {
-    if (!confirm(`Khôi phục phiên bản ${version.version}?\n\nLưu ý: Phiên bản hiện tại sẽ được lưu vào lịch sử trước khi khôi phục.`)) {
+    if (!confirm(t('promptHistory.restoreConfirm', { version: version.version }))) {
       return;
     }
 
@@ -55,13 +73,13 @@ export function PromptHistory({ promptId, onRestore, compact = false }: Props) {
       const res = await adminApi.restorePromptVersion(promptId, version.id);
       if (res.success && res.data) {
         const data = res.data as unknown as { message: string; restored_version: number; new_version: number };
-        alert(`Đã khôi phục phiên bản ${version.version}!\nPhiên bản mới: ${data.new_version}`);
+        alert(t('promptHistory.restoreSuccess', { version: version.version, new_version: data.new_version }));
         loadVersions();
         onRestore?.();
       }
     } catch (error) {
       console.error('Failed to restore version:', error);
-      alert('Có lỗi khi khôi phục phiên bản');
+      alert(t('promptHistory.restoreError'));
     } finally {
       setRestoring(null);
     }
@@ -69,7 +87,14 @@ export function PromptHistory({ promptId, onRestore, compact = false }: Props) {
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
-    return date.toLocaleDateString('vi-VN', {
+    // Use locale based on language
+    const localeMap: Record<string, string> = {
+      vi: 'vi-VN',
+      en: 'en-US',
+      ar: 'ar-SA',
+      fr: 'fr-FR',
+    };
+    return date.toLocaleDateString(localeMap[translations[useLanguageStore.getState().language] ? useLanguageStore.getState().language : 'vi'] || 'vi-VN', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
@@ -90,9 +115,9 @@ export function PromptHistory({ promptId, onRestore, compact = false }: Props) {
     return (
       <div className="bg-white border border-slate-200 rounded-xl p-6 text-center">
         <History className="w-8 h-8 text-slate-400 mx-auto mb-2" />
-        <p className="text-sm text-slate-600">Chưa có lịch sử phiên bản</p>
+        <p className="text-sm text-slate-600">{t('promptHistory.noHistory')}</p>
         <p className="text-xs text-slate-400 mt-1">
-          Phiên bản sẽ được lưu khi bạn chỉnh sửa prompt
+          {t('promptHistory.noHistoryHint')}
         </p>
       </div>
     );
@@ -114,13 +139,13 @@ export function PromptHistory({ promptId, onRestore, compact = false }: Props) {
               className="text-indigo-600 hover:text-indigo-700 disabled:opacity-50 flex items-center gap-1"
             >
               <RotateCcw className="w-3 h-3" />
-              Khôi phục
+              {t('promptHistory.restore')}
             </button>
           </div>
         ))}
         {versions.length > 3 && (
           <p className="text-xs text-slate-400 text-center">
-            +{versions.length - 3} phiên bản khác
+            {t('promptHistory.moreVersions', { count: versions.length - 3 })}
           </p>
         )}
       </div>
@@ -134,17 +159,17 @@ export function PromptHistory({ promptId, onRestore, compact = false }: Props) {
         <div className="flex items-center gap-2">
           <History className="w-4 h-4 text-slate-500" />
           <span className="text-sm font-medium text-slate-700">
-            Lịch sử phiên bản
+            {t('promptHistory.versionHistory')}
           </span>
           <span className="px-2 py-0.5 bg-slate-200 text-slate-600 rounded text-xs">
-            {versions.length} phiên bản
+            {versions.length} {t('promptHistory.versions')}
           </span>
         </div>
         
         <button
           onClick={loadVersions}
           className="p-1.5 hover:bg-slate-200 rounded-lg transition-colors"
-          title="Làm mới"
+          title={t('promptHistory.refresh')}
         >
           <RotateCcw className="w-4 h-4 text-slate-400" />
         </button>
@@ -171,13 +196,13 @@ export function PromptHistory({ promptId, onRestore, compact = false }: Props) {
                         'bg-slate-100 text-slate-600'
                       }`}>
                         v{version.version}
-                        {isLatest && ' (mới nhất)'}
-                        {version.is_restored && ' (đã khôi phục)'}
+                        {isLatest && ` ${t('promptHistory.latest')}`}
+                        {version.is_restored && ` ${t('promptHistory.restored')}`}
                       </span>
                     </div>
                     
                     <p className="text-sm text-slate-600 line-clamp-1">
-                      {version.change_summary || 'Không có mô tả'}
+                      {version.change_summary || t('promptHistory.noDescription')}
                     </p>
                     
                     <div className="flex items-center gap-3 mt-1.5 text-xs text-slate-400">
@@ -209,7 +234,7 @@ export function PromptHistory({ promptId, onRestore, compact = false }: Props) {
                         ) : (
                           <RotateCcw className="w-3 h-3" />
                         )}
-                        Khôi phục
+                        {t('promptHistory.restore')}
                       </button>
                     )}
                     
@@ -233,8 +258,8 @@ export function PromptHistory({ promptId, onRestore, compact = false }: Props) {
                   </div>
                   
                   <div className="mt-2 flex items-center justify-between text-xs text-slate-400">
-                    <span>{version.prompt.length} ký tự</span>
-                    <span>{version.prompt.split(/\s+/).length} từ</span>
+                    <span>{version.prompt.length} {t('promptHistory.characters')}</span>
+                    <span>{version.prompt.split(/\s+/).length} {t('promptHistory.words')}</span>
                   </div>
                 </div>
               )}

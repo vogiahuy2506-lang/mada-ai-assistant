@@ -1,21 +1,21 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { AdminLayout } from './AdminLayout';
 import { adminApi } from './adminApi';
-import { useAuthStore } from '@/stores';
-import { useTranslation } from '@/lib/translations';
+import { useAuthStore, useLanguageStore } from '@/stores';
+import { translations, type Language } from '@/lib/translations';
 import clsx from 'clsx';
 
 // ============== TYPES ==============
 type ATCategory = 'vision' | 'hearing' | 'mobility' | 'cognition' | 'communication' | 'daily_living' | 'education' | 'general';
 type ViewMode = 'end_user' | 'at_specialist';
-type Language = 'vi' | 'en' | 'ar' | 'fr';
+type LanguageType = 'vi' | 'en' | 'ar' | 'fr';
 
 interface SuggestedQuestion {
   id: string;
   agent_id: string | null;
   category: ATCategory;
   view_mode: ViewMode;
-  language: Language;
+  language: LanguageType;
   question: string;
   sort_order: number;
   is_active: number;
@@ -24,15 +24,15 @@ interface SuggestedQuestion {
 }
 
 // ============== CONSTANTS ==============
-const CATEGORIES: { value: ATCategory; label: string; icon: string }[] = [
-  { value: 'vision', label: 'Thị giác', icon: '👁️' },
-  { value: 'hearing', label: 'Thính giác', icon: '👂' },
-  { value: 'mobility', label: 'Vận động', icon: '🦴' },
-  { value: 'cognition', label: 'Nhận thức', icon: '🧠' },
-  { value: 'communication', label: 'Giao tiếp', icon: '💬' },
-  { value: 'daily_living', label: 'Sinh hoạt', icon: '🦽' },
-  { value: 'education', label: 'Giáo dục', icon: '📋' },
-  { value: 'general', label: 'Tổng quát', icon: '📦' },
+const CATEGORIES: { value: ATCategory; label: string; labelEn: string; icon: string }[] = [
+  { value: 'vision', label: 'Thị giác', labelEn: 'Vision', icon: '👁️' },
+  { value: 'hearing', label: 'Thính giác', labelEn: 'Hearing', icon: '👂' },
+  { value: 'mobility', label: 'Vận động', labelEn: 'Mobility', icon: '🦴' },
+  { value: 'cognition', label: 'Nhận thức', labelEn: 'Cognition', icon: '🧠' },
+  { value: 'communication', label: 'Giao tiếp', labelEn: 'Communication', icon: '💬' },
+  { value: 'daily_living', label: 'Sinh hoạt', labelEn: 'Daily Living', icon: '🦽' },
+  { value: 'education', label: 'Giáo dục', labelEn: 'Education', icon: '📋' },
+  { value: 'general', label: 'Tổng quát', labelEn: 'General', icon: '📦' },
 ];
 
 const VIEW_MODES: { value: ViewMode; label: string; labelEn: string }[] = [
@@ -40,18 +40,33 @@ const VIEW_MODES: { value: ViewMode; label: string; labelEn: string }[] = [
   { value: 'at_specialist', label: 'Chuyên gia AT', labelEn: 'AT Specialist' },
 ];
 
-const LANGUAGES: { value: Language; label: string; flag: string }[] = [
-  { value: 'vi', label: 'Tiếng Việt', flag: '🇻🇳' },
-  { value: 'en', label: 'English', flag: '🇬🇧' },
-  { value: 'ar', label: 'العربية', flag: '🇸🇦' },
-  { value: 'fr', label: 'Français', flag: '🇫🇷' },
+const LANGUAGES: { value: LanguageType; label: string; labelEn: string; flag: string }[] = [
+  { value: 'vi', label: 'Tiếng Việt', labelEn: 'Vietnamese', flag: '🇻🇳' },
+  { value: 'en', label: 'English', labelEn: 'English', flag: '🇬🇧' },
+  { value: 'ar', label: 'العربية', labelEn: 'Arabic', flag: '🇸🇦' },
+  { value: 'fr', label: 'Français', labelEn: 'French', flag: '🇫🇷' },
 ];
+
+// ============== TRANSLATION HELPER ==============
+function useSuggestedQuestionsTranslation() {
+  const language = useLanguageStore((state) => state.language) as Language;
+  const t = (key: string, params?: Record<string, string | number>) => {
+    let text = translations[language]?.[key as keyof typeof translations[typeof language]] as string || key;
+    if (params) {
+      Object.entries(params).forEach(([k, v]) => {
+        text = text.replace(new RegExp(`\\{${k}\\}`, 'g'), String(v));
+      });
+    }
+    return text;
+  };
+  return { t, language };
+}
 
 // ============== MAIN COMPONENT ==============
 export default function AdminSuggestedQuestions() {
   const { user } = useAuthStore();
   const isSuperAdmin = user?.role === 'super_admin';
-  const { t } = useTranslation();
+  const { t, language } = useSuggestedQuestionsTranslation();
 
   // Data state
   const [questions, setQuestions] = useState<SuggestedQuestion[]>([]);
@@ -62,7 +77,7 @@ export default function AdminSuggestedQuestions() {
   // Filter state
   const [filterCategory, setFilterCategory] = useState<ATCategory | ''>('');
   const [filterViewMode, setFilterViewMode] = useState<ViewMode | ''>('');
-  const [filterLanguage, setFilterLanguage] = useState<Language | ''>('');
+  const [filterLanguage, setFilterLanguage] = useState<LanguageType | ''>('');
   const [filterAgentId, setFilterAgentId] = useState<string>('');
 
   // Form state
@@ -71,7 +86,7 @@ export default function AdminSuggestedQuestions() {
   const [formData, setFormData] = useState({
     category: 'vision' as ATCategory,
     view_mode: 'end_user' as ViewMode,
-    language: 'vi' as Language,
+    language: 'vi' as LanguageType,
     question: '',
     sort_order: 0,
     is_active: true,
@@ -101,7 +116,7 @@ export default function AdminSuggestedQuestions() {
       if (questionsRes.success && questionsRes.data) {
         setQuestions(questionsRes.data);
       } else {
-        setError(questionsRes.error || 'Failed to load questions');
+        setError(questionsRes.error || t('common.error'));
       }
 
       if (statsRes.success && statsRes.data) {
@@ -164,7 +179,7 @@ export default function AdminSuggestedQuestions() {
 
   const handleSubmit = async () => {
     if (!formData.question.trim()) {
-      alert('Vui lòng nhập câu hỏi');
+      alert(t('adminSuggested.pleaseEnterQuestion'));
       return;
     }
 
@@ -179,7 +194,7 @@ export default function AdminSuggestedQuestions() {
           is_active: formData.is_active,
         });
         if (!res.success) {
-          alert(res.error || 'Lỗi cập nhật');
+          alert(res.error || t('adminSuggested.errorUpdating'));
           return;
         }
       } else {
@@ -191,7 +206,7 @@ export default function AdminSuggestedQuestions() {
           sort_order: formData.sort_order,
         });
         if (!res.success) {
-          alert(res.error || 'Lỗi tạo mới');
+          alert(res.error || t('adminSuggested.errorCreating'));
           return;
         }
       }
@@ -212,7 +227,7 @@ export default function AdminSuggestedQuestions() {
     id?: string;
     category: ATCategory;
     view_mode: ViewMode;
-    language: Language;
+    language: LanguageType;
     question: string;
     sort_order: number;
     is_active: boolean;
@@ -222,7 +237,7 @@ export default function AdminSuggestedQuestions() {
   const getBulkDefaultRow = (index: number = 0) => ({
     category: 'vision' as ATCategory,
     view_mode: 'end_user' as ViewMode,
-    language: 'vi' as Language,
+    language: 'vi' as LanguageType,
     question: '',
     sort_order: index * 10,
     is_active: true,
@@ -231,7 +246,14 @@ export default function AdminSuggestedQuestions() {
   const openBulkAddForm = () => {
     if (!isSuperAdmin) return;
     setBulkMode('add');
-    setBulkQuestions([getBulkDefaultRow(0)]);
+    // Start with 5 empty rows for faster bulk entry
+    setBulkQuestions([
+      getBulkDefaultRow(0),
+      getBulkDefaultRow(1),
+      getBulkDefaultRow(2),
+      getBulkDefaultRow(3),
+      getBulkDefaultRow(4),
+    ]);
     setShowBulkForm(true);
   };
 
@@ -269,7 +291,7 @@ export default function AdminSuggestedQuestions() {
     // Validate all questions have content
     const invalidRows = bulkQuestions.filter(q => !q.question.trim());
     if (invalidRows.length > 0) {
-      alert('Vui lòng nhập đầy đủ câu hỏi cho tất cả các dòng');
+      alert(t('adminSuggested.fillAllRows'));
       return;
     }
 
@@ -287,9 +309,9 @@ export default function AdminSuggestedQuestions() {
         
         const res = await adminApi.createSuggestedQuestionsBulk(questionsToCreate);
         if (res.success) {
-          alert(`Đã thêm ${res.data?.count || bulkQuestions.length} câu hỏi`);
+          alert(t('adminSuggested.addedCount', { count: res.data?.count || bulkQuestions.length }));
         } else {
-          alert(res.error || 'Lỗi khi thêm câu hỏi');
+          alert(res.error || t('adminSuggested.errorAdding'));
           return;
         }
       } else if (bulkMode === 'edit') {
@@ -308,9 +330,9 @@ export default function AdminSuggestedQuestions() {
         
         const res = await adminApi.updateSuggestedQuestionsBulk(questionsToUpdate);
         if (res.success) {
-          alert(`Đã cập nhật ${res.data?.count || questionsToUpdate.length} câu hỏi`);
+          alert(t('adminSuggested.updatedCount', { count: res.data?.count || questionsToUpdate.length }));
         } else {
-          alert(res.error || 'Lỗi khi cập nhật câu hỏi');
+          alert(res.error || t('adminSuggested.errorUpdatingQuestions'));
           return;
         }
       }
@@ -327,10 +349,9 @@ export default function AdminSuggestedQuestions() {
 
   const handleBulkToggleActive = async () => {
     if (!isSuperAdmin || selectedIds.size === 0) return;
-    if (!confirm(`Bật/tắt trạng thái cho ${selectedIds.size} câu hỏi đã chọn?`)) return;
+    if (!confirm(t('adminSuggested.toggleConfirm', { count: selectedIds.size }))) return;
 
     try {
-      const toggleValue = true; // Will toggle based on current state
       for (const id of selectedIds) {
         const q = questions.find(q => q.id === id);
         if (q) {
@@ -341,7 +362,7 @@ export default function AdminSuggestedQuestions() {
       }
       setSelectedIds(new Set());
       loadData();
-      alert('Đã cập nhật trạng thái');
+      alert(t('adminSuggested.statusUpdated'));
     } catch (err: any) {
       alert(err.message);
     }
@@ -349,15 +370,15 @@ export default function AdminSuggestedQuestions() {
 
   const handleBulkDelete = async () => {
     if (!isSuperAdmin || selectedIds.size === 0) return;
-    if (!confirm(`Xóa ${selectedIds.size} câu hỏi đã chọn? Hành động này không thể hoàn tác.`)) return;
+    if (!confirm(t('adminSuggested.deleteConfirm', { count: selectedIds.size }))) return;
 
     try {
       const ids = Array.from(selectedIds);
       const res = await adminApi.deleteSuggestedQuestionsBulk(ids);
       if (res.success) {
-        alert(`Đã xóa ${res.data?.count || selectedIds.size} câu hỏi`);
+        alert(t('adminSuggested.deletedCount', { count: res.data?.count || selectedIds.size }));
       } else {
-        alert(res.error || 'Lỗi khi xóa câu hỏi');
+        alert(res.error || t('adminSuggested.errorDeleting'));
         return;
       }
       setSelectedIds(new Set());
@@ -389,7 +410,7 @@ export default function AdminSuggestedQuestions() {
 
   const handleDelete = async (id: string) => {
     if (!isSuperAdmin) return;
-    if (!confirm('Bạn có chắc muốn xóa câu hỏi này?')) return;
+    if (!confirm(t('adminSuggested.confirmDeleteQuestion'))) return;
 
     try {
       const res = await adminApi.deleteSuggestedQuestion(id);
@@ -421,12 +442,12 @@ export default function AdminSuggestedQuestions() {
 
   const handleImportDefaults = async () => {
     if (!isSuperAdmin) return;
-    if (!confirm('Import tất cả câu hỏi mặc định từ SAMPLE_QUESTIONS? Câu hỏi trùng lặp sẽ được thay thế.')) return;
+    if (!confirm(t('adminSuggested.importConfirm'))) return;
 
     try {
       const res = await adminApi.importSuggestedQuestionDefaults();
       if (res.success) {
-        alert(`Đã import ${res.data?.count || 0} câu hỏi mặc định`);
+        alert(t('adminSuggested.importedCount', { count: res.data?.count || 0 }));
         loadData();
       } else {
         alert(res.error);
@@ -437,17 +458,18 @@ export default function AdminSuggestedQuestions() {
   };
 
   const getCategoryLabel = (cat: string) => CATEGORIES.find(c => c.value === cat)?.label || cat;
+  const getCategoryLabelEn = (cat: string) => CATEGORIES.find(c => c.value === cat)?.labelEn || cat;
   const getCategoryIcon = (cat: string) => CATEGORIES.find(c => c.value === cat)?.icon || '📦';
   const getViewModeLabel = (mode: string) => VIEW_MODES.find(v => v.value === mode)?.label || mode;
   const getLanguageLabel = (lang: string) => LANGUAGES.find(l => l.value === lang)?.label || lang;
 
   return (
     <AdminLayout
-      title="Câu hỏi gợi ý"
+      title={t('adminSuggested.title')}
       titleEn="Suggested Questions"
       titleAr="الأسئلة المقترحة"
       titleFr="Questions suggérées"
-      subtitle="Quản lý câu hỏi gợi ý cho Agent theo category, view mode và ngôn ngữ"
+      subtitle={t('adminSuggested.subtitle')}
       subtitleEn="Manage suggested questions for agents by category, view mode and language"
       showLayoutTitle={false}
     >
@@ -456,9 +478,9 @@ export default function AdminSuggestedQuestions() {
         <div className="bg-gradient-to-br from-primary/10 via-white to-secondary/10 backdrop-blur-xl rounded-2xl border-2 border-black p-5 shadow-[6px_6px_0px_0px_#000]">
           <div className="flex justify-between items-center flex-wrap gap-4">
             <div>
-              <h2 className="text-2xl font-black text-on-surface mb-1">Quản lý Câu hỏi gợi ý</h2>
+              <h2 className="text-2xl font-black text-on-surface mb-1">{t('adminSuggested.heroTitle')}</h2>
               <p className="text-sm text-on-surface-variant">
-                Câu hỏi hiển thị cho người dùng khi bắt đầu chat với Agent
+                {t('adminSuggested.heroSubtitle')}
               </p>
             </div>
             {isSuperAdmin && (
@@ -468,14 +490,14 @@ export default function AdminSuggestedQuestions() {
                   className="flex items-center gap-2 px-4 py-2 rounded-full bg-secondary text-white font-bold text-sm border-2 border-black shadow-[3px_3px_0px_0px_#000] hover:shadow-[4px_4px_0px_0px_#000] transition-all"
                 >
                   <span className="material-symbols-outlined text-sm">download</span>
-                  Import Defaults
+                  {t('adminSuggested.importDefaults')}
                 </button>
                 <button
                   onClick={openBulkAddForm}
                   className="flex items-center gap-2 px-4 py-2 rounded-full bg-primary text-white font-bold text-sm border-2 border-black shadow-[3px_3px_0px_0px_#000] hover:shadow-[4px_4px_0px_0px_#000] transition-all"
                 >
                   <span className="material-symbols-outlined text-sm">add</span>
-                  Thêm nhiều câu hỏi
+                  {t('adminSuggested.addMany')}
                 </button>
               </div>
             )}
@@ -489,28 +511,28 @@ export default function AdminSuggestedQuestions() {
           <div className="bg-gradient-to-br from-blue-50 to-blue-100/50 backdrop-blur-xl rounded-xl p-4 border-2 border-black shadow-[4px_4px_0px_0px_#000]">
             <div className="flex items-center gap-2 mb-2">
               <span className="material-symbols-outlined text-blue-600">quiz</span>
-              <span className="text-xs font-bold text-blue-700 uppercase">Tổng cộng</span>
+              <span className="text-xs font-bold text-blue-700 uppercase">{t('adminSuggested.total')}</span>
             </div>
             <h3 className="text-2xl font-black text-blue-700">{stats.total?.count || 0}</h3>
           </div>
           <div className="bg-gradient-to-br from-green-50 to-green-100/50 backdrop-blur-xl rounded-xl p-4 border-2 border-black shadow-[4px_4px_0px_0px_#000]">
             <div className="flex items-center gap-2 mb-2">
               <span className="material-symbols-outlined text-green-600">check_circle</span>
-              <span className="text-xs font-bold text-green-700 uppercase">Đang hoạt động</span>
+              <span className="text-xs font-bold text-green-700 uppercase">{t('adminSuggested.active')}</span>
             </div>
             <h3 className="text-2xl font-black text-green-700">{stats.active?.count || 0}</h3>
           </div>
           <div className="bg-gradient-to-br from-purple-50 to-purple-100/50 backdrop-blur-xl rounded-xl p-4 border-2 border-black shadow-[4px_4px_0px_0px_#000]">
             <div className="flex items-center gap-2 mb-2">
               <span className="material-symbols-outlined text-purple-600">smart_toy</span>
-              <span className="text-xs font-bold text-purple-700 uppercase">Agent riêng</span>
+              <span className="text-xs font-bold text-purple-700 uppercase">{t('adminSuggested.agentSpecific')}</span>
             </div>
             <h3 className="text-2xl font-black text-purple-700">{stats.agentSpecific?.count || 0}</h3>
           </div>
           <div className="bg-gradient-to-br from-amber-50 to-amber-100/50 backdrop-blur-xl rounded-xl p-4 border-2 border-black shadow-[4px_4px_0px_0px_#000]">
             <div className="flex items-center gap-2 mb-2">
               <span className="material-symbols-outlined text-amber-600">language</span>
-              <span className="text-xs font-bold text-amber-700 uppercase">Ngôn ngữ</span>
+              <span className="text-xs font-bold text-amber-700 uppercase">{t('adminSuggested.languages')}</span>
             </div>
             <h3 className="text-2xl font-black text-amber-700">
               {LANGUAGES.filter(l => 
@@ -525,55 +547,55 @@ export default function AdminSuggestedQuestions() {
       <section className="bg-white/80 backdrop-blur-xl rounded-xl border-2 border-black p-4 mb-6 shadow-[4px_4px_0px_0px_#000]">
         <div className="flex items-center gap-2 mb-3">
           <span className="material-symbols-outlined text-gray-600">filter_list</span>
-          <span className="text-sm font-bold text-gray-700">Bộ lọc</span>
+          <span className="text-sm font-bold text-gray-700">{t('adminSuggested.filter')}</span>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <div>
-            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Category</label>
+            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">{t('adminSuggested.category')}</label>
             <select
               value={filterCategory}
               onChange={(e) => { setFilterCategory(e.target.value as ATCategory | ''); setCurrentPage(1); }}
               className="w-full px-3 py-2 rounded-lg bg-white border-2 border-black text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
             >
-              <option value="">Tất cả</option>
+              <option value="">{t('adminSuggested.all')}</option>
               {CATEGORIES.map(c => (
-                <option key={c.value} value={c.value}>{c.icon} {c.label}</option>
+                <option key={c.value} value={c.value}>{c.icon} {language === 'en' ? c.labelEn : c.label}</option>
               ))}
             </select>
           </div>
           <div>
-            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">View Mode</label>
+            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">{t('adminSuggested.viewMode')}</label>
             <select
               value={filterViewMode}
               onChange={(e) => { setFilterViewMode(e.target.value as ViewMode | ''); setCurrentPage(1); }}
               className="w-full px-3 py-2 rounded-lg bg-white border-2 border-black text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
             >
-              <option value="">Tất cả</option>
+              <option value="">{t('adminSuggested.all')}</option>
               {VIEW_MODES.map(v => (
-                <option key={v.value} value={v.value}>{v.label}</option>
+                <option key={v.value} value={v.value}>{language === 'en' ? v.labelEn : v.label}</option>
               ))}
             </select>
           </div>
           <div>
-            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Ngôn ngữ</label>
+            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">{t('adminSuggested.language')}</label>
             <select
               value={filterLanguage}
-              onChange={(e) => { setFilterLanguage(e.target.value as Language | ''); setCurrentPage(1); }}
+              onChange={(e) => { setFilterLanguage(e.target.value as LanguageType | ''); setCurrentPage(1); }}
               className="w-full px-3 py-2 rounded-lg bg-white border-2 border-black text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
             >
-              <option value="">Tất cả</option>
+              <option value="">{t('adminSuggested.all')}</option>
               {LANGUAGES.map(l => (
-                <option key={l.value} value={l.value}>{l.flag} {l.label}</option>
+                <option key={l.value} value={l.value}>{l.flag} {language === 'en' ? l.labelEn : l.label}</option>
               ))}
             </select>
           </div>
           <div>
-            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Agent ID</label>
+            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">{t('adminSuggested.agentId')}</label>
             <input
               type="text"
               value={filterAgentId}
               onChange={(e) => { setFilterAgentId(e.target.value); setCurrentPage(1); }}
-              placeholder="Để trống = mặc định"
+              placeholder={t('adminSuggested.leaveEmptyDefault')}
               className="w-full px-3 py-2 rounded-lg bg-white border-2 border-black text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
             />
           </div>
@@ -589,7 +611,7 @@ export default function AdminSuggestedQuestions() {
             }}
             className="mt-3 text-xs text-red-600 hover:text-red-700 font-medium"
           >
-            ✕ Xóa bộ lọc
+            ✕ {t('adminSuggested.clearFilters')}
           </button>
         )}
       </section>
@@ -598,7 +620,7 @@ export default function AdminSuggestedQuestions() {
       {error && (
         <div className="mb-6 p-4 bg-red-50 border-2 border-red-300 rounded-xl text-red-700">
           <p className="font-medium">{error}</p>
-          <button onClick={loadData} className="mt-2 text-sm underline">Thử lại</button>
+          <button onClick={loadData} className="mt-2 text-sm underline">{t('adminSuggested.retry')}</button>
         </div>
       )}
 
@@ -608,10 +630,10 @@ export default function AdminSuggestedQuestions() {
         <div className="bg-gradient-to-r from-gray-100 to-gray-50 border-b-2 border-black p-4">
           <div className="flex items-center justify-between">
             <h3 className="font-bold text-on-surface">
-              {loading ? 'Đang tải...' : `${filteredQuestions.length} câu hỏi`}
+              {loading ? t('adminSuggested.loading') : `${filteredQuestions.length} ${t('adminSuggested.questions')}`}
             </h3>
             <button onClick={loadData} className="text-xs text-primary hover:text-primary/80 font-medium">
-              ↻ Làm mới
+              ↻ {t('common.refresh')}
             </button>
           </div>
         </div>
@@ -622,28 +644,28 @@ export default function AdminSuggestedQuestions() {
             <div className="w-12 h-12 rounded-xl bg-gray-100 border-2 border-black flex items-center justify-center mb-4 shadow-[4px_4px_0px_0px_#000] animate-pulse">
               <span className="material-symbols-outlined text-2xl text-gray-400">hourglass_empty</span>
             </div>
-            <p className="text-lg font-bold text-gray-500">Đang tải...</p>
+            <p className="text-lg font-bold text-gray-500">{t('adminSuggested.loading')}</p>
           </div>
         ) : filteredQuestions.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12">
             <div className="w-12 h-12 rounded-xl bg-gray-100 border-2 border-black flex items-center justify-center mb-4 shadow-[4px_4px_0px_0px_#000]">
               <span className="material-symbols-outlined text-2xl text-gray-400">quiz</span>
             </div>
-            <h4 className="text-lg font-bold text-on-surface mb-1">Chưa có câu hỏi nào</h4>
-            <p className="text-sm text-on-surface-variant mb-4">Thêm câu hỏi gợi ý mới hoặc import từ mặc định</p>
+            <h4 className="text-lg font-bold text-on-surface mb-1">{t('adminSuggested.noQuestions')}</h4>
+            <p className="text-sm text-on-surface-variant mb-4">{t('adminSuggested.noQuestionsHint')}</p>
             {isSuperAdmin && (
               <div className="flex gap-2">
                 <button
                   onClick={handleImportDefaults}
                   className="px-4 py-2 rounded-full bg-secondary text-white font-bold text-sm border-2 border-black shadow-[3px_3px_0px_0px_#000] hover:shadow-[4px_4px_0px_0px_#000] transition-all"
                 >
-                  Import Defaults
+                  {t('adminSuggested.importDefaults')}
                 </button>
                 <button
                   onClick={openBulkAddForm}
                   className="px-4 py-2 rounded-full bg-primary text-white font-bold text-sm border-2 border-black shadow-[3px_3px_0px_0px_#000] hover:shadow-[4px_4px_0px_0px_#000] transition-all"
                 >
-                  Thêm nhiều câu hỏi
+                  {t('adminSuggested.addMany')}
                 </button>
               </div>
             )}
@@ -655,13 +677,13 @@ export default function AdminSuggestedQuestions() {
               <div className="sticky top-0 z-10 bg-primary/10 border-b-2 border-primary p-3 flex items-center justify-between flex-wrap gap-2">
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-bold text-primary">
-                    Đã chọn {selectedIds.size} câu hỏi
+                    {t('adminSuggested.selected')} {selectedIds.size} {t('adminSuggested.questions')}
                   </span>
                   <button
                     onClick={() => setSelectedIds(new Set())}
                     className="text-xs text-gray-500 hover:text-gray-700 underline"
                   >
-                    Hủy chọn
+                    {t('adminSuggested.clearSelection')}
                   </button>
                 </div>
                 <div className="flex items-center gap-2">
@@ -671,7 +693,7 @@ export default function AdminSuggestedQuestions() {
                   >
                     <span className="flex items-center gap-1">
                       <span className="material-symbols-outlined text-xs">edit</span>
-                      Sửa {selectedIds.size} câu hỏi
+                      {t('adminSuggested.edit')} {selectedIds.size}
                     </span>
                   </button>
                   <button
@@ -680,7 +702,7 @@ export default function AdminSuggestedQuestions() {
                   >
                     <span className="flex items-center gap-1">
                       <span className="material-symbols-outlined text-xs">toggle_on</span>
-                      Bật/Tắt
+                      {t('adminSuggested.toggle')}
                     </span>
                   </button>
                   <button
@@ -689,7 +711,7 @@ export default function AdminSuggestedQuestions() {
                   >
                     <span className="flex items-center gap-1">
                       <span className="material-symbols-outlined text-xs">delete</span>
-                      Xóa
+                      {t('adminSuggested.delete')}
                     </span>
                   </button>
                 </div>
@@ -710,14 +732,14 @@ export default function AdminSuggestedQuestions() {
                         />
                       </th>
                     )}
-                    <th className="text-left text-[10px] font-bold text-gray-500 uppercase px-4 py-3">Câu hỏi</th>
-                    <th className="text-left text-[10px] font-bold text-gray-500 uppercase px-4 py-3 w-24">Category</th>
-                    <th className="text-left text-[10px] font-bold text-gray-500 uppercase px-4 py-3 w-24">View Mode</th>
-                    <th className="text-left text-[10px] font-bold text-gray-500 uppercase px-4 py-3 w-20">Ngôn ngữ</th>
-                    <th className="text-left text-[10px] font-bold text-gray-500 uppercase px-4 py-3 w-16">Thứ tự</th>
-                    <th className="text-left text-[10px] font-bold text-gray-500 uppercase px-4 py-3 w-16">Trạng thái</th>
+                    <th className="text-left text-[10px] font-bold text-gray-500 uppercase px-4 py-3">{t('adminSuggested.question')}</th>
+                    <th className="text-left text-[10px] font-bold text-gray-500 uppercase px-4 py-3 w-24">{t('adminSuggested.category')}</th>
+                    <th className="text-left text-[10px] font-bold text-gray-500 uppercase px-4 py-3 w-24">{t('adminSuggested.viewMode')}</th>
+                    <th className="text-left text-[10px] font-bold text-gray-500 uppercase px-4 py-3 w-20">{t('adminSuggested.language')}</th>
+                    <th className="text-left text-[10px] font-bold text-gray-500 uppercase px-4 py-3 w-16">{t('adminSuggested.order')}</th>
+                    <th className="text-left text-[10px] font-bold text-gray-500 uppercase px-4 py-3 w-16">{t('adminSuggested.status')}</th>
                     {isSuperAdmin && (
-                      <th className="text-left text-[10px] font-bold text-gray-500 uppercase px-4 py-3 w-24">Hành động</th>
+                      <th className="text-left text-[10px] font-bold text-gray-500 uppercase px-4 py-3 w-24">{t('adminSuggested.actions')}</th>
                     )}
                   </tr>
                 </thead>
@@ -745,7 +767,7 @@ export default function AdminSuggestedQuestions() {
                       </td>
                       <td className="px-4 py-3">
                         <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-bold border border-blue-300">
-                          {getCategoryIcon(q.category)} {getCategoryLabel(q.category)}
+                          {getCategoryIcon(q.category)} {language === 'en' ? getCategoryLabelEn(q.category) : getCategoryLabel(q.category)}
                         </span>
                       </td>
                       <td className="px-4 py-3">
@@ -776,7 +798,7 @@ export default function AdminSuggestedQuestions() {
                             !isSuperAdmin && 'opacity-50 cursor-not-allowed'
                           )}
                         >
-                          {q.is_active === 1 ? '✓ Active' : '✕ Disabled'}
+                          {q.is_active === 1 ? `✓ ${t('adminSuggested.activeStatus')}` : `✕ ${t('adminSuggested.disabledStatus')}`}
                         </button>
                       </td>
                       {isSuperAdmin && (
@@ -785,14 +807,14 @@ export default function AdminSuggestedQuestions() {
                             <button
                               onClick={() => openEditForm(q)}
                               className="w-7 h-7 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 flex items-center justify-center border border-primary/30 transition-colors"
-                              title="Sửa"
+                              title={t('adminSuggested.edit')}
                             >
                               <span className="material-symbols-outlined text-xs">edit</span>
                             </button>
                             <button
                               onClick={() => handleDelete(q.id)}
                               className="w-7 h-7 rounded-lg bg-red-100 text-red-600 hover:bg-red-200 flex items-center justify-center border border-red-300 transition-colors"
-                              title="Xóa"
+                              title={t('adminSuggested.delete')}
                             >
                               <span className="material-symbols-outlined text-xs">delete</span>
                             </button>
@@ -809,7 +831,7 @@ export default function AdminSuggestedQuestions() {
             {totalPages > 1 && (
               <div className="flex items-center justify-between p-4 border-t border-black/10">
                 <p className="text-sm text-gray-600">
-                  Trang {currentPage} / {totalPages} ({filteredQuestions.length} câu hỏi)
+                  {t('admin.common.page')} {currentPage} / {totalPages} ({filteredQuestions.length} {t('adminSuggested.questions')})
                 </p>
                 <div className="flex items-center gap-2">
                   <button
@@ -817,14 +839,14 @@ export default function AdminSuggestedQuestions() {
                     disabled={currentPage === 1}
                     className="px-3 py-1.5 rounded-lg bg-white border-2 border-black text-sm font-bold disabled:opacity-50 hover:bg-gray-50 transition-colors shadow-[2px_2px_0px_0px_#000]"
                   >
-                    ← Trước
+                    ← {t('admin.common.previous')}
                   </button>
                   <button
                     onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
                     disabled={currentPage === totalPages}
                     className="px-3 py-1.5 rounded-lg bg-white border-2 border-black text-sm font-bold disabled:opacity-50 hover:bg-gray-50 transition-colors shadow-[2px_2px_0px_0px_#000]"
                   >
-                    Sau →
+                    {t('admin.common.next')} →
                   </button>
                 </div>
               </div>
@@ -842,10 +864,10 @@ export default function AdminSuggestedQuestions() {
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-lg font-black text-on-surface">
-                    {editingId ? 'Sửa Câu hỏi' : 'Thêm Câu hỏi mới'}
+                    {editingId ? t('adminSuggested.editQuestion') : t('adminSuggested.addQuestion')}
                   </h3>
                   <p className="text-xs text-on-surface-variant">
-                    {editingId ? 'Cập nhật thông tin câu hỏi' : 'Tạo câu hỏi gợi ý mới'}
+                    {editingId ? t('adminSuggested.updateInfo') : t('adminSuggested.createNew')}
                   </p>
                 </div>
                 <button
@@ -865,7 +887,7 @@ export default function AdminSuggestedQuestions() {
               {/* Category */}
               <div>
                 <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">
-                  Category <span className="text-red-500">*</span>
+                  {t('adminSuggested.category')} <span className="text-red-500">*</span>
                 </label>
                 <select
                   value={formData.category}
@@ -873,7 +895,7 @@ export default function AdminSuggestedQuestions() {
                   className="w-full px-3 py-2 rounded-lg bg-white border-2 border-black text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
                 >
                   {CATEGORIES.map(c => (
-                    <option key={c.value} value={c.value}>{c.icon} {c.label}</option>
+                    <option key={c.value} value={c.value}>{c.icon} {language === 'en' ? c.labelEn : c.label}</option>
                   ))}
                 </select>
               </div>
@@ -881,7 +903,7 @@ export default function AdminSuggestedQuestions() {
               {/* View Mode */}
               <div>
                 <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">
-                  View Mode <span className="text-red-500">*</span>
+                  {t('adminSuggested.viewMode')} <span className="text-red-500">*</span>
                 </label>
                 <select
                   value={formData.view_mode}
@@ -889,7 +911,7 @@ export default function AdminSuggestedQuestions() {
                   className="w-full px-3 py-2 rounded-lg bg-white border-2 border-black text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
                 >
                   {VIEW_MODES.map(v => (
-                    <option key={v.value} value={v.value}>{v.label} ({v.labelEn})</option>
+                    <option key={v.value} value={v.value}>{language === 'en' ? v.labelEn : v.label}</option>
                   ))}
                 </select>
               </div>
@@ -897,15 +919,15 @@ export default function AdminSuggestedQuestions() {
               {/* Language */}
               <div>
                 <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">
-                  Ngôn ngữ <span className="text-red-500">*</span>
+                  {t('adminSuggested.language')} <span className="text-red-500">*</span>
                 </label>
                 <select
                   value={formData.language}
-                  onChange={(e) => setFormData(prev => ({ ...prev, language: e.target.value as Language }))}
+                  onChange={(e) => setFormData(prev => ({ ...prev, language: e.target.value as LanguageType }))}
                   className="w-full px-3 py-2 rounded-lg bg-white border-2 border-black text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
                 >
                   {LANGUAGES.map(l => (
-                    <option key={l.value} value={l.value}>{l.flag} {l.label}</option>
+                    <option key={l.value} value={l.value}>{l.flag} {language === 'en' ? l.labelEn : l.label}</option>
                   ))}
                 </select>
               </div>
@@ -913,12 +935,12 @@ export default function AdminSuggestedQuestions() {
               {/* Question */}
               <div>
                 <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">
-                  Câu hỏi <span className="text-red-500">*</span>
+                  {t('adminSuggested.question')} <span className="text-red-500">*</span>
                 </label>
                 <textarea
                   value={formData.question}
                   onChange={(e) => setFormData(prev => ({ ...prev, question: e.target.value }))}
-                  placeholder="VD: Phần mềm đọc màn hình nào tốt nhất cho người khiếm thị?"
+                  placeholder={t('adminSuggested.example')}
                   rows={3}
                   className="w-full px-3 py-2 rounded-lg bg-white border-2 border-black text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/30"
                 />
@@ -927,7 +949,7 @@ export default function AdminSuggestedQuestions() {
               {/* Sort Order */}
               <div>
                 <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">
-                  Thứ tự
+                  {t('adminSuggested.order')}
                 </label>
                 <input
                   type="number"
@@ -936,7 +958,7 @@ export default function AdminSuggestedQuestions() {
                   min={0}
                   className="w-full px-3 py-2 rounded-lg bg-white border-2 border-black text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
                 />
-                <p className="text-[10px] text-gray-500 mt-1">Số nhỏ hơn sẽ hiển thị trước</p>
+                <p className="text-[10px] text-gray-500 mt-1">{t('adminSuggested.orderHint')}</p>
               </div>
 
               {/* Active Toggle */}
@@ -949,7 +971,7 @@ export default function AdminSuggestedQuestions() {
                   className="w-4 h-4 accent-primary"
                 />
                 <label htmlFor="is_active" className="text-sm font-medium text-gray-700 cursor-pointer">
-                  Câu hỏi đang hoạt động
+                  {t('adminSuggested.questionActive')}
                 </label>
               </div>
             </form>
@@ -961,14 +983,14 @@ export default function AdminSuggestedQuestions() {
                 onClick={() => { setShowForm(false); resetForm(); }}
                 className="flex-1 px-3 py-2 rounded-lg bg-white border-2 border-black font-bold text-xs hover:bg-gray-100 transition-colors shadow-[2px_2px_0px_0px_#000]"
               >
-                Hủy
+                {t('adminSuggested.cancel')}
               </button>
               <button
                 type="button"
                 onClick={handleSubmit}
                 className="flex-1 px-3 py-2 rounded-lg bg-primary text-white font-bold text-xs border-2 border-black shadow-[2px_2px_0px_0px_#000] hover:-translate-y-0.5 hover:shadow-[3px_3px_0px_0px_#000] transition-all"
               >
-                {editingId ? 'Cập nhật' : 'Tạo mới'}
+                {editingId ? t('adminSuggested.update') : t('adminSuggested.create')}
               </button>
             </div>
           </div>
@@ -984,12 +1006,12 @@ export default function AdminSuggestedQuestions() {
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-lg font-black text-on-surface">
-                    {bulkMode === 'add' ? 'Thêm nhiều Câu hỏi' : 'Sửa nhiều Câu hỏi'}
+                    {bulkMode === 'add' ? t('adminSuggested.addMultiple') : t('adminSuggested.editMultiple')}
                   </h3>
                   <p className="text-xs text-on-surface-variant">
                     {bulkMode === 'add' 
-                      ? `Đang thêm ${bulkQuestions.length} câu hỏi - Có thể thêm hoặc bớt dòng` 
-                      : `Đang sửa ${bulkQuestions.length} câu hỏi đã chọn`}
+                      ? `${t('adminSuggested.adding', { count: bulkQuestions.length })} - ${t('adminSuggested.canAddRemoveRows')}` 
+                      : `${t('adminSuggested.editingSelected', { count: bulkQuestions.length })} ${t('adminSuggested.questionsSelected')}`}
                   </p>
                 </div>
                 <button
@@ -1006,12 +1028,12 @@ export default function AdminSuggestedQuestions() {
               {/* Header Row */}
               <div className="grid grid-cols-12 gap-2 mb-2 px-2">
                 <div className="col-span-1 text-[10px] font-bold text-gray-500 uppercase">#</div>
-                <div className="col-span-2 text-[10px] font-bold text-gray-500 uppercase">Category</div>
-                <div className="col-span-2 text-[10px] font-bold text-gray-500 uppercase">View Mode</div>
-                <div className="col-span-2 text-[10px] font-bold text-gray-500 uppercase">Ngôn ngữ</div>
-                <div className="col-span-3 text-[10px] font-bold text-gray-500 uppercase">Câu hỏi</div>
-                <div className="col-span-1 text-[10px] font-bold text-gray-500 uppercase">Thứ tự</div>
-                <div className="col-span-1 text-[10px] font-bold text-gray-500 uppercase">Active</div>
+                <div className="col-span-2 text-[10px] font-bold text-gray-500 uppercase">{t('adminSuggested.category')}</div>
+                <div className="col-span-2 text-[10px] font-bold text-gray-500 uppercase">{t('adminSuggested.viewMode')}</div>
+                <div className="col-span-2 text-[10px] font-bold text-gray-500 uppercase">{t('adminSuggested.language')}</div>
+                <div className="col-span-3 text-[10px] font-bold text-gray-500 uppercase">{t('adminSuggested.question')}</div>
+                <div className="col-span-1 text-[10px] font-bold text-gray-500 uppercase">{t('adminSuggested.order')}</div>
+                <div className="col-span-1 text-[10px] font-bold text-gray-500 uppercase">{t('adminSuggested.status')}</div>
               </div>
 
               {/* Question Rows */}
@@ -1025,7 +1047,7 @@ export default function AdminSuggestedQuestions() {
                         <button
                           onClick={() => removeBulkRow(index)}
                           className="ml-1 w-5 h-5 rounded-full bg-red-100 text-red-600 flex items-center justify-center hover:bg-red-200"
-                          title="Xóa dòng này"
+                          title={t('adminSuggested.removeRow')}
                         >
                           <span className="material-symbols-outlined text-xs">remove</span>
                         </button>
@@ -1040,7 +1062,7 @@ export default function AdminSuggestedQuestions() {
                         className="w-full px-2 py-1.5 rounded-lg bg-white border border-black text-xs focus:outline-none focus:ring-2 focus:ring-primary/30"
                       >
                         {CATEGORIES.map(c => (
-                          <option key={c.value} value={c.value}>{c.icon} {c.label}</option>
+                          <option key={c.value} value={c.value}>{c.icon} {language === 'en' ? c.labelEn : c.label}</option>
                         ))}
                       </select>
                     </div>
@@ -1053,7 +1075,7 @@ export default function AdminSuggestedQuestions() {
                         className="w-full px-2 py-1.5 rounded-lg bg-white border border-black text-xs focus:outline-none focus:ring-2 focus:ring-primary/30"
                       >
                         {VIEW_MODES.map(v => (
-                          <option key={v.value} value={v.value}>{v.label}</option>
+                          <option key={v.value} value={v.value}>{language === 'en' ? v.labelEn : v.label}</option>
                         ))}
                       </select>
                     </div>
@@ -1066,7 +1088,7 @@ export default function AdminSuggestedQuestions() {
                         className="w-full px-2 py-1.5 rounded-lg bg-white border border-black text-xs focus:outline-none focus:ring-2 focus:ring-primary/30"
                       >
                         {LANGUAGES.map(l => (
-                          <option key={l.value} value={l.value}>{l.flag} {l.label}</option>
+                          <option key={l.value} value={l.value}>{l.flag} {language === 'en' ? l.labelEn : l.label}</option>
                         ))}
                       </select>
                     </div>
@@ -1076,7 +1098,7 @@ export default function AdminSuggestedQuestions() {
                       <textarea
                         value={q.question}
                         onChange={(e) => updateBulkRow(index, 'question', e.target.value)}
-                        placeholder="Nhập câu hỏi..."
+                        placeholder={t('adminSuggested.enterQuestionPlaceholder')}
                         rows={2}
                         className="w-full px-2 py-1.5 rounded-lg bg-white border border-black text-xs resize-none focus:outline-none focus:ring-2 focus:ring-primary/30"
                       />
@@ -1113,16 +1135,16 @@ export default function AdminSuggestedQuestions() {
                   className="mt-3 w-full py-2 rounded-lg border-2 border-dashed border-gray-400 text-gray-600 text-sm font-medium hover:bg-gray-50 hover:border-gray-500 transition-colors flex items-center justify-center gap-2"
                 >
                   <span className="material-symbols-outlined text-sm">add</span>
-                  Thêm dòng mới
+                  {t('adminSuggested.addRow')}
                 </button>
               )}
 
               {/* Summary */}
               <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
                 <p className="text-xs text-blue-700">
-                  <span className="font-bold">Tổng cộng:</span> {bulkQuestions.length} câu hỏi
-                  • <span className="font-bold">Đang active:</span> {bulkQuestions.filter(q => q.is_active).length}
-                  • <span className="font-bold">Đã nhập:</span> {bulkQuestions.filter(q => q.question.trim()).length} / {bulkQuestions.length}
+                  <span className="font-bold">{t('adminSuggested.totalQuestions')}:</span> {bulkQuestions.length} {t('adminSuggested.questions')}
+                  • <span className="font-bold">{t('adminSuggested.activeCount')}:</span> {bulkQuestions.filter(q => q.is_active).length}
+                  • <span className="font-bold">{t('adminSuggested.filled')}:</span> {bulkQuestions.filter(q => q.question.trim()).length} / {bulkQuestions.length}
                 </p>
               </div>
             </div>
@@ -1134,14 +1156,14 @@ export default function AdminSuggestedQuestions() {
                 onClick={() => { setShowBulkForm(false); setBulkMode(null); setBulkQuestions([]); }}
                 className="flex-1 px-3 py-2 rounded-lg bg-white border-2 border-black font-bold text-xs hover:bg-gray-100 transition-colors shadow-[2px_2px_0px_0px_#000]"
               >
-                Hủy
+                {t('adminSuggested.cancel')}
               </button>
               <button
                 type="button"
                 onClick={handleBulkSubmit}
                 className="flex-1 px-3 py-2 rounded-lg bg-primary text-white font-bold text-xs border-2 border-black shadow-[2px_2px_0px_0px_#000] hover:-translate-y-0.5 hover:shadow-[3px_3px_0px_0px_#000] transition-all"
               >
-                {bulkMode === 'add' ? `Thêm ${bulkQuestions.length} câu hỏi` : `Cập nhật ${bulkQuestions.filter(q => q.id).length} câu hỏi`}
+                {bulkMode === 'add' ? `${t('adminSuggested.commonAdd')} ${bulkQuestions.length} ${t('adminSuggested.questions')}` : `${t('adminSuggested.update')} ${bulkQuestions.filter(q => q.id).length} ${t('adminSuggested.questions')}`}
               </button>
             </div>
           </div>

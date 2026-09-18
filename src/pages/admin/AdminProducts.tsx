@@ -4,12 +4,28 @@ import { adminApi, Product, Category } from './adminApi';
 import { AIImportCard } from './AIImportCard';
 import { formatPrice } from '../../lib/formatPrice';
 import { getImageUrl } from '../../lib/imageProxy';
-import { useTranslation } from '@/lib/translations';
+import { useTranslation, translations, type Language } from '@/lib/translations';
+import { useLanguageStore } from '@/stores';
 import {
  Plus, RefreshCw, Loader2, CheckCircle2, AlertCircle,
  Languages,
 } from 'lucide-react';
 import clsx from 'clsx';
+
+// Translation helper function using useLanguageStore
+function useProductTranslation() {
+ const language = useLanguageStore((state) => state.language) as Language;
+ const t = (key: string, params?: Record<string, string>) => {
+   let text = translations[language]?.[key as keyof typeof translations[typeof language]] as string || key;
+   if (params) {
+     Object.entries(params).forEach(([k, v]) => {
+       text = text.replace(`{${k}}`, v);
+     });
+   }
+   return text;
+ };
+ return { t, language };
+}
 
 // ==================== ICONS ====================
 // (Icons removed - unused)
@@ -21,6 +37,7 @@ function CategoryModal({ category, onSave, onClose }: {
  onClose: () => void;
 }) {
  const { t } = useTranslation();
+ const { t: pt } = useProductTranslation();
  const [form, setForm] = useState({
   id: category?.id || '',
   name_vi: category?.name_vi || '',
@@ -77,12 +94,12 @@ function CategoryModal({ category, onSave, onClose }: {
      <div className="grid grid-cols-2 gap-4">
       <div>
        <label className="block text-xs font-black text-black uppercase tracking-wider mb-1.5 ml-1">Tên (VI) <span className="text-error">*</span></label>
-       <input type="text" value={form.name_vi} onChange={(e) => setForm({...form, name_vi: e.target.value})} placeholder="Hỗ trợ Thị giác" 
+       <input type="text" value={form.name_vi} onChange={(e) => setForm({...form, name_vi: e.target.value})} placeholder={pt('product.placeholder.categoryVi')} 
         className="w-full px-4 py-3 rounded-xl border border-outline bg-surface-container-low font-label-md text-on-surface placeholder:text-on-surface-variant/60 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all" />
       </div>
       <div>
        <label className="block text-xs font-black text-black uppercase tracking-wider mb-1.5 ml-1">Tên (EN) <span className="text-error">*</span></label>
-       <input type="text" value={form.name_en} onChange={(e) => setForm({...form, name_en: e.target.value})} placeholder="Vision Support" 
+       <input type="text" value={form.name_en} onChange={(e) => setForm({...form, name_en: e.target.value})} placeholder={pt('product.placeholder.categoryEn')} 
         className="w-full px-4 py-3 rounded-xl border border-outline bg-surface-container-low font-label-md text-on-surface placeholder:text-on-surface-variant/60 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all" />
       </div>
      </div>
@@ -142,6 +159,7 @@ function ProductModal({ product, categories, defaultCategory, onSave, onClose }:
  onClose: () => void;
 }) {
  const { t: tp } = useTranslation();
+ const { t: pt } = useProductTranslation();
  const [form, setForm] = useState({
   title: product?.title || '', title_en: product?.title_en || '',
   description: product?.description || '', description_en: product?.description_en || '',
@@ -252,7 +270,7 @@ const handleImportFromUrl = async () => {
        <div>
         <label className="block text-xs font-medium text-slate-600 mb-1">{tp('admin.products.brand')}</label>
         <input type="text" value={form.brand} onChange={(e) => setForm({...form, brand: e.target.value})}
-         placeholder="Apple, Microsoft..."
+         placeholder={pt('product.placeholder.brand')}
          className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm text-black placeholder:text-slate-400 focus:outline-none focus:border-primary transition-colors" />
        </div>
 
@@ -275,13 +293,13 @@ const handleImportFromUrl = async () => {
        <div>
         <label className="block text-xs font-medium text-slate-600 mb-1">{tp('admin.products.descShortVi')}</label>
         <textarea value={form.description} onChange={(e) => setForm({...form, description: e.target.value})}
-         rows={2} placeholder="Tóm tắt ngắn gọn"
+         rows={2} placeholder={pt('product.placeholder.descVi')}
          className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm text-black placeholder:text-slate-400 focus:outline-none focus:border-primary transition-colors resize-none" />
        </div>
        <div>
         <label className="block text-xs font-medium text-slate-600 mb-1">{tp('admin.products.descShortEn')}</label>
         <textarea value={form.description_en} onChange={(e) => setForm({...form, description_en: e.target.value})}
-         rows={2} placeholder="Short summary"
+         rows={2} placeholder={pt('product.placeholder.descEn')}
          className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm text-black placeholder:text-slate-400 focus:outline-none focus:border-primary transition-colors resize-none" />
        </div>
       </div>
@@ -353,7 +371,7 @@ const handleImportFromUrl = async () => {
        <div>
         <label className="block text-xs font-medium text-slate-600 mb-1">{tp('admin.products.isoCode')}</label>
         <input type="text" value={form.iso_codes} onChange={(e) => setForm({...form, iso_codes: e.target.value})}
-         placeholder="ISO 9999..."
+         placeholder={pt('product.placeholder.iso')}
          className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm text-black placeholder:text-slate-400 focus:outline-none focus:border-primary transition-colors" />
        </div>
        <div>
@@ -450,6 +468,7 @@ function ProductCard({ product, categoryName, onEdit, onDelete, onTogglePublish,
  onTranslate: (p: Product) => void;
 }) {
  const { t } = useTranslation();
+ const { t: pt } = useProductTranslation();
  const isPublished = product.status === 'published';
  const catColors: Record<string, { bg: string; text: string }> = {
   vision: { bg: 'bg-blue-100', text: 'text-blue-700' },
@@ -484,7 +503,7 @@ function ProductCard({ product, categoryName, onEdit, onDelete, onTogglePublish,
     <div className="absolute top-2 left-2 flex gap-1">
      {product.featured && (
       <span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-amber-400 text-black border border-black/20">
-       HOT
+       {pt('product.hot')}
       </span>
      )}
      {!isPublished && (
@@ -498,7 +517,7 @@ function ProductCard({ product, categoryName, onEdit, onDelete, onTogglePublish,
     <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
      <button onClick={(e) => { e.stopPropagation(); onTranslate(product); }}
       className="w-7 h-7 rounded bg-white/90 border border-slate-300 flex items-center justify-center text-slate-600 hover:bg-purple-100 hover:text-purple-600 transition-colors"
-      title="Dịch AI (EN/AR/FR)">
+      title={pt('product.aiTranslate')}>
       <Languages className="w-4 h-4" />
      </button>
      <button onClick={(e) => { e.stopPropagation(); onEdit(product); }}
@@ -548,6 +567,7 @@ function CategoryCard({ category, productCount, onEdit, onAddProduct }: {
  category: Category; productCount: number; onEdit: (c: Category) => void; onAddProduct: (c: Category) => void;
 }) {
  const { t } = useTranslation();
+ const { t: pt } = useProductTranslation();
  const catColors: Record<string, { bg: string; text: string; icon: string }> = {
   vision: { bg: 'bg-blue-100 text-blue-600', text: 'text-blue-700', icon: 'visibility' },
   hearing: { bg: 'bg-amber-100 text-amber-600', text: 'text-amber-700', icon: 'hearing' },
@@ -574,7 +594,7 @@ function CategoryCard({ category, productCount, onEdit, onAddProduct }: {
     </div>
 
     <div className="flex items-center gap-2 text-xs">
-     <span className={clsx('px-2 py-1 rounded font-medium', colors.bg)}>{productCount} SP</span>
+     <span className={clsx('px-2 py-1 rounded font-medium', colors.bg)}>{productCount} {pt('product.countShort')}</span>
      <span className="px-2 py-1 rounded bg-slate-100 text-slate-600 font-mono">#{category.sort_order}</span>
     </div>
 
@@ -696,17 +716,17 @@ const handleTogglePublish = async (prod: Product) => {
 };
 
 const handleTranslate = async (prod: Product) => {
-  if (!confirm(`Dịch sản phẩm "${prod.title}" sang EN/AR/FR bằng AI?`)) return;
+  if (!confirm(pt('product.translateConfirm', { title: prod.title }))) return;
   try {
     const result = await adminApi.translateProduct(prod.id);
     if (result.success) {
-      alert(`✅ Đã dịch thành công!`);
+      alert(pt('product.translateSuccess'));
       await loadProducts();
     } else {
-      alert(`❌ Lỗi: ${result.error}`);
+      alert(`${pt('product.syncError')} ${result.error}`);
     }
   } catch (e) {
-    alert(`❌ Lỗi: ${(e as Error)?.message}`);
+    alert(`${pt('product.syncError')} ${(e as Error)?.message}`);
   }
 };
 
@@ -719,11 +739,11 @@ const handlePublishAll = async () => {
   }
   try {
     const result = await adminApi.bulkPublish({ scope: 'all_unpublished' });
-    const msg = result?.message || `Đã đăng ${unpublished.length} sản phẩm`;
-    alert(`✅ ${msg}`);
+    const msg = result?.message || pt('product.syncComplete');
+    alert(msg);
     await loadProducts();
   } catch (e) {
-    alert(`❌ Lỗi: ${(e as Error)?.message || 'Không thể đăng hàng loạt'}`);
+    alert(`${pt('product.syncError')} ${(e as Error)?.message || pt('product.errorBatch')}`);
   }
 };
 
@@ -767,6 +787,7 @@ const totalPages = Math.ceil(totalProducts / pageSize);
  };
 
   const { t } = useTranslation();
+  const { t: pt } = useProductTranslation();
 
   return (
    <AdminLayout
@@ -810,7 +831,7 @@ const totalPages = Math.ceil(totalProducts / pageSize);
       ) : (
        <h3 className="text-xl font-black text-on-surface">{totalProducts.toLocaleString()}</h3>
       )}
-      <p className="text-[10px] text-on-surface-variant mt-0.5">trong hệ thống</p>
+      <p className="text-[10px] text-on-surface-variant mt-0.5">{pt('product.inSystem')}</p>
      </div>
     </div>
     <div className="relative bg-gradient-to-br from-amber-50/80 to-amber-100/40 backdrop-blur-xl rounded-2xl p-4 border-[3px] border-black shadow-[4px_4px_0px_0px_#000] transform rotate-[0.3deg] hover:rotate-0 transition-all flex items-center gap-3">
@@ -824,7 +845,7 @@ const totalPages = Math.ceil(totalProducts / pageSize);
       ) : (
        <h3 className="text-xl font-black text-on-surface">{categories.length}</h3>
       )}
-      <p className="text-[10px] text-on-surface-variant mt-0.5">active</p>
+      <p className="text-[10px] text-on-surface-variant mt-0.5">{pt('product.active')}</p>
      </div>
     </div>
     <div className="relative bg-gradient-to-br from-emerald-50/80 to-emerald-100/40 backdrop-blur-xl rounded-2xl p-4 border-[3px] border-black shadow-[4px_4px_0px_0px_#000] transform rotate-[-0.3deg] hover:rotate-0 transition-all flex items-center gap-3">
@@ -853,7 +874,7 @@ const totalPages = Math.ceil(totalProducts / pageSize);
      </div>
      <button onClick={() => { loadCategories(); loadProducts(); }}
       className="ml-auto px-3 py-1 bg-red-500 text-white text-sm rounded-lg hover:bg-red-600">
-      Thử lại
+      {pt('product.retry')}
      </button>
     </div>
    )}
@@ -875,16 +896,16 @@ const totalPages = Math.ceil(totalProducts / pageSize);
        </button>
       )}
       <button onClick={async () => {
-        if (!confirm('🔄 Sync tất cả sản phẩm vào AI Knowledge Base?\n\nĐiều này sẽ:\n1. Đồng bộ kb_products → Knowledge Items\n2. Index vào Vector Store để AI tìm được\n\nCó thể mất 30-60 giây.')) return;
+        if (!confirm(pt('product.syncContent'))) return;
         try {
           const result = await (adminApi as any).syncAndIndex();
           if (result?.success) {
-            alert(result.message || '✅ Sync hoàn tất!');
+            alert(result.message || pt('product.syncComplete'));
           } else {
-            alert('❌ Lỗi: ' + (result?.error || 'Không rõ'));
+            alert(pt('product.syncError') + ' ' + (result?.error || ''));
           }
         } catch (e) {
-          alert('❌ Lỗi: ' + (e as Error)?.message);
+          alert(pt('product.syncError') + ' ' + (e as Error)?.message);
         }
       }}
        className="px-4 py-2 rounded-lg bg-violet-500 text-white font-bold text-sm border-2 border-black hover:bg-violet-600 transition-all flex items-center gap-2 shadow-[2px_2px_0px_0px_#000]">
@@ -970,7 +991,7 @@ const totalPages = Math.ceil(totalProducts / pageSize);
        <div className="relative">
         <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-base">search</span>
         <input className="h-8 pl-8 pr-3 rounded-lg bg-white border border-slate-300 font-medium text-sm text-black placeholder:text-slate-400 focus:outline-none focus:border-black w-48"
-         placeholder="Tìm..." value={search} onChange={(e) => setSearch(e.target.value)} />
+         placeholder={pt('product.search')} value={search} onChange={(e) => setSearch(e.target.value)} />
        </div>
        <button onClick={() => setShowFeatured(!showFeatured)}
         className={clsx('px-3 h-8 rounded-lg font-bold text-xs flex items-center gap-1 transition-all border border-slate-300',

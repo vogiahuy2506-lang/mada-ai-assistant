@@ -4,6 +4,8 @@ import { PromptValidator } from './PromptValidator';
 import { PromptHistory } from './PromptHistory';
 import { PromptTemplates } from './PromptTemplates';
 import { getAccessToken } from '@/lib/api';
+import { useLanguageStore } from '@/stores';
+import { translations, type Language } from '@/lib/translations';
 
 interface Prompt {
   key: string;
@@ -17,7 +19,13 @@ interface PromptsEditorProps {
   onClose?: () => void;
 }
 
+// Translation helper
+const t = (key: string, lang: Language): string => {
+  return translations[lang]?.[key] || translations.vi[key] || key;
+};
+
 export function PromptsEditor({ onClose }: PromptsEditorProps) {
+  const { language } = useLanguageStore();
   const [prompts, setPrompts] = useState<Prompt[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
@@ -50,9 +58,9 @@ export function PromptsEditor({ onClose }: PromptsEditorProps) {
       
       if (!res.ok) {
         if (res.status === 401) {
-          setError('Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.');
+          setError(t('prompt.sessionExpired', language));
         } else {
-          setError(`Lỗi server: ${res.status}`);
+          setError(`${t('prompt.serverError', language)}: ${res.status}`);
         }
         setLoading(false);
         return;
@@ -69,10 +77,10 @@ export function PromptsEditor({ onClose }: PromptsEditorProps) {
         }));
         setPrompts(validPrompts);
       } else {
-        setError(data.error || 'Failed to load prompts');
+        setError(data.error || t('prompt.loadFailed', language));
       }
     } catch (e: any) {
-      setError(e.message || 'Network error');
+      setError(e.message || t('prompt.networkError', language));
     }
     setLoading(false);
   }
@@ -93,7 +101,7 @@ export function PromptsEditor({ onClose }: PromptsEditorProps) {
       
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || `Lỗi server: ${res.status}`);
+        throw new Error(errData.error || `${t('prompt.serverError', language)}: ${res.status}`);
       }
       
       const data = await res.json();
@@ -106,16 +114,16 @@ export function PromptsEditor({ onClose }: PromptsEditorProps) {
         setSaveSuccess(key);
         setTimeout(() => setSaveSuccess(null), 2000);
       } else {
-        throw new Error(data.error || 'Failed to save');
+        throw new Error(data.error || t('prompt.saveFailed', language));
       }
     } catch (e: any) {
-      setError(e.message || 'Network error');
+      setError(e.message || t('prompt.networkError', language));
     }
     setSaving(null);
   }
 
   async function resetPrompt(key: string) {
-    if (!confirm('Reset this prompt to default?')) return;
+    if (!confirm(t('prompt.confirmReset', language))) return;
     setSaving(key);
     try {
       const res = await fetch(`/api/admin/system-prompts/${key}`, {
@@ -139,7 +147,7 @@ export function PromptsEditor({ onClose }: PromptsEditorProps) {
   }
 
   async function resetAll() {
-    if (!confirm('Reset ALL prompts to default? This cannot be undone.')) return;
+    if (!confirm(t('prompt.confirmResetAll', language))) return;
     try {
       const res = await fetch('/api/admin/prompts', {
         method: 'DELETE',
@@ -181,7 +189,7 @@ export function PromptsEditor({ onClose }: PromptsEditorProps) {
     return (
       <div className="flex items-center justify-center py-12">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
-        <span className="ml-3 text-on-surface-variant">Đang tải prompts...</span>
+        <span className="ml-3 text-on-surface-variant">{t('prompt.loading', language)}</span>
       </div>
     );
   }
@@ -191,7 +199,7 @@ export function PromptsEditor({ onClose }: PromptsEditorProps) {
       <div className="p-4 rounded-xl bg-red-50 border-2 border-red-200 text-red-700">
         <AlertCircle className="w-5 h-5 inline mr-2" />
         {error}
-        <button onClick={loadPrompts} className="ml-4 underline">Thử lại</button>
+        <button onClick={loadPrompts} className="ml-4 underline">{t('prompt.retry', language)}</button>
       </div>
     );
   }
@@ -203,10 +211,10 @@ export function PromptsEditor({ onClose }: PromptsEditorProps) {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-bold text-on-surface">System Prompts</h3>
+          <h3 className="text-lg font-bold text-on-surface">{t('prompt.title', language)}</h3>
           <p className="text-sm text-on-surface-variant mt-1">
-            Chỉnh sửa prompt cho AI chatbot. {changedCount > 0 && (
-              <span className="text-amber-600 font-semibold">{changedCount} prompt đã thay đổi</span>
+            {t('prompt.subtitle', language)} {changedCount > 0 && (
+              <span className="text-amber-600 font-semibold">{changedCount} {t('prompt.changed', language)}</span>
             )}
           </p>
         </div>
@@ -220,7 +228,7 @@ export function PromptsEditor({ onClose }: PromptsEditorProps) {
             }`}
           >
             <Zap className="w-4 h-4" />
-            Templates
+            {t('prompt.templates', language)}
           </button>
           {changedCount > 0 && (
             <button
@@ -228,7 +236,7 @@ export function PromptsEditor({ onClose }: PromptsEditorProps) {
               className="px-4 py-2 rounded-xl bg-red-100 text-red-700 font-semibold text-sm border-2 border-red-300 hover:bg-red-200 transition-colors flex items-center gap-2"
             >
               <RotateCcw className="w-4 h-4" />
-              Reset All
+              {t('prompt.resetAll', language)}
             </button>
           )}
           {onClose && (
@@ -237,7 +245,7 @@ export function PromptsEditor({ onClose }: PromptsEditorProps) {
               className="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 font-semibold text-sm border-2 border-slate-300 hover:bg-slate-200 transition-colors flex items-center gap-2"
             >
               <X className="w-4 h-4" />
-              Đóng
+              {t('prompt.close', language)}
             </button>
           )}
         </div>
@@ -282,7 +290,7 @@ export function PromptsEditor({ onClose }: PromptsEditorProps) {
                       <h4 className="font-bold text-on-surface">{prompt.name}</h4>
                       {isChanged && (
                         <span className="px-2 py-0.5 rounded-full bg-amber-200 text-amber-800 text-xs font-semibold">
-                          Modified
+                          {t('prompt.modified', language)}
                         </span>
                       )}
                       <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-xs">
@@ -300,7 +308,7 @@ export function PromptsEditor({ onClose }: PromptsEditorProps) {
                             ? 'bg-indigo-100 text-indigo-700 border-indigo-300' 
                             : 'bg-slate-100 text-slate-600 border-slate-300 hover:bg-slate-200'
                         }`}
-                        title="Xem lịch sử"
+                        title={t('prompt.viewHistory', language)}
                       >
                         <History className="w-4 h-4" />
                       </button>
@@ -309,13 +317,13 @@ export function PromptsEditor({ onClose }: PromptsEditorProps) {
                         className="px-3 py-1.5 rounded-lg bg-primary/10 text-primary font-semibold text-sm border-2 border-primary/30 hover:bg-primary/20 transition-colors"
                       >
                         <Edit3 className="w-4 h-4 inline mr-1" />
-                        Sửa
+                        {t('prompt.edit', language)}
                       </button>
                       {isChanged && (
                         <button
                           onClick={() => resetPrompt(prompt.key)}
                           className="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 font-semibold text-sm border border-slate-300 hover:bg-slate-200 transition-colors"
-                          title="Reset to default"
+                          title={t('prompt.resetToDefault', language)}
                         >
                           <RotateCcw className="w-4 h-4" />
                         </button>
@@ -335,7 +343,7 @@ export function PromptsEditor({ onClose }: PromptsEditorProps) {
                           className="px-3 py-1.5 rounded-lg bg-indigo-100 text-indigo-700 font-semibold text-xs border border-indigo-200 hover:bg-indigo-200 transition-colors flex items-center gap-1"
                         >
                           <Zap className="w-3.5 h-3.5" />
-                          Áp dụng Template
+                          {t('prompt.applyTemplate', language)}
                         </button>
                         <button
                           onClick={() => setShowValidator(showValidator === prompt.key ? null : prompt.key)}
@@ -346,11 +354,11 @@ export function PromptsEditor({ onClose }: PromptsEditorProps) {
                           }`}
                         >
                           <FileText className="w-3.5 h-3.5" />
-                          Kiểm tra Prompt
+                          {t('prompt.validatePrompt', language)}
                         </button>
                       </div>
                       <span className="text-xs text-on-surface-variant">
-                        {(editValue ?? '').length} ký tự • {(editValue ?? '').split(/\s+/).filter(Boolean).length} từ
+                        {(editValue ?? '').length} {t('prompt.characters', language)} • {(editValue ?? '').split(/\s+/).filter(Boolean).length} {t('prompt.words', language)}
                       </span>
                     </div>
                     
@@ -358,7 +366,7 @@ export function PromptsEditor({ onClose }: PromptsEditorProps) {
                     {showTemplates && (
                       <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-xl">
                         <p className="text-xs text-indigo-700 mb-2">
-                          Chọn template để thay thế nội dung hiện tại:
+                          {t('prompt.selectTemplate', language)}
                         </p>
                         <PromptTemplates 
                           onSelectTemplate={(template) => {
@@ -385,18 +393,18 @@ export function PromptsEditor({ onClose }: PromptsEditorProps) {
                       onChange={e => setEditValue(e.target.value)}
                       rows={12}
                       className="w-full px-4 py-3 rounded-xl bg-white border-2 border-black/20 font-mono text-sm resize-y focus:border-primary focus:ring-2 focus:ring-primary/20"
-                      placeholder="Enter prompt content..."
+                      placeholder={t('prompt.enterContent', language)}
                     />
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2 text-xs text-slate-400">
-                        <span>Chỉnh sửa: {prompt.key}</span>
+                        <span>{t('prompt.editing', language)}: {prompt.key}</span>
                       </div>
                       <div className="flex gap-2">
                         <button
                           onClick={cancelEdit}
                           className="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 font-semibold text-sm border-2 border-slate-300 hover:bg-slate-200 transition-colors"
                         >
-                          Hủy
+                          {t('prompt.cancel', language)}
                         </button>
                         <button
                           onClick={() => savePrompt(prompt.key)}
@@ -404,9 +412,9 @@ export function PromptsEditor({ onClose }: PromptsEditorProps) {
                           className="px-4 py-2 rounded-xl bg-primary text-white font-semibold text-sm border-2 border-black shadow-[2px_2px_0px_0px_#000] hover:-translate-y-0.5 hover:shadow-[3px_3px_0px_0px_#000] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           {isSaving ? (
-                            <><Loader2 className="w-4 h-4 inline animate-spin" /> Đang lưu...</>
+                            <><Loader2 className="w-4 h-4 inline animate-spin" /> {t('prompt.saving', language)}</>
                           ) : (
-                            <><Save className="w-4 h-4 inline mr-1" /> Lưu</>
+                            <><Save className="w-4 h-4 inline mr-1" /> {t('prompt.save', language)}</>
                           )}
                         </button>
                       </div>
@@ -440,7 +448,7 @@ export function PromptsEditor({ onClose }: PromptsEditorProps) {
                 {isSuccess && (
                   <div className="mt-3 flex items-center text-green-600 text-sm font-semibold bg-green-50 px-3 py-2 rounded-lg border border-green-200">
                     <CheckCircle className="w-4 h-4 mr-2" />
-                    Đã lưu thành công!
+                    {t('prompt.savedSuccess', language)}
                   </div>
                 )}
               </div>
@@ -451,14 +459,14 @@ export function PromptsEditor({ onClose }: PromptsEditorProps) {
 
       {/* Info */}
       <div className="p-4 rounded-xl bg-blue-50 border-2 border-blue-200">
-        <h5 className="font-bold text-blue-800 mb-2">💡 Lưu ý</h5>
+        <h5 className="font-bold text-blue-800 mb-2">💡 {t('prompt.notes', language)}</h5>
         <ul className="text-sm text-blue-700 space-y-1">
-          <li>• Prompt thay đổi sẽ được tô vàng để dễ nhận biết</li>
-          <li>• Sử dụng <strong>Templates</strong> để áp dụng nhanh các prompt có sẵn theo ngành</li>
-          <li>• Nhấn <strong>Kiểm tra Prompt</strong> để validate trước khi lưu</li>
-          <li>• Xem <strong>Lịch sử</strong> để khôi phục các phiên bản trước đó</li>
-          <li>• Reset về default sẽ xóa thay đổi hiện tại</li>
-          <li>• Thay đổi có hiệu lực ngay lập tức (không cần restart server)</li>
+          <li>• {t('prompt.note1', language)}</li>
+          <li>• {t('prompt.note2', language)}</li>
+          <li>• {t('prompt.note3', language)}</li>
+          <li>• {t('prompt.note4', language)}</li>
+          <li>• {t('prompt.note5', language)}</li>
+          <li>• {t('prompt.note6', language)}</li>
         </ul>
       </div>
     </div>

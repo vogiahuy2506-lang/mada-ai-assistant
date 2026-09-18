@@ -21,6 +21,9 @@ export function AuthModal() {
   const resetAnon = useAnonQuotaStore((s) => s.reset);
   const language = useLanguageStore((s) => s.language);
 
+  // Translation helper function
+  const tr = (key: string) => t(key, language);
+
   const [tab, setTab] = useState<AuthTab>(mode);
   const [form, setForm] = useState<FormState>({ email: '', password: '', name: '' });
   const [showPwd, setShowPwd] = useState(false);
@@ -68,7 +71,7 @@ export function AuthModal() {
       return;
     }
     if (form.password.length < 6) {
-      setError('Mật khẩu phải có ít nhất 6 ký tự.');
+      setError(t('auth.passwordMinLength', language));
       return;
     }
     if (tab === 'register' && !form.name.trim()) {
@@ -148,7 +151,7 @@ export function AuthModal() {
         <button
           onClick={close}
           className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/80 hover:bg-white flex items-center justify-center text-slate-400 hover:text-slate-700 transition-all z-10 shadow-sm"
-          aria-label="Đóng"
+          aria-label={tr('auth.close')}
         >
           <X className="w-4 h-4" />
         </button>
@@ -158,12 +161,12 @@ export function AuthModal() {
           <div className="text-center mb-6">
             <img src={madaLogo} alt="MADA" className="h-12 mx-auto mb-4" />
             <h2 className="text-xl font-bold text-slate-800 tracking-tight">
-              {tab === 'login' ? 'Chào mừng trở lại' : 'Tạo tài khoản mới'}
+              {tab === 'login' ? tr('auth.welcomeBack') : tr('auth.createAccount')}
             </h2>
             <p className="text-xs text-slate-500 mt-1.5">
               {tab === 'login'
-                ? 'Đăng nhập để tiếp tục với MADA AI'
-                : 'Đăng ký miễn phí — nhận 10 lượt trải nghiệm'}
+                ? tr('auth.loginToContinue')
+                : tr('auth.registerFree')}
             </p>
           </div>
 
@@ -177,7 +180,7 @@ export function AuthModal() {
                   : 'text-slate-500 hover:text-slate-700'
               }`}
             >
-              Đăng nhập
+              {tr('auth.loginTab')}
             </button>
             <button
               onClick={() => handleTabChange('register')}
@@ -187,7 +190,7 @@ export function AuthModal() {
                   : 'text-slate-500 hover:text-slate-700'
               }`}
             >
-              Đăng ký
+              {tr('auth.registerTab')}
             </button>
           </div>
 
@@ -198,7 +201,7 @@ export function AuthModal() {
                 <UserIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                 <input
                   type="text"
-                  placeholder="Họ và tên"
+                  placeholder={tr('auth.fullName')}
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
                   className="w-full pl-11 pr-4 py-3 rounded-xl bg-white border border-slate-200 focus:border-violet-400 focus:ring-2 focus:ring-violet-100 outline-none text-sm transition-all"
@@ -210,7 +213,7 @@ export function AuthModal() {
               <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input
                 type="email"
-                placeholder="Email của bạn"
+                placeholder={tr('auth.emailPlaceholder')}
                 value={form.email}
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
                 className="w-full pl-11 pr-4 py-3 rounded-xl bg-white border border-slate-200 focus:border-violet-400 focus:ring-2 focus:ring-violet-100 outline-none text-sm transition-all"
@@ -221,7 +224,7 @@ export function AuthModal() {
               <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input
                 type={showPwd ? 'text' : 'password'}
-                placeholder="Mật khẩu (tối thiểu 6 ký tự)"
+                placeholder={tr('auth.passwordPlaceholder')}
                 value={form.password}
                 onChange={(e) => setForm({ ...form, password: e.target.value })}
                 className="w-full pl-11 pr-11 py-3 rounded-xl bg-white border border-slate-200 focus:border-violet-400 focus:ring-2 focus:ring-violet-100 outline-none text-sm transition-all"
@@ -238,7 +241,7 @@ export function AuthModal() {
             {tab === 'login' && (
               <div className="flex justify-end">
                 <button type="button" className="text-xs font-medium text-violet-600 hover:text-violet-700 transition-colors">
-                  Quên mật khẩu?
+                  {tr('auth.forgotPassword')}
                 </button>
               </div>
             )}
@@ -262,16 +265,16 @@ export function AuthModal() {
               {loading ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  Đang xử lý...
+                  {tr('auth.processing')}
                 </>
-              ) : tab === 'login' ? 'Đăng nhập' : 'Tạo tài khoản'}
+              ) : tab === 'login' ? tr('auth.loginBtn') : tr('auth.registerBtn')}
             </button>
           </form>
 
           {/* Divider */}
           <div className="flex items-center gap-3 my-5">
             <div className="flex-1 h-px bg-slate-200" />
-            <span className="text-[10px] font-medium text-slate-400 uppercase">hoặc</span>
+            <span className="text-[10px] font-medium text-slate-400 uppercase">{tr('auth.or')}</span>
             <div className="flex-1 h-px bg-slate-200" />
           </div>
 
@@ -287,14 +290,12 @@ export function AuthModal() {
               <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
               <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
             </svg>
-            Đăng nhập với Google
+            {tr('auth.loginWithGoogle')}
           </button>
 
           {/* Terms */}
           <p className="text-[10px] text-slate-400 text-center mt-5 leading-relaxed">
-            Bằng việc tiếp tục, bạn đồng ý với{' '}
-            <span className="font-medium text-slate-500">Điều khoản</span> và{' '}
-            <span className="font-medium text-slate-500">Chính sách bảo mật</span>.
+            {tr('auth.termsAgree')}
           </p>
         </div>
       </div>

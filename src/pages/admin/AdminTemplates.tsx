@@ -4,6 +4,254 @@ import { Loader2, Search, Star, X, Check, Zap, FileText } from 'lucide-react';
 import { adminApi } from './adminApi';
 import { usePromptStore } from '@/stores';
 import { useTranslation } from '@/lib/translations';
+import { useLanguageStore } from '@/stores';
+
+// Translation helper for AdminTemplates
+const useAdminTemplateTranslation = () => {
+  const { language } = useLanguageStore();
+  
+  const t = (key: string): string => {
+    const keys: Record<string, Record<string, string>> = {
+      vi: {
+        // Categories
+        'adminTemplate.category.general': 'Tổng quát',
+        'adminTemplate.category.medical': 'Y tế',
+        'adminTemplate.category.legal': 'Pháp lý',
+        'adminTemplate.category.finance': 'Tài chính',
+        'adminTemplate.category.support': 'Hỗ trợ',
+        'adminTemplate.category.sales': 'Bán hàng',
+        'adminTemplate.category.technical': 'Kỹ thuật',
+        // Languages
+        'adminTemplate.lang.all': 'Tất cả',
+        'adminTemplate.lang.vi': 'Tiếng Việt',
+        'adminTemplate.lang.en': 'English',
+        'adminTemplate.lang.ar': 'العربية',
+        'adminTemplate.lang.fr': 'Français',
+        // UI Text
+        'adminTemplate.templates': 'Templates',
+        'adminTemplate.templatesAvailable': 'templates có sẵn',
+        'adminTemplate.searchPlaceholder': 'Tìm kiếm template...',
+        'adminTemplate.featured': 'Nổi bật',
+        'adminTemplate.noTemplateFound': 'Không tìm thấy template',
+        'adminTemplate.tryChangeFilter': 'Thử thay đổi bộ lọc',
+        'adminTemplate.usageCount': 'lượt sử dụng',
+        'adminTemplate.refresh': 'Làm mới',
+        'adminTemplate.templateDetail': 'Template Detail',
+        'adminTemplate.usedCount': 'Đã sử dụng',
+        'adminTemplate.times': 'lần',
+        'adminTemplate.updated': 'Cập nhật',
+        'adminTemplate.tags': 'Tags',
+        'adminTemplate.variables': 'Variables có thể tùy chỉnh',
+        'adminTemplate.exampleQuestions': 'Câu hỏi mẫu',
+        'adminTemplate.promptContent': 'Nội dung Prompt',
+        'adminTemplate.templateId': 'Template ID',
+        'adminTemplate.viewDetails': 'Xem chi tiết',
+        'adminTemplate.applyTemplate': 'Áp dụng Template',
+        'adminTemplate.selectTemplate': 'Chọn một Template',
+        'adminTemplate.selectFromList': 'Chọn template từ danh sách bên trái để xem chi tiết và áp dụng',
+        'adminTemplate.templateHelp': 'Template giúp bạn nhanh chóng tạo prompts cho nhiều ngành khác nhau',
+        'adminTemplate.preview': 'Preview Template',
+        'adminTemplate.close': 'Đóng',
+        'adminTemplate.apply': 'Áp dụng Template',
+        'adminTemplate.applyConfirm': 'Áp dụng Template',
+        'adminTemplate.templateName': 'Template Name',
+        'adminTemplate.templateInfo': 'Khi áp dụng template, phiên bản hiện tại sẽ được lưu vào lịch sử trước khi thay đổi. Bạn có thể khôi phục lại bất kỳ lúc nào.',
+        'adminTemplate.targetPrompt': 'Prompt đích',
+        'adminTemplate.required': 'Bắt buộc',
+        'adminTemplate.selectPrompt': '-- Chọn prompt --',
+        'adminTemplate.changeDescription': 'Mô tả thay đổi',
+        'adminTemplate.changePlaceholder': 'VD: Áp dụng template Y tế cho chatbot tư vấn sức khỏe',
+        'adminTemplate.templatePreview': 'Preview Template',
+        'adminTemplate.cancel': 'Hủy',
+        'adminTemplate.applying': 'Đang áp dụng...',
+        'adminTemplate.applySuccess': 'Đã áp dụng template',
+        'adminTemplate.success': 'thành công!',
+        'adminTemplate.newVersion': 'Phiên bản mới',
+        'adminTemplate.applyError': 'Có lỗi khi áp dụng template',
+        'adminTemplate.appliedTemplate': 'Áp dụng template',
+      },
+      en: {
+        // Categories
+        'adminTemplate.category.general': 'General',
+        'adminTemplate.category.medical': 'Medical',
+        'adminTemplate.category.legal': 'Legal',
+        'adminTemplate.category.finance': 'Finance',
+        'adminTemplate.category.support': 'Support',
+        'adminTemplate.category.sales': 'Sales',
+        'adminTemplate.category.technical': 'Technical',
+        // Languages
+        'adminTemplate.lang.all': 'All',
+        'adminTemplate.lang.vi': 'Tiếng Việt',
+        'adminTemplate.lang.en': 'English',
+        'adminTemplate.lang.ar': 'العربية',
+        'adminTemplate.lang.fr': 'Français',
+        // UI Text
+        'adminTemplate.templates': 'Templates',
+        'adminTemplate.templatesAvailable': 'templates available',
+        'adminTemplate.searchPlaceholder': 'Search templates...',
+        'adminTemplate.featured': 'Featured',
+        'adminTemplate.noTemplateFound': 'No template found',
+        'adminTemplate.tryChangeFilter': 'Try changing the filters',
+        'adminTemplate.usageCount': 'uses',
+        'adminTemplate.refresh': 'Refresh',
+        'adminTemplate.templateDetail': 'Template Detail',
+        'adminTemplate.usedCount': 'Used',
+        'adminTemplate.times': 'times',
+        'adminTemplate.updated': 'Updated',
+        'adminTemplate.tags': 'Tags',
+        'adminTemplate.variables': 'Customizable Variables',
+        'adminTemplate.exampleQuestions': 'Example Questions',
+        'adminTemplate.promptContent': 'Prompt Content',
+        'adminTemplate.templateId': 'Template ID',
+        'adminTemplate.viewDetails': 'View Details',
+        'adminTemplate.applyTemplate': 'Apply Template',
+        'adminTemplate.selectTemplate': 'Select a Template',
+        'adminTemplate.selectFromList': 'Select a template from the list on the left to view details and apply',
+        'adminTemplate.templateHelp': 'Templates help you quickly create prompts for various industries',
+        'adminTemplate.preview': 'Preview Template',
+        'adminTemplate.close': 'Close',
+        'adminTemplate.apply': 'Apply Template',
+        'adminTemplate.applyConfirm': 'Apply Template',
+        'adminTemplate.templateName': 'Template Name',
+        'adminTemplate.templateInfo': 'When applying a template, the current version will be saved to history before changes. You can restore it at any time.',
+        'adminTemplate.targetPrompt': 'Target Prompt',
+        'adminTemplate.required': 'Required',
+        'adminTemplate.selectPrompt': '-- Select prompt --',
+        'adminTemplate.changeDescription': 'Change Description',
+        'adminTemplate.changePlaceholder': 'e.g.: Apply medical template for health consultation chatbot',
+        'adminTemplate.templatePreview': 'Template Preview',
+        'adminTemplate.cancel': 'Cancel',
+        'adminTemplate.applying': 'Applying...',
+        'adminTemplate.applySuccess': 'Template applied',
+        'adminTemplate.success': 'successfully!',
+        'adminTemplate.newVersion': 'New version',
+        'adminTemplate.applyError': 'Error applying template',
+        'adminTemplate.appliedTemplate': 'Applied template',
+      },
+      ar: {
+        // Categories
+        'adminTemplate.category.general': 'عام',
+        'adminTemplate.category.medical': 'طبي',
+        'adminTemplate.category.legal': 'قانوني',
+        'adminTemplate.category.finance': 'مالي',
+        'adminTemplate.category.support': 'دعم',
+        'adminTemplate.category.sales': 'مبيعات',
+        'adminTemplate.category.technical': 'تقني',
+        // Languages
+        'adminTemplate.lang.all': 'الكل',
+        'adminTemplate.lang.vi': 'Tiếng Việt',
+        'adminTemplate.lang.en': 'English',
+        'adminTemplate.lang.ar': 'العربية',
+        'adminTemplate.lang.fr': 'Français',
+        // UI Text
+        'adminTemplate.templates': 'القوالب',
+        'adminTemplate.templatesAvailable': 'قوالب متاحة',
+        'adminTemplate.searchPlaceholder': 'البحث في القوالب...',
+        'adminTemplate.featured': 'مميز',
+        'adminTemplate.noTemplateFound': 'لم يتم العثور على قالب',
+        'adminTemplate.tryChangeFilter': 'جرب تغيير الفلاتر',
+        'adminTemplate.usageCount': 'استخدامات',
+        'adminTemplate.refresh': 'تحديث',
+        'adminTemplate.templateDetail': 'تفاصيل القالب',
+        'adminTemplate.usedCount': 'المستخدم',
+        'adminTemplate.times': 'مرات',
+        'adminTemplate.updated': 'تم التحديث',
+        'adminTemplate.tags': 'الوسوم',
+        'adminTemplate.variables': 'متغيرات قابلة للتخصيص',
+        'adminTemplate.exampleQuestions': 'أسئلة نموذجية',
+        'adminTemplate.promptContent': 'محتوى Prompt',
+        'adminTemplate.templateId': 'معرف القالب',
+        'adminTemplate.viewDetails': 'عرض التفاصيل',
+        'adminTemplate.applyTemplate': 'تطبيق القالب',
+        'adminTemplate.selectTemplate': 'اختر قالباً',
+        'adminTemplate.selectFromList': 'اختر قالباً من القائمة على اليسار لعرض التفاصيل والتطبيق',
+        'adminTemplate.templateHelp': 'تساعدك القوالب في إنشاء prompts بسرعة لمختلف الصناعات',
+        'adminTemplate.preview': 'معاينة القالب',
+        'adminTemplate.close': 'إغلاق',
+        'adminTemplate.apply': 'تطبيق القالب',
+        'adminTemplate.applyConfirm': 'تطبيق القالب',
+        'adminTemplate.templateName': 'اسم القالب',
+        'adminTemplate.templateInfo': 'عند تطبيق قالب، سيتم حفظ النسخة الحالية في السجل قبل التغييرات. يمكنك استعادتها في أي وقت.',
+        'adminTemplate.targetPrompt': 'Prompt الهدف',
+        'adminTemplate.required': 'مطلوب',
+        'adminTemplate.selectPrompt': '-- اختر prompt --',
+        'adminTemplate.changeDescription': 'وصف التغيير',
+        'adminTemplate.changePlaceholder': 'مثال: تطبيق قالب طبي لروبوت الاستشارة الصحية',
+        'adminTemplate.templatePreview': 'معاينة القالب',
+        'adminTemplate.cancel': 'إلغاء',
+        'adminTemplate.applying': 'جارٍ التطبيق...',
+        'adminTemplate.applySuccess': 'تم تطبيق القالب',
+        'adminTemplate.success': 'بنجاح!',
+        'adminTemplate.newVersion': 'النسخة الجديدة',
+        'adminTemplate.applyError': 'خطأ في تطبيق القالب',
+        'adminTemplate.appliedTemplate': 'تطبيق القالب',
+      },
+      fr: {
+        // Categories
+        'adminTemplate.category.general': 'Général',
+        'adminTemplate.category.medical': 'Médical',
+        'adminTemplate.category.legal': 'Juridique',
+        'adminTemplate.category.finance': 'Finance',
+        'adminTemplate.category.support': 'Support',
+        'adminTemplate.category.sales': 'Ventes',
+        'adminTemplate.category.technical': 'Technique',
+        // Languages
+        'adminTemplate.lang.all': 'Tous',
+        'adminTemplate.lang.vi': 'Tiếng Việt',
+        'adminTemplate.lang.en': 'English',
+        'adminTemplate.lang.ar': 'العربية',
+        'adminTemplate.lang.fr': 'Français',
+        // UI Text
+        'adminTemplate.templates': 'Modèles',
+        'adminTemplate.templatesAvailable': 'modèles disponibles',
+        'adminTemplate.searchPlaceholder': 'Rechercher des modèles...',
+        'adminTemplate.featured': 'En vedette',
+        'adminTemplate.noTemplateFound': 'Aucun modèle trouvé',
+        'adminTemplate.tryChangeFilter': 'Essayez de modifier les filtres',
+        'adminTemplate.usageCount': 'utilisations',
+        'adminTemplate.refresh': 'Actualiser',
+        'adminTemplate.templateDetail': 'Détail du modèle',
+        'adminTemplate.usedCount': 'Utilisé',
+        'adminTemplate.times': 'fois',
+        'adminTemplate.updated': 'Mis à jour',
+        'adminTemplate.tags': 'Tags',
+        'adminTemplate.variables': 'Variables personnalisables',
+        'adminTemplate.exampleQuestions': 'Questions d\'exemple',
+        'adminTemplate.promptContent': 'Contenu du Prompt',
+        'adminTemplate.templateId': 'ID du modèle',
+        'adminTemplate.viewDetails': 'Voir les détails',
+        'adminTemplate.applyTemplate': 'Appliquer le modèle',
+        'adminTemplate.selectTemplate': 'Sélectionnez un modèle',
+        'adminTemplate.selectFromList': 'Sélectionnez un modèle dans la liste de gauche pour voir les détails et appliquer',
+        'adminTemplate.templateHelp': 'Les modèles vous aident à créer rapidement des prompts pour différents secteurs',
+        'adminTemplate.preview': 'Aperçu du modèle',
+        'adminTemplate.close': 'Fermer',
+        'adminTemplate.apply': 'Appliquer le modèle',
+        'adminTemplate.applyConfirm': 'Appliquer le modèle',
+        'adminTemplate.templateName': 'Nom du modèle',
+        'adminTemplate.templateInfo': 'Lors de l\'application d\'un modèle, la version actuelle sera enregistrée dans l\'historique avant les modifications. Vous pouvez la restaurer à tout moment.',
+        'adminTemplate.targetPrompt': 'Prompt cible',
+        'adminTemplate.required': 'Obligatoire',
+        'adminTemplate.selectPrompt': '-- Sélectionner un prompt --',
+        'adminTemplate.changeDescription': 'Description du changement',
+        'adminTemplate.changePlaceholder': 'Ex: Appliquer le modèle médical pour le chatbot de consultation santé',
+        'adminTemplate.templatePreview': 'Aperçu du modèle',
+        'adminTemplate.cancel': 'Annuler',
+        'adminTemplate.applying': 'Application en cours...',
+        'adminTemplate.applySuccess': 'Modèle appliqué',
+        'adminTemplate.success': 'avec succès!',
+        'adminTemplate.newVersion': 'Nouvelle version',
+        'adminTemplate.applyError': 'Erreur lors de l\'application du modèle',
+        'adminTemplate.appliedTemplate': 'Appliquer le modèle',
+      },
+    };
+    
+    const langKeys = keys[language] || keys['vi'];
+    return langKeys[key] || key;
+  };
+  
+  return { t, language };
+};
 
 interface PromptTemplate {
   id: string;
@@ -21,26 +269,29 @@ interface PromptTemplate {
   updated_at: string;
 }
 
-const CATEGORIES = [
-  { value: 'general', label: 'Tổng quát', icon: '💬', color: 'bg-sky-50 text-sky-600 border-sky-200' },
-  { value: 'medical', label: 'Y tế', icon: '🏥', color: 'bg-rose-50 text-rose-600 border-rose-200' },
-  { value: 'legal', label: 'Pháp lý', icon: '⚖️', color: 'bg-blue-50 text-blue-600 border-blue-200' },
-  { value: 'finance', label: 'Tài chính', icon: '💰', color: 'bg-emerald-50 text-emerald-600 border-emerald-200' },
-  { value: 'support', label: 'Hỗ trợ', icon: '🎧', color: 'bg-violet-50 text-violet-600 border-violet-200' },
-  { value: 'sales', label: 'Bán hàng', icon: '🛒', color: 'bg-amber-50 text-amber-600 border-amber-200' },
-  { value: 'technical', label: 'Kỹ thuật', icon: '🔧', color: 'bg-slate-100 text-slate-600 border-slate-300' },
+const CATEGORIES = (t: (key: string) => string) => [
+  { value: 'general', label: t('adminTemplate.category.general'), icon: '💬', color: 'bg-sky-50 text-sky-600 border-sky-200' },
+  { value: 'medical', label: t('adminTemplate.category.medical'), icon: '🏥', color: 'bg-rose-50 text-rose-600 border-rose-200' },
+  { value: 'legal', label: t('adminTemplate.category.legal'), icon: '⚖️', color: 'bg-blue-50 text-blue-600 border-blue-200' },
+  { value: 'finance', label: t('adminTemplate.category.finance'), icon: '💰', color: 'bg-emerald-50 text-emerald-600 border-emerald-200' },
+  { value: 'support', label: t('adminTemplate.category.support'), icon: '🎧', color: 'bg-violet-50 text-violet-600 border-violet-200' },
+  { value: 'sales', label: t('adminTemplate.category.sales'), icon: '🛒', color: 'bg-amber-50 text-amber-600 border-amber-200' },
+  { value: 'technical', label: t('adminTemplate.category.technical'), icon: '🔧', color: 'bg-slate-100 text-slate-600 border-slate-300' },
 ];
 
-const LANGUAGES = [
-  { value: 'all', label: 'Tất cả' },
-  { value: 'vi', label: 'Tiếng Việt' },
-  { value: 'en', label: 'English' },
-  { value: 'ar', label: 'العربية' },
-  { value: 'fr', label: 'Français' },
+const LANGUAGES = (t: (key: string) => string) => [
+  { value: 'all', label: t('adminTemplate.lang.all') },
+  { value: 'vi', label: t('adminTemplate.lang.vi') },
+  { value: 'en', label: t('adminTemplate.lang.en') },
+  { value: 'ar', label: t('adminTemplate.lang.ar') },
+  { value: 'fr', label: t('adminTemplate.lang.fr') },
 ];
 
 export function AdminTemplates() {
   const { t } = useTranslation();
+  const { t: tAdminTemplate } = useAdminTemplateTranslation();
+  const categories = CATEGORIES(tAdminTemplate);
+  const languages = LANGUAGES(tAdminTemplate);
   const [templates, setTemplates] = useState<PromptTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterCategory, setFilterCategory] = useState('all');
@@ -97,11 +348,11 @@ export function AdminTemplates() {
       const res = await adminApi.applyPromptTemplate(
         selectedTemplate.id,
         applyTargetPrompt,
-        applyChangeSummary || `Áp dụng template: ${selectedTemplate.name}`
+        applyChangeSummary || `${tAdminTemplate('adminTemplate.appliedTemplate')}: ${selectedTemplate.name}`
       );
       if (res.success && res.data) {
         const data = res.data as unknown as { message: string; prompt_id: string; version: number; template_id: string };
-        alert(`Đã áp dụng template "${selectedTemplate.name}" thành công!\nPhiên bản mới: ${data.version}`);
+        alert(`${tAdminTemplate('adminTemplate.applySuccess')} "${selectedTemplate.name}" ${tAdminTemplate('adminTemplate.success')}\n${tAdminTemplate('adminTemplate.newVersion')}: ${data.version}`);
         setShowApplyModal(false);
         setSelectedTemplate(null);
         setApplyTargetPrompt('');
@@ -109,18 +360,18 @@ export function AdminTemplates() {
       }
     } catch (error) {
       console.error('Failed to apply template:', error);
-      alert('Có lỗi khi áp dụng template');
+      alert(tAdminTemplate('adminTemplate.applyError'));
     } finally {
       setApplying(false);
     }
   };
 
   const getCategoryConfig = (cat: string) => {
-    return CATEGORIES.find(c => c.value === cat) || CATEGORIES[0];
+    return categories.find(c => c.value === cat) || categories[0];
   };
 
   const getLangLabel = (lang: string) => {
-    return LANGUAGES.find(l => l.value === lang)?.label || lang;
+    return languages.find(l => l.value === lang)?.label || lang;
   };
 
   const activePrompts = storePrompts.filter(p => p.isActive);
@@ -148,8 +399,8 @@ export function AdminTemplates() {
                 <Zap className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h2 className="text-lg font-bold text-slate-800">Templates</h2>
-                <p className="text-sm text-slate-500">{templates.length} templates có sẵn</p>
+                <h2 className="text-lg font-bold text-slate-800">{tAdminTemplate('adminTemplate.templates')}</h2>
+                <p className="text-sm text-slate-500">{templates.length} {tAdminTemplate('adminTemplate.templatesAvailable')}</p>
               </div>
             </div>
             
@@ -158,7 +409,7 @@ export function AdminTemplates() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input
                 type="text"
-                placeholder="Tìm kiếm template..."
+                placeholder={tAdminTemplate('adminTemplate.searchPlaceholder')}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:bg-white transition-colors"
@@ -173,10 +424,10 @@ export function AdminTemplates() {
                   showFeatured ? 'bg-amber-100 text-amber-700 border border-amber-200' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                 }`}
               >
-                <Star className="w-3 h-3" /> Nổi bật
+                <Star className="w-3 h-3" /> {tAdminTemplate('adminTemplate.featured')}
               </button>
               <span className="h-4 w-px bg-slate-200 mx-1" />
-              {CATEGORIES.slice(0, 4).map(cat => (
+              {categories.slice(0, 4).map(cat => (
                 <button
                   key={cat.value}
                   onClick={() => setFilterCategory(filterCategory === cat.value ? 'all' : cat.value)}
@@ -191,7 +442,7 @@ export function AdminTemplates() {
             
             {/* Language Filters */}
             <div className="flex flex-wrap gap-1.5 items-center">
-              {LANGUAGES.map(lang => (
+              {languages.map(lang => (
                 <button
                   key={lang.value}
                   onClick={() => setFilterLanguage(lang.value)}
@@ -216,8 +467,8 @@ export function AdminTemplates() {
                 <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-slate-100 flex items-center justify-center">
                   <FileText className="w-8 h-8 text-slate-400" />
                 </div>
-                <h3 className="text-lg font-semibold text-slate-700 mb-2">Không tìm thấy template</h3>
-                <p className="text-sm text-slate-500">Thử thay đổi bộ lọc</p>
+                <h3 className="text-lg font-semibold text-slate-700 mb-2">{tAdminTemplate('adminTemplate.noTemplateFound')}</h3>
+                <p className="text-sm text-slate-500">{tAdminTemplate('adminTemplate.tryChangeFilter')}</p>
               </div>
             ) : (
               <div className="space-y-2">
@@ -251,7 +502,7 @@ export function AdminTemplates() {
                             </span>
                             <span>{getLangLabel(template.language)}</span>
                             <span>•</span>
-                            <span>{template.use_count} lượt sử dụng</span>
+                            <span>{template.use_count} {tAdminTemplate('adminTemplate.usageCount')}</span>
                           </div>
                         </div>
                       </div>
@@ -276,12 +527,12 @@ export function AdminTemplates() {
           
           {/* Footer */}
           <div className="p-3 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
-            <span className="text-xs text-slate-500">{templates.length} templates</span>
+            <span className="text-xs text-slate-500">{templates.length} {tAdminTemplate('adminTemplate.templates').toLowerCase()}</span>
             <button
               onClick={() => loadTemplates()}
               className="text-xs text-violet-600 hover:text-violet-700 font-medium"
             >
-              Làm mới
+              {tAdminTemplate('adminTemplate.refresh')}
             </button>
           </div>
         </div>
@@ -305,7 +556,7 @@ export function AdminTemplates() {
                   <div className="flex items-center gap-2">
                     {selectedTemplate.is_featured && (
                       <span className="px-3 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-700 flex items-center gap-1">
-                        <Star className="w-3 h-3 fill-amber-500" /> Nổi bật
+                        <Star className="w-3 h-3 fill-amber-500" /> {tAdminTemplate('adminTemplate.featured')}
                       </span>
                     )}
                     <span className={`px-3 py-1 rounded-full text-xs font-medium ${getCategoryConfig(selectedTemplate.category).color}`}>
@@ -321,11 +572,11 @@ export function AdminTemplates() {
                 <div className="flex items-center gap-6 mt-4 pt-4 border-t border-slate-100">
                   <div className="flex items-center gap-2 text-sm text-slate-600">
                     <span className="material-symbols-outlined text-violet-500">schedule</span>
-                    <span>Đã sử dụng <strong>{selectedTemplate.use_count}</strong> lần</span>
+                    <span>{tAdminTemplate('adminTemplate.usedCount')} <strong>{selectedTemplate.use_count}</strong> {tAdminTemplate('adminTemplate.times')}</span>
                   </div>
                   <div className="flex items-center gap-2 text-sm text-slate-600">
                     <span className="material-symbols-outlined text-slate-400">update</span>
-                    <span>Cập nhật: {new Date(selectedTemplate.updated_at).toLocaleDateString('vi-VN')}</span>
+                    <span>{tAdminTemplate('adminTemplate.updated')}: {new Date(selectedTemplate.updated_at).toLocaleDateString('vi-VN')}</span>
                   </div>
                 </div>
               </div>
@@ -335,7 +586,7 @@ export function AdminTemplates() {
                 {/* Tags */}
                 {selectedTemplate.tags.length > 0 && (
                   <div>
-                    <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Tags</h3>
+                    <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">{tAdminTemplate('adminTemplate.tags')}</h3>
                     <div className="flex flex-wrap gap-2">
                       {selectedTemplate.tags.map((tag, i) => (
                         <span key={i} className="px-3 py-1 bg-indigo-50 text-indigo-600 rounded-full text-sm">
@@ -351,7 +602,7 @@ export function AdminTemplates() {
                   <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl">
                     <h3 className="text-xs font-semibold text-blue-600 mb-2 flex items-center gap-2">
                       <span className="material-symbols-outlined text-sm">code</span>
-                      Variables có thể tùy chỉnh
+                      {tAdminTemplate('adminTemplate.variables')}
                     </h3>
                     <div className="flex flex-wrap gap-2">
                       {selectedTemplate.variables.map((v, i) => (
@@ -366,7 +617,7 @@ export function AdminTemplates() {
                   <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl">
                     <h3 className="text-xs font-semibold text-emerald-600 mb-2 flex items-center gap-2">
                       <span className="material-symbols-outlined text-sm">help</span>
-                      Câu hỏi mẫu
+                      {tAdminTemplate('adminTemplate.exampleQuestions')}
                     </h3>
                     <ul className="space-y-1">
                       {selectedTemplate.example_questions.map((q, i) => (
@@ -383,7 +634,7 @@ export function AdminTemplates() {
                 <div>
                   <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
                     <span className="material-symbols-outlined text-sm">text_snippet</span>
-                    Nội dung Prompt
+                    {tAdminTemplate('adminTemplate.promptContent')}
                   </h3>
                   <div className="p-5 bg-slate-900 text-slate-100 rounded-xl overflow-x-auto">
                     <pre className="text-sm font-mono whitespace-pre-wrap leading-relaxed">{selectedTemplate.prompt}</pre>
@@ -395,7 +646,7 @@ export function AdminTemplates() {
               <div className="p-6 border-t border-slate-100 flex items-center justify-between bg-slate-50">
                 <div className="flex items-center gap-2 text-sm text-slate-500">
                   <span className="material-symbols-outlined text-sm">info</span>
-                  <span>Template ID: <code className="bg-slate-200 px-2 py-0.5 rounded text-xs">{selectedTemplate.id}</code></span>
+                  <span>{tAdminTemplate('adminTemplate.templateId')}: <code className="bg-slate-200 px-2 py-0.5 rounded text-xs">{selectedTemplate.id}</code></span>
                 </div>
                 <div className="flex items-center gap-3">
                   <button
@@ -403,14 +654,14 @@ export function AdminTemplates() {
                     className="flex items-center gap-2 px-4 py-2.5 text-slate-600 hover:bg-slate-100 rounded-xl transition-colors text-sm font-medium"
                   >
                     <FileText className="w-4 h-4" />
-                    Xem chi tiết
+                    {tAdminTemplate('adminTemplate.viewDetails')}
                   </button>
                   <button
                     onClick={() => setShowApplyModal(true)}
                     className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-violet-600 to-purple-600 text-white rounded-xl hover:opacity-90 transition-opacity text-sm font-medium shadow-lg shadow-violet-200"
                   >
                     <Zap className="w-4 h-4" />
-                    Áp dụng Template
+                    {tAdminTemplate('adminTemplate.applyTemplate')}
                   </button>
                 </div>
               </div>
@@ -421,13 +672,13 @@ export function AdminTemplates() {
                 <div className="w-24 h-24 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-slate-100 to-slate-50 flex items-center justify-center">
                   <Zap className="w-12 h-12 text-slate-400" />
                 </div>
-                <h3 className="text-xl font-bold text-slate-700 mb-2">Chọn một Template</h3>
+                <h3 className="text-xl font-bold text-slate-700 mb-2">{tAdminTemplate('adminTemplate.selectTemplate')}</h3>
                 <p className="text-sm text-slate-500 mb-6">
-                  Chọn template từ danh sách bên trái để xem chi tiết và áp dụng
+                  {tAdminTemplate('adminTemplate.selectFromList')}
                 </p>
                 <div className="flex items-center justify-center gap-2 text-xs text-slate-400">
                   <span className="material-symbols-outlined text-sm">lightbulb</span>
-                  <span>Template giúp bạn nhanh chóng tạo prompts cho nhiều ngành khác nhau</span>
+                  <span>{tAdminTemplate('adminTemplate.templateHelp')}</span>
                 </div>
               </div>
             </div>
@@ -446,7 +697,7 @@ export function AdminTemplates() {
                 </div>
                 <div>
                   <h2 className="text-lg font-bold text-slate-800">{selectedTemplate.name}</h2>
-                  <p className="text-sm text-slate-500">Preview Template</p>
+                  <p className="text-sm text-slate-500">{tAdminTemplate('adminTemplate.preview')}</p>
                 </div>
               </div>
               <button onClick={() => setShowPreview(false)} className="p-2 hover:bg-slate-100 rounded-lg transition-colors">
@@ -464,7 +715,7 @@ export function AdminTemplates() {
                 </span>
                 {selectedTemplate.is_featured && (
                   <span className="px-3 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-700 flex items-center gap-1">
-                    <Star className="w-3 h-3 fill-amber-500" /> Nổi bật
+                    <Star className="w-3 h-3 fill-amber-500" /> {tAdminTemplate('adminTemplate.featured')}
                   </span>
                 )}
               </div>
@@ -494,7 +745,7 @@ export function AdminTemplates() {
               
               {selectedTemplate.example_questions.length > 0 && (
                 <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl">
-                  <h4 className="text-xs font-semibold text-emerald-600 mb-1">Câu hỏi mẫu</h4>
+                  <h4 className="text-xs font-semibold text-emerald-600 mb-1">{tAdminTemplate('adminTemplate.exampleQuestions')}</h4>
                   <ul className="text-xs text-emerald-700 space-y-1">
                     {selectedTemplate.example_questions.map((q, i) => (
                       <li key={i}>• {q}</li>
@@ -504,7 +755,7 @@ export function AdminTemplates() {
               )}
               
               <div>
-                <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Nội dung Prompt</h4>
+                <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">{tAdminTemplate('adminTemplate.promptContent')}</h4>
                 <div className="p-4 bg-slate-900 text-slate-100 rounded-xl overflow-x-auto">
                   <pre className="text-xs font-mono whitespace-pre-wrap">{selectedTemplate.prompt}</pre>
                 </div>
@@ -513,14 +764,14 @@ export function AdminTemplates() {
             
             <div className="p-5 border-t border-slate-100 flex justify-between items-center">
               <div className="text-xs text-slate-400">
-                Đã sử dụng {selectedTemplate.use_count} lần
+                {tAdminTemplate('adminTemplate.usedCount')} {selectedTemplate.use_count} {tAdminTemplate('adminTemplate.times')}
               </div>
               <div className="flex gap-2">
                 <button
                   onClick={() => setShowPreview(false)}
                   className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl transition-colors text-sm font-medium"
                 >
-                  Đóng
+                  {tAdminTemplate('adminTemplate.close')}
                 </button>
                 <button
                   onClick={() => {
@@ -530,7 +781,7 @@ export function AdminTemplates() {
                   className="px-5 py-2 bg-violet-600 text-white rounded-xl hover:bg-violet-700 transition-colors text-sm font-medium flex items-center gap-2"
                 >
                   <Zap className="w-4 h-4" />
-                  Áp dụng Template
+                  {tAdminTemplate('adminTemplate.applyTemplate')}
                 </button>
               </div>
             </div>
@@ -548,7 +799,7 @@ export function AdminTemplates() {
                   <Zap className="w-5 h-5 text-violet-600" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-bold text-slate-800">Áp dụng Template</h2>
+                  <h2 className="text-lg font-bold text-slate-800">{tAdminTemplate('adminTemplate.applyConfirm')}</h2>
                   <p className="text-sm text-slate-500">{selectedTemplate.name}</p>
                 </div>
               </div>
@@ -561,20 +812,20 @@ export function AdminTemplates() {
               <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl">
                 <p className="text-sm text-amber-800 flex items-start gap-2">
                   <span className="material-symbols-outlined text-amber-600 shrink-0">info</span>
-                  <span>Khi áp dụng template, phiên bản hiện tại sẽ được lưu vào lịch sử trước khi thay đổi. Bạn có thể khôi phục lại bất kỳ lúc nào.</span>
+                  <span>{tAdminTemplate('adminTemplate.templateInfo')}</span>
                 </p>
               </div>
               
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                  Prompt đích <span className="text-red-500">*</span>
+                  {tAdminTemplate('adminTemplate.targetPrompt')} <span className="text-red-500">*</span>
                 </label>
                 <select
                   value={applyTargetPrompt}
                   onChange={(e) => setApplyTargetPrompt(e.target.value)}
                   className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 bg-white"
                 >
-                  <option value="">-- Chọn prompt --</option>
+                  <option value="">{tAdminTemplate('adminTemplate.selectPrompt')}</option>
                   {activePrompts.map(p => (
                     <option key={p.id} value={p.id}>{p.name} ({p.id})</option>
                   ))}
@@ -583,19 +834,19 @@ export function AdminTemplates() {
               
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                  Mô tả thay đổi
+                  {tAdminTemplate('adminTemplate.changeDescription')}
                 </label>
                 <input
                   type="text"
                   value={applyChangeSummary}
                   onChange={(e) => setApplyChangeSummary(e.target.value)}
-                  placeholder="VD: Áp dụng template Y tế cho chatbot tư vấn sức khỏe"
+                  placeholder={tAdminTemplate('adminTemplate.changePlaceholder')}
                   className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30"
                 />
               </div>
               
               <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
-                <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Preview Template</h4>
+                <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">{tAdminTemplate('adminTemplate.templatePreview')}</h4>
                 <pre className="text-xs text-slate-600 whitespace-pre-wrap line-clamp-6 font-mono">
                   {selectedTemplate.prompt.slice(0, 500)}...
                 </pre>
@@ -607,7 +858,7 @@ export function AdminTemplates() {
                 onClick={() => setShowApplyModal(false)}
                 className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl transition-colors text-sm font-medium"
               >
-                Hủy
+                {tAdminTemplate('adminTemplate.cancel')}
               </button>
               <button
                 onClick={handleApplyTemplate}
@@ -615,7 +866,7 @@ export function AdminTemplates() {
                 className="px-5 py-2 bg-gradient-to-r from-violet-600 to-purple-600 text-white rounded-xl hover:opacity-90 transition-opacity text-sm font-medium disabled:opacity-50 flex items-center gap-2 shadow-lg shadow-violet-200"
               >
                 {applying ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-                Áp dụng Template
+                {applying ? tAdminTemplate('adminTemplate.applying') : tAdminTemplate('adminTemplate.applyTemplate')}
               </button>
             </div>
           </div>

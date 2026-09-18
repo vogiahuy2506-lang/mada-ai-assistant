@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Loader2, CheckCircle, AlertTriangle, XCircle, Info } from 'lucide-react';
 import { adminApi } from './adminApi';
+import { useLanguageStore } from '@/stores';
 
 interface ValidationIssue {
   type: string;
@@ -31,6 +32,87 @@ export function PromptValidator({ prompt, autoValidate = true, minDelay = 500, c
   const [validating, setValidating] = useState(false);
   const [result, setResult] = useState<ValidationResult | null>(null);
   const [lastValidated, setLastValidated] = useState<string>('');
+  const language = useLanguageStore((state) => state.language ?? 'vi') as 'vi' | 'en' | 'ar' | 'fr';
+
+  // Translation helper
+  const t = (key: string, replacements?: Record<string, string | number>): string => {
+    const translations: Record<string, Record<string, string>> = {
+      vi: {
+        validating: 'Đang kiểm tra...',
+        valid: 'Hợp lệ',
+        needsEdit: 'Cần chỉnh sửa',
+        hasErrors: 'Có lỗi cần sửa',
+        hasWarnings: 'Có cảnh báo',
+        characters: 'ký tự',
+        words: 'từ',
+        lines: 'dòng',
+        type: 'Loại',
+        promptValid: 'Prompt hợp lệ',
+        promptIsGood: 'Prompt của bạn đã đạt chuẩn!',
+        allRulesFollowed: 'Tất cả quy tắc cơ bản đã được tuân thủ.',
+        enterToValidate: 'Nhập nội dung prompt để kiểm tra',
+        charactersCount: '{{count}} ký tự',
+      },
+      en: {
+        validating: 'Validating...',
+        valid: 'Valid',
+        needsEdit: 'Needs edit',
+        hasErrors: 'Has errors to fix',
+        hasWarnings: 'Has warnings',
+        characters: 'characters',
+        words: 'words',
+        lines: 'lines',
+        type: 'Type',
+        promptValid: 'Prompt is valid',
+        promptIsGood: 'Your prompt is valid!',
+        allRulesFollowed: 'All basic rules have been followed.',
+        enterToValidate: 'Enter prompt content to validate',
+        charactersCount: '{{count}} characters',
+      },
+      ar: {
+        validating: 'جارٍ التحقق...',
+        valid: 'صالح',
+        needsEdit: 'يحتاج تعديل',
+        hasErrors: 'يوجد أخطاء يجب إصلاحها',
+        hasWarnings: 'يوجد تحذيرات',
+        characters: 'حرف',
+        words: 'كلمة',
+        lines: 'سطر',
+        type: 'النوع',
+        promptValid: 'الوصف صالح',
+        promptIsGood: 'الوصف الخاص بك صالح!',
+        allRulesFollowed: 'تم اتباع جميع القواعد الأساسية.',
+        enterToValidate: 'أدخل محتوى الوصف للتحقق',
+        charactersCount: '{{count}} حرف',
+      },
+      fr: {
+        validating: 'Validation en cours...',
+        valid: 'Valide',
+        needsEdit: 'Nécessite une modification',
+        hasErrors: 'Des erreurs à corriger',
+        hasWarnings: 'Des avertissements',
+        characters: 'caractères',
+        words: 'mots',
+        lines: 'lignes',
+        type: 'Type',
+        promptValid: 'Le prompt est valide',
+        promptIsGood: 'Votre prompt est valide!',
+        allRulesFollowed: 'Toutes les règles de base ont été respectées.',
+        enterToValidate: 'Entrez le contenu du prompt à valider',
+        charactersCount: '{{count}} caractères',
+      },
+    };
+
+    let text = translations[language]?.[key] || translations.vi[key] || key;
+    
+    if (replacements) {
+      for (const [k, v] of Object.entries(replacements)) {
+        text = text.replace(new RegExp(`\\{${k}\\}`, 'g'), String(v));
+      }
+    }
+    
+    return text;
+  };
 
   useEffect(() => {
     if (!autoValidate || !prompt) {
@@ -79,23 +161,23 @@ export function PromptValidator({ prompt, autoValidate = true, minDelay = 500, c
         {validating ? (
           <div className="flex items-center gap-1.5 text-slate-400">
             <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            <span className="text-xs">Đang kiểm tra...</span>
+            <span className="text-xs">{t('validating')}</span>
           </div>
         ) : result ? (
           <div className="flex items-center gap-1.5">
             {result.valid ? (
               <div className="flex items-center gap-1 text-emerald-600">
                 <CheckCircle className="w-3.5 h-3.5" />
-                <span className="text-xs font-medium">Hợp lệ</span>
+                <span className="text-xs font-medium">{t('valid')}</span>
               </div>
             ) : (
               <div className="flex items-center gap-1 text-amber-600">
                 <AlertTriangle className="w-3.5 h-3.5" />
-                <span className="text-xs font-medium">Cần chỉnh sửa</span>
+                <span className="text-xs font-medium">{t('needsEdit')}</span>
               </div>
             )}
             <span className="text-xs text-slate-400">
-              ({result.stats.length} ký tự)
+              ({t('charactersCount', { count: result.stats.length })})
             </span>
           </div>
         ) : null}
@@ -124,19 +206,19 @@ export function PromptValidator({ prompt, autoValidate = true, minDelay = 500, c
             )}
           </div>
           <span className="text-sm font-medium text-slate-700">
-            {validating ? 'Đang kiểm tra...' : 
-             result?.valid ? 'Prompt hợp lệ' : 
-             result?.issues.some(i => i.severity === 'error') ? 'Có lỗi cần sửa' : 'Có cảnh báo'}
+            {validating ? t('validating') : 
+             result?.valid ? t('promptValid') : 
+             result?.issues.some(i => i.severity === 'error') ? t('hasErrors') : t('hasWarnings')}
           </span>
         </div>
         
         {result && (
           <div className="flex items-center gap-3 text-xs text-slate-500">
-            <span>{result.stats.length} ký tự</span>
+            <span>{result.stats.length} {t('characters')}</span>
             <span>•</span>
-            <span>{result.stats.wordCount} từ</span>
+            <span>{result.stats.wordCount} {t('words')}</span>
             <span>•</span>
-            <span>{result.stats.lineCount} dòng</span>
+            <span>{result.stats.lineCount} {t('lines')}</span>
           </div>
         )}
       </div>
@@ -175,7 +257,7 @@ export function PromptValidator({ prompt, autoValidate = true, minDelay = 500, c
                   {issue.message}
                 </p>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Type: {issue.type}
+                  {t('type')}: {issue.type}
                 </p>
               </div>
             </div>
@@ -187,9 +269,9 @@ export function PromptValidator({ prompt, autoValidate = true, minDelay = 500, c
       {result && result.issues.length === 0 && (
         <div className="p-6 text-center">
           <CheckCircle className="w-8 h-8 text-emerald-500 mx-auto mb-2" />
-          <p className="text-sm text-emerald-700 font-medium">Prompt của bạn đã đạt chuẩn!</p>
+          <p className="text-sm text-emerald-700 font-medium">{t('promptIsGood')}</p>
           <p className="text-xs text-slate-500 mt-1">
-            Tất cả quy tắc cơ bản đã được tuân thủ.
+            {t('allRulesFollowed')}
           </p>
         </div>
       )}
@@ -199,7 +281,7 @@ export function PromptValidator({ prompt, autoValidate = true, minDelay = 500, c
         <div className="p-6 text-center">
           <Info className="w-8 h-8 text-slate-400 mx-auto mb-2" />
           <p className="text-sm text-slate-600">
-            Nhập nội dung prompt để kiểm tra
+            {t('enterToValidate')}
           </p>
         </div>
       )}

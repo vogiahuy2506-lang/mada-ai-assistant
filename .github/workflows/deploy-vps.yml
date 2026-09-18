@@ -28,6 +28,15 @@ on:
       - main
       - feat/code-review-and-cleanup   # Tạm thời để test; xóa sau khi deploy lên main xong
   workflow_dispatch:                  # Cho phép trigger thủ công từ Actions tab
+    inputs:
+      action:
+        description: 'Action to perform'
+        required: false
+        default: 'deploy'
+        type: choice
+        options:
+          - deploy
+          - cleanup
 
 env:
   REGISTRY: ghcr.io
@@ -41,6 +50,7 @@ jobs:
     name: Lint & Build
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    if: github.event.inputs.action != 'cleanup'
     continue-on-error: false
     steps:
       - name: Checkout
@@ -77,6 +87,7 @@ jobs:
     name: Build & Push Image
     runs-on: ubuntu-latest
     needs: []  # Chạy song song với CI, không chờ CI xong
+    if: github.event.inputs.action != 'cleanup'
     timeout-minutes: 25
     permissions:
       contents: read
@@ -132,6 +143,7 @@ jobs:
     name: Deploy to VPS
     runs-on: ubuntu-latest
     needs: [build]
+    if: github.event.inputs.action != 'cleanup'
     timeout-minutes: 15
     environment: production
     steps:
@@ -304,3 +316,35 @@ jobs:
         run: |
           echo "❌ Deploy failed!"
           echo "Check logs in the 'Deploy to VPS' step above."
+
+  # ===========================================
+  # Cleanup: Delete seed data from production DB
+  # ===========================================
+  cleanup:
+    name: Cleanup Seed Data
+    runs-on: ubuntu-latest
+    if: github.event.inputs.action == 'cleanup'
+    environment: production
+    steps:
+      - name: Delete seed questions from production DB
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          command_timeout: 2m
+          script: |
+            echo "Finding app container..."
+            CONTAINER=$(docker ps --format '{{.Names}}' | grep -E 'mada|app' | head -1)
+            echo "Container: $CONTAINER"
+            
+            echo "Checking row counts before delete..."
+            docker exec $CONTAINER sh -c "sqlite3 /app/mada-ai-assistant/data/mada.db 'SELECT COUNT(*) as total, COUNT(CASE WHEN id LIKE \"sq_%\" THEN 1 END) as seed_count FROM suggested_questions;'"
+            
+            echo "Deleting seed questions (id LIKE sq_%)..."
+            docker exec $CONTAINER sh -c "sqlite3 /app/mada-ai-assistant/data/mada.db \"DELETE FROM suggested_questions WHERE id LIKE 'sq_%';\""
+            
+            echo "Verifying after delete..."
+            docker exec $CONTAINER sh -c "sqlite3 /app/mada-ai-assistant/data/mada.db 'SELECT COUNT(*) as remaining FROM suggested_questions;'"
+            
+            echo "✅ Cleanup complete!"

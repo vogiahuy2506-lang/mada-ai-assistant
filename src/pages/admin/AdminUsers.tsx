@@ -389,13 +389,6 @@ export default function AdminUsers() {
     );
   };
 
-  const formatDate = (date: string | null) => {
-    if (!date) return '—';
-    return new Date(date).toLocaleDateString('vi-VN', {
-      day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
-    });
-  };
-
   return (
     <AdminLayout
       title={t('admin.users.title')}

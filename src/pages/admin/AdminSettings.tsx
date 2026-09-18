@@ -3,13 +3,25 @@ import { AdminLayout } from './AdminLayout';
 import { adminApi, UserStats, KnowledgeStats } from './adminApi';
 import { useSystemSettingsStore, useAuthStore } from '@/stores';
 import { useLanguageStore } from '@/stores';
+import { translations, Language } from '@/lib/translations';
 import clsx from 'clsx';
 import { systemApi } from '@/lib/api';
 import { CheckCircle, Loader2, AlertCircle, Shield, Settings, Lock, Cloud, CreditCard, Mail, Bug, Sparkles, FileText, Zap, ArrowRight } from 'lucide-react';
 import { PromptTemplates } from './PromptTemplates';
 
 type Tab = 'general' | 'plans' | 'security' | 'ai' | 'integrations' | 'live' | 'system' | 'templates';
-type Language = 'vi' | 'en' | 'ar' | 'fr';
+
+// Translation helper function
+const t = (key: string): string => {
+  const language = useLanguageStore.getState().language as Language;
+  return (translations as any)[language]?.[key] || (translations as any).vi[key] || key;
+};
+
+// Helper to get current language translations object
+const getLang = () => {
+  const language = useLanguageStore.getState().language as Language;
+  return (translations as any)[language] || (translations as any).vi;
+};
 
 // Translation object
 const t = {

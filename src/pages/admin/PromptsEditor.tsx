@@ -21,7 +21,9 @@ interface PromptsEditorProps {
 
 // Translation helper
 const t = (key: string, lang: Language): string => {
-  return translations[lang]?.[key] || translations.vi[key] || key;
+  // First try promptsEditor.* keys, then fall back to prompt.* keys
+  const promptsEditorKey = 'promptsEditor.' + key.split('.')[1];
+  return translations[lang]?.[promptsEditorKey] || translations[lang]?.[key] || translations.vi?.[promptsEditorKey] || translations.vi?.[key] || key;
 };
 
 export function PromptsEditor({ onClose }: PromptsEditorProps) {

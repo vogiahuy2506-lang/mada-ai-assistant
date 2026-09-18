@@ -3,6 +3,7 @@ import { AdminLayout } from './AdminLayout';
 import { adminApi } from './adminApi';
 import { useAuthStore, useLanguageStore } from '@/stores';
 import { getAccessToken } from '@/lib/api';
+import { translations, Language } from '@/lib/translations';
 import clsx from 'clsx';
 import { RefreshCw, Search, User as UserIcon, Clock, Download as FileDownload, Filter } from 'lucide-react';
 
@@ -42,7 +43,13 @@ function badgeClass(action: string): string {
 
 export function AdminAudit() {
   const { language } = useLanguageStore();
-  const isEn = language === 'en';
+
+  // Translation helper function
+  const t = (key: string): string => {
+    const lang = language as Language;
+    return translations[lang]?.[key] || translations['vi'][key] || key;
+  };
+
   const user = useAuthStore((s) => s.user);
   const isAdmin = user?.role === 'admin';
 
@@ -98,7 +105,10 @@ export function AdminAudit() {
   useEffect(() => { load(); }, [load]);
 
   const formatDate = (iso: string): string => {
-    try { return new Date(iso).toLocaleString(isEn ? 'en-US' : 'vi-VN'); } catch { return iso; }
+    try {
+      const locale = language === 'vi' ? 'vi-VN' : language === 'ar' ? 'ar-SA' : language === 'fr' ? 'fr-FR' : 'en-US';
+      return new Date(iso).toLocaleString(locale);
+    } catch { return iso; }
   };
 
   const exportCsv = () => {
@@ -124,25 +134,19 @@ export function AdminAudit() {
   };
 
   const stats = [
-    { label: isEn ? 'TOTAL EVENTS' : 'TỔNG SỰ KIỆN', value: total, color: 'from-primary/10 to-primary/5', iconColor: 'text-primary', icon: 'list_alt', iconBg: 'bg-primary/20' },
-    { label: isEn ? 'ACTION TYPES' : 'LOẠI HÀNH ĐỘNG', value: actions.length, color: 'from-green-50/80 to-green-100/40', iconColor: 'text-green-600', icon: 'category', iconBg: 'bg-green-200' },
-    { label: isEn ? 'DISPLAYING' : 'ĐANG HIỂN THỊ', value: logs.length, color: 'from-blue-50/80 to-blue-100/40', iconColor: 'text-blue-600', icon: 'visibility', iconBg: 'bg-blue-200' },
-    { label: isEn ? 'MAX LIMIT' : 'GIỚI HẠN', value: 200, color: 'from-purple-50/80 to-purple-100/40', iconColor: 'text-purple-600', icon: 'data_usage', iconBg: 'bg-purple-200' },
+    { label: t('admin.audit.statsTotalEvents'), value: total, color: 'from-primary/10 to-primary/5', iconColor: 'text-primary', icon: 'list_alt', iconBg: 'bg-primary/20' },
+    { label: t('admin.audit.statsActionTypes'), value: actions.length, color: 'from-green-50/80 to-green-100/40', iconColor: 'text-green-600', icon: 'category', iconBg: 'bg-green-200' },
+    { label: t('admin.audit.statsDisplaying'), value: logs.length, color: 'from-blue-50/80 to-blue-100/40', iconColor: 'text-blue-600', icon: 'visibility', iconBg: 'bg-blue-200' },
+    { label: t('admin.audit.statsMaxLimit'), value: 200, color: 'from-purple-50/80 to-purple-100/40', iconColor: 'text-purple-600', icon: 'data_usage', iconBg: 'bg-purple-200' },
   ];
 
   return (
     <AdminLayout
-      title={language === 'en' ? 'Activity Logs' : language === 'ar' ? 'سجل النشاط' : language === 'fr' ? "Journal d'activité" : 'Nhật ký Hoạt động'}
+      title={t('admin.audit.title')}
       titleEn="Activity Logs"
       titleAr="سجل النشاط"
       titleFr="Journal d'activité"
-      subtitle={language === 'en'
-        ? 'Track every user & admin action across the MADA AI system.'
-        : language === 'ar'
-        ? 'تتبع كل إجراء للمستخدم والمشرف في نظام MADA AI.'
-        : language === 'fr'
-        ? "Tracer chaque action utilisateur & admin dans le système MADA AI."
-        : 'Truy vết mọi hành vi của người dùng & admin trong hệ thống MADA AI.'}
+      subtitle={t('admin.audit.subtitle')}
       subtitleEn="Track every user & admin action across the MADA AI system."
       subtitleAr="تتبع كل إجراء للمستخدم والمشرف في نظام MADA AI."
       subtitleFr="Tracer chaque action utilisateur & admin dans le système MADA AI."
@@ -155,12 +159,10 @@ export function AdminAudit() {
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-purple-500/10 via-transparent to-transparent rounded-3xl"></div>
           <div className="max-w-2xl relative z-10 py-8 px-6">
             <h2 className="text-4xl font-black text-on-surface mb-4 tracking-tight">
-              {isEn ? 'Activity Logs' : 'Nhật ký Hoạt động'}
+              {t('admin.audit.heroTitle')}
             </h2>
             <p className="text-lg font-medium text-on-surface-variant border-l-4 border-purple-500 pl-6 py-2 bg-white/40 backdrop-blur-sm rounded-r-xl">
-              {isEn
-                ? 'Every user & admin action (login, CRUD, crawl, ingest, approval, payment) is recorded — track behaviour, audit changes, and investigate violations.'
-                : 'Mọi hành vi của người dùng & admin (đăng nhập, CRUD, crawl, ingest, duyệt, thanh toán) đều được ghi lại — theo dõi hành vi, truy vết thay đổi và điều tra vi phạm.'}
+              {t('admin.audit.heroDesc')}
             </p>
           </div>
         </div>
@@ -194,7 +196,7 @@ export function AdminAudit() {
         <div className="flex items-center gap-3 p-1.5 bg-white/60 backdrop-blur-xl rounded-full border-2 border-black">
           <span className="text-on-surface-variant font-medium text-sm ml-4 mr-2 flex items-center gap-1">
             <Filter className="w-4 h-4" />
-            {isEn ? 'Filter:' : 'Lọc:'}
+            {t('admin.audit.filter')}
           </span>
           <button
             onClick={() => { setFilterAction(''); setFilterUser(''); }}
@@ -206,7 +208,7 @@ export function AdminAudit() {
                 : 'bg-transparent text-on-surface-variant hover:bg-white/80 border-transparent hover:border-black transition-colors'
             )}
           >
-            {isEn ? 'All' : 'Tất cả'}
+            {t('admin.audit.all')}
           </button>
         </div>
 
@@ -214,7 +216,7 @@ export function AdminAudit() {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant" />
             <input
-              placeholder={isEn ? 'User ID...' : 'User ID...'}
+              placeholder={t('admin.audit.userIdPlaceholder')}
               value={filterUser}
               onChange={(e) => setFilterUser(e.target.value)}
               className="h-10 pl-10 pr-4 rounded-full border-2 border-black bg-white/60 backdrop-blur-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500 w-56"
@@ -226,7 +228,7 @@ export function AdminAudit() {
             onChange={(e) => setFilterAction(e.target.value)}
             className="h-10 px-4 rounded-full border-2 border-black bg-white/60 backdrop-blur-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500 font-medium"
           >
-            <option value="">{isEn ? 'All actions' : 'Tất cả actions'}</option>
+            <option value="">{t('admin.audit.allActions')}</option>
             {actions.map((a) => (
               <option key={a} value={a}>{a}</option>
             ))}
@@ -238,7 +240,7 @@ export function AdminAudit() {
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-white/60 backdrop-blur-xl border-2 border-black font-bold text-sm hover:bg-white hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[3px_3px_0px_0px_#000] shadow-[2px_2px_0px_0px_#000] transition-all disabled:opacity-50"
           >
             <RefreshCw className={clsx('w-4 h-4', loading && 'animate-spin')} />
-            <span>{isEn ? 'Refresh' : 'Làm mới'}</span>
+            <span>{t('admin.audit.refresh')}</span>
           </button>
 
           <button
@@ -247,7 +249,7 @@ export function AdminAudit() {
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-purple-500 text-white border-2 border-black font-bold text-sm hover:bg-purple-600 hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[3px_3px_0px_0px_#000] shadow-[2px_2px_0px_0px_#000] transition-all disabled:opacity-40"
           >
             <FileDownload className="w-4 h-4" />
-            <span>{isEn ? 'Export CSV' : 'Xuất CSV'}</span>
+            <span>{t('admin.audit.exportCsv')}</span>
           </button>
         </div>
       </div>

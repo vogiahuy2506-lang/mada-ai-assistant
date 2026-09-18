@@ -261,19 +261,19 @@ export function AdminLayout({
           <div className="px-4 py-3 mb-4 rounded-2xl border border-primary/10 bg-primary/5">
             <div className="flex items-center gap-2">
               <span className="material-symbols-outlined text-primary">account_circle</span>
-              <span className="font-label-sm font-bold text-primary truncate flex-1">{user?.name || user?.email || 'Admin'}</span>
+              <span className="font-label-sm font-bold text-primary truncate flex-1">{user?.name || user?.email || t('admin.layout.admin')}</span>
               {isUserSuperAdmin ? (
                 <span className="px-2 py-0.5 rounded-full bg-gradient-to-r from-amber-400 to-orange-500 text-white text-[10px] font-bold shadow-sm">
-                  SUPER
+                  {t('admin.layout.super')}
                 </span>
               ) : (
                 <span className="px-2 py-0.5 rounded-full bg-primary/20 text-primary text-[10px] font-bold">
-                  ADMIN
+                  {t('admin.layout.admin')}
                 </span>
               )}
             </div>
             <p className="font-label-sm text-primary/70 mt-1">
-              Plan: {user?.plan === 'enterprise' ? 'Enterprise' : user?.plan === 'pro' ? 'Pro' : 'Free'}
+              {t('admin.layout.plan')}: {user?.plan === 'enterprise' ? t('admin.layout.planEnterprise') : user?.plan === 'pro' ? t('admin.layout.planPro') : t('admin.layout.planFree')}
             </p>
           </div>
 
@@ -282,7 +282,7 @@ export function AdminLayout({
             className="flex items-center gap-3 px-4 py-3 rounded-xl text-on-surface-variant hover:bg-error/5 hover:text-error transition-all text-left"
           >
             <span className="material-symbols-outlined">logout</span>
-            <span className="font-label-md">{language === 'vi' ? 'Đăng xuất' : language === 'en' ? 'Logout' : language === 'ar' ? 'تسجيل الخروج' : 'Déconnexion'}</span>
+            <span className="font-label-md">{t('admin.layout.logout')}</span>
           </button>
         </div>
       </aside>
@@ -305,10 +305,10 @@ export function AdminLayout({
             <LanguageSwitcher />
             <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-primary/5 border border-primary/20">
               <span className="material-symbols-outlined text-[18px] text-primary">account_circle</span>
-              <span className="font-label-sm font-semibold text-primary">{user?.email || user?.name || 'Admin'}</span>
+              <span className="font-label-sm font-semibold text-primary">{user?.email || user?.name || t('admin.layout.admin')}</span>
               {isUserSuperAdmin && (
                 <span className="px-1.5 py-0.5 rounded bg-gradient-to-r from-amber-400 to-orange-500 text-white text-[10px] font-bold shadow-sm">
-                  SUPER
+                  {t('admin.layout.super')}
                 </span>
               )}
             </div>

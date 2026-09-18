@@ -5007,15 +5007,29 @@ app.post('/api/kb/scrape-with-suggest', async (req, res) => {
 
 // Serve frontend static files (production)
 const clientDistPath = path.join(__dirname, 'client');
+const assetsPath = path.join(clientDistPath, 'assets');
 if (fs.existsSync(clientDistPath)) {
+  console.log(`📁 Static files root: ${clientDistPath}`);
+  console.log(`📁 Assets path: ${assetsPath}`);
+  console.log(`📁 Assets exist: ${fs.existsSync(assetsPath)}`);
+  
+  // Explicitly serve /assets from clientDistPath/assets to ensure files are served correctly
+  // This fixes the issue where SPA fallback catches /assets/* requests
+  app.use('/assets', express.static(assetsPath));
+  
+  // Also serve other static files from client root (manifest.json, favicon, etc.)
   app.use(express.static(clientDistPath));
+  
   // SPA fallback - serve index.html for all non-API routes
-  app.get(/^(?!\/api\/|\/uploads\/).*/, (_req, res) => {
+  // Note: This regex should NOT match /assets/* since we handle it explicitly above
+  app.get(/^(?!\/api\/|\/uploads\/|\/assets\/).*/, (_req, res) => {
     res.sendFile(path.join(clientDistPath, 'index.html'), (err) => {
       if (err) res.status(404).json({ success: false, error: 'Not found' });
     });
   });
   console.log(`📦 Serving frontend from ${clientDistPath}`);
+} else {
+  console.log(`⚠️  Frontend build not found at ${clientDistPath}`);
 }
 
 export default app;

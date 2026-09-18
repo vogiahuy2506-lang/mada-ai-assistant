@@ -11,500 +11,10 @@ import { PromptTemplates } from './PromptTemplates';
 
 type Tab = 'general' | 'plans' | 'security' | 'ai' | 'integrations' | 'live' | 'system' | 'templates';
 
-// Translation helper function
-const t = (key: string): string => {
-  const language = useLanguageStore.getState().language as Language;
-  return (translations as any)[language]?.[key] || (translations as any).vi[key] || key;
-};
-
 // Helper to get current language translations object
 const getLang = () => {
   const language = useLanguageStore.getState().language as Language;
   return (translations as any)[language] || (translations as any).vi;
-};
-
-// Translation object
-const t = {
-  vi: {
-    title: 'Cấu hình Hệ thống',
-    subtitle: 'Điều chỉnh các tham số cốt lõi của MADA AI: gói giá, bảo mật, mô hình AI và tích hợp bên thứ ba.',
-    tabs: {
-      general: 'Chung',
-      plans: 'Gói & Quota',
-      security: 'Bảo mật',
-      ai: 'AI Models',
-      integrations: 'Tích hợp',
-      live: 'Trạng thái thật',
-      system: 'System DB',
-      templates: 'Templates',
-    },
-    general: {
-      sectionTitle: 'Thông tin chung',
-      systemName: 'Tên hệ thống',
-      systemUrl: 'URL hệ thống',
-      contactEmail: 'Email liên hệ',
-      defaultLanguage: 'Ngôn ngữ mặc định',
-      description: 'Mô tả hệ thống',
-      saveChanges: 'Lưu thay đổi',
-      saving: 'Đang lưu...',
-      savedAt: 'Đã lưu lúc',
-      saveFailed: 'Lưu thất bại',
-      connectionError: 'Lỗi kết nối server',
-    },
-    plans: {
-      sectionTitle: 'Cấu hình Gói & Quota',
-      anonQuota: 'Quota cho người dùng ẩn danh',
-      unlimited: 'Không giới hạn',
-      messagesPerSession: 'tin nhắn/phiên',
-      anonQuotaDesc: 'Người dùng chưa đăng nhập sẽ có giới hạn này. Đặt "Không giới hạn" để bỏ giới hạn.',
-      fileUploadLimits: 'Giới hạn Upload File',
-      filePerSession: 'File/phiên chat:',
-      totalFiles: 'Tổng file:',
-      fileSize: 'Dung lượng/file:',
-      maxPerSession: 'Tối đa file cho mỗi cuộc trò chuyện',
-      maxTotalFiles: 'Tổng số file tối đa cho tất cả phiên',
-      maxFileSize: 'Kích thước tối đa cho mỗi file',
-      supportedFormats: 'Định dạng hỗ trợ:',
-      planQuotas: 'Quota theo Gói dịch vụ',
-      pricePerMonth: 'Giá (VND/tháng)',
-      quotaPerMonth: 'Quota/tháng',
-      current: 'HIỆN TẠI',
-      saveConfig: 'Lưu cấu hình',
-    },
-    security: {
-      sectionTitle: 'Bảo mật',
-      require2FA: 'Bắt buộc 2FA cho Admin',
-      require2FADesc: 'Tất cả tài khoản admin phải bật xác thực 2 yếu tố.',
-      allowGoogle: 'Cho phép đăng nhập Google',
-      allowGoogleDesc: 'Người dùng có thể đăng nhập bằng tài khoản Google.',
-      ipWhitelist: 'Giới hạn IP Whitelist',
-      ipWhitelistDesc: 'Chỉ cho phép admin đăng nhập từ IP được phê duyệt.',
-      auditLog: 'Audit log chi tiết',
-      auditLogDesc: 'Ghi lại mọi hành động admin vào bảng admin_audit_log.',
-      autoLock: 'Tự động khóa sau 5 lần sai',
-      autoLockDesc: 'Khóa tài khoản sau 5 lần đăng nhập thất bại.',
-      jwtSecret: 'JWT Secret (chỉ hiển thị một lần)',
-      saveConfig: 'Lưu cấu hình',
-    },
-    ai: {
-      sectionTitle: 'Cấu hình AI Models',
-      madaLLM: 'MADA-LLM',
-      madaLLMDesc: 'Mô hình ngôn ngữ chính cho trợ lý ảo.',
-      madaVision: 'MADA-Vision',
-      madaVisionDesc: 'Nhận diện hình ảnh thiết bị hỗ trợ.',
-      madaVoice: 'MADA-Voice',
-      madaVoiceDesc: 'TTS/STT đa ngôn ngữ (Vi, En, Fr, Ar).',
-      update: 'Cập nhật',
-      temperature: 'Temperature (0–1)',
-      maxTokens: 'Max tokens',
-      saveConfig: 'Lưu cấu hình',
-    },
-    integrations: {
-      sectionTitle: 'Tích hợp bên thứ ba',
-      openai: 'OpenAI API',
-      openaiDesc: 'GPT-4 cho RAG fallback',
-      googleCloud: 'Google Cloud',
-      googleCloudDesc: 'Storage & Translation',
-      stripe: 'Stripe',
-      stripeDesc: 'Thanh toán Pro/Enterprise',
-      sendgrid: 'SendGrid',
-      sendgridDesc: 'Email thông báo',
-      sentry: 'Sentry',
-      sentryDesc: 'Error tracking',
-      connected: 'Connected',
-      disconnect: 'Ngắt',
-      connect: 'Kết nối',
-    },
-    live: {
-      sectionTitle: 'Trạng thái hệ thống (real-time)',
-      sectionDesc: 'Dữ liệu đọc trực tiếp từ backend MADA AI.',
-      users: 'Người dùng',
-      total: 'Tổng',
-      active: 'Active',
-      suspended: 'Suspended',
-      pending: 'Pending',
-      knowledgeBase: 'Knowledge Base',
-      totalDocs: 'Tổng tài liệu',
-      categories: 'Danh mục',
-      storageSize: 'Dung lượng',
-      endpoints: 'Endpoints',
-      loading: 'Đang tải...',
-    },
-    system: {
-      dbTitle: 'System Settings (DB)',
-      dbDescription: 'Toàn bộ cấu hình hệ thống được lưu trong {table} table.',
-      accessDenied: 'Truy cập bị hạn chế',
-      accessDeniedDesc: 'System DB chỉ dành cho Super Admin. Bạn không có quyền xem hoặc chỉnh sửa các cấu hình này.',
-      limitedAccess: 'Limited Access',
-      loading: 'Đang tải...',
-    },
-    templates: {
-      sectionTitle: 'Prompt Templates',
-      sectionDesc: 'Quản lý và áp dụng các template prompt có sẵn theo ngành.',
-      bannerDesc: 'Template có sẵn theo ngành',
-    },
-    languages: ['Tiếng Việt', 'English', 'Français', 'العربية'],
-  },
-  en: {
-    title: 'System Configuration',
-    subtitle: 'Adjust core parameters of MADA AI: pricing plans, security, AI models and third-party integrations.',
-    tabs: {
-      general: 'General',
-      plans: 'Plans & Quota',
-      security: 'Security',
-      ai: 'AI Models',
-      integrations: 'Integrations',
-      live: 'Live Status',
-      system: 'System DB',
-      templates: 'Templates',
-    },
-    general: {
-      sectionTitle: 'General Information',
-      systemName: 'System Name',
-      systemUrl: 'System URL',
-      contactEmail: 'Contact Email',
-      defaultLanguage: 'Default Language',
-      description: 'System Description',
-      saveChanges: 'Save Changes',
-      saving: 'Saving...',
-      savedAt: 'Saved at',
-      saveFailed: 'Save failed',
-      connectionError: 'Server connection error',
-    },
-    plans: {
-      sectionTitle: 'Plans & Quota Configuration',
-      anonQuota: 'Anonymous User Quota',
-      unlimited: 'Unlimited',
-      messagesPerSession: 'messages/session',
-      anonQuotaDesc: 'Unauthenticated users will have this limit. Set "Unlimited" to remove limit.',
-      fileUploadLimits: 'File Upload Limits',
-      filePerSession: 'Files/session:',
-      totalFiles: 'Total files:',
-      fileSize: 'File size:',
-      maxPerSession: 'Maximum files per conversation',
-      maxTotalFiles: 'Maximum total files across all sessions',
-      maxFileSize: 'Maximum size per file',
-      supportedFormats: 'Supported formats:',
-      planQuotas: 'Quota by Service Plan',
-      pricePerMonth: 'Price (VND/month)',
-      quotaPerMonth: 'Quota/month',
-      current: 'CURRENT',
-      saveConfig: 'Save Configuration',
-    },
-    security: {
-      sectionTitle: 'Security',
-      require2FA: 'Require 2FA for Admin',
-      require2FADesc: 'All admin accounts must enable two-factor authentication.',
-      allowGoogle: 'Allow Google Login',
-      allowGoogleDesc: 'Users can log in using Google accounts.',
-      ipWhitelist: 'IP Whitelist Limit',
-      ipWhitelistDesc: 'Only allow admin login from approved IPs.',
-      auditLog: 'Detailed Audit Log',
-      auditLogDesc: 'Record all admin actions to admin_audit_log table.',
-      autoLock: 'Auto-lock after 5 failures',
-      autoLockDesc: 'Lock account after 5 failed login attempts.',
-      jwtSecret: 'JWT Secret (shown once)',
-      saveConfig: 'Save Configuration',
-    },
-    ai: {
-      sectionTitle: 'AI Models Configuration',
-      madaLLM: 'MADA-LLM',
-      madaLLMDesc: 'Main language model for virtual assistant.',
-      madaVision: 'MADA-Vision',
-      madaVisionDesc: 'Recognize assistive device images.',
-      madaVoice: 'MADA-Voice',
-      madaVoiceDesc: 'Multilingual TTS/STT (Vi, En, Fr, Ar).',
-      update: 'Update',
-      temperature: 'Temperature (0–1)',
-      maxTokens: 'Max tokens',
-      saveConfig: 'Save Configuration',
-    },
-    integrations: {
-      sectionTitle: 'Third-party Integrations',
-      openai: 'OpenAI API',
-      openaiDesc: 'GPT-4 for RAG fallback',
-      googleCloud: 'Google Cloud',
-      googleCloudDesc: 'Storage & Translation',
-      stripe: 'Stripe',
-      stripeDesc: 'Pro/Enterprise payments',
-      sendgrid: 'SendGrid',
-      sendgridDesc: 'Email notifications',
-      sentry: 'Sentry',
-      sentryDesc: 'Error tracking',
-      connected: 'Connected',
-      disconnect: 'Disconnect',
-      connect: 'Connect',
-    },
-    live: {
-      sectionTitle: 'System Status (real-time)',
-      sectionDesc: 'Data read directly from MADA AI backend.',
-      users: 'Users',
-      total: 'Total',
-      active: 'Active',
-      suspended: 'Suspended',
-      pending: 'Pending',
-      knowledgeBase: 'Knowledge Base',
-      totalDocs: 'Total Documents',
-      categories: 'Categories',
-      storageSize: 'Storage Size',
-      endpoints: 'Endpoints',
-      loading: 'Loading...',
-    },
-    system: {
-      dbTitle: 'System Settings (DB)',
-      dbDescription: 'All system configurations are stored in the {table} table.',
-      accessDenied: 'Access Restricted',
-      accessDeniedDesc: 'System DB is for Super Admin only. You do not have permission to view or edit these configurations.',
-      limitedAccess: 'Limited Access',
-      loading: 'Loading...',
-    },
-    templates: {
-      sectionTitle: 'Prompt Templates',
-      sectionDesc: 'Manage and apply pre-built industry prompt templates.',
-      bannerDesc: 'Pre-built industry templates',
-    },
-    languages: ['Tiếng Việt', 'English', 'Français', 'العربية'],
-  },
-  ar: {
-    title: 'إعدادات النظام',
-    subtitle: 'ضبط المعلمات الأساسية لـ MADA AI: خطط التسعير والأمان ونماذج الذكاء الاصطناعي والتكاملات الخارجية.',
-    tabs: {
-      general: 'عام',
-      plans: 'الخطط والحصص',
-      security: 'الأمان',
-      ai: 'نماذج الذكاء',
-      integrations: 'التكاملات',
-      live: 'الحالة المباشرة',
-      system: 'قاعدة النظام',
-      templates: 'القوالب',
-    },
-    general: {
-      sectionTitle: 'المعلومات العامة',
-      systemName: 'اسم النظام',
-      systemUrl: 'رابط النظام',
-      contactEmail: 'البريد الإلكتروني',
-      defaultLanguage: 'اللغة الافتراضية',
-      description: 'وصف النظام',
-      saveChanges: 'حفظ التغييرات',
-      saving: 'جاري الحفظ...',
-      savedAt: 'تم الحفظ في',
-      saveFailed: 'فشل الحفظ',
-      connectionError: 'خطأ في الاتصال بالخادم',
-    },
-    plans: {
-      sectionTitle: 'إعدادات الخطط والحصص',
-      anonQuota: 'حصة المستخدم المجهول',
-      unlimited: 'غير محدود',
-      messagesPerSession: 'رسائل/جلسة',
-      anonQuotaDesc: 'المستخدمون غير المصادق عليهم سيكون لديهم هذا الحد. اضبط "غير محدود" لإزالة الحد.',
-      fileUploadLimits: 'حدود رفع الملفات',
-      filePerSession: 'ملفات/جلسة:',
-      totalFiles: 'إجمالي الملفات:',
-      fileSize: 'حجم الملف:',
-      maxPerSession: 'الحد الأقصى للملفات لكل محادثة',
-      maxTotalFiles: 'الحد الأقصى لإجمالي الملفات عبر جميع الجلسات',
-      maxFileSize: 'الحد الأقصى لحجم كل ملف',
-      supportedFormats: 'التنسيقات المدعومة:',
-      planQuotas: 'الحصص حسب خطة الخدمة',
-      pricePerMonth: 'السعر (فيتنامdong/شهر)',
-      quotaPerMonth: 'الحصة/شهر',
-      current: 'الحالي',
-      saveConfig: 'حفظ الإعدادات',
-    },
-    security: {
-      sectionTitle: 'الأمان',
-      require2FA: 'طلب المصادقة الثنائية للمدير',
-      require2FADesc: 'يجب على جميع حسابات المديرين تمكين المصادقة الثنائية.',
-      allowGoogle: 'السماح بتسجيل الدخول بجوجل',
-      allowGoogleDesc: 'يمكن للمستخدمين تسجيل الدخول باستخدام حسابات جوجل.',
-      ipWhitelist: 'قائمة بيضاء IP',
-      ipWhitelistDesc: 'السماح فقط بتسجيل دخول المدير من IPs المعتمدة.',
-      auditLog: 'سجل التدقيق المفصل',
-      auditLogDesc: 'تسجيل جميع إجراءات المدير في جدول سجل التدقيق.',
-      autoLock: 'القفل التلقائي بعد 5 محاولات فاشلة',
-      autoLockDesc: 'قفل الحساب بعد 5 محاولات تسجيل دخول فاشلة.',
-      jwtSecret: 'JWT Secret (يُعرض مرة واحدة)',
-      saveConfig: 'حفظ الإعدادات',
-    },
-    ai: {
-      sectionTitle: 'إعدادات نماذج الذكاء الاصطناعي',
-      madaLLM: 'MADA-LLM',
-      madaLLMDesc: 'نموذج اللغة الرئيسي للمساعد الافتراضي.',
-      madaVision: 'MADA-Vision',
-      madaVisionDesc: 'التعرف على صور الأجهزة المساعدة.',
-      madaVoice: 'MADA-Voice',
-      madaVoiceDesc: 'تحويل النص إلى كلام / التعرف على الكلام متعدد اللغات.',
-      update: 'تحديث',
-      temperature: 'درجة الحرارة (0–1)',
-      maxTokens: 'الحد الأقصى للرموز',
-      saveConfig: 'حفظ الإعدادات',
-    },
-    integrations: {
-      sectionTitle: 'التكاملات الخارجية',
-      openai: 'OpenAI API',
-      openaiDesc: 'GPT-4 للانعكاس',
-      googleCloud: 'Google Cloud',
-      googleCloudDesc: 'التخزين والترجمة',
-      stripe: 'Stripe',
-      stripeDesc: 'مدفوعات برو/المؤسسات',
-      sendgrid: 'SendGrid',
-      sendgridDesc: 'إشعارات البريد الإلكتروني',
-      sentry: 'Sentry',
-      sentryDesc: 'تتبع الأخطاء',
-      connected: 'متصل',
-      disconnect: 'قطع الاتصال',
-      connect: 'اتصال',
-    },
-    live: {
-      sectionTitle: 'حالة النظام (الوقت الفعلي)',
-      sectionDesc: 'البيانات مقروءة مباشرة من خلفية MADA AI.',
-      users: 'المستخدمون',
-      total: 'المجموع',
-      active: 'نشط',
-      suspended: 'موقوف',
-      pending: 'قيد الانتظار',
-      knowledgeBase: 'قاعدة المعرفة',
-      totalDocs: 'إجمالي المستندات',
-      categories: 'الفئات',
-      storageSize: 'حجم التخزين',
-      endpoints: 'نقاط النهاية',
-      loading: 'جاري التحميل...',
-    },
-    system: {
-      dbTitle: 'إعدادات النظام (قاعدة البيانات)',
-      dbDescription: 'يتم تخزين جميع إعدادات النظام في جدول {table}.',
-      accessDenied: 'الوصول مقيد',
-      accessDeniedDesc: 'قاعدة بيانات النظام مخصصة للمدير الأعلى فقط. ليس لديك صلاحية عرض أو تعديل هذه الإعدادات.',
-      limitedAccess: 'وصول محدود',
-      loading: 'جاري التحميل...',
-    },
-    templates: {
-      sectionTitle: 'قوالب الطلبات',
-      sectionDesc: 'إدارة وتطبيق قوالب الطلبات الجاهزة حسب الصناعة.',
-      bannerDesc: 'قوالب جاهزة حسب الصناعة',
-    },
-    languages: ['Tiếng Việt', 'English', 'Français', 'العربية'],
-  },
-  fr: {
-    title: 'Configuration du Système',
-    subtitle: 'Ajustez les paramètres essentiels de MADA AI: forfaits tarifaires, sécurité, modèles d\'IA et intégrations tierces.',
-    tabs: {
-      general: 'Général',
-      plans: 'Forfaits & Quotas',
-      security: 'Sécurité',
-      ai: 'Modèles IA',
-      integrations: 'Intégrations',
-      live: 'État en Direct',
-      system: 'Base de Données',
-      templates: 'Modèles',
-    },
-    general: {
-      sectionTitle: 'Informations Générales',
-      systemName: 'Nom du Système',
-      systemUrl: 'URL du Système',
-      contactEmail: 'Email de Contact',
-      defaultLanguage: 'Langue par Défaut',
-      description: 'Description du Système',
-      saveChanges: 'Enregistrer les Modifications',
-      saving: 'Enregistrement...',
-      savedAt: 'Enregistré à',
-      saveFailed: 'Échec de l\'enregistrement',
-      connectionError: 'Erreur de connexion au serveur',
-    },
-    plans: {
-      sectionTitle: 'Configuration des Forfaits & Quotas',
-      anonQuota: 'Quota Utilisateur Anonyme',
-      unlimited: 'Illimité',
-      messagesPerSession: 'messages/session',
-      anonQuotaDesc: 'Les utilisateurs non authentifiés auront cette limite. Définissez "Illimité" pour supprimer la limite.',
-      fileUploadLimits: 'Limites de Téléversement',
-      filePerSession: 'Fichiers/session:',
-      totalFiles: 'Total fichiers:',
-      fileSize: 'Taille fichier:',
-      maxPerSession: 'Fichiers maximum par conversation',
-      maxTotalFiles: 'Fichiers totaux maximum pour toutes les sessions',
-      maxFileSize: 'Taille maximum par fichier',
-      supportedFormats: 'Formats supportés:',
-      planQuotas: 'Quota par Forfait de Service',
-      pricePerMonth: 'Prix (VND/mois)',
-      quotaPerMonth: 'Quota/mois',
-      current: 'ACTUEL',
-      saveConfig: 'Enregistrer la Configuration',
-    },
-    security: {
-      sectionTitle: 'Sécurité',
-      require2FA: 'Exiger 2FA pour Admin',
-      require2FADesc: 'Tous les comptes admin doivent activer l\'authentification à deux facteurs.',
-      allowGoogle: 'Autoriser Connexion Google',
-      allowGoogleDesc: 'Les utilisateurs peuvent se connecter avec un compte Google.',
-      ipWhitelist: 'Liste Blanche IP',
-      ipWhitelistDesc: 'Autoriser uniquement la connexion admin depuis des IPs approuvées.',
-      auditLog: 'Journal d\'Audit Détaillé',
-      auditLogDesc: 'Enregistrer toutes les actions admin dans la table admin_audit_log.',
-      autoLock: 'Verrouillage auto après 5 échecs',
-      autoLockDesc: 'Verrouiller le compte après 5 tentatives de connexion échouées.',
-      jwtSecret: 'JWT Secret (affiché une fois)',
-      saveConfig: 'Enregistrer la Configuration',
-    },
-    ai: {
-      sectionTitle: 'Configuration des Modèles IA',
-      madaLLM: 'MADA-LLM',
-      madaLLMDesc: 'Modèle de langage principal pour l\'assistant virtuel.',
-      madaVision: 'MADA-Vision',
-      madaVisionDesc: 'Reconnaissance d\'images d\'appareils d\'assistance.',
-      madaVoice: 'MADA-Voice',
-      madaVoiceDesc: 'TTS/STT multilingue (Vi, En, Fr, Ar).',
-      update: 'Mettre à jour',
-      temperature: 'Température (0–1)',
-      maxTokens: 'Tokens max',
-      saveConfig: 'Enregistrer la Configuration',
-    },
-    integrations: {
-      sectionTitle: 'Intégrations Tierces',
-      openai: 'OpenAI API',
-      openaiDesc: 'GPT-4 pour repli RAG',
-      googleCloud: 'Google Cloud',
-      googleCloudDesc: 'Stockage & Traduction',
-      stripe: 'Stripe',
-      stripeDesc: 'Paiements Pro/Entreprise',
-      sendgrid: 'SendGrid',
-      sendgridDesc: 'Notifications email',
-      sentry: 'Sentry',
-      sentryDesc: 'Suivi des erreurs',
-      connected: 'Connecté',
-      disconnect: 'Déconnecter',
-      connect: 'Connecter',
-    },
-    live: {
-      sectionTitle: 'État du Système (temps réel)',
-      sectionDesc: 'Données lues directement depuis le backend MADA AI.',
-      users: 'Utilisateurs',
-      total: 'Total',
-      active: 'Actif',
-      suspended: 'Suspendu',
-      pending: 'En attente',
-      knowledgeBase: 'Base de Connaissances',
-      totalDocs: 'Documents Totaux',
-      categories: 'Catégories',
-      storageSize: 'Taille Stockage',
-      endpoints: 'Points de Terminaison',
-      loading: 'Chargement...',
-    },
-    system: {
-      dbTitle: 'Paramètres Système (BD)',
-      dbDescription: 'Toutes les configurations système sont stockées dans la table {table}.',
-      accessDenied: 'Accès Restreint',
-      accessDeniedDesc: 'La base de données système est réservée aux Super Admins. Vous n\'avez pas la permission de voir ou modifier ces configurations.',
-      limitedAccess: 'Accès Limité',
-      loading: 'Chargement...',
-    },
-    templates: {
-      sectionTitle: 'Modèles de Prompts',
-      sectionDesc: 'Gérez et appliquez des modèles de prompts prédéfinis par secteur.',
-      bannerDesc: 'Modèles prédéfinis par secteur',
-    },
-    languages: ['Tiếng Việt', 'English', 'Français', 'العربية'],
-  },
 };
 
 export function AdminSettings() {
@@ -517,8 +27,9 @@ export function AdminSettings() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
+  // Get current language and translations
   const language = useLanguageStore((s) => s.language) as Language;
-  const lang = t[language] || t.vi;
+  const lang = getLang();
   
   // Get current user role
   const user = useAuthStore((s) => s.user);
@@ -591,8 +102,8 @@ export function AdminSettings() {
 
   return (
     <AdminLayout
-      title={lang.title}
-      subtitle={lang.subtitle}
+      title={lang['admin.settings.title']}
+      subtitle={lang['admin.settings.subtitle']}
       showLayoutTitle={false}
     >
       {/* ===================== HERO BANNER ===================== */}
@@ -610,10 +121,10 @@ export function AdminSettings() {
                 </div>
                 <div>
                   <h1 className="text-2xl font-black text-on-surface tracking-tight leading-tight">
-                    {lang.title}
+                    {lang['admin.settings.title']}
                   </h1>
                   <p className="text-sm text-on-surface-variant mt-0.5 leading-relaxed max-w-xl">
-                    {lang.subtitle}
+                    {lang['admin.settings.subtitle']}
                   </p>
                 </div>
               </div>
@@ -627,8 +138,8 @@ export function AdminSettings() {
                   <Zap className="w-6 h-6 text-white" />
                 </div>
                 <div className="text-left flex-1">
-                  <h3 className="font-bold text-slate-800">Prompt Templates</h3>
-                  <p className="text-xs text-slate-500 mt-0.5">{lang.templates.bannerDesc}</p>
+                  <h3 className="font-bold text-slate-800">{lang['admin.settings.promptTemplates']}</h3>
+                  <p className="text-xs text-slate-500 mt-0.5">{lang['admin.settings.templates.bannerDesc']}</p>
                 </div>
                 <ArrowRight className="w-5 h-5 text-indigo-400 group-hover:translate-x-1 transition-transform" />
               </button>
@@ -639,13 +150,13 @@ export function AdminSettings() {
               {isSuperAdmin ? (
                 <div className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200">
                   <Shield className="w-4 h-4 text-amber-600" />
-                  <span className="text-sm font-bold text-amber-700">Super Admin</span>
+                  <span className="text-sm font-bold text-amber-700">{lang['admin.settings.superAdmin']}</span>
                 </div>
               ) : (
                 <div className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary/5 border border-primary/20">
                   <Lock className="w-4 h-4 text-primary" />
-                  <span className="text-sm font-semibold text-primary">Admin</span>
-                  <span className="text-xs text-on-surface-variant">({lang.system.limitedAccess})</span>
+                  <span className="text-sm font-semibold text-primary">{lang['admin.settings.admin']}</span>
+                  <span className="text-xs text-on-surface-variant">({lang['admin.settings.system.limitedAccess']})</span>
                 </div>
               )}
             </div>
@@ -657,28 +168,28 @@ export function AdminSettings() {
       <div className="flex items-center gap-1 p-1.5 bg-white rounded-xl border border-outline-variant mb-8 overflow-x-auto">
         {(
           [
-            { id: 'general', label: lang.tabs.general, icon: Settings },
-            { id: 'plans', label: lang.tabs.plans, icon: CreditCard },
-            { id: 'security', label: lang.tabs.security, icon: Shield },
-            { id: 'ai', label: lang.tabs.ai, icon: Sparkles },
-            { id: 'integrations', label: lang.tabs.integrations, icon: Cloud },
-            { id: 'live', label: lang.tabs.live, icon: AlertCircle },
-            { id: 'system', label: lang.tabs.system, icon: Lock },
-            { id: 'templates', label: lang.tabs.templates, icon: FileText },
+            { id: 'general', label: lang['admin.settings.tabs.general'], icon: Settings },
+            { id: 'plans', label: lang['admin.settings.tabs.plans'], icon: CreditCard },
+            { id: 'security', label: lang['admin.settings.tabs.security'], icon: Shield },
+            { id: 'ai', label: lang['admin.settings.tabs.ai'], icon: Sparkles },
+            { id: 'integrations', label: lang['admin.settings.tabs.integrations'], icon: Cloud },
+            { id: 'live', label: lang['admin.settings.tabs.live'], icon: AlertCircle },
+            { id: 'system', label: lang['admin.settings.tabs.system'], icon: Lock },
+            { id: 'templates', label: lang['admin.settings.tabs.templates'], icon: FileText },
           ] as { id: Tab; label: string; icon: any }[]
-        ).map((t) => (
+        ).map((tabItem) => (
           <button
-            key={t.id}
-            onClick={() => setTab(t.id)}
+            key={tabItem.id}
+            onClick={() => setTab(tabItem.id)}
             className={clsx(
               'flex items-center gap-2 px-4 py-2.5 rounded-lg font-label-md font-semibold text-sm transition-all whitespace-nowrap flex-shrink-0',
-              tab === t.id
+              tab === tabItem.id
                 ? 'bg-primary text-on-primary shadow-sm'
                 : 'text-on-surface-variant hover:bg-surface-variant/50 hover:text-on-surface'
             )}
           >
-            <t.icon className="w-4 h-4 flex-shrink-0" />
-            {t.label}
+            <tabItem.icon className="w-4 h-4 flex-shrink-0" />
+            {tabItem.label}
           </button>
         ))}
       </div>
@@ -687,26 +198,26 @@ export function AdminSettings() {
       {tab === 'general' && (
         <div className="bg-white rounded-2xl border border-outline-variant overflow-hidden">
           <div className="px-8 py-6 border-b border-outline-variant">
-            <h3 className="text-lg font-black text-on-surface">{lang.general.sectionTitle}</h3>
+            <h3 className="text-lg font-black text-on-surface">{lang['admin.settings.general.sectionTitle']}</h3>
           </div>
           <div className="p-8 space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
-                <label className="text-label-sm font-semibold text-on-surface">{lang.general.systemName}</label>
+                <label className="text-label-sm font-semibold text-on-surface">{lang['admin.settings.general.systemName']}</label>
                 <input
                   defaultValue="MADA AI"
                   className="w-full px-4 py-3 rounded-xl bg-surface-variant/30 border border-outline-variant text-on-surface text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30 transition-colors"
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-label-sm font-semibold text-on-surface">{lang.general.systemUrl}</label>
+                <label className="text-label-sm font-semibold text-on-surface">{lang['admin.settings.general.systemUrl']}</label>
                 <input
                   defaultValue="https://mada.ai"
                   className="w-full px-4 py-3 rounded-xl bg-surface-variant/30 border border-outline-variant text-on-surface text-sm font-mono focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30 transition-colors"
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-label-sm font-semibold text-on-surface">{lang.general.contactEmail}</label>
+                <label className="text-label-sm font-semibold text-on-surface">{lang['admin.settings.general.contactEmail']}</label>
                 <input
                   type="email"
                   defaultValue="contact@mada.vn"
@@ -714,18 +225,18 @@ export function AdminSettings() {
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-label-sm font-semibold text-on-surface">{lang.general.defaultLanguage}</label>
+                <label className="text-label-sm font-semibold text-on-surface">{lang['admin.settings.general.defaultLanguage']}</label>
                 <select className="w-full px-4 py-3 rounded-xl bg-surface-variant/30 border border-outline-variant text-on-surface text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30 transition-colors">
-                  <option>{lang.languages[0]}</option>
-                  <option>{lang.languages[1]}</option>
-                  <option>{lang.languages[2]}</option>
-                  <option>{lang.languages[3]}</option>
+                  <option>{lang['admin.settings.languages'][0]}</option>
+                  <option>{lang['admin.settings.languages'][1]}</option>
+                  <option>{lang['admin.settings.languages'][2]}</option>
+                  <option>{lang['admin.settings.languages'][3]}</option>
                 </select>
               </div>
             </div>
 
             <div className="space-y-2">
-              <label className="text-label-sm font-semibold text-on-surface">{lang.general.description}</label>
+              <label className="text-label-sm font-semibold text-on-surface">{lang['admin.settings.general.description']}</label>
               <textarea
                 rows={3}
                 defaultValue="MADA AI - Trợ lý ảo thông minh hỗ trợ người khuyết tật tiếp cận công nghệ."
@@ -742,16 +253,16 @@ export function AdminSettings() {
                 {isSaving ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    {lang.general.saving}
+                    {lang['admin.settings.general.saving']}
                   </>
                 ) : (
-                  lang.general.saveChanges
+                  lang['admin.settings.general.saveChanges']
                 )}
               </button>
               {savedAt && (
                 <span className="text-sm font-semibold text-green-600 flex items-center gap-1.5">
                   <CheckCircle className="w-4 h-4" />
-                  {lang.general.savedAt} {savedAt}
+                  {lang['admin.settings.general.savedAt']} {savedAt}
                 </span>
               )}
               {saveError && (

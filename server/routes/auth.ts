@@ -20,6 +20,25 @@ import { logActivity } from '../index';
 
 const router = Router();
 
+// Helper: write to admin_system_logs
+function sysLog(level: 'critical' | 'error' | 'warn' | 'info' | 'success', source: string, message: string, details?: Record<string, any>, userId?: string) {
+  try {
+    db.prepare(`
+      INSERT INTO admin_system_logs (id, level, source, message, details, user_id, ip_address, user_agent, timestamp)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      randomUUID(),
+      level,
+      source,
+      message,
+      details ? JSON.stringify(details) : null,
+      userId || null,
+      null, null,
+      new Date().toISOString()
+    );
+  } catch { /* silently ignore */ }
+}
+
 // ============== POST /api/auth/register ==============
 
 router.post('/register', async (req, res) => {
@@ -56,6 +75,7 @@ router.post('/register', async (req, res) => {
 
     auditLog(user.id, 'register', req, { email: user.email });
     logActivity('success', `New user registered: ${user.name}`, 'Auth Service', user.email);
+    sysLog('success', 'auth', 'Đăng ký tài khoản mới', { email: user.email, name: user.name, role: user.role });
 
     // Check if pending approval
     const needsApproval = user.status === 'pending';
@@ -101,20 +121,31 @@ router.post('/login', async (req, res) => {
     if (!verifyPassword(password, user.password_hash)) {
       auditLog(user.id, 'login_failed', req, { reason: 'wrong_password' });
       logActivity('warn', `Failed login attempt for ${normalizedEmail}`, 'Auth Service', undefined, 'wrong_password');
+      sysLog('error', 'auth', 'Đăng nhập thất bại', { email: normalizedEmail, reason: 'wrong_password' });
       return res.status(401).json({ success: false, error: 'Email hoặc mật khẩu không đúng', code: 'INVALID_CREDENTIALS' });
     }
 
     if (user.status === 'suspended') {
       logActivity('warn', `Suspended account login attempt: ${normalizedEmail}`, 'Auth Service');
+      sysLog('error', 'auth', 'Đăng nhập thất bại - tài khoản bị khóa', { email: normalizedEmail });
       return res.status(403).json({ success: false, error: 'Tài khoản đã bị tạm khóa', code: 'SUSPENDED' });
     }
 
-    if (user.status === 'pending') {
+    // Super Admin và Admin luôn được đăng nhập, bỏ qua pending approval
+    const bypassApproval = user.role === 'super_admin' || user.role === 'admin';
+    if (user.status === 'pending' && !bypassApproval) {
       logActivity('warn', `Pending account login attempt: ${normalizedEmail}`, 'Auth Service');
       return res.status(403).json({ success: false, error: 'Tài khoản đang chờ duyệt', code: 'PENDING' });
     }
 
     const now = new Date().toISOString();
+
+    // Auto-activate super_admin và admin nếu đang pending
+    if (user.status === 'pending' && bypassApproval) {
+      db.prepare('UPDATE users SET status = ?, updated_at = ? WHERE id = ?').run('active', now, user.id);
+      logActivity('info', `Auto-activated ${user.role} account: ${normalizedEmail}`, 'Auth Service');
+    }
+
     db.prepare('UPDATE users SET last_login_at = ?, updated_at = ? WHERE id = ?').run(now, now, user.id);
 
     const freshUser = db.prepare('SELECT * FROM users WHERE id = ?').get(user.id) as UserRow;
@@ -123,6 +154,7 @@ router.post('/login', async (req, res) => {
 
     auditLog(freshUser.id, 'login', req);
     logActivity('info', `User logged in: ${freshUser.name} (${freshUser.role})`, 'Auth Service', freshUser.email);
+    sysLog('success', 'auth', 'Đăng nhập thành công', { email: freshUser.email, name: freshUser.name, role: freshUser.role }, freshUser.id);
 
     res.json({
       success: true,
@@ -198,6 +230,7 @@ router.post('/logout', authenticate as any, (req: Request, res: Response) => {
   }
   auditLog(authReq.user!.id, 'logout', req);
   logActivity('info', `User logged out: ${authReq.user!.email}`, 'Auth Service', authReq.user!.email);
+  sysLog('info', 'auth', 'Đăng xuất khỏi hệ thống', { email: authReq.user!.email }, authReq.user!.id);
   res.json({ success: true });
 });
 
@@ -237,6 +270,7 @@ router.put('/profile', authenticate as any, (req: Request, res: Response) => {
 
     const updated = db.prepare('SELECT * FROM users WHERE id = ?').get(user.id) as UserRow;
     auditLog(user.id, 'profile_update', req);
+    sysLog('info', 'auth', 'Cập nhật hồ sơ cá nhân', { updatedFields: Object.keys(req.body) }, user.id);
     res.json({ success: true, data: { user: toPublicUser(updated) } });
   } catch (err) {
     console.error('Profile update error:', err);

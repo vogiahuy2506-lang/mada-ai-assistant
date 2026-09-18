@@ -20,6 +20,7 @@ const fileTranslations: Record<string, Record<Language, string>> = {
   'file.saveSuccess': { vi: 'Cài đặt đã được lưu thành công!', en: 'Settings saved successfully!', ar: 'تم حفظ الإعدادات بنجاح!', fr: 'Paramètres enregistrés avec succès!' },
   'file.error': { vi: 'Không thể lưu cài đặt', en: 'Cannot save settings', ar: 'لا يمكن حفظ الإعدادات', fr: 'Impossible d\'enregistrer les paramètres' },
   'file.errorOccurred': { vi: 'Đã xảy ra lỗi khi lưu cài đặt', en: 'An error occurred while saving settings', ar: 'حدث خطأ أثناء حفظ الإعدادات', fr: 'Une erreur s\'est produite lors de l\'enregistrement' },
+  'file.sessionExpired': { vi: 'Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.', en: 'Session expired. Please log in again.', ar: 'انتهت صلاحية الجلسة. يرجى تسجيل الدخول مرة أخرى.', fr: 'Session expirée. Veuillez vous reconnecter.' },
 
   // Main title
   'file.title': { vi: 'Quản Lý Upload File', en: 'File Management', ar: 'إدارة الملفات', fr: 'Gestion des fichiers' },
@@ -135,12 +136,28 @@ const FileManagement: React.FC = () => {
   const loadSettings = async () => {
     try {
       const token = getAccessToken() || localStorage.getItem('token');
+      if (!token) {
+        // Not logged in - show login prompt
+        setMessage({ type: 'error', text: tFile('file.sessionExpired', language) || 'Vui lòng đăng nhập để tiếp tục.' });
+        setLoading(false);
+        return;
+      }
       const res = await fetch('/api/admin/file-settings', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
+      
+      // Handle 401 Unauthorized
+      if (res.status === 401) {
+        setMessage({ type: 'error', text: tFile('file.sessionExpired', language) || 'Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.' });
+        setLoading(false);
+        return;
+      }
+      
       const data = await res.json();
       if (data.success) {
         setSettings(prev => ({ ...prev, ...data.data }));
+      } else {
+        console.error('Failed to load file settings:', data.error);
       }
     } catch (error) {
       console.error('Failed to load settings:', error);

@@ -7,6 +7,7 @@ import { Loader2 } from 'lucide-react';
 import { AuthModal } from '@/components/auth/AuthModal';
 import { PaywallModal } from '@/components/auth/PaywallModal';
 import { translations } from '@/lib/translations';
+import { validateLocalToken, clearTokens } from '@/lib/api';
 
 // Import ChatPage directly to avoid lazy loading issues
 import { ChatPage } from '@/pages/ChatPage';
@@ -63,18 +64,22 @@ function App() {
 
   // Refresh user data from server on mount to ensure role is correct
   useEffect(() => {
-    // Only refresh if we have a token (isAuthenticated) but user might be stale
-    const token = localStorage.getItem('mada-access-token');
-    if (token && !user) {
-      refreshUser().catch(console.error);
+    // Validate token locally FIRST — prevents unnecessary 401 API calls
+    const tokenCheck = validateLocalToken();
+    if (!tokenCheck.valid) {
+      // Token is missing, expired, or malformed — clear it immediately
+      if (tokenCheck.reason !== 'missing') {
+        console.warn('[Auth] Local token invalid:', tokenCheck.reason, '— clearing tokens');
+        clearTokens();
+      }
+      return; // Don't call /api/auth/me with an invalid token
     }
-    // Also refresh if user has old invalid role 'superadmin' (should be 'super_admin')
-    if (user?.role === 'super_admin') {
+
+    // Token is locally valid — only refresh if user data might be stale
+    if (!user) {
       refreshUser().catch(() => {
-        // If refresh fails, clear tokens and force re-login
-        localStorage.removeItem('mada-access-token');
-        localStorage.removeItem('mada-refresh-token');
-        window.location.reload();
+        // If refresh fails, tokens will be cleared by the store's refreshUser
+        // No need to manually clear here
       });
     }
   }, []);

@@ -61,11 +61,40 @@ export function clearTokens() {
   localStorage.removeItem(REFRESH_KEY);
 }
 
+/**
+ * Validate JWT token locally WITHOUT making API call.
+ * Returns: { valid: true } | { valid: false, reason: 'missing' | 'expired' | 'malformed' }
+ * This prevents unnecessary 401 errors from the server when we know the token is invalid.
+ */
+export function validateLocalToken(): { valid: boolean; reason?: 'missing' | 'expired' | 'malformed' } {
+  const token = getAccessToken();
+  if (!token) return { valid: false, reason: 'missing' };
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return { valid: false, reason: 'malformed' };
+    const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+    if (payload.exp) {
+      const now = Math.floor(Date.now() / 1000);
+      if (payload.exp < now) return { valid: false, reason: 'expired' };
+    }
+    return { valid: true };
+  } catch {
+    return { valid: false, reason: 'malformed' };
+  }
+}
+
 async function request<T>(
   path: string,
   options: RequestInit = {},
   retry = true
 ): Promise<{ success: true; data: T } | ApiError> {
+  // Pre-check: if token is locally invalid, skip the API call to avoid 401 errors
+  const tokenCheck = validateLocalToken();
+  if (!tokenCheck.valid && tokenCheck.reason !== 'missing') {
+    clearTokens();
+    return { success: false, error: 'Session expired. Please login again.' };
+  }
+
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(options.headers as Record<string, string> || {}),

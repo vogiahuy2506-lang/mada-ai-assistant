@@ -6,6 +6,25 @@ import { logActivity } from '../index';
 
 const router = Router();
 
+// Helper: write to admin_system_logs
+function sysLog(level: 'critical' | 'error' | 'warn' | 'info' | 'success', source: string, message: string, details?: Record<string, any>, userId?: string) {
+  try {
+    db.prepare(`
+      INSERT INTO admin_system_logs (id, level, source, message, details, user_id, ip_address, user_agent, timestamp)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      randomUUID(),
+      level,
+      source,
+      message,
+      details ? JSON.stringify(details) : null,
+      userId || null,
+      null, null,
+      new Date().toISOString()
+    );
+  } catch { /* silently ignore */ }
+}
+
 // All endpoints require admin
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 router.use(authenticate as any, requireRole('admin') as any);
@@ -177,6 +196,15 @@ router.patch('/:id', (req: Request, res: Response) => {
       (req as any).user?.email
     );
 
+    // Log to admin_system_logs
+    sysLog(
+      status === 'suspended' ? 'warn' : 'info',
+      'users',
+      `Cập nhật người dùng ${target.email}`,
+      { targetId: target.id, changes: req.body },
+      (req as any).user?.id
+    );
+
     res.json({ success: true, data: { user: toPublicUser(updated) } });
   } catch (err) {
     console.error('Update user error:', err);
@@ -198,6 +226,15 @@ router.delete('/:id', (req: Request, res: Response) => {
   db.prepare('DELETE FROM users WHERE id = ?').run(target.id);
   auditLog((req as any).user?.id, 'admin_delete_user', req, { targetId: target.id, email: target.email });
   logActivity('warn', `Admin deleted user: ${target.email}`, 'User Management', (req as any).user?.email);
+
+  // Log to admin_system_logs
+  sysLog(
+    'error',
+    'users',
+    `Xóa tài khoản người dùng ${target.email}`,
+    { targetId: target.id, email: target.email },
+    (req as any).user?.id
+  );
 
   res.json({ success: true });
 });

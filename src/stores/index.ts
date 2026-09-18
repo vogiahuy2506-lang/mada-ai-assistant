@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { User, UserRole, UserPlan, ChatMessage, Language, Notification, ViewMode } from '@/types';
-import { authApi, setTokens, clearTokens, getAccessToken, type ApiUser } from '@/lib/api';
+import { authApi, setTokens, clearTokens, getAccessToken, validateLocalToken, type ApiUser } from '@/lib/api';
 
 // Limits per plan (admin có thể override trong system settings)
 // -1 = unlimited
@@ -188,6 +188,10 @@ export const useAuthStore = create<AuthState>()(
           import('@/stores').then(({ usePermissionsStore }) => {
             usePermissionsStore.getState().loadPermissions();
           });
+        } else {
+          // If API returns error (401/403), clear invalid tokens to prevent further 401 errors
+          clearTokens();
+          set({ user: null, isAuthenticated: false });
         }
       },
 
@@ -737,21 +741,31 @@ export const usePermissionsStore = create<PermissionsState>()((set, get) => ({
   isLoaded: false,
   
   loadPermissions: async () => {
-    // Skip if not logged in (no token = anonymous user)
-    const token = localStorage.getItem('mada-access-token');
-    if (!token) {
+    // Skip if not logged in OR token is locally invalid (prevents 401 errors)
+    const tokenCheck = validateLocalToken();
+    if (!tokenCheck.valid) {
+      set({ effectivePermissions: [], customPermissions: [], deniedPermissions: [], features: {
+        admin_panel: false, user_management: false, kb_management: false,
+        product_management: false, scraper: false, analytics: false,
+        audit_logs: false, consultations: false, file_upload: false, chat_export: false,
+      }, isLoaded: false });
       return;
     }
+    const token = getAccessToken();
+    if (!token) return;
     try {
       const res = await fetch('/api/permissions/my', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
+        headers: { 'Authorization': `Bearer ${token}` },
       });
+      if (res.status === 401 || res.status === 403) {
+        // Token invalid on server — clear and skip
+        clearTokens();
+        set({ effectivePermissions: [], customPermissions: [], deniedPermissions: [], isLoaded: false });
+        return;
+      }
       const data = await res.json();
       if (data.success) {
         const { effectivePermissions, customPermissions, deniedPermissions, features } = data.data;
-        
         set({
           effectivePermissions,
           customPermissions,
@@ -761,7 +775,7 @@ export const usePermissionsStore = create<PermissionsState>()((set, get) => ({
         });
       }
     } catch (e) {
-      console.error('Failed to load permissions:', e);
+      // Network error — silently skip, don't crash
     }
   },
   

@@ -1,4 +1,4 @@
-import { getAccessToken } from '@/lib/api';
+import { getAccessToken, validateLocalToken, clearTokens } from '@/lib/api';
 
 const API_BASE = '/api';
 
@@ -22,6 +22,14 @@ async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs = 1
 }
 
 async function request<T>(path: string, options: RequestInit = {}, retry = true): Promise<{ success: boolean; data?: T; error?: string }> {
+  // Pre-check: if token is locally invalid, skip the API call to avoid 401 errors
+  const tokenCheck = validateLocalToken();
+  if (!tokenCheck.valid && tokenCheck.reason !== 'missing') {
+    // Token expired or malformed — clear it
+    clearTokens();
+    return { success: false, error: 'Session expired. Please login again.' };
+  }
+
   const token = getAccessToken();
   const refreshToken = localStorage.getItem('mada-refresh-token');
   try {

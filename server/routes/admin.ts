@@ -17,6 +17,38 @@ const requireAdmin = [authenticate, requireRole('admin', 'super_admin')];
 // Middleware: require super_admin authentication (highest privilege)
 const requireSuperAdmin = [authenticate, requireRole('super_admin')];
 
+// ============== HELPER: Write to admin_system_logs ==============
+function logSystemEvent(
+  level: 'critical' | 'error' | 'warn' | 'info' | 'success',
+  source: string,
+  message: string,
+  details?: Record<string, any>,
+  userId?: string,
+  ip?: string,
+  userAgent?: string
+) {
+  try {
+    const now = new Date().toISOString();
+    db.prepare(`
+      INSERT INTO admin_system_logs (id, level, source, message, details, user_id, ip_address, user_agent, timestamp)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      uuidv4(),
+      level,
+      source,
+      message,
+      details ? JSON.stringify(details) : null,
+      userId || null,
+      ip || null,
+      userAgent || null,
+      now
+    );
+  } catch (err) {
+    // Silently fail - logging should never crash the app
+    console.error('Failed to write system log:', err);
+  }
+}
+
 // ============== CATEGORIES ==============
 
 // GET /api/admin/categories
@@ -234,6 +266,15 @@ router.post('/products', requireAdmin, (req: Request, res: Response) => {
     
     const product = db.prepare('SELECT * FROM kb_products WHERE id = ?').get(id);
     res.status(201).json({ success: true, data: product });
+
+    // Log the creation
+    logSystemEvent(
+      'success', 'products', 'Tạo sản phẩm mới',
+      { id, title, category, status: status || 'draft' },
+      (req as any).user?.id,
+      req.ip,
+      req.headers['user-agent']
+    );
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -277,6 +318,15 @@ router.patch('/products/:id', requireAdmin, (req: Request, res: Response) => {
     
     const product = db.prepare('SELECT * FROM kb_products WHERE id = ?').get(req.params.id);
     res.json({ success: true, data: product });
+
+    // Log the update
+    logSystemEvent(
+      'info', 'products', 'Cập nhật sản phẩm',
+      { id: req.params.id, title: (product as any)?.title, updatedFields: Object.keys(req.body) },
+      (req as any).user?.id,
+      req.ip,
+      req.headers['user-agent']
+    );
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -292,6 +342,15 @@ router.delete('/products/:id', requireAdmin, (req: Request, res: Response) => {
     
     db.prepare('DELETE FROM kb_products WHERE id = ?').run(req.params.id);
     res.json({ success: true, message: 'Product deleted successfully' });
+
+    // Log the deletion
+    logSystemEvent(
+      'warn', 'products', 'Xóa sản phẩm',
+      { id: req.params.id, title: (product as any)?.title, category: (product as any)?.category },
+      (req as any).user?.id,
+      req.ip,
+      req.headers['user-agent']
+    );
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -526,6 +585,15 @@ router.post('/agents', requireAdmin, (req: Request, res: Response) => {
       success: true,
       data: { ...agent, capabilities: JSON.parse(agent.capabilities), isActive: agent.is_active === 1 },
     });
+
+    // Log the creation
+    logSystemEvent(
+      'success', 'agents', 'Tạo AI Agent mới',
+      { id: agentId, name, mada_category, is_active: is_active !== false },
+      (req as any).user?.id,
+      req.ip,
+      req.headers['user-agent']
+    );
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -583,6 +651,15 @@ router.patch('/agents/:id', requireAdmin, (req: Request, res: Response) => {
       success: true,
       data: { ...agent, capabilities: JSON.parse(agent.capabilities), isActive: agent.is_active === 1 },
     });
+
+    // Log the update
+    logSystemEvent(
+      'info', 'agents', 'Cập nhật AI Agent',
+      { id: req.params.id, name: agent.name, updatedFields: Object.keys(req.body) },
+      (req as any).user?.id,
+      req.ip,
+      req.headers['user-agent']
+    );
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -591,8 +668,18 @@ router.patch('/agents/:id', requireAdmin, (req: Request, res: Response) => {
 // DELETE /api/admin/agents/:id
 router.delete('/agents/:id', requireAdmin, (req: Request, res: Response) => {
   try {
+    const agent = db.prepare('SELECT * FROM admin_agents WHERE id = ?').get(req.params.id) as any;
     db.prepare('DELETE FROM admin_agents WHERE id = ?').run(req.params.id);
     res.json({ success: true, message: 'Agent deleted successfully' });
+
+    // Log the deletion
+    logSystemEvent(
+      'warn', 'agents', 'Xóa AI Agent',
+      { id: req.params.id, name: agent?.name },
+      (req as any).user?.id,
+      req.ip,
+      req.headers['user-agent']
+    );
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -1291,8 +1378,17 @@ router.patch('/settings', requireAdmin, (req: Request, res: Response) => {
       // 4 values for UPDATE: value, type, description, updated_at
       stmt.run(key, strValue, type, '', now, strValue, type, '', now);
     }
-    
+
     res.json({ success: true, message: 'Settings updated successfully' });
+
+    // Log the settings update
+    logSystemEvent(
+      'info', 'settings', 'Cập nhật cài đặt hệ thống',
+      { keys: Object.keys(updates), sensitive: sensitiveUpdates.length > 0 },
+      (req as any).user?.id,
+      req.ip,
+      req.headers['user-agent']
+    );
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -1772,6 +1868,15 @@ router.post('/users', requireAdmin, (req: Request, res: Response) => {
           : 'Tạo tài khoản thành công.',
       },
     });
+
+    // Log the creation
+    logSystemEvent(
+      'success', 'users', 'Tạo tài khoản người dùng mới',
+      { id, email: normalizedEmail, name: name.trim(), role, plan },
+      (req as any).user?.id,
+      req.ip,
+      req.headers['user-agent']
+    );
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
   }

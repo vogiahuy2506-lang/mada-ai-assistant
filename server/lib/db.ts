@@ -516,12 +516,12 @@ function seedSuggestedQuestions() {
   console.log(`🌱 Seeded ${count} suggested questions from SAMPLE_QUESTIONS`);
 }
 
-// Try to seed, but don't fail if the import fails
-try {
-  seedSuggestedQuestions();
-} catch (e) {
-  console.log('📋 Seed suggested_questions skipped (SAMPLE_QUESTIONS import failed, will use empty table)');
-}
+// Seed disabled - only user-created questions allowed
+// try {
+//   seedSuggestedQuestions();
+// } catch (e) {
+//   console.log('📋 Seed suggested_questions skipped (SAMPLE_QUESTIONS import failed, will use empty table)');
+// }
 
 // ============== ADMIN PROMPTS SCHEMA ==============
 

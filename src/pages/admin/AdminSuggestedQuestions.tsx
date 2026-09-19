@@ -803,19 +803,53 @@ export default function AdminSuggestedQuestions() {
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-600">{q.sort_order}</td>
                       <td className="px-4 py-3">
-                        <button
-                          onClick={() => handleToggleActive(q)}
-                          disabled={!isSuperAdmin}
-                          className={clsx(
-                            'px-2 py-1 rounded text-xs font-bold border transition-all',
+                        {isSuperAdmin ? (
+                          <button
+                            onClick={() => handleToggleActive(q)}
+                            className={clsx(
+                              'group relative inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border-2 transition-all duration-200',
+                              q.is_active === 1
+                                ? 'bg-gradient-to-r from-green-50 to-emerald-50 text-emerald-700 border-emerald-200 hover:from-green-100 hover:to-emerald-100 hover:border-emerald-300 hover:shadow-[0_0_0_2px_rgba(16,185,129,0.15)] active:scale-95'
+                                : 'bg-gradient-to-r from-gray-50 to-slate-50 text-gray-500 border-gray-200 hover:from-gray-100 hover:to-slate-100 hover:border-gray-300 hover:shadow-[0_0_0_2px_rgba(107,114,128,0.15)] active:scale-95',
+                            )}
+                          >
+                            {/* Animated dot indicator */}
+                            <span className={clsx(
+                              'relative flex h-2 w-2',
+                            )}>
+                              <span className={clsx(
+                                'animate-ping absolute inline-flex h-full w-full rounded-full opacity-75',
+                                q.is_active === 1 ? 'bg-emerald-400' : 'bg-gray-400'
+                              )} />
+                              <span className={clsx(
+                                'relative inline-flex rounded-full h-2 w-2',
+                                q.is_active === 1 ? 'bg-emerald-500' : 'bg-gray-400'
+                              )} />
+                            </span>
+                            {q.is_active === 1 ? t('adminSuggested.activeStatus') : t('adminSuggested.disabledStatus')}
+                          </button>
+                        ) : (
+                          <span className={clsx(
+                            'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border-2',
                             q.is_active === 1
-                              ? 'bg-green-100 text-green-700 border-green-300 hover:bg-green-200'
-                              : 'bg-gray-100 text-gray-500 border-gray-300 hover:bg-gray-200',
-                            !isSuperAdmin && 'opacity-50 cursor-not-allowed'
-                          )}
-                        >
-                          {q.is_active === 1 ? `✓ ${t('adminSuggested.activeStatus')}` : `✕ ${t('adminSuggested.disabledStatus')}`}
-                        </button>
+                              ? 'bg-gradient-to-r from-green-50 to-emerald-50 text-emerald-700 border-emerald-200'
+                              : 'bg-gradient-to-r from-gray-50 to-slate-50 text-gray-500 border-gray-200',
+                          )}>
+                            <span className={clsx(
+                              'relative flex h-2 w-2',
+                            )}>
+                              <span className={clsx(
+                                'absolute inline-flex h-full w-full rounded-full',
+                                q.is_active === 1 ? 'bg-emerald-400' : 'bg-gray-400'
+                              )} />
+                              <span className={clsx(
+                                'relative inline-flex rounded-full h-2 w-2',
+                                q.is_active === 1 ? 'bg-emerald-500' : 'bg-gray-400'
+                              )} />
+                            </span>
+                            {q.is_active === 1 ? t('adminSuggested.activeStatus') : t('adminSuggested.disabledStatus')}
+                          </span>
+                        )}
                       </td>
                       {isSuperAdmin && (
                         <td className="px-4 py-3">
@@ -978,16 +1012,37 @@ export default function AdminSuggestedQuestions() {
               </div>
 
               {/* Active Toggle */}
-              <div className="flex items-center gap-2 p-3 rounded-lg bg-gray-50 border border-gray-200">
-                <input
-                  type="checkbox"
-                  id="is_active"
-                  checked={formData.is_active}
-                  onChange={(e) => setFormData(prev => ({ ...prev, is_active: e.target.checked }))}
-                  className="w-4 h-4 accent-primary"
-                />
-                <label htmlFor="is_active" className="text-sm font-medium text-gray-700 cursor-pointer">
-                  {t('adminSuggested.questionActive')}
+              <div className="flex items-center justify-between p-4 rounded-xl bg-gradient-to-r from-gray-50 to-slate-50 border-2 border-gray-200">
+                <div className="flex items-center gap-3">
+                  <div className={clsx(
+                    'w-10 h-10 rounded-xl flex items-center justify-center border-2',
+                    formData.is_active
+                      ? 'bg-gradient-to-br from-emerald-400 to-green-500 border-emerald-300 shadow-lg shadow-emerald-200'
+                      : 'bg-gradient-to-br from-gray-200 to-slate-300 border-gray-300'
+                  )}>
+                    <span className={clsx(
+                      'material-symbols-outlined text-lg',
+                      formData.is_active ? 'text-white' : 'text-gray-500'
+                    )}>
+                      {formData.is_active ? 'check_circle' : 'cancel'}
+                    </span>
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-gray-800">{t('adminSuggested.questionActive')}</p>
+                    <p className="text-xs text-gray-500">
+                      {formData.is_active ? t('adminSuggested.activeDescription') : t('adminSuggested.inactiveDescription')}
+                    </p>
+                  </div>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    id="is_active"
+                    checked={formData.is_active}
+                    onChange={(e) => setFormData(prev => ({ ...prev, is_active: e.target.checked }))}
+                    className="sr-only peer"
+                  />
+                  <div className="w-14 h-7 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-emerald-100 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-gradient-to-r peer-checked:from-emerald-400 peer-checked:to-green-500 shadow-inner"></div>
                 </label>
               </div>
             </form>
@@ -1131,14 +1186,17 @@ export default function AdminSuggestedQuestions() {
                       />
                     </div>
 
-                    {/* Active */}
+                    {/* Active Toggle */}
                     <div className="col-span-1 flex items-center justify-center">
-                      <input
-                        type="checkbox"
-                        checked={q.is_active}
-                        onChange={(e) => updateBulkRow(index, 'is_active', e.target.checked)}
-                        className="w-4 h-4 accent-primary"
-                      />
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={q.is_active}
+                          onChange={(e) => updateBulkRow(index, 'is_active', e.target.checked)}
+                          className="sr-only peer"
+                        />
+                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-emerald-100 rounded-full peer peer-checked:after:translate-x-5 peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[3px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-gradient-to-r peer-checked:from-emerald-400 peer-checked:to-green-500 shadow-sm"></div>
+                      </label>
                     </div>
                   </div>
                 ))}

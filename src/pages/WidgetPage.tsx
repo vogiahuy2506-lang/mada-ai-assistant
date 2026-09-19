@@ -7,12 +7,12 @@ import type { Language } from '@/types';
 import { useLanguageStore } from '@/stores';
 
 // Translation helper - just to subscribe to language changes
-const _useTranslation = () => {
+const useWidgetTranslation = () => {
   useLanguageStore((s) => s.language);
 };
 
 export function WidgetPage() {
-  _useTranslation(); // Subscribe to language changes for reactivity
+  useWidgetTranslation(); // Subscribe to language changes for reactivity
   const [searchParams] = useSearchParams();
   
   // Get configuration from URL params or defaults

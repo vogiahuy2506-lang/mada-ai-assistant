@@ -1701,7 +1701,7 @@ export const translations = {
     'admin.settings.templates.sectionDesc': 'Quản lý và áp dụng các template prompt có sẵn theo ngành.',
     'admin.settings.templates.bannerDesc': 'Template có sẵn theo ngành',
     'admin.settings.promptTemplates': 'Prompt Templates',
-    'admin.settings.languages': ['Tiếng Việt', 'English', 'Français', 'العربية'],
+    'admin.settings.languages': 'Tiếng Việt, English, Français, العربية',
     'admin.settings.superAdmin': 'Super Admin',
     'admin.settings.admin': 'Admin',
     'admin.settings.refresh': 'Refresh',
@@ -2118,14 +2118,6 @@ export const translations = {
     'admin.settings.active': 'ACTIVE',
     'admin.settings.beta': 'BETA',
 
-    // Admin Scraper Table
-    'admin.scraper.table.url': 'URL',
-    'admin.scraper.table.type': 'Type',
-    'admin.scraper.table.status': 'Status',
-    'admin.scraper.table.frequency': 'Frequency',
-    'admin.scraper.table.lastRun': 'Last Run',
-    'admin.scraper.table.actions': 'Actions',
-
     // Widget Customization
     'admin.widget.title': 'Widget Customization',
     'admin.widget.subtitle': 'Customize chat widget appearance and behavior',
@@ -2289,49 +2281,6 @@ export const translations = {
     'admin.products.synced': 'Synced',
     'admin.products.notSynced': 'Not Synced',
     'admin.products.lastSync': 'Last Sync',
-
-    // ============== ADMIN: LAYOUT ==============
-    'admin.layout.controlCenter': 'Control Center',
-    'admin.layout.controlCenterSub': 'Manage and monitor MADA AI system',
-    'admin.layout.logout': 'Logout',
-    'admin.layout.admin': 'Admin',
-    'admin.layout.super': 'SUPER',
-    'admin.layout.plan': 'Plan',
-    'admin.layout.planFree': 'Free',
-    'admin.layout.planPro': 'Pro',
-    'admin.layout.planEnterprise': 'Enterprise',
-    'admin.layout.superAdminOnly': 'Super Admin Only',
-    'admin.layout.switchLanguage': 'Switch Language',
-    'admin.layout.langVi': 'Tiếng Việt',
-    'admin.layout.langEn': 'English',
-    'admin.layout.langAr': 'العربية',
-    'admin.layout.langFr': 'Français',
-    'admin.layout.navOverview': 'Overview',
-    'admin.layout.navAiChatbox': 'AI Chatbox',
-    'admin.layout.navUsers': 'Users',
-    'admin.layout.navProducts': 'Products',
-    'admin.layout.navScraper': 'Scraper & KB',
-    'admin.layout.navActivityLogs': 'Activity Log',
-    'admin.layout.navAnalytics': 'Analytics',
-    'admin.layout.navAgents': 'Agents',
-    'admin.layout.navSuggestedQuestions': 'Suggested Questions',
-    'admin.layout.navSystemPrompts': 'System Prompts',
-    'admin.layout.navConsultations': 'Consultations',
-    'admin.layout.navFileUpload': 'Upload File',
-    'admin.layout.navSettings': 'Settings',
-    'admin.layout.navPermissions': 'Permissions',
-    'admin.layout.dashboard': 'Dashboard',
-    'admin.layout.users': 'Users',
-    'admin.layout.products': 'Products',
-    'admin.layout.agents': 'AI Agents',
-    'admin.layout.prompts': 'System Prompts',
-    'admin.layout.consultations': 'Consultations',
-    'admin.layout.scraper': 'Scraper & KB',
-    'admin.layout.settings': 'Settings',
-    'admin.layout.audit': 'Activity Log',
-    'admin.layout.logs': 'System Logs',
-    'admin.layout.overview': 'Overview',
-    'admin.layout.welcome': 'Welcome',
   },
 
 
@@ -4005,7 +3954,7 @@ export const translations = {
     'admin.settings.templates.sectionDesc': 'إدارة وتطبيق قوالب الطلبات الجاهزة حسب الصناعة.',
     'admin.settings.templates.bannerDesc': 'قوالب جاهزة حسب الصناعة',
     'admin.settings.promptTemplates': 'قوالب الطلبات',
-    'admin.settings.languages': ['Tiếng Việt', 'English', 'Français', 'العربية'],
+    'admin.settings.languages': 'Tiếng Việt, English, Français, العربية',
     'admin.settings.superAdmin': 'المدير الأعلى',
     'admin.settings.admin': 'مدير',
     'admin.settings.refresh': 'تحديث',
@@ -5683,7 +5632,7 @@ export const translations = {
     'admin.settings.templates.sectionDesc': 'Gérez et appliquez des modèles de prompts prédéfinis par secteur.',
     'admin.settings.templates.bannerDesc': 'Modèles prédéfinis par secteur',
     'admin.settings.promptTemplates': 'Modèles de Prompts',
-    'admin.settings.languages': ['Tiếng Việt', 'English', 'Français', 'العربية'],
+    'admin.settings.languages': 'Tiếng Việt, English, Français, العربية',
     'admin.settings.superAdmin': 'Super Admin',
     'admin.settings.admin': 'Admin',
     'admin.settings.refresh': 'Actualiser',
@@ -5697,14 +5646,14 @@ export type TranslationKey = keyof typeof translations.en;
 
 // Simple translation function with interpolation support
 export function t(key: TranslationKey, languageOrParams?: Language | Record<string, string | number>, maybeLanguage?: Language): string {
-  let language: Language;
+  let language: Language = 'vi';
   let params: Record<string, string | number> | undefined;
   
   if (typeof languageOrParams === 'object' && languageOrParams !== null) {
     params = languageOrParams;
     language = maybeLanguage || 'vi';
-  } else {
-    language = languageOrParams || 'vi';
+  } else if (typeof languageOrParams === 'string') {
+    language = languageOrParams;
   }
   
   const lang = translations[language] as Record<string, string>;

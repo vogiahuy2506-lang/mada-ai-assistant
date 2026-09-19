@@ -274,6 +274,8 @@ interface RAGConfig {
   botId?: string;
   /** ⭐ MỚI: Filter RAG theo MADA category slug (e.g. 'sensory-hearing') */
   madaCategory?: string;
+  /** ⭐ MỚI: Filter RAG theo custom agent ID (for custom agents like 'kkkk') */
+  agentId?: string;
   /** ⭐ MỚI: Nếu true → ưu tiên KB theo filter, nếu thiếu thì fallback toàn bộ KB */
   priority?: boolean;
 }
@@ -343,7 +345,7 @@ class RAGEngine {
     conversationHistory: Array<{ role: string; content: string }> = [],
     config: RAGConfig = {}
   ): Promise<RAGResponse> {
-    const { topK = 10, systemInstruction, botId, madaCategory, priority = false } = config;
+    const { topK = 10, systemInstruction, botId, madaCategory, agentId, priority = false } = config;
 
     try {
       // Initialize if not already
@@ -352,7 +354,7 @@ class RAGEngine {
       }
 
       // ⚡ PERFORMANCE OPTIMIZATION: Reduce docs retrieved (was topK * 4, now topK * 2)
-      let relevantDocs = await this.retrieveDocuments(userQuery, topK * 2, { botId, madaCategory, priority });
+      let relevantDocs = await this.retrieveDocuments(userQuery, topK * 2, { botId, madaCategory, agentId, priority });
 
       // Apply re-ranking only if top score is low (relevance uncertain)
       // Re-ranking costs ~2s extra per query. For seed/migration KB, vector search
@@ -819,22 +821,27 @@ ${tail.answerPrompt}`;
   private async retrieveDocuments(
     userQuery: string,
     topK: number,
-    options: { botId?: string; madaCategory?: string; priority?: boolean }
+    options: { botId?: string; madaCategory?: string; agentId?: string; priority?: boolean }
   ): Promise<any[]> {
-    const { botId, madaCategory, priority = false } = options;
+    const { botId, madaCategory, agentId, priority = false } = options;
+    // ⭐ Build filter: agentId (custom agents) > botId/madaCategory (MADA bots)
     const filter = (botId || madaCategory) ? { botId, madaCategory } : undefined;
+    const agentFilter = agentId ? { agentId } : undefined;
 
-    // Pass 1: search theo filter (nếu có) - Dùng hybrid search để kết hợp vector + keyword
+    // Pass 1: search theo filter - Dùng hybrid search để kết hợp vector + keyword
+    // ⭐ Ưu tiên agentFilter (custom agents) > filter (MADA bots) > no filter
     let primary: any[] = [];
-    if (filter) {
+    const searchFilter = agentFilter || filter;
+    
+    if (searchFilter) {
       try {
         // Hybrid search: kết hợp vector similarity + BM25 keyword matching
-        primary = await vectorStore.hybridSearch(userQuery, topK, filter, 0.7, 0.3);
-        console.log(`🔍 [RAG] Hybrid search (filter) (botId=${botId}, madaCategory=${madaCategory}): ${primary.length} docs`);
+        primary = await vectorStore.hybridSearch(userQuery, topK, searchFilter, 0.7, 0.3);
+        console.log(`🔍 [RAG] Hybrid search (filter) (agentId=${agentId}, botId=${botId}, madaCategory=${madaCategory}): ${primary.length} docs`);
       } catch (err) {
         console.warn('⚠️ [RAG] Hybrid filter search failed, falling back to vector:', err);
         try {
-          primary = await vectorStore.search(userQuery, { topK, filter });
+          primary = await vectorStore.search(userQuery, { topK, filter: searchFilter });
         } catch (err2) {
           console.warn('⚠️ [RAG] Vector filter search also failed:', err2);
         }
@@ -842,7 +849,7 @@ ${tail.answerPrompt}`;
     }
 
     // Nếu priority mode VÀ chưa đủ → fallback hybrid search toàn bộ KB
-    if (priority && filter && primary.length < topK) {
+    if (priority && searchFilter && primary.length < topK) {
       const need = topK - primary.length;
       console.log(`🔁 [RAG] Priority fallback: cần thêm ${need} docs từ toàn bộ KB`);
       try {
@@ -880,8 +887,8 @@ ${tail.answerPrompt}`;
       }
     }
 
-    // Nếu không có filter hoặc không priority → trả về primary hoặc search toàn bộ
-    if (!filter) {
+    // Nếu không có searchFilter hoặc không priority → trả về primary hoặc search toàn bộ
+    if (!searchFilter) {
       try {
         // Hybrid search: kết hợp vector + BM25
         const noFilterResults = await vectorStore.hybridSearch(userQuery, topK, undefined, 0.7, 0.3);
@@ -900,7 +907,7 @@ ${tail.answerPrompt}`;
 
     // Nếu filter search rỗng mà priority=false → fallback SQLite
     if (primary.length === 0) {
-      return await this.sqliteFallback(userQuery, topK, { botId, madaCategory });
+      return await this.sqliteFallback(userQuery, topK, { botId, madaCategory, agentId });
     }
 
     return primary;
@@ -914,7 +921,7 @@ ${tail.answerPrompt}`;
   private async sqliteFallback(
     userQuery: string,
     topK: number,
-    filter?: { botId?: string; madaCategory?: string }
+    filter?: { botId?: string; madaCategory?: string; agentId?: string }
   ): Promise<any[]> {
     try {
       const query = userQuery.trim();
@@ -933,7 +940,7 @@ ${tail.answerPrompt}`;
       const likeConditions = keywords.map(() => '(LOWER(title) LIKE ? OR LOWER(content) LIKE ?)').join(' OR ');
       const likeParams = keywords.flatMap(k => [`%${k}%`, `%${k}%`]);
 
-      // Map botId/category từ filter (nếu có)
+      // Map botId/category/agentId từ filter (nếu có)
       let categoryFilter = '';
       const catFilterParams: string[] = [];
       if (filter?.madaCategory) {
@@ -945,6 +952,14 @@ ${tail.answerPrompt}`;
         }
       }
 
+      // ⭐ Filter by agentId (stored in metadata as JSON)
+      let agentFilter = '';
+      const agentFilterParams: string[] = [];
+      if (filter?.agentId) {
+        agentFilter = ` AND (LOWER(metadata) LIKE ? OR LOWER(metadata) LIKE ?)`;
+        agentFilterParams.push(`%"agentId":"${filter.agentId}"%`, `%agentId%${filter.agentId}%`);
+      }
+
       // ⭐ Fix: Include ALL source types (web, manual, pdf, text, etc.) — imported products have source_type='manual'
       const sql = `
         SELECT id, title, content, source, category, metadata,
@@ -953,13 +968,12 @@ ${tail.answerPrompt}`;
         WHERE source_type IN ('web', 'manual', 'pdf', 'text', 'image', 'docx', 'xlsx', 'csv')
           AND (${likeConditions})
           ${categoryFilter}
+          ${agentFilter}
         ORDER BY score DESC, length(content) DESC
         LIMIT ?
       `;
 
-      // Params: score weight params + like params + category params + limit
-      const scoreParams = keywords.flatMap(() => ['%' + keywords.join('%') + '%', '%' + keywords.join('%') + '%']);
-      // Loại bỏ score params vì SQL trên dùng placeholder lặp, đơn giản hóa:
+      // Params: score weight params + like params + category params + agent filter params + limit
       const simpleSql = `
         SELECT id, title, content, source, category, metadata,
           (${keywords.map(() => '(CASE WHEN LOWER(title) LIKE ? THEN 2 ELSE 0 END + CASE WHEN LOWER(content) LIKE ? THEN 1 ELSE 0 END)').join(' + ')}) as match_score
@@ -967,6 +981,7 @@ ${tail.answerPrompt}`;
         WHERE source_type IN ('web', 'manual', 'pdf', 'text', 'image', 'docx', 'xlsx', 'csv')
           AND (${likeConditions})
           ${categoryFilter}
+          ${agentFilter}
         ORDER BY match_score DESC
         LIMIT ?
       `;
@@ -976,6 +991,7 @@ ${tail.answerPrompt}`;
       });
       allParams.push(...likeParams);
       allParams.push(...catFilterParams);
+      allParams.push(...agentFilterParams);
       allParams.push(topK);
 
       const rows = db.prepare(simpleSql).all(...allParams) as any[];

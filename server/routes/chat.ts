@@ -312,6 +312,10 @@ router.post('/', async (req, res) => {
       ragConfig.botId = madaMapping.botId;
       ragConfig.madaCategory = madaMapping.madaCategory;
       ragConfig.priority = true;
+    } else if (agentId) {
+      // ⭐ Custom agent: filter by agentId to get agent's own KB docs
+      ragConfig.agentId = agentId;
+      ragConfig.priority = true;
     }
     
     // Query RAG
@@ -585,6 +589,10 @@ router.post('/stream', async (req: any, res: any) => {
     if (madaMapping) {
       ragConfig.botId = madaMapping.botId;
       ragConfig.madaCategory = madaMapping.madaCategory;
+      ragConfig.priority = true;
+    } else if (agentId) {
+      // ⭐ Custom agent: filter by agentId to get agent's own KB docs
+      ragConfig.agentId = agentId;
       ragConfig.priority = true;
     }
     

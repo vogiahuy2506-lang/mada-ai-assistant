@@ -97,6 +97,8 @@ export interface Document {
     madaCategory?: string;
     /** ⭐ Bot ID (e.g. 'bot-hearing') để filter RAG theo agent */
     botId?: string;
+    /** ⭐ Custom agent ID (e.g. 'kkkk') để filter RAG theo custom agent KB */
+    agentId?: string;
     tags?: string[];
     // MADA-specific
     thumbnailUrl?: string;
@@ -113,6 +115,8 @@ export interface SearchFilter {
   botId?: string;
   /** Filter theo madaCategory slug, e.g. 'sensory-hearing' */
   madaCategory?: string;
+  /** Filter theo custom agent ID (e.g. 'kkkk') */
+  agentId?: string;
 }
 
 export interface SearchOptions {
@@ -305,6 +309,7 @@ class VectorStore {
             category: doc.metadata.category || '',
             madaCategory: doc.metadata.madaCategory || '',
             botId: doc.metadata.botId || '',
+            agentId: doc.metadata.agentId || '',
           },
         }));
         await this.pineconeIndex.upsert({ records: vectors });
@@ -383,6 +388,7 @@ class VectorStore {
     const conditions: any[] = [];
     if (filter.botId) conditions.push({ botId: { '$eq': filter.botId } });
     if (filter.madaCategory) conditions.push({ madaCategory: { '$eq': filter.madaCategory } });
+    if (filter.agentId) conditions.push({ agentId: { '$eq': filter.agentId } });
     if (conditions.length === 0) return undefined;
     if (conditions.length === 1) return conditions[0];
     return { '$and': conditions };
@@ -394,6 +400,7 @@ class VectorStore {
     this.inMemoryStore.forEach(doc => {
       if (filter?.botId && doc.metadata?.botId !== filter.botId) return;
       if (filter?.madaCategory && doc.metadata?.madaCategory !== filter.madaCategory) return;
+      if (filter?.agentId && doc.metadata?.agentId !== filter.agentId) return;
 
       const similarity = cosineSimilarity(queryEmbedding, doc.embedding);
       results.push({ doc, score: similarity });
@@ -572,6 +579,7 @@ class VectorStore {
     this.inMemoryStore.forEach(doc => {
       if (filter?.botId && doc.metadata?.botId !== filter.botId) return;
       if (filter?.madaCategory && doc.metadata?.madaCategory !== filter.madaCategory) return;
+      if (filter?.agentId && doc.metadata?.agentId !== filter.agentId) return;
       
       const content = (doc.content || '').toLowerCase();
       const terms = content.split(/\s+/).filter(t => t.length > 2);
@@ -603,6 +611,7 @@ class VectorStore {
     this.inMemoryStore.forEach(doc => {
       if (filter?.botId && doc.metadata?.botId !== filter.botId) return;
       if (filter?.madaCategory && doc.metadata?.madaCategory !== filter.madaCategory) return;
+      if (filter?.agentId && doc.metadata?.agentId !== filter.agentId) return;
       
       const content = (doc.content || '').toLowerCase();
       const docLength = content.split(/\s+/).length;

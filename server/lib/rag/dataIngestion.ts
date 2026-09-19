@@ -227,6 +227,8 @@ class DataIngestionService {
           // ⭐ MỚI: Gắn MADA category + botId cho RAG filter theo domain
           madaCategory: source.metadata?.madaCategory,
           botId: source.metadata?.botId,
+          // ⭐ MỚI: Gắn agentId cho custom agent filter
+          agentId: source.metadata?.agentId,
           // ✅ Copy MADA-specific metadata so RAG responses include image_url
           thumbnailUrl: source.metadata?.thumbnailUrl,
           galleryImages: source.metadata?.galleryImages,

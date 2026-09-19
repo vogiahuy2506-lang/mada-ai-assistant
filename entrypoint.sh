@@ -44,7 +44,36 @@ if [ -d /app/data ]; then
   fi
 fi
 
-# ---- Step 4: Cleanup seed data from suggested_questions ----
+# ---- Step 4b: Auto-create Super Admin ----
+SUPER_ADMIN_EMAIL="${SUPER_ADMIN_EMAIL:-superadmin@mada.vn}"
+SUPER_ADMIN_PASSWORD="${SUPER_ADMIN_PASSWORD:-SuperAdmin@123}"
+SUPER_ADMIN_NAME="${SUPER_ADMIN_NAME:-Super Administrator}"
+
+for DB_PATH in /app/data/mada.db /app/mada-ai-assistant/data/mada.db; do
+  if [ -f "$DB_PATH" ]; then
+    echo "🔐 Checking for Super Admin in $DB_PATH..."
+    EXISTING=$(sqlite3 "$DB_PATH" "SELECT id FROM users WHERE role='super_admin' LIMIT 1;" 2>/dev/null || echo "")
+    if [ -z "$EXISTING" ]; then
+      echo "📝 Creating Super Admin account..."
+      NOW=$(date -u +"%Y-%m-%dT%H:%M:%S.000Z")
+      ID="superadmin-$(date +%s)"
+      # Hash for "SuperAdmin@123" using bcrypt
+      HASH='$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/X4.VTTsMmJfEjT8H2'
+      sqlite3 "$DB_PATH" "
+      INSERT OR IGNORE INTO users (id, email, name, password_hash, role, plan, status, provider, quota_used, quota_limit, last_login_at, created_at, updated_at)
+      VALUES ('$ID', '$SUPER_ADMIN_EMAIL', '$SUPER_ADMIN_NAME', '\$2b\$12\$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/X4.VTTsMmJfEjT8H2', 'super_admin', 'enterprise', 'active', 'email', 0, -1, '$NOW', '$NOW', '$NOW');
+      "
+      echo "✅ Super Admin created!"
+      echo "   Email: $SUPER_ADMIN_EMAIL"
+      echo "   Password: $SUPER_ADMIN_PASSWORD"
+    else
+      echo "✅ Super Admin already exists (ID: $EXISTING)"
+    fi
+    break
+  fi
+done
+
+# ---- Step 5: Cleanup seed data from suggested_questions ----
 # Database can be at /app/data/mada.db (volume) or /app/mada-ai-assistant/data/mada.db
 for DB_PATH in /app/data/mada.db /app/mada-ai-assistant/data/mada.db; do
   if [ -f "$DB_PATH" ]; then

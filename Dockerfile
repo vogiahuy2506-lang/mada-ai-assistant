@@ -1,17 +1,23 @@
 # Stage 1: Build frontend + server bundle
 FROM node:22-alpine AS builder
 
-RUN apk add --no-cache python3 make g++ cairo-dev pango-dev jpeg-dev giflib-dev librsvg-dev
+RUN apk add --no-cache python3 make g++ cairo-dev pango-dev jpeg-dev giflib-dev librsvg-dev git
 
 WORKDIR /app
 
 COPY package*.json ./
 
-RUN npm ci
+# Skip native module compilation (better-sqlite3) - will be copied from builder
+RUN npm ci --ignore-scripts
 
 COPY . .
 
 RUN npm run build
+
+# Copy node_modules with pre-built binaries to a separate stage
+FROM node:22-alpine AS modules
+WORKDIR /app
+COPY --from=builder /app/node_modules ./node_modules
 
 # Stage 2: Production
 FROM node:22-alpine AS production
@@ -27,8 +33,8 @@ COPY package*.json ./
 COPY entrypoint.sh ./
 RUN chmod +x ./entrypoint.sh
 
-# Use prebuilt binaries (Alpine glibc/musl matches host); rebuild from source if needed
-RUN npm ci --only=production && npm rebuild && npm cache clean --force
+# Install production deps WITHOUT scripts, then copy pre-built native modules from builder
+RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
 
 # Copy pre-built dist from builder stage
 COPY --from=builder /app/dist ./dist

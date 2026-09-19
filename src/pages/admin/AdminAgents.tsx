@@ -481,6 +481,7 @@ export function AdminAgents() {
   const [sqLoading, setSqLoading] = useState(false);
   const [sqShowForm, setSqShowForm] = useState(false);
   const [sqEditingId, setSqEditingId] = useState<string | null>(null);
+  const [sqSuccess, setSqSuccess] = useState<string | null>(null);
   const [sqFormData, setSqFormData] = useState({
     category: 'general' as ATCategory,
     view_mode: 'end_user' as ViewMode,
@@ -530,6 +531,10 @@ export function AdminAgents() {
       alert('Vui lòng nhập câu hỏi');
       return;
     }
+    if (sqFormData.question.length > 200) {
+      alert('Câu hỏi không được vượt quá 200 ký tự');
+      return;
+    }
     if (!editingId) {
       alert('Vui lòng lưu Agent trước khi thêm câu hỏi');
       return;
@@ -538,18 +543,28 @@ export function AdminAgents() {
     try {
       if (sqEditingId) {
         await adminApi.updateSuggestedQuestion(sqEditingId, {
-          ...sqFormData,
-          is_active: sqFormData.is_active ? 1 : 0,
+          category: sqFormData.category,
+          view_mode: sqFormData.view_mode,
+          language: sqFormData.language,
+          question: sqFormData.question,
+          sort_order: sqFormData.sort_order,
+          is_active: sqFormData.is_active,
         });
       } else {
         await adminApi.createSuggestedQuestion({
-          ...sqFormData,
+          category: sqFormData.category,
+          view_mode: sqFormData.view_mode,
+          language: sqFormData.language,
+          question: sqFormData.question,
+          sort_order: sqFormData.sort_order,
           agent_id: editingId,
         });
       }
       setSqShowForm(false);
       resetSqForm();
       loadSqQuestions(editingId);
+      setSqSuccess(sqEditingId ? 'Đã cập nhật câu hỏi!' : 'Đã thêm câu hỏi!');
+      setTimeout(() => setSqSuccess(null), 3000);
     } catch (err: any) {
       alert(err.message);
     }
@@ -573,6 +588,8 @@ export function AdminAgents() {
     try {
       await adminApi.deleteSuggestedQuestion(id);
       if (editingId) loadSqQuestions(editingId);
+      setSqSuccess('Đã xóa câu hỏi!');
+      setTimeout(() => setSqSuccess(null), 3000);
     } catch (err: any) {
       alert(err.message);
     }
@@ -580,8 +597,10 @@ export function AdminAgents() {
 
   const handleSqToggle = async (q: SuggestedQuestion) => {
     try {
-      await adminApi.updateSuggestedQuestion(q.id, { is_active: q.is_active !== 1 ? 1 : 0 });
+      await adminApi.updateSuggestedQuestion(q.id, { is_active: q.is_active !== 1 });
       if (editingId) loadSqQuestions(editingId);
+      setSqSuccess(q.is_active === 1 ? 'Đã tắt câu hỏi' : 'Đã bật câu hỏi');
+      setTimeout(() => setSqSuccess(null), 3000);
     } catch (err: any) {
       alert(err.message);
     }
@@ -1613,160 +1632,323 @@ export function AdminAgents() {
                 </div>
               </div>
 
-              {/* Suggested Questions Section - Inline */}
-              <div className="p-3 rounded-xl bg-gradient-to-br from-indigo-50 to-violet-50/40 border-2 border-indigo-200">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <span className="material-symbols-outlined text-indigo-600 text-base">quiz</span>
-                    <span className="text-[10px] font-bold text-indigo-700 uppercase tracking-wider">
-                      {tAgent('agent.form.suggestedQuestions', language)}
-                    </span>
-                    <span className="text-[10px] text-indigo-500">({sqQuestions.length})</span>
+              {/* ============== SUGGESTED QUESTIONS - ENHANCED UI ============== */}
+              <div className="rounded-2xl bg-gradient-to-br from-indigo-50/90 via-blue-50/60 to-violet-50/50 border-2 border-blue-200/80 overflow-hidden shadow-sm">
+                {/* Section Header */}
+                <div className="px-4 pt-3.5 pb-3 border-b border-blue-100/80 bg-white/60 backdrop-blur-sm">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      {/* Luminous Icon */}
+                      <div className="relative flex items-center justify-center">
+                        <div className="absolute -inset-1 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-xl blur-sm opacity-30"></div>
+                        <div className="relative w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-sm">
+                          <span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>forum</span>
+                        </div>
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+                            {tAgent('agent.form.suggestedQuestions', language)}
+                          </h3>
+                          <span className="inline-flex items-center justify-center px-2 py-0.5 text-[10px] font-bold rounded-full bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-700 border border-blue-200/70">
+                            {sqQuestions.length}
+                          </span>
+                          {sqSuccess && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200 animate-pulse">
+                              <span className="material-symbols-outlined text-[10px]">check</span>
+                              {sqSuccess}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[10px] text-slate-400 mt-0.5">
+                          {editingId ? 'Câu hỏi riêng cho agent này' : 'Lưu Agent trước để thêm câu hỏi'}
+                        </p>
+                      </div>
+                    </div>
+                    {/* Action buttons row */}
+                    <div className="flex items-center gap-1.5">
+                      {/* AI Suggest Button */}
+                      {!isReadOnly && editingId && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const samples = [
+                              'Làm sao để kiểm tra tình trạng đơn hàng?',
+                              'Chính sách bảo hành và đổi trả như thế nào?',
+                              'Có những hình thức thanh toán nào được hỗ trợ?',
+                              'Thời gian làm việc và hỗ trợ viên trực tuyến?',
+                              'MADA AI có thể hướng dẫn tôi cài đặt ứng dụng không?',
+                            ];
+                            const pick = samples[Math.floor(Math.random() * samples.length)];
+                            setSqFormData(prev => ({ ...prev, question: pick }));
+                            setSqShowForm(true);
+                          }}
+                          className="relative group overflow-hidden flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-semibold rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-600 border border-amber-200/70 shadow-xs transition-all"
+                          title="Gợi ý câu hỏi với AI"
+                        >
+                          <span className="material-symbols-outlined text-[11px] text-amber-500">auto_awesome</span>
+                          <span>AI gợi ý</span>
+                        </button>
+                      )}
+                      {/* Quick Add Button */}
+                      {!isReadOnly && editingId && (
+                        <button
+                          type="button"
+                          onClick={() => { resetSqForm(); setSqShowForm(true); }}
+                          className="flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-bold rounded-lg bg-blue-500 hover:bg-blue-600 text-white shadow-sm border border-blue-600 transition-all active:scale-95"
+                        >
+                          <span className="material-symbols-outlined text-[11px]">add</span>
+                          <span>Thêm</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
-                  {!isReadOnly && editingId && (
-                    <button
-                      type="button"
-                      onClick={() => { resetSqForm(); setSqShowForm(true); }}
-                      className="px-2 py-1 rounded-lg bg-indigo-500 text-white text-[10px] font-bold border border-indigo-600 hover:bg-indigo-600"
-                    >
-                      + Thêm
-                    </button>
-                  )}
                 </div>
 
-                {/* Add/Edit Form */}
-                {sqShowForm && (
-                  <div className="bg-white/80 rounded-lg p-3 mb-3 border border-indigo-200 space-y-2">
-                    <div className="grid grid-cols-3 gap-2">
-                      <select
-                        value={sqFormData.category}
-                        onChange={(e) => setSqFormData(prev => ({ ...prev, category: e.target.value as ATCategory }))}
-                        className="px-2 py-1.5 rounded-lg border border-indigo-200 text-[10px]"
-                      >
-                        {SQ_CATEGORIES.map(c => (
-                          <option key={c.value} value={c.value}>{c.icon} {c.label}</option>
+                {/* Body */}
+                <div className="p-3 space-y-3">
+                  {/* Quick chips - shown when form is hidden and no questions */}
+                  {!sqShowForm && sqQuestions.length === 0 && (
+                    <div className="p-3 rounded-xl bg-white/70 border border-dashed border-blue-200 text-center">
+                      <div className="w-10 h-10 rounded-xl bg-blue-100/80 mx-auto mb-2 flex items-center justify-center">
+                        <span className="material-symbols-outlined text-blue-400 text-xl">chat_bubble</span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 font-medium">
+                        Chưa có câu hỏi nào
+                      </p>
+                      <p className="text-[10px] text-slate-400 mt-1">
+                        Nhấn <b className="text-blue-600">"Thêm"</b> hoặc <b className="text-amber-600">"AI gợi ý"</b> để tạo câu hỏi đầu tiên
+                      </p>
+                      {/* Quick chips */}
+                      <div className="flex flex-wrap items-center justify-center gap-1.5 mt-3">
+                        {[
+                          'Kiểm tra đơn hàng?',
+                          'Chính sách đổi trả?',
+                          'Thời gian hỗ trợ?',
+                        ].map((txt) => (
+                          <button
+                            key={txt}
+                            type="button"
+                            onClick={() => {
+                              setSqFormData(prev => ({ ...prev, question: txt }));
+                              setSqShowForm(true);
+                            }}
+                            className="px-2.5 py-1 text-[10px] font-medium text-blue-600 bg-blue-50/80 hover:bg-blue-100 border border-blue-200/80 rounded-lg transition-all active:scale-95"
+                          >
+                            {txt}
+                          </button>
                         ))}
-                      </select>
-                      <select
-                        value={sqFormData.language}
-                        onChange={(e) => setSqFormData(prev => ({ ...prev, language: e.target.value as LanguageType }))}
-                        className="px-2 py-1.5 rounded-lg border border-indigo-200 text-[10px]"
-                      >
-                        {SQ_LANGUAGES.map(l => (
-                          <option key={l.value} value={l.value}>{l.flag} {l.label}</option>
-                        ))}
-                      </select>
-                      <input
-                        type="number"
-                        value={sqFormData.sort_order}
-                        onChange={(e) => setSqFormData(prev => ({ ...prev, sort_order: parseInt(e.target.value) || 0 }))}
-                        placeholder="Thứ tự"
-                        className="px-2 py-1.5 rounded-lg border border-indigo-200 text-[10px]"
-                      />
+                      </div>
                     </div>
-                    <textarea
-                      value={sqFormData.question}
-                      onChange={(e) => setSqFormData(prev => ({ ...prev, question: e.target.value }))}
-                      placeholder="Nhập câu hỏi gợi ý..."
-                      rows={2}
-                      className="w-full px-2 py-1.5 rounded-lg border border-indigo-200 text-[10px] resize-none"
-                    />
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        id="sq_active"
-                        checked={sqFormData.is_active}
-                        onChange={(e) => setSqFormData(prev => ({ ...prev, is_active: e.target.checked }))}
-                        className="w-3 h-3"
-                      />
-                      <label 
-                        htmlFor="sq_active" 
-                        className={clsx(
-                          'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-bold border-2 border-black cursor-pointer transition-all shadow-[2px_2px_0px_0px_#000]',
-                          sqFormData.is_active 
-                            ? 'bg-green-500 text-white translate-y-[-1px] hover:bg-green-600' 
-                            : 'bg-white text-gray-500 hover:bg-gray-50'
-                        )}
-                      >
-                        <span className="material-symbols-outlined text-xs" style={{ fontVariationSettings: "'FILL' 1" }}>
-                          {sqFormData.is_active ? 'check_circle' : 'radio_button_unchecked'}
-                        </span>
-                        {sqFormData.is_active ? 'Hoạt động' : 'Tắt'}
-                      </label>
-                    </div>
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => { setSqShowForm(false); resetSqForm(); }}
-                        className="px-3 py-1.5 rounded-lg bg-gray-200 text-gray-700 text-[10px] font-medium"
-                      >
-                        Hủy
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleSqSubmit}
-                        className="px-3 py-1.5 rounded-lg bg-indigo-500 text-white text-[10px] font-medium hover:bg-indigo-600"
-                      >
-                        {sqEditingId ? 'Cập nhật' : 'Thêm mới'}
-                      </button>
-                    </div>
-                  </div>
-                )}
+                  )}
 
-                {/* Questions List */}
-                {sqLoading ? (
-                  <p className="text-[10px] text-indigo-500 text-center py-2">Đang tải...</p>
-                ) : sqQuestions.length === 0 ? (
-                  <p className="text-[10px] text-indigo-400 text-center py-2">
-                    {editingId ? 'Chưa có câu hỏi gợi ý nào' : 'Lưu Agent trước để thêm câu hỏi'}
-                  </p>
-                ) : (
-                  <div className="space-y-1.5 max-h-40 overflow-y-auto">
-                    {sqQuestions.map((q) => (
-                      <div key={q.id} className="flex items-start gap-2 p-2 bg-white/60 rounded-lg border border-indigo-100">
-                        <span className="text-sm">{SQ_CATEGORIES.find(c => c.value === q.category)?.icon || '📦'}</span>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[11px] text-gray-800 line-clamp-2">{q.question}</p>
-                          <div className="flex items-center gap-1 mt-0.5">
-                            <span className="text-[9px] text-gray-400">{SQ_LANGUAGES.find(l => l.value === q.language)?.flag}</span>
-                            <span className="text-[9px] text-gray-400">•</span>
-                            <span className={clsx('text-[9px] px-1 rounded', q.is_active === 1 ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400')}>
-                              {q.is_active === 1 ? '✓' : '✕'}
-                            </span>
+                  {/* Add/Edit Form - Modern UI */}
+                  {sqShowForm && (
+                    <div className="rounded-xl bg-white/90 border border-blue-200/80 shadow-sm overflow-hidden">
+                      {/* Form top accent */}
+                      <div className="h-0.5 w-full bg-gradient-to-r from-cyan-400 via-blue-500 to-indigo-500"></div>
+                      <div className="p-3 space-y-3">
+                        {/* Controls Row */}
+                        <div className="grid grid-cols-3 gap-2">
+                          {/* Category */}
+                          <div>
+                            <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1 ml-1">Danh mục</label>
+                            <select
+                              value={sqFormData.category}
+                              onChange={(e) => setSqFormData(prev => ({ ...prev, category: e.target.value as ATCategory }))}
+                              className="w-full px-2 py-1.5 rounded-lg border border-slate-200 text-[10px] font-medium text-slate-700 bg-white hover:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400 transition-all cursor-pointer"
+                            >
+                              {SQ_CATEGORIES.map(c => (
+                                <option key={c.value} value={c.value}>{c.icon} {c.label}</option>
+                              ))}
+                            </select>
+                          </div>
+                          {/* Language */}
+                          <div>
+                            <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1 ml-1">Ngôn ngữ</label>
+                            <select
+                              value={sqFormData.language}
+                              onChange={(e) => setSqFormData(prev => ({ ...prev, language: e.target.value as LanguageType }))}
+                              className="w-full px-2 py-1.5 rounded-lg border border-slate-200 text-[10px] font-medium text-slate-700 bg-white hover:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400 transition-all cursor-pointer"
+                            >
+                              {SQ_LANGUAGES.map(l => (
+                                <option key={l.value} value={l.value}>{l.flag} {l.label}</option>
+                              ))}
+                            </select>
+                          </div>
+                          {/* Sort Order */}
+                          <div>
+                            <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1 ml-1">Thứ tự</label>
+                            <div className="relative flex items-center bg-white border border-slate-200 rounded-lg overflow-hidden hover:border-blue-400 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-400/40 transition-all">
+                              <button
+                                type="button"
+                                onClick={() => setSqFormData(prev => ({ ...prev, sort_order: Math.max(0, prev.sort_order - 1) }))}
+                                className="w-7 h-8 flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                              >
+                                <span className="material-symbols-outlined text-xs">remove</span>
+                              </button>
+                              <input
+                                type="number"
+                                value={sqFormData.sort_order}
+                                onChange={(e) => setSqFormData(prev => ({ ...prev, sort_order: parseInt(e.target.value) || 0 }))}
+                                className="w-full py-1.5 bg-transparent border-0 text-[10px] font-semibold text-slate-800 text-center focus:ring-0"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setSqFormData(prev => ({ ...prev, sort_order: prev.sort_order + 1 }))}
+                                className="w-7 h-8 flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                              >
+                                <span className="material-symbols-outlined text-xs">add</span>
+                              </button>
+                            </div>
                           </div>
                         </div>
-                        {!isReadOnly && (
-                          <div className="flex gap-0.5">
+
+                        {/* Question Input */}
+                        <div>
+                          <div className="flex items-center justify-between mb-1 ml-1">
+                            <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Nội dung câu hỏi</label>
+                            <span className={clsx('text-[9px] font-semibold', sqFormData.question.length >= 200 ? 'text-red-500' : sqFormData.question.length >= 180 ? 'text-amber-500' : 'text-slate-400')}>{sqFormData.question.length}/200</span>
+                          </div>
+                          <div className="relative">
+                            <textarea
+                              value={sqFormData.question}
+                              onChange={(e) => setSqFormData(prev => ({ ...prev, question: e.target.value.slice(0, 200) }))}
+                              placeholder="Nhập câu hỏi gợi ý (VD: Làm sao để kiểm tra tình trạng đơn hàng?)..."
+                              rows={2}
+                              className="w-full px-2.5 py-2 rounded-lg border border-slate-200 text-[11px] text-slate-800 placeholder-slate-400 bg-white hover:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400/40 focus:border-blue-400 transition-all resize-none leading-relaxed"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Status Toggle Row */}
+                        <div className="flex items-center justify-between">
+                          {/* Modern Toggle Switch */}
+                          <button
+                            type="button"
+                            onClick={() => setSqFormData(prev => ({ ...prev, is_active: !prev.is_active }))}
+                            className="flex items-center gap-2 cursor-pointer"
+                          >
+                            <div className={clsx(
+                              'relative w-9 h-5 rounded-full transition-colors duration-300',
+                              sqFormData.is_active ? 'bg-emerald-500' : 'bg-slate-300'
+                            )}>
+                              <span className={clsx(
+                                'absolute top-[2px] left-[2px] bg-white rounded-full h-4 w-4 shadow-sm transition-transform duration-300 flex items-center justify-center',
+                                sqFormData.is_active && 'translate-x-4'
+                              )}>
+                                <span className={clsx('w-1 h-1 rounded-full', sqFormData.is_active ? 'bg-emerald-500' : 'bg-slate-400')}></span>
+                              </span>
+                            </div>
+                            <span className={clsx(
+                              'text-[10px] font-semibold px-2.5 py-1 rounded-full border transition-all',
+                              sqFormData.is_active
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                : 'bg-slate-50 text-slate-500 border-slate-200'
+                            )}>
+                              {sqFormData.is_active ? '✓ Hoạt động' : '✕ Tạm tắt'}
+                            </span>
+                          </button>
+
+                          {/* Form Action Buttons */}
+                          <div className="flex gap-1.5">
                             <button
                               type="button"
-                              onClick={() => handleSqToggle(q)}
-                              className="w-5 h-5 rounded hover:bg-indigo-100 flex items-center justify-center text-[10px]"
-                              title={q.is_active === 1 ? 'Tắt' : 'Bật'}
+                              onClick={() => { setSqShowForm(false); resetSqForm(); }}
+                              className="px-3 py-1.5 rounded-lg bg-white text-slate-600 text-[10px] font-semibold border border-slate-200 hover:bg-slate-50 transition-all active:scale-95"
                             >
-                              {q.is_active === 1 ? '🔴' : '⚪'}
+                              Hủy
                             </button>
                             <button
                               type="button"
-                              onClick={() => handleSqEdit(q)}
-                              className="w-5 h-5 rounded hover:bg-indigo-100 flex items-center justify-center"
-                              title="Sửa"
+                              onClick={handleSqSubmit}
+                              disabled={!sqFormData.question.trim() || sqFormData.question.length > 200}
+                              className="px-4 py-1.5 rounded-lg bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-[10px] font-bold hover:from-blue-600 hover:to-indigo-600 shadow-sm border border-blue-600 transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:from-blue-500 disabled:hover:to-indigo-500"
                             >
-                              <span className="text-[9px]">✏️</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleSqDelete(q.id)}
-                              className="w-5 h-5 rounded hover:bg-red-100 flex items-center justify-center"
-                              title="Xóa"
-                            >
-                              <span className="text-[9px]">🗑️</span>
+                              {sqEditingId ? 'Cập nhật' : 'Thêm mới'}
                             </button>
                           </div>
-                        )}
+                        </div>
                       </div>
-                    ))}
-                  </div>
-                )}
+                    </div>
+                  )}
+
+                  {/* Questions List */}
+                  {sqLoading ? (
+                    <div className="flex items-center justify-center gap-2 py-4">
+                      <div className="w-4 h-4 rounded-full border-2 border-blue-500 border-t-transparent animate-spin"></div>
+                      <span className="text-[11px] text-blue-500 font-medium">Đang tải...</span>
+                    </div>
+                  ) : sqQuestions.length > 0 && !sqShowForm && (
+                    <div className="space-y-1.5 max-h-52 overflow-y-auto pr-1">
+                      {sqQuestions
+                        .slice()
+                        .sort((a, b) => a.sort_order - b.sort_order)
+                        .map((q) => (
+                          <div key={q.id} className={clsx(
+                            'group flex items-start gap-2.5 p-2.5 rounded-xl border transition-all',
+                            q.is_active === 1
+                              ? 'bg-white/80 border-slate-200 hover:border-blue-300 hover:shadow-sm'
+                              : 'bg-slate-50/70 border-slate-100 opacity-60'
+                          )}>
+                            {/* Category Icon */}
+                            <div className={clsx(
+                              'w-8 h-8 rounded-lg flex items-center justify-center text-base shrink-0 mt-0.5',
+                              q.is_active === 1 ? 'bg-blue-50' : 'bg-slate-100'
+                            )}>
+                              {SQ_CATEGORIES.find(c => c.value === q.category)?.icon || '📦'}
+                            </div>
+
+                            {/* Content */}
+                            <div className="flex-1 min-w-0">
+                              <p className="text-[11px] text-slate-800 font-medium line-clamp-2 leading-relaxed">{q.question}</p>
+                              <div className="flex items-center gap-1.5 mt-1">
+                                <span className="text-[10px]">{SQ_LANGUAGES.find(l => l.value === q.language)?.flag}</span>
+                                <span className="text-[9px] text-slate-300">•</span>
+                                <span className="text-[9px] text-slate-400">{SQ_CATEGORIES.find(c => c.value === q.category)?.label}</span>
+                                <span className="text-[9px] text-slate-300">•</span>
+                                <span className={clsx('text-[9px] px-1.5 py-0.5 rounded-full font-semibold', q.is_active === 1 ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-400')}>
+                                  {q.is_active === 1 ? '✓ Hoạt động' : '✕ Tắt'}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Actions */}
+                            {!isReadOnly && (
+                              <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button
+                                  type="button"
+                                  onClick={() => handleSqToggle(q)}
+                                  className="w-7 h-7 rounded-lg hover:bg-emerald-50 flex items-center justify-center transition-colors"
+                                  title={q.is_active === 1 ? 'Tắt' : 'Bật'}
+                                >
+                                  <span className={clsx('material-symbols-outlined text-[13px]', q.is_active === 1 ? 'text-emerald-500' : 'text-slate-400')}>
+                                    {q.is_active === 1 ? 'toggle_on' : 'toggle_off'}
+                                  </span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleSqEdit(q)}
+                                  className="w-7 h-7 rounded-lg hover:bg-blue-50 flex items-center justify-center transition-colors"
+                                  title="Sửa"
+                                >
+                                  <span className="material-symbols-outlined text-[13px] text-blue-500">edit</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleSqDelete(q.id)}
+                                  className="w-7 h-7 rounded-lg hover:bg-red-50 flex items-center justify-center transition-colors"
+                                  title="Xóa"
+                                >
+                                  <span className="material-symbols-outlined text-[13px] text-red-400">delete</span>
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                    </div>
+                  )}
+                </div>
               </div>
             </form>
 

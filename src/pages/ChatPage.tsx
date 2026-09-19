@@ -2798,6 +2798,26 @@ export function ChatPage() {
                   </p>
                 </div>
 
+                {/* Section Header: Câu hỏi gợi ý */}
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-blue-500 text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>forum</span>
+                    <h3 className="text-sm font-bold text-slate-600 uppercase tracking-wide">
+                      {language === 'vi' ? 'Câu hỏi gợi ý' : language === 'en' ? 'Suggested Questions' : language === 'ar' ? 'الأسئلة المقترحة' : 'Questions suggérées'}
+                    </h3>
+                  </div>
+                  {/* Quản lý - Chỉ hiện cho admin */}
+                  {(user?.role === 'admin' || user?.role === 'super_admin') && (
+                    <button
+                      onClick={() => navigate('/admin/suggested-questions')}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg transition-all duration-150 active:scale-95 shadow-xs"
+                    >
+                      <Settings className="w-3.5 h-3.5" />
+                      <span>{language === 'vi' ? 'Quản lý' : language === 'en' ? 'Manage' : language === 'ar' ? 'إدارة' : 'Gérer'}</span>
+                    </button>
+                  )}
+                </div>
+
                 {/* Prompt Cards Grid - Material Design 3 Style */}
                 <div className="w-full max-w-3xl">
                   <div className="grid grid-cols-2 gap-3">

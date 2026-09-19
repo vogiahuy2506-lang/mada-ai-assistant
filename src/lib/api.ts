@@ -88,10 +88,13 @@ async function request<T>(
   options: RequestInit = {},
   retry = true
 ): Promise<{ success: true; data: T } | ApiError> {
-  // Pre-check: if token is locally invalid, skip the API call to avoid 401 errors
+  // Pre-check: skip API call if token is invalid (missing, expired, or malformed)
+  // to avoid unnecessary 401 errors hitting the console
   const tokenCheck = validateLocalToken();
-  if (!tokenCheck.valid && tokenCheck.reason !== 'missing') {
-    clearTokens();
+  if (!tokenCheck.valid) {
+    if (tokenCheck.reason !== 'missing') {
+      clearTokens();
+    }
     return { success: false, error: 'Session expired. Please login again.' };
   }
 
@@ -146,10 +149,21 @@ export const authApi = {
     });
   },
   async login(email: string, password: string) {
-    return request<AuthResponse>('/auth/login', {
-      method: 'POST',
-      body: JSON.stringify({ email, password }),
-    });
+    // Direct fetch - skip token validation (login doesn't need existing token)
+    try {
+      const res = await fetch(`${API_BASE}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        return { success: false, error: data.error || 'Lỗi không xác định', code: data.code };
+      }
+      return data;
+    } catch {
+      return { success: false, error: 'Không thể kết nối server. Vui lòng kiểm tra backend đang chạy.' };
+    }
   },
   async logout() {
     return request<{ success: boolean }>('/auth/logout', {

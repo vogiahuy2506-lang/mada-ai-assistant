@@ -1,102 +1,190 @@
-import { ReactNode, useState, useRef, useEffect } from 'react';
+import { ReactNode } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore, useLanguageStore } from '@/stores';
-import { translations, Language } from '@/lib/translations';
 import clsx from 'clsx';
 import madaLogo from '@/assets/mada-logo.png';
 
-// ============== TRANSLATION HELPER ==============
-function useTranslation() {
-  const { language } = useLanguageStore();
-  const t = (key: string): string => {
-    const lang = language as Language;
-    // Translations uses flat keys like 'admin.layout.controlCenter'
-    const value = translations[lang]?.[key as keyof typeof translations['vi']];
-    if (typeof value === 'string') return value;
-    // Fallback to Vietnamese
-    const fallback = translations['vi']?.[key as keyof typeof translations['vi']];
-    if (typeof fallback === 'string') return fallback;
-    return key; // Return key if not found
+// Admin Layout translations - Vietnamese, English, Arabic, French
+const tL = (key: string): string => {
+  const lang = useLanguageStore.getState().language;
+  const translations: Record<string, Record<string, string>> = {
+    vi: {
+      // Navigation
+      'admin.layout.navOverview': 'Tổng quan',
+      'admin.layout.navAiChatbox': 'AI Chatbox',
+      'admin.layout.navUsers': 'Người dùng',
+      'admin.layout.navProducts': 'Sản phẩm',
+      'admin.layout.navScraper': 'Scraper',
+      'admin.layout.navActivityLogs': 'Nhật ký hoạt động',
+      'admin.layout.navAnalytics': 'Phân tích',
+      'admin.layout.navAgents': 'AI Agents',
+      'admin.layout.navSuggestedQuestions': 'Câu hỏi gợi ý',
+      'admin.layout.navSystemPrompts': 'System Prompts',
+      'admin.layout.navConsultations': 'Tư vấn',
+      'admin.layout.navFileUpload': 'Quản lý file',
+      'admin.layout.navSettings': 'Cài đặt',
+      'admin.layout.navPermissions': 'Phân quyền',
+      // Labels
+      'admin.layout.superAdminOnly': 'Chỉ Super Admin',
+      'admin.layout.admin': 'Quản trị',
+      'admin.layout.super': 'SUPER',
+      'admin.layout.plan': 'Gói',
+      'admin.layout.planEnterprise': 'Enterprise',
+      'admin.layout.planPro': 'Pro',
+      'admin.layout.planFree': 'Miễn phí',
+      'admin.layout.logout': 'Đăng xuất',
+      'admin.layout.controlCenter': 'Trung tâm quản trị',
+      // Top bar titles
+      'admin.topBar.overview': 'Tổng quan',
+      'admin.topBar.overviewSub': 'Xem nhanh tình trạng hệ thống',
+      'admin.topBar.users': 'Người dùng',
+      'admin.topBar.usersSub': 'Quản lý tài khoản người dùng',
+      'admin.topBar.products': 'Sản phẩm',
+      'admin.topBar.productsSub': 'Quản lý danh mục và sản phẩm',
+      'admin.topBar.agents': 'AI Agents',
+      'admin.topBar.agentsSub': 'Quản lý các AI Agent',
+      'admin.topBar.prompts': 'System Prompts',
+      'admin.topBar.promptsSub': 'Quản lý prompts cho AI',
+      'admin.topBar.consultations': 'Tư vấn',
+      'admin.topBar.consultationsSub': 'Xem và quản lý các yêu cầu tư vấn',
+      'admin.topBar.templates': 'Templates',
+      'admin.topBar.templatesSub': 'Quản lý mẫu prompts',
+    },
+    en: {
+      // Navigation
+      'admin.layout.navOverview': 'Overview',
+      'admin.layout.navAiChatbox': 'AI Chatbox',
+      'admin.layout.navUsers': 'Users',
+      'admin.layout.navProducts': 'Products',
+      'admin.layout.navScraper': 'Scraper',
+      'admin.layout.navActivityLogs': 'Activity Logs',
+      'admin.layout.navAnalytics': 'Analytics',
+      'admin.layout.navAgents': 'AI Agents',
+      'admin.layout.navSuggestedQuestions': 'Suggested Questions',
+      'admin.layout.navSystemPrompts': 'System Prompts',
+      'admin.layout.navConsultations': 'Consultations',
+      'admin.layout.navFileUpload': 'File Management',
+      'admin.layout.navSettings': 'Settings',
+      'admin.layout.navPermissions': 'Permissions',
+      // Labels
+      'admin.layout.superAdminOnly': 'Super Admin only',
+      'admin.layout.admin': 'Admin',
+      'admin.layout.super': 'SUPER',
+      'admin.layout.plan': 'Plan',
+      'admin.layout.planEnterprise': 'Enterprise',
+      'admin.layout.planPro': 'Pro',
+      'admin.layout.planFree': 'Free',
+      'admin.layout.logout': 'Logout',
+      'admin.layout.controlCenter': 'Control Center',
+      // Top bar titles
+      'admin.topBar.overview': 'Overview',
+      'admin.topBar.overviewSub': 'Quick view of system status',
+      'admin.topBar.users': 'Users',
+      'admin.topBar.usersSub': 'Manage user accounts',
+      'admin.topBar.products': 'Products',
+      'admin.topBar.productsSub': 'Manage categories and products',
+      'admin.topBar.agents': 'AI Agents',
+      'admin.topBar.agentsSub': 'Manage AI Agents',
+      'admin.topBar.prompts': 'System Prompts',
+      'admin.topBar.promptsSub': 'Manage AI prompts',
+      'admin.topBar.consultations': 'Consultations',
+      'admin.topBar.consultationsSub': 'View and manage consultation requests',
+      'admin.topBar.templates': 'Templates',
+      'admin.topBar.templatesSub': 'Manage prompt templates',
+    },
+    ar: {
+      // Navigation
+      'admin.layout.navOverview': 'نظرة عامة',
+      'admin.layout.navAiChatbox': 'مساعد AI',
+      'admin.layout.navUsers': 'المستخدمون',
+      'admin.layout.navProducts': 'المنتجات',
+      'admin.layout.navScraper': 'المجمع',
+      'admin.layout.navActivityLogs': 'سجلات النشاط',
+      'admin.layout.navAnalytics': 'التحليلات',
+      'admin.layout.navAgents': 'وكلاء الذكاء الاصطناعي',
+      'admin.layout.navSuggestedQuestions': 'الأسئلة المقترحة',
+      'admin.layout.navSystemPrompts': 'طلبات النظام',
+      'admin.layout.navConsultations': 'الاستشارات',
+      'admin.layout.navFileUpload': 'إدارة الملفات',
+      'admin.layout.navSettings': 'الإعدادات',
+      'admin.layout.navPermissions': 'الصلاحيات',
+      // Labels
+      'admin.layout.superAdminOnly': 'مدير رئيسي فقط',
+      'admin.layout.admin': 'مدير',
+      'admin.layout.super': 'مدير رئيسي',
+      'admin.layout.plan': 'الباقة',
+      'admin.layout.planEnterprise': 'مؤسساتي',
+      'admin.layout.planPro': 'احترافي',
+      'admin.layout.planFree': 'مجاني',
+      'admin.layout.logout': 'تسجيل الخروج',
+      'admin.layout.controlCenter': 'مركز التحكم',
+      // Top bar titles
+      'admin.topBar.overview': 'نظرة عامة',
+      'admin.topBar.overviewSub': 'عرض سريع لحالة النظام',
+      'admin.topBar.users': 'المستخدمون',
+      'admin.topBar.usersSub': 'إدارة حسابات المستخدمين',
+      'admin.topBar.products': 'المنتجات',
+      'admin.topBar.productsSub': 'إدارة الفئات والمنتجات',
+      'admin.topBar.agents': 'وكلاء الذكاء الاصطناعي',
+      'admin.topBar.agentsSub': 'إدارة وكلاء الذكاء الاصطناعي',
+      'admin.topBar.prompts': 'طلبات النظام',
+      'admin.topBar.promptsSub': 'إدارة طلبات الذكاء الاصطناعي',
+      'admin.topBar.consultations': 'الاستشارات',
+      'admin.topBar.consultationsSub': 'عرض وإدارة طلبات الاستشارة',
+      'admin.topBar.templates': 'القوالب',
+      'admin.topBar.templatesSub': 'إدارة قوالب الطلبات',
+    },
+    fr: {
+      // Navigation
+      'admin.layout.navOverview': 'Aperçu',
+      'admin.layout.navAiChatbox': 'Chatbot IA',
+      'admin.layout.navUsers': 'Utilisateurs',
+      'admin.layout.navProducts': 'Produits',
+      'admin.layout.navScraper': 'Extracteur',
+      'admin.layout.navActivityLogs': 'Journaux d\'activité',
+      'admin.layout.navAnalytics': 'Analytique',
+      'admin.layout.navAgents': 'Agents IA',
+      'admin.layout.navSuggestedQuestions': 'Questions suggérées',
+      'admin.layout.navSystemPrompts': 'Prompts système',
+      'admin.layout.navConsultations': 'Consultations',
+      'admin.layout.navFileUpload': 'Gestion des fichiers',
+      'admin.layout.navSettings': 'Paramètres',
+      'admin.layout.navPermissions': 'Permissions',
+      // Labels
+      'admin.layout.superAdminOnly': 'Super Admin uniquement',
+      'admin.layout.admin': 'Admin',
+      'admin.layout.super': 'SUPER',
+      'admin.layout.plan': 'Plan',
+      'admin.layout.planEnterprise': 'Entreprise',
+      'admin.layout.planPro': 'Pro',
+      'admin.layout.planFree': 'Gratuit',
+      'admin.layout.logout': 'Déconnexion',
+      'admin.layout.controlCenter': 'Centre de contrôle',
+      // Top bar titles
+      'admin.topBar.overview': 'Aperçu',
+      'admin.topBar.overviewSub': 'Vue rapide de l\'état du système',
+      'admin.topBar.users': 'Utilisateurs',
+      'admin.topBar.usersSub': 'Gérer les comptes utilisateurs',
+      'admin.topBar.products': 'Produits',
+      'admin.topBar.productsSub': 'Gérer les catégories et produits',
+      'admin.topBar.agents': 'Agents IA',
+      'admin.topBar.agentsSub': 'Gérer les agents IA',
+      'admin.topBar.prompts': 'Prompts système',
+      'admin.topBar.promptsSub': 'Gérer les prompts IA',
+      'admin.topBar.consultations': 'Consultations',
+      'admin.topBar.consultationsSub': 'Voir et gérer les demandes de consultation',
+      'admin.topBar.templates': 'Modèles',
+      'admin.topBar.templatesSub': 'Gérer les modèles de prompts',
+    },
   };
-  return { t, language };
-}
-
-// ============== LANGUAGE SWITCHER (top bar) ==============
-const LANGUAGES: Array<{ code: 'vi' | 'en' | 'ar' | 'fr'; labelKey: string; flag: string }> = [
-  { code: 'vi', labelKey: 'admin.layout.langVi', flag: '🇻🇳' },
-  { code: 'en', labelKey: 'admin.layout.langEn', flag: '🇬🇧' },
-  { code: 'ar', labelKey: 'admin.layout.langAr', flag: '🇸🇦' },
-  { code: 'fr', labelKey: 'admin.layout.langFr', flag: '🇫🇷' },
-];
-
-function LanguageSwitcher() {
-  const { t, language } = useTranslation();
-  const { setLanguage } = useLanguageStore();
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  const current = LANGUAGES.find((l) => l.code === language) || LANGUAGES[0];
-
-  useEffect(() => {
-    const onClick = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', onClick);
-    return () => document.removeEventListener('mousedown', onClick);
-  }, []);
-
-  // Apply RTL for Arabic globally on the admin root
-  useEffect(() => {
-    const root = document.documentElement;
-    if (language === 'ar') root.setAttribute('dir', 'rtl');
-    else root.setAttribute('dir', 'ltr');
-  }, [language]);
-
-  return (
-    <div ref={ref} className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-2 px-3 py-2 rounded-xl border border-outline-variant/40 bg-white/60 hover:bg-white/90 transition-all shadow-sm"
-        title={t('admin.layout.switchLanguage')}
-      >
-        <span className="text-base leading-none">{current.flag}</span>
-        <span className="font-label-sm font-semibold text-on-surface">{current.code.toUpperCase()}</span>
-        <span className="material-symbols-outlined text-[18px] text-on-surface-variant">expand_more</span>
-      </button>
-      {open && (
-        <div className="absolute right-0 mt-2 w-48 rounded-xl bg-white shadow-xl border border-outline-variant/30 overflow-hidden z-[60]">
-          {LANGUAGES.map((l) => (
-            <button
-              key={l.code}
-              type="button"
-              onClick={() => {
-                setLanguage(l.code);
-                setOpen(false);
-              }}
-              className={clsx(
-                'w-full flex items-center gap-3 px-4 py-2.5 text-left text-sm hover:bg-primary/5 transition-colors',
-                language === l.code && 'bg-primary/10 text-primary font-semibold'
-              )}
-            >
-              <span className="text-base leading-none">{l.flag}</span>
-              <span className="font-label-md">{t(l.labelKey)}</span>
-              {language === l.code && (
-                <span className="material-symbols-outlined text-[18px] ml-auto text-primary">check</span>
-              )}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
+  return translations[lang]?.[key] || translations['vi'][key] || key;
+};
 
 interface NavItem {
   labelKey: string;
   href: string;
   icon: string;
   superAdminOnly?: boolean;
-  adminOnly?: boolean;
 }
 
 const NAV_ITEMS: NavItem[] = [
@@ -119,13 +207,9 @@ const NAV_ITEMS: NavItem[] = [
 interface AdminLayoutProps {
   children: ReactNode;
   title?: string;
-  titleEn?: string;
-  titleAr?: string;
-  titleFr?: string;
+  titleKey?: string;
   subtitle?: string;
-  subtitleEn?: string;
-  subtitleAr?: string;
-  subtitleFr?: string;
+  subtitleKey?: string;
   showFab?: boolean;
   showLayoutTitle?: boolean;
 }
@@ -133,38 +217,37 @@ interface AdminLayoutProps {
 export function AdminLayout({
   children,
   title,
-  titleEn,
-  titleAr,
-  titleFr,
+  titleKey,
   subtitle,
-  subtitleEn,
-  subtitleAr,
-  subtitleFr,
+  subtitleKey,
   showFab: _showFab = false,
   showLayoutTitle = true,
 }: AdminLayoutProps) {
-  const { t, language } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout, isSuperAdmin } = useAuthStore();
-  const isRtl = language === 'ar';
+  const { language, setLanguage } = useLanguageStore();
   const isUserSuperAdmin = isSuperAdmin();
 
-  // Default title/subtitle from translations
-  const defaultTitle = t('admin.layout.controlCenter');
-  const defaultSubtitle = t('admin.layout.controlCenterSub');
+  const toggleLanguage = () => {
+    setLanguage(language === 'vi' ? 'en' : 'vi');
+  };
 
-  // Pick title/subtitle theo ngôn ngữ hiện tại
-  const currentTitle =
-    language === 'en' ? (titleEn || title || defaultTitle) :
-    language === 'ar' ? (titleAr || title || defaultTitle) :
-    language === 'fr' ? (titleFr || title || defaultTitle) :
-    (title || defaultTitle);
-  const currentSubtitle =
-    language === 'en' ? (subtitleEn || subtitle || defaultSubtitle) :
-    language === 'ar' ? (subtitleAr || subtitle || defaultSubtitle) :
-    language === 'fr' ? (subtitleFr || subtitle || defaultSubtitle) :
-    (subtitle || defaultSubtitle);
+  // Get the title
+  const getCurrentTitle = () => {
+    if (title) return title;
+    if (titleKey) return tL(titleKey);
+    return tL('admin.layout.controlCenter');
+  };
+
+  const getCurrentSubtitle = () => {
+    if (subtitle) return subtitle;
+    if (subtitleKey) return tL(subtitleKey);
+    return '';
+  };
+
+  const currentTitle = getCurrentTitle();
+  const currentSubtitle = getCurrentSubtitle();
 
   const handleLogout = () => {
     logout();
@@ -173,7 +256,6 @@ export function AdminLayout({
 
   return (
     <div
-      dir={isRtl ? 'rtl' : 'ltr'}
       className="font-body-md antialiased bg-background text-on-background min-h-screen"
       style={{ overflowX: 'hidden' }}
     >
@@ -215,7 +297,6 @@ export function AdminLayout({
         <nav className="flex-1 space-y-1 overflow-y-auto">
           {NAV_ITEMS
             .filter((item) => {
-              // Lọc menu theo role
               if (item.superAdminOnly && !isUserSuperAdmin) return false;
               return true;
             })
@@ -234,9 +315,9 @@ export function AdminLayout({
                 )}
               >
                 <span className="material-symbols-outlined">{item.icon}</span>
-                <span className="font-label-md">{t(item.labelKey)}</span>
+                <span className="font-label-md">{tL(item.labelKey)}</span>
                 {item.superAdminOnly && (
-                  <span className="material-symbols-outlined text-xs text-warning ml-auto" title={t('admin.layout.superAdminOnly')}>lock</span>
+                  <span className="material-symbols-outlined text-xs text-warning ml-auto" title={tL('admin.layout.superAdminOnly')}>lock</span>
                 )}
               </Link>
             );
@@ -249,19 +330,19 @@ export function AdminLayout({
           <div className="px-4 py-3 mb-4 rounded-2xl border border-primary/10 bg-primary/5">
             <div className="flex items-center gap-2">
               <span className="material-symbols-outlined text-primary">account_circle</span>
-              <span className="font-label-sm font-bold text-primary truncate flex-1">{user?.name || user?.email || t('admin.layout.admin')}</span>
+              <span className="font-label-sm font-bold text-primary truncate flex-1">{user?.name || user?.email || tL('admin.layout.admin')}</span>
               {isUserSuperAdmin ? (
                 <span className="px-2 py-0.5 rounded-full bg-gradient-to-r from-amber-400 to-orange-500 text-white text-[10px] font-bold shadow-sm">
-                  {t('admin.layout.super')}
+                  {tL('admin.layout.super')}
                 </span>
               ) : (
                 <span className="px-2 py-0.5 rounded-full bg-primary/20 text-primary text-[10px] font-bold">
-                  {t('admin.layout.admin')}
+                  {tL('admin.layout.admin')}
                 </span>
               )}
             </div>
             <p className="font-label-sm text-primary/70 mt-1">
-              {t('admin.layout.plan')}: {user?.plan === 'enterprise' ? t('admin.layout.planEnterprise') : user?.plan === 'pro' ? t('admin.layout.planPro') : t('admin.layout.planFree')}
+              {tL('admin.layout.plan')}: {user?.plan === 'enterprise' ? tL('admin.layout.planEnterprise') : user?.plan === 'pro' ? tL('admin.layout.planPro') : tL('admin.layout.planFree')}
             </p>
           </div>
 
@@ -270,7 +351,7 @@ export function AdminLayout({
             className="flex items-center gap-3 px-4 py-3 rounded-xl text-on-surface-variant hover:bg-error/5 hover:text-error transition-all text-left"
           >
             <span className="material-symbols-outlined">logout</span>
-            <span className="font-label-md">{t('admin.layout.logout')}</span>
+            <span className="font-label-md">{tL('admin.layout.logout')}</span>
           </button>
         </div>
       </aside>
@@ -290,15 +371,165 @@ export function AdminLayout({
             )}
           </div>
           <div className="flex items-center gap-3">
-            <LanguageSwitcher />
             <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-primary/5 border border-primary/20">
               <span className="material-symbols-outlined text-[18px] text-primary">account_circle</span>
-              <span className="font-label-sm font-semibold text-primary">{user?.email || user?.name || t('admin.layout.admin')}</span>
+              <span className="font-label-sm font-semibold text-primary">{user?.email || user?.name || tL('admin.layout.admin')}</span>
               {isUserSuperAdmin && (
                 <span className="px-1.5 py-0.5 rounded bg-gradient-to-r from-amber-400 to-orange-500 text-white text-[10px] font-bold shadow-sm">
-                  {t('admin.layout.super')}
+                  {tL('admin.layout.super')}
                 </span>
               )}
+            </div>
+
+            {/* Language Selector - Premium Design */}
+            <div className="relative group">
+              <button className="group/btn flex items-center gap-2 pl-2.5 pr-2 py-1.5 rounded-full bg-gradient-to-r from-primary/10 to-secondary/10 border border-primary/20 hover:border-primary/40 hover:shadow-md hover:shadow-primary/10 transition-all duration-300 backdrop-blur-sm">
+                {/* Globe Icon */}
+                <span className="material-symbols-outlined text-[16px] text-primary transition-transform duration-300 group-hover/btn:rotate-12">language</span>
+                
+                {/* Flag + Code */}
+                <span className="text-base leading-none">
+                  {language === 'vi' ? '🇻🇳' : language === 'en' ? '🇺🇸' : language === 'ar' ? '🇸🇦' : '🇫🇷'}
+                </span>
+                <span className="font-bold text-xs text-primary tracking-wide">
+                  {language === 'vi' ? 'VI' : language === 'en' ? 'EN' : language === 'ar' ? 'AR' : 'FR'}
+                </span>
+                
+                {/* Arrow */}
+                <span className="material-symbols-outlined text-[14px] text-primary/70 transition-transform duration-300 group-hover/btn:translate-y-0.5">expand_more</span>
+              </button>
+              
+              {/* Premium Dropdown */}
+              <div className="absolute right-0 top-full mt-2 py-2 px-2 rounded-2xl bg-white/95 backdrop-blur-xl border border-black/10 shadow-2xl shadow-black/10 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 z-50 min-w-[200px]">
+                {/* Arrow */}
+                <div className="absolute -top-1.5 right-5 w-3 h-3 bg-white/95 border-l border-t border-black/10 rotate-45"></div>
+                
+                <div className="relative">
+                  <div className="px-2.5 py-1 mb-1">
+                    <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">Chọn ngôn ngữ</p>
+                  </div>
+                  
+                  {/* Vietnamese */}
+                  <button
+                    onClick={() => setLanguage('vi')}
+                    className={clsx(
+                      'w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl transition-all duration-200 group/lang',
+                      language === 'vi' 
+                        ? 'bg-gradient-to-r from-primary/20 to-primary/10 border border-primary/30' 
+                        : 'hover:bg-gray-50 border border-transparent'
+                    )}
+                  >
+                    <div className={clsx(
+                      'w-7 h-7 rounded-md flex items-center justify-center text-base transition-all',
+                      language === 'vi' ? 'bg-primary/20' : 'bg-gray-100'
+                    )}>
+                      🇻🇳
+                    </div>
+                    <div className="flex-1 text-left">
+                      <p className={clsx(
+                        'font-semibold text-xs transition-colors',
+                        language === 'vi' ? 'text-primary' : 'text-gray-700'
+                      )}>
+                        Tiếng Việt
+                      </p>
+                      <p className="text-[10px] text-gray-400">Việt Nam</p>
+                    </div>
+                    {language === 'vi' && (
+                      <span className="material-symbols-outlined text-primary text-[16px]">check</span>
+                    )}
+                  </button>
+                  
+                  {/* English */}
+                  <button
+                    onClick={() => setLanguage('en')}
+                    className={clsx(
+                      'w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl transition-all duration-200 group/lang',
+                      language === 'en' 
+                        ? 'bg-gradient-to-r from-primary/20 to-primary/10 border border-primary/30' 
+                        : 'hover:bg-gray-50 border border-transparent'
+                    )}
+                  >
+                    <div className={clsx(
+                      'w-7 h-7 rounded-md flex items-center justify-center text-base transition-all',
+                      language === 'en' ? 'bg-primary/20' : 'bg-gray-100'
+                    )}>
+                      🇺🇸
+                    </div>
+                    <div className="flex-1 text-left">
+                      <p className={clsx(
+                        'font-semibold text-xs transition-colors',
+                        language === 'en' ? 'text-primary' : 'text-gray-700'
+                      )}>
+                        English
+                      </p>
+                      <p className="text-[10px] text-gray-400">United States</p>
+                    </div>
+                    {language === 'en' && (
+                      <span className="material-symbols-outlined text-primary text-[16px]">check</span>
+                    )}
+                  </button>
+                  
+                  {/* Arabic */}
+                  <button
+                    onClick={() => setLanguage('ar')}
+                    className={clsx(
+                      'w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl transition-all duration-200 group/lang',
+                      language === 'ar' 
+                        ? 'bg-gradient-to-r from-primary/20 to-primary/10 border border-primary/30' 
+                        : 'hover:bg-gray-50 border border-transparent'
+                    )}
+                  >
+                    <div className={clsx(
+                      'w-7 h-7 rounded-md flex items-center justify-center text-base transition-all',
+                      language === 'ar' ? 'bg-primary/20' : 'bg-gray-100'
+                    )}>
+                      🇸🇦
+                    </div>
+                    <div className="flex-1 text-left">
+                      <p className={clsx(
+                        'font-semibold text-xs transition-colors',
+                        language === 'ar' ? 'text-primary' : 'text-gray-700'
+                      )}>
+                        العربية
+                      </p>
+                      <p className="text-[10px] text-gray-400">العربية</p>
+                    </div>
+                    {language === 'ar' && (
+                      <span className="material-symbols-outlined text-primary text-[16px]">check</span>
+                    )}
+                  </button>
+                  
+                  {/* French */}
+                  <button
+                    onClick={() => setLanguage('fr')}
+                    className={clsx(
+                      'w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl transition-all duration-200 group/lang',
+                      language === 'fr' 
+                        ? 'bg-gradient-to-r from-primary/20 to-primary/10 border border-primary/30' 
+                        : 'hover:bg-gray-50 border border-transparent'
+                    )}
+                  >
+                    <div className={clsx(
+                      'w-7 h-7 rounded-md flex items-center justify-center text-base transition-all',
+                      language === 'fr' ? 'bg-primary/20' : 'bg-gray-100'
+                    )}>
+                      🇫🇷
+                    </div>
+                    <div className="flex-1 text-left">
+                      <p className={clsx(
+                        'font-semibold text-xs transition-colors',
+                        language === 'fr' ? 'text-primary' : 'text-gray-700'
+                      )}>
+                        Français
+                      </p>
+                      <p className="text-[10px] text-gray-400">France</p>
+                    </div>
+                    {language === 'fr' && (
+                      <span className="material-symbols-outlined text-primary text-[16px]">check</span>
+                    )}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -310,7 +541,6 @@ export function AdminLayout({
       </main>
     </div>
   );
-
 }
 
 export default AdminLayout;

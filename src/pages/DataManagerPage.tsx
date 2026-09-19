@@ -8,8 +8,81 @@ import {
   Menu, X as XIcon
 } from 'lucide-react';
 import clsx from 'clsx';
-import { useTranslation } from '@/lib/translations';
 import { getAccessToken } from '@/lib/api';
+
+// Simple translations - Vietnamese default
+const t = {
+  pageTitle: 'Quản lý Dữ liệu',
+  pageSubtitle: 'Quản lý tri thức và nội dung cho MADA AI',
+  totalDocs: 'Tổng tài liệu',
+  knowledgeBase: 'Knowledge Base',
+  ready: 'Sẵn sàng',
+  initializing: 'Đang khởi tạo',
+  topics: 'Chủ đề',
+  quickActions: 'Thao tác nhanh',
+  loadSample: 'Tải mẫu',
+  loadKnowledge: 'Tải tri thức',
+  collectFromWebsite: 'Thu thập từ Website',
+  placeholderUrl: 'Nhập URL website...',
+  startCollect: 'Bắt đầu thu thập',
+  collecting: 'Đang thu thập...',
+  collectingAnalyzing: 'Đang phân tích nội dung...',
+  addData: 'Thêm dữ liệu',
+  refresh: 'Làm mới',
+  searchPlaceholder: 'Tìm kiếm tài liệu...',
+  filter: 'Lọc',
+  clearKb: 'Xóa KB',
+  emptyNoData: 'Chưa có dữ liệu',
+  emptyNoResults: 'Không tìm thấy kết quả',
+  addSampleData: 'Thêm dữ liệu mẫu',
+  importData: 'Nhập dữ liệu',
+  colTitle: 'Tiêu đề',
+  colSource: 'Nguồn',
+  colType: 'Loại',
+  colStatus: 'Trạng thái',
+  colDate: 'Ngày',
+  colActions: 'Hành động',
+  chunks: 'chunks',
+  modalTitle: 'Thêm Dữ liệu',
+  tabText: 'Văn bản',
+  tabUrl: 'URL',
+  tabFile: 'File',
+  labelTitleOptional: 'Tiêu đề (tùy chọn)',
+  placeholderTitle: 'Nhập tiêu đề...',
+  labelContent: 'Nội dung',
+  placeholderContent: 'Nhập nội dung...',
+  urlLabel: 'URL',
+  urlHelp: 'Nhập URL trang web để thu thập dữ liệu tự động',
+  clickToUploadFile: 'Click để chọn file hoặc kéo thả vào đây',
+  supportedFormats: 'Định dạng hỗ trợ:',
+  uploading: 'Đang tải lên...',
+  processing: 'Đang xử lý...',
+  uploadToKb: 'Tải lên Knowledge Base',
+  confirmAdd: 'Xác nhận thêm',
+  cancel: 'Hủy',
+  tipViewAi: 'Xem gợi ý AI',
+  tipViewDetail: 'Xem chi tiết',
+  tipDelete: 'Xóa',
+  aiDone: 'AI đã phân tích xong!',
+  topicLabel: 'Chủ đề',
+  aiAnalyzing: 'Đang phân tích bằng AI...',
+  suggestedQuestions: 'Câu hỏi gợi ý',
+  clickToCopy: 'Click để copy',
+  relatedTopics: 'Chủ đề liên quan',
+  suggestedProducts: 'Sản phẩm gợi ý',
+  close: 'Đóng',
+  askMadaAbout: 'Hỏi MADA về chủ đề này',
+  statusPending: 'Đang chờ',
+  statusProcessing: 'Đang xử lý',
+  statusCompleted: 'Hoàn thành',
+  statusFailed: 'Thất bại',
+  alertSampleAdded: 'Đã thêm tài liệu mẫu',
+  alertTopicsAdded: 'Đã thêm chủ đề',
+  alertFileAdded: 'Đã thêm tài liệu',
+  uploadFailed: 'Tải lên thất bại',
+  confirmClearKb: 'Xóa toàn bộ Knowledge Base? Hành động này không thể hoàn tác.',
+  loading: 'Đang tải...',
+};
 
 // Helper: fetch với auth header
 function authFetch(url: string, options: RequestInit = {}) {
@@ -49,8 +122,7 @@ interface KnowledgeStats {
 
 export function DataManagerPage() {
   const navigate = useNavigate();
-  const { t, language } = useTranslation();
-  const locale = language === 'vi' ? 'vi-VN' : language === 'fr' ? 'fr-FR' : language === 'ar' ? 'ar-EG' : 'en-US';
+  const locale = 'vi-VN';
   const [knowledgeItems, setKnowledgeItems] = useState<KnowledgeItem[]>([]);
   const [stats, setStats] = useState<KnowledgeStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -241,7 +313,7 @@ export function DataManagerPage() {
 
       if (data.success) {
         await fetchKnowledgeBase();
-        alert(t('dataManager.alertSampleAdded').replace('{{count}}', String(data.data.documentsAdded)));
+        alert(t.alertSampleAdded);
       }
     } catch (error) {
       console.error('Load sample failed:', error);
@@ -259,7 +331,7 @@ export function DataManagerPage() {
 
       if (data.success) {
         await fetchKnowledgeBase();
-        alert(t('dataManager.alertTopicsAdded').replace('{{count}}', String(data.data.topicsAdded)));
+        alert(t.alertTopicsAdded);
       }
     } catch (error) {
       console.error('Load seed failed:', error);
@@ -301,7 +373,7 @@ export function DataManagerPage() {
       const data = await response.json();
 
       if (data.success) {
-        setUploadSuccess(t('dataManager.alertFileAdded').replace('{{count}}', String(data.data.documentsAdded)).replace('{{filename}}', selectedFile.name));
+        setUploadSuccess(t.alertFileAdded);
         
         // Add to list
         const newItem: KnowledgeItem = {
@@ -325,17 +397,17 @@ export function DataManagerPage() {
           fetchKnowledgeBase();
         }, 1500);
       } else {
-        setUploadError(data.error || t('dataManager.uploadFailed'));
+        setUploadError(data.error || t.uploadFailed);
       }
     } catch (error: any) {
-      setUploadError(error.message || t('dataManager.uploadFailed'));
+      setUploadError(error.message || t.uploadFailed);
     } finally {
       setIsUploading(false);
     }
   }, [selectedFile, fetchKnowledgeBase]);
 
   const handleClearKnowledge = async () => {
-    if (!confirm(t('dataManager.confirmClearKb'))) {
+    if (!confirm(t.confirmClearKb)) {
       return;
     }
 
@@ -354,19 +426,19 @@ export function DataManagerPage() {
   );
 
   const statusConfig = {
-    pending: { label: t('dataManager.statusPending'), color: 'bg-yellow-100 text-yellow-800', icon: Clock },
-    processing: { label: t('dataManager.statusProcessing'), color: 'bg-blue-100 text-blue-800', icon: Loader2 },
-    completed: { label: t('dataManager.statusCompleted'), color: 'bg-green-100 text-green-800', icon: CheckCircle },
-    failed: { label: t('dataManager.statusFailed'), color: 'bg-red-100 text-red-800', icon: AlertCircle },
+    pending: { label: t.statusPending, color: 'bg-yellow-100 text-yellow-800', icon: Clock },
+    processing: { label: t.statusProcessing, color: 'bg-blue-100 text-blue-800', icon: Loader2 },
+    completed: { label: t.statusCompleted, color: 'bg-green-100 text-green-800', icon: CheckCircle },
+    failed: { label: t.statusFailed, color: 'bg-red-100 text-red-800', icon: AlertCircle },
   };
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
   
   const navItems = [
-    { id: 'knowledge', label: t('dataManager.pageTitle'), icon: Brain, path: '/data' },
-    { id: 'collect', label: t('dataManager.collectFromWebsite'), icon: Globe, path: '/data/collect' },
-    { id: 'documents', label: t('dataManager.totalDocs'), icon: FileText, path: '/data/documents' },
-    { id: 'categories', label: t('dataManager.topics'), icon: Package, path: '/data/categories' },
+    { id: 'knowledge', label: t.pageTitle, icon: Brain, path: '/data' },
+    { id: 'collect', label: t.collectFromWebsite, icon: Globe, path: '/data/collect' },
+    { id: 'documents', label: t.totalDocs, icon: FileText, path: '/data/documents' },
+    { id: 'categories', label: t.topics, icon: Package, path: '/data/categories' },
   ];
   
   return (
@@ -431,9 +503,9 @@ export function DataManagerPage() {
           {/* Header */}
           <div className="mb-8 flex items-center justify-between">
             <div>
-              <h1 className="text-headline-md font-bold mb-2">{t('dataManager.pageTitle')}</h1>
+              <h1 className="text-headline-md font-bold mb-2">{t.pageTitle}</h1>
               <p className="text-body-md text-on-surface-variant">
-                {t('dataManager.pageSubtitle')}
+                {t.pageSubtitle}
               </p>
             </div>
             <div className="flex items-center gap-3">
@@ -442,14 +514,14 @@ export function DataManagerPage() {
                 className="flex items-center gap-2 px-4 py-2 rounded-xl border-2 border-outline hover:bg-surface-container transition-colors"
               >
                 <RefreshCw className={clsx('w-4 h-4', isLoading && 'animate-spin')} />
-                {t('dataManager.refresh')}
+                {t.refresh}
               </button>
               <button
                 onClick={() => setShowAddModal(true)}
                 className="flex items-center gap-2 px-6 py-3 rounded-full bg-primary text-on-primary border-2 border-on-background neo-brutalist-shadow-sm hover:-translate-y-0.5 hover:-translate-x-0.5 transition-all"
               >
                 <Plus className="w-5 h-5" />
-                {t('dataManager.addData')}
+                {t.addData}
               </button>
             </div>
           </div>
@@ -459,23 +531,23 @@ export function DataManagerPage() {
             <div className="p-6 bg-surface dark:bg-on-background border-2 border-on-background dark:border-surface neo-brutalist-shadow-sm">
               <div className="flex items-center gap-3 mb-2">
                 <Database className="w-8 h-8 text-primary" />
-                <span className="text-on-surface-variant text-label-md">{t('dataManager.totalDocs')}</span>
+                <span className="text-on-surface-variant text-label-md">{t.totalDocs}</span>
               </div>
               <p className="text-headline-lg font-bold">{stats?.totalDocuments || 0}</p>
             </div>
             <div className="p-6 bg-surface dark:bg-on-background border-2 border-on-background dark:border-surface neo-brutalist-shadow-sm">
               <div className="flex items-center gap-3 mb-2">
                 <Brain className="w-8 h-8 text-blue-500" />
-                <span className="text-on-surface-variant text-label-md">{t('dataManager.knowledgeBase')}</span>
+                <span className="text-on-surface-variant text-label-md">{t.knowledgeBase}</span>
               </div>
               <p className="text-headline-lg font-bold">
                 {stats?.isInitialized ? (
                   <span className="text-green-600 flex items-center gap-2">
-                    <CheckCircle className="w-6 h-6" /> {t('dataManager.ready')}
+                    <CheckCircle className="w-6 h-6" /> {t.ready}
                   </span>
                 ) : (
                   <span className="text-yellow-600 flex items-center gap-2">
-                    <Clock className="w-6 h-6" /> {t('dataManager.initializing')}
+                    <Clock className="w-6 h-6" /> {t.initializing}
                   </span>
                 )}
               </p>
@@ -483,14 +555,14 @@ export function DataManagerPage() {
             <div className="p-6 bg-surface dark:bg-on-background border-2 border-on-background dark:border-surface neo-brutalist-shadow-sm">
               <div className="flex items-center gap-3 mb-2">
                 <BookOpen className="w-8 h-8 text-purple-500" />
-                <span className="text-on-surface-variant text-label-md">{t('dataManager.topics')}</span>
+                <span className="text-on-surface-variant text-label-md">{t.topics}</span>
               </div>
               <p className="text-headline-lg font-bold">{knowledgeItems.length}</p>
             </div>
             <div className="p-6 bg-surface dark:bg-on-background border-2 border-on-background dark:border-surface neo-brutalist-shadow-sm">
               <div className="flex items-center gap-3 mb-2">
                 <Sparkles className="w-8 h-8 text-amber-500" />
-                <span className="text-on-surface-variant text-label-md">{t('dataManager.quickActions')}</span>
+                <span className="text-on-surface-variant text-label-md">{t.quickActions}</span>
               </div>
               <div className="flex gap-2">
                 <button
@@ -498,14 +570,14 @@ export function DataManagerPage() {
                   disabled={isAddingSeed}
                   className="px-3 py-1.5 text-xs bg-blue-100 text-blue-800 rounded-lg hover:bg-blue-200 transition-colors disabled:opacity-50"
                 >
-                  {isAddingSeed ? t('dataManager.loading') : t('dataManager.loadSample')}
+                  {isAddingSeed ? t.loading : t.loadSample}
                 </button>
                 <button
                   onClick={handleLoadSeed}
                   disabled={isAddingSeed}
                   className="px-3 py-1.5 text-xs bg-purple-100 text-purple-800 rounded-lg hover:bg-purple-200 transition-colors disabled:opacity-50"
                 >
-                  {t('dataManager.loadKnowledge')}
+                  {t.loadKnowledge}
                 </button>
               </div>
             </div>
@@ -515,7 +587,7 @@ export function DataManagerPage() {
           <div className="mb-8 p-6 bg-surface dark:bg-on-background border-2 border-on-background dark:border-surface neo-brutalist-shadow-sm">
             <h2 className="font-bold text-headline-sm mb-4 flex items-center gap-2">
               <Globe className="w-6 h-6" />
-              {t('dataManager.collectFromWebsite')}
+              {t.collectFromWebsite}
             </h2>
 
             <div className="flex gap-4">
@@ -524,7 +596,7 @@ export function DataManagerPage() {
                   type="url"
                   value={websiteUrl}
                   onChange={(e) => setWebsiteUrl(e.target.value)}
-                  placeholder={t('dataManager.placeholderUrl')}
+                  placeholder={t.placeholderUrl}
                   className="w-full px-4 py-3 pl-12 rounded-xl border-2 border-outline bg-transparent focus:border-primary focus:outline-none transition-colors"
                 />
                 <Globe className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-on-surface-variant" />
@@ -541,12 +613,12 @@ export function DataManagerPage() {
                 {isCollecting ? (
                   <>
                     <Loader2 className="w-5 h-5 animate-spin" />
-                    {t('dataManager.collecting')}
+                    {t.collecting}
                   </>
                 ) : (
                   <>
                     <CloudUpload className="w-5 h-5" />
-                    {t('dataManager.startCollect')}
+                    {t.startCollect}
                   </>
                 )}
               </button>
@@ -557,7 +629,7 @@ export function DataManagerPage() {
               <div className="mt-4 p-4 bg-surface-container dark:bg-surface-container-high rounded-xl">
                 <div className="flex items-center gap-4 mb-2">
                   <Loader2 className="w-5 h-5 animate-spin text-primary" />
-                  <span className="text-body-md">{t('dataManager.collectingAnalyzing')}</span>
+                  <span className="text-body-md">{t.collectingAnalyzing}</span>
                 </div>
                 <div className="h-2 bg-outline rounded-full overflow-hidden">
                   <div className="h-full bg-primary animate-pulse" style={{ width: '60%' }} />
@@ -574,9 +646,9 @@ export function DataManagerPage() {
                       <Sparkles className="w-5 h-5 text-white" />
                     </div>
                     <div>
-                      <h3 className="font-bold text-lg">{t('dataManager.aiDone')}</h3>
+                      <h3 className="font-bold text-lg">{t.aiDone}</h3>
                       <p className="text-sm text-on-surface-variant">
-                        {lastCollectedTitle && `${t('dataManager.topicLabel')}: ${lastCollectedTitle}`}
+                        {lastCollectedTitle && `${t.topicLabel}: ${lastCollectedTitle}`}
                       </p>
                     </div>
                   </div>
@@ -591,7 +663,7 @@ export function DataManagerPage() {
                 {isLoadingSuggestions ? (
                   <div className="flex items-center gap-3 py-4">
                     <Loader2 className="w-6 h-6 animate-spin text-violet-600" />
-                    <span>{t('dataManager.aiAnalyzing')}</span>
+                    <span>{t.aiAnalyzing}</span>
                   </div>
                 ) : suggestions && (
                   <div className="space-y-6">
@@ -600,7 +672,7 @@ export function DataManagerPage() {
                       <div>
                         <h4 className="flex items-center gap-2 font-bold mb-3 text-violet-700 dark:text-violet-300">
                           <MessageCircle className="w-5 h-5" />
-                          {t('dataManager.suggestedQuestions')}
+                          {t.suggestedQuestions}
                         </h4>
                         <div className="space-y-2">
                           {suggestions.questions.slice(0, 3).map((q, idx) => (
@@ -616,7 +688,7 @@ export function DataManagerPage() {
                                 {idx + 1}
                               </span>
                               <span className="flex-1 text-sm">{q}</span>
-                              <span className="text-xs text-on-surface-variant">{t('dataManager.clickToCopy')}</span>
+                              <span className="text-xs text-on-surface-variant">{t.clickToCopy}</span>
                             </div>
                           ))}
                         </div>
@@ -628,7 +700,7 @@ export function DataManagerPage() {
                       <div>
                         <h4 className="flex items-center gap-2 font-bold mb-3 text-indigo-700 dark:text-indigo-300">
                           <Lightbulb className="w-5 h-5" />
-                          {t('dataManager.relatedTopics')}
+                          {t.relatedTopics}
                         </h4>
                         <div className="flex flex-wrap gap-2">
                           {suggestions.topics.slice(0, 4).map((topic, idx) => (
@@ -648,7 +720,7 @@ export function DataManagerPage() {
                       <div>
                         <h4 className="flex items-center gap-2 font-bold mb-3 text-purple-700 dark:text-purple-300">
                           <Package className="w-5 h-5" />
-                          {t('dataManager.suggestedProducts')}
+                          {t.suggestedProducts}
                         </h4>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                           {suggestions.products.slice(0, 4).map((product, idx) => (
@@ -672,13 +744,13 @@ export function DataManagerPage() {
                         onClick={() => setShowSuggestions(false)}
                         className="flex-1 py-2 px-4 border-2 border-violet-300 dark:border-violet-600 text-violet-600 dark:text-violet-300 rounded-xl font-medium hover:bg-violet-50 dark:hover:bg-violet-900/30 transition-colors"
                       >
-                        {t('dataManager.close')}
+                        {t.close}
                       </button>
                       <button
                         onClick={() => navigate('/chat')}
                         className="flex-1 py-2 px-4 bg-gradient-to-r from-violet-500 to-indigo-600 text-white rounded-xl font-bold hover:shadow-lg transition-all"
                       >
-                        {t('dataManager.askMadaAbout')}
+                        {t.askMadaAbout}
                       </button>
                     </div>
                   </div>
@@ -694,21 +766,21 @@ export function DataManagerPage() {
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder={t('dataManager.searchPlaceholder')}
+                placeholder={t.searchPlaceholder}
                 className="w-full px-4 py-3 pl-12 rounded-xl border-2 border-outline bg-transparent focus:border-primary focus:outline-none"
               />
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-on-surface-variant" />
             </div>
             <button className="flex items-center gap-2 px-4 py-3 rounded-xl border-2 border-outline hover:bg-surface-container transition-colors">
               <Filter className="w-5 h-5" />
-              {t('dataManager.filter')}
+              {t.filter}
             </button>
             <button
               onClick={handleClearKnowledge}
               className="flex items-center gap-2 px-4 py-3 rounded-xl border-2 border-red-300 text-red-600 hover:bg-red-50 transition-colors"
             >
               <Trash className="w-5 h-5" />
-              {t('dataManager.clearKb')}
+              {t.clearKb}
             </button>
           </div>
 
@@ -722,7 +794,7 @@ export function DataManagerPage() {
               <div className="flex flex-col items-center justify-center p-12">
                 <Database className="w-16 h-16 text-on-surface-variant mb-4" />
                 <p className="text-on-surface-variant text-lg mb-4">
-                  {searchTerm ? t('dataManager.emptyNoResults') : t('dataManager.emptyNoData')}
+                  {searchTerm ? t.emptyNoResults : t.emptyNoData}
                 </p>
                 {!searchTerm && (
                   <div className="flex gap-3">
@@ -731,13 +803,13 @@ export function DataManagerPage() {
                       disabled={isAddingSeed}
                       className="px-4 py-2 bg-primary text-on-primary rounded-xl hover:bg-primary/90 transition-colors disabled:opacity-50"
                     >
-                      {t('dataManager.addSampleData')}
+                      {t.addSampleData}
                     </button>
                     <button
                       onClick={() => setShowAddModal(true)}
                       className="px-4 py-2 border-2 border-outline rounded-xl hover:bg-surface-container transition-colors"
                     >
-                      {t('dataManager.importData')}
+                      {t.importData}
                     </button>
                   </div>
                 )}
@@ -746,12 +818,12 @@ export function DataManagerPage() {
               <table className="w-full">
                 <thead className="bg-surface-container dark:bg-surface-container-high border-b-2 border-on-background dark:border-surface">
                   <tr>
-                    <th className="text-left p-4 font-bold">{t('dataManager.colTitle')}</th>
-                    <th className="text-left p-4 font-bold">{t('dataManager.colSource')}</th>
-                    <th className="text-left p-4 font-bold">{t('dataManager.colType')}</th>
-                    <th className="text-left p-4 font-bold">{t('dataManager.colStatus')}</th>
-                    <th className="text-left p-4 font-bold">{t('dataManager.colDate')}</th>
-                    <th className="text-right p-4 font-bold">{t('dataManager.colActions')}</th>
+                    <th className="text-left p-4 font-bold">{t.colTitle}</th>
+                    <th className="text-left p-4 font-bold">{t.colSource}</th>
+                    <th className="text-left p-4 font-bold">{t.colType}</th>
+                    <th className="text-left p-4 font-bold">{t.colStatus}</th>
+                    <th className="text-left p-4 font-bold">{t.colDate}</th>
+                    <th className="text-right p-4 font-bold">{t.colActions}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -766,7 +838,7 @@ export function DataManagerPage() {
                           </div>
                           {item.documentsAdded && (
                             <span className="text-xs text-on-surface-variant ml-8">
-                              {item.documentsAdded} {t('dataManager.chunks')}
+                              {item.documentsAdded} {t.chunks}
                             </span>
                           )}
                         </td>
@@ -795,7 +867,7 @@ export function DataManagerPage() {
                           <div className="flex items-center justify-end gap-2">
                             <button
                               className="p-2 rounded-lg hover:bg-violet-100 dark:hover:bg-violet-900/30 text-violet-600 transition-colors"
-                              title={t('dataManager.tipViewAi')}
+                              title={t.tipViewAi}
                               onClick={() => {
                                 const itemStatus = item.status === 'completed';
                                 if (itemStatus) {
@@ -805,10 +877,10 @@ export function DataManagerPage() {
                             >
                               <Sparkles className="w-5 h-5" />
                             </button>
-                            <button className="p-2 rounded-lg hover:bg-surface-container transition-colors" title={t('dataManager.tipViewDetail')}>
+                            <button className="p-2 rounded-lg hover:bg-surface-container transition-colors" title={t.tipViewDetail}>
                               <Eye className="w-5 h-5" />
                             </button>
-                            <button className="p-2 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/20 text-red-600 transition-colors" title={t('dataManager.tipDelete')}>
+                            <button className="p-2 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/20 text-red-600 transition-colors" title={t.tipDelete}>
                               <Trash2 className="w-5 h-5" />
                             </button>
                           </div>
@@ -829,7 +901,7 @@ export function DataManagerPage() {
           <div className="bg-white dark:bg-[#2e3038] rounded-2xl border-2 border-[#191b23] w-full max-w-2xl max-h-[80vh] overflow-hidden">
             {/* Modal Header */}
             <div className="p-4 border-b-2 border-[#191b23] flex items-center justify-between">
-              <h2 className="text-lg font-bold">{t('dataManager.modalTitle')}</h2>
+              <h2 className="text-lg font-bold">{t.modalTitle}</h2>
               <button
                 onClick={() => setShowAddModal(false)}
                 className="p-2 rounded-lg hover:bg-surface-container transition-colors"
@@ -850,7 +922,7 @@ export function DataManagerPage() {
                   )}
                 >
                   <FilePlus className="w-4 h-4" />
-                  {t('dataManager.tabText')}
+                  {t.tabText}
                 </button>
                 <button
                   onClick={() => setAddMode('url')}
@@ -860,7 +932,7 @@ export function DataManagerPage() {
                   )}
                 >
                   <Globe className="w-4 h-4" />
-                  {t('dataManager.tabUrl')}
+                  {t.tabUrl}
                 </button>
                 <button
                   onClick={() => setAddMode('file')}
@@ -870,7 +942,7 @@ export function DataManagerPage() {
                   )}
                 >
                   <Upload className="w-4 h-4" />
-                  {t('dataManager.tabFile')}
+                  {t.tabFile}
                 </button>
               </div>
 
@@ -878,21 +950,21 @@ export function DataManagerPage() {
               {addMode === 'text' && (
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium mb-2">{t('dataManager.labelTitleOptional')}</label>
+                    <label className="block text-sm font-medium mb-2">{t.labelTitleOptional}</label>
                     <input
                       type="text"
                       value={manualTitle}
                       onChange={(e) => setManualTitle(e.target.value)}
-                      placeholder={t('dataManager.placeholderTitle')}
+                      placeholder={t.placeholderTitle}
                       className="w-full px-4 py-3 rounded-xl border-2 border-outline bg-transparent focus:border-primary focus:outline-none"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium mb-2">{t('dataManager.labelContent')}</label>
+                    <label className="block text-sm font-medium mb-2">{t.labelContent}</label>
                     <textarea
                       value={manualContent}
                       onChange={(e) => setManualContent(e.target.value)}
-                      placeholder={t('dataManager.placeholderContent')}
+                      placeholder={t.placeholderContent}
                       rows={10}
                       className="w-full px-4 py-3 rounded-xl border-2 border-outline bg-transparent focus:border-primary focus:outline-none resize-none"
                     />
@@ -904,17 +976,17 @@ export function DataManagerPage() {
               {addMode === 'url' && (
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium mb-2">{t('dataManager.urlLabel')}</label>
+                    <label className="block text-sm font-medium mb-2">{t.urlLabel}</label>
                     <input
                       type="url"
                       value={websiteUrl}
                       onChange={(e) => setWebsiteUrl(e.target.value)}
-                      placeholder={t('dataManager.placeholderUrl')}
+                      placeholder={t.placeholderUrl}
                       className="w-full px-4 py-3 rounded-xl border-2 border-outline bg-transparent focus:border-primary focus:outline-none"
                     />
                   </div>
                   <p className="text-sm text-on-surface-variant">
-                    {t('dataManager.urlHelp')}
+                    {t.urlHelp}
                   </p>
                 </div>
               )}
@@ -937,9 +1009,9 @@ export function DataManagerPage() {
                       className="border-2 border-dashed border-outline rounded-xl p-12 text-center cursor-pointer hover:border-primary hover:bg-surface-container transition-colors"
                     >
                       <Upload className="w-12 h-12 mx-auto mb-4 text-on-surface-variant" />
-                      <p className="font-medium">{t('dataManager.clickToUploadFile')}</p>
+                      <p className="font-medium">{t.clickToUploadFile}</p>
                       <p className="text-sm text-on-surface-variant mt-2">
-                        {t('dataManager.supportedFormats')} TXT, MD, PDF, DOCX, CSV, JPG, PNG, WEBP
+                        {t.supportedFormats} TXT, MD, PDF, DOCX, CSV, JPG, PNG, WEBP
                       </p>
                     </div>
                   ) : (
@@ -972,7 +1044,7 @@ export function DataManagerPage() {
                           <div className="flex items-center justify-between text-sm">
                             <span className="flex items-center gap-2">
                               <Loader2 className="w-4 h-4 animate-spin" />
-                              {t('dataManager.uploading')}
+                              {t.uploading}
                             </span>
                             <span>{uploadProgress}%</span>
                           </div>
@@ -1015,12 +1087,12 @@ export function DataManagerPage() {
                         {isUploading ? (
                           <>
                             <Loader2 className="w-5 h-5 animate-spin" />
-                            {t('dataManager.processing')}
+                            {t.processing}
                           </>
                         ) : (
                           <>
                             <CloudUpload className="w-5 h-5" />
-                            {t('dataManager.uploadToKb')}
+                            {t.uploadToKb}
                           </>
                         )}
                       </button>
@@ -1036,14 +1108,14 @@ export function DataManagerPage() {
                 onClick={() => setShowAddModal(false)}
                 className="px-6 py-2 rounded-xl border-2 border-outline hover:bg-surface-container transition-colors"
               >
-                {t('dataManager.cancel')}
+                {t.cancel}
               </button>
               <button
                 onClick={addMode === 'url' ? handleCollect : handleAddManual}
                 disabled={isCollecting || (addMode === 'text' && !manualContent.trim())}
                 className="px-6 py-2 rounded-xl bg-primary text-on-primary hover:bg-primary/90 transition-colors disabled:opacity-50"
               >
-                {isCollecting ? t('dataManager.processing') : t('dataManager.confirmAdd')}
+                {isCollecting ? t.processing : t.confirmAdd}
               </button>
             </div>
           </div>

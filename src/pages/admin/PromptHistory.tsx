@@ -8,7 +8,7 @@ import { translations, type Language } from '@/lib/translations';
 function usePromptHistoryTranslation() {
   const language = useLanguageStore((state) => state.language) as Language;
   const t = (key: string, params?: Record<string, string | number>) => {
-    let text = translations[language]?.[key as keyof typeof translations[typeof language]] as string || key;
+    let text = (translations[language]?.[key as keyof typeof translations[typeof language]] || translations.vi[key as keyof typeof translations.vi]) as string || key;
     if (params) {
       Object.entries(params).forEach(([k, v]) => {
         text = text.replace(`{${k}}`, String(v));
@@ -43,7 +43,7 @@ export function PromptHistory({ promptId, onRestore, compact = false }: Props) {
   const [loading, setLoading] = useState(true);
   const [expandedVersion, setExpandedVersion] = useState<string | null>(null);
   const [restoring, setRestoring] = useState<string | null>(null);
-  const { t } = usePromptHistoryTranslation();
+  const { t, language } = usePromptHistoryTranslation();
 
   useEffect(() => {
     loadVersions();
@@ -87,14 +87,15 @@ export function PromptHistory({ promptId, onRestore, compact = false }: Props) {
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
-    // Use locale based on language
+    // Use locale based on current language from store (reactive)
     const localeMap: Record<string, string> = {
       vi: 'vi-VN',
       en: 'en-US',
       ar: 'ar-SA',
       fr: 'fr-FR',
     };
-    return date.toLocaleDateString(localeMap[translations[useLanguageStore.getState().language] ? useLanguageStore.getState().language : 'vi'] || 'vi-VN', {
+    const lang = localeMap[language] || 'vi-VN';
+    return date.toLocaleDateString(lang, {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',

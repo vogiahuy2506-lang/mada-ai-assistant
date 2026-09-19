@@ -1,9 +1,144 @@
 import { useState, useEffect } from 'react';
 import { AdminLayout } from './AdminLayout';
 import { adminApi, type Consultation } from './adminApi';
-import { useTranslation } from '@/lib/translations';
-import { useLanguageStore } from '@/stores';
 import clsx from 'clsx';
+import { useLanguageStore } from '@/stores';
+
+// Admin Consultations translations - supports all languages via useLanguageStore
+const tC = (key: string): string => {
+  const lang = useLanguageStore.getState().language;
+  const translations: Record<string, Record<string, string>> = {
+    vi: {
+      // Top bar
+      'admin.topBar.consultations': 'Tư vấn',
+      'admin.topBar.consultationsSub': 'Xem và quản lý các yêu cầu tư vấn',
+      // Consultations
+      'admin.consult.title': 'Yêu cầu Tư vấn',
+      'admin.consult.subtitle': 'Theo dõi và xử lý các yêu cầu tư vấn từ người dùng',
+      'admin.consult.totalRequests': 'Tổng yêu cầu',
+      'admin.consult.pending': 'Đang chờ',
+      'admin.consult.reviewed': 'Đã xem',
+      'admin.consult.contacted': 'Đã liên hệ',
+      'admin.consult.filter': 'Lọc',
+      'admin.consult.all': 'Tất cả',
+      'admin.consult.status.pending': 'Đang chờ',
+      'admin.consult.status.reviewed': 'Đã xem',
+      'admin.consult.status.contacted': 'Đã liên hệ',
+      'admin.consult.exportReport': 'Xuất báo cáo',
+      'admin.consult.loading': 'Đang tải dữ liệu...',
+      'admin.consult.noRequests': 'Chưa có yêu cầu nào',
+      'admin.consult.noRequestsHint': 'Các yêu cầu tư vấn sẽ xuất hiện ở đây khi có người dùng gửi.',
+      'admin.consult.viewDetails': 'Xem chi tiết',
+      'admin.consult.requestDetails': 'Chi tiết yêu cầu',
+      'admin.consult.fullName': 'Họ tên',
+      'admin.consult.email': 'Email',
+      'admin.consult.phone': 'Số điện thoại',
+      'admin.consult.dateSent': 'Ngày gửi',
+      'admin.consult.requestContent': 'Nội dung yêu cầu',
+      'admin.consult.updateStatus': 'Cập nhật trạng thái',
+      'admin.consult.replyEmail': 'Trả lời qua Email',
+      'admin.consult.close': 'Đóng',
+      'consult.title': 'Yêu cầu Tư vấn',
+    },
+    en: {
+      // Top bar
+      'admin.topBar.consultations': 'Consultations',
+      'admin.topBar.consultationsSub': 'View and manage consultation requests',
+      // Consultations
+      'admin.consult.title': 'Consultation Requests',
+      'admin.consult.subtitle': 'Track and process consultation requests from users',
+      'admin.consult.totalRequests': 'Total Requests',
+      'admin.consult.pending': 'Pending',
+      'admin.consult.reviewed': 'Reviewed',
+      'admin.consult.contacted': 'Contacted',
+      'admin.consult.filter': 'Filter',
+      'admin.consult.all': 'All',
+      'admin.consult.status.pending': 'Pending',
+      'admin.consult.status.reviewed': 'Reviewed',
+      'admin.consult.status.contacted': 'Contacted',
+      'admin.consult.exportReport': 'Export Report',
+      'admin.consult.loading': 'Loading data...',
+      'admin.consult.noRequests': 'No requests yet',
+      'admin.consult.noRequestsHint': 'Consultation requests will appear here when users submit them.',
+      'admin.consult.viewDetails': 'View details',
+      'admin.consult.requestDetails': 'Request Details',
+      'admin.consult.fullName': 'Full Name',
+      'admin.consult.email': 'Email',
+      'admin.consult.phone': 'Phone',
+      'admin.consult.dateSent': 'Date Sent',
+      'admin.consult.requestContent': 'Request Content',
+      'admin.consult.updateStatus': 'Update Status',
+      'admin.consult.replyEmail': 'Reply via Email',
+      'admin.consult.close': 'Close',
+      'consult.title': 'Consultation Request',
+    },
+    ar: {
+      // Top bar
+      'admin.topBar.consultations': 'الاستشارات',
+      'admin.topBar.consultationsSub': 'عرض وإدارة طلبات الاستشارة',
+      // Consultations
+      'admin.consult.title': 'طلبات الاستشارة',
+      'admin.consult.subtitle': 'تتبع ومعالجة طلبات الاستشارة من المستخدمين',
+      'admin.consult.totalRequests': 'إجمالي الطلبات',
+      'admin.consult.pending': 'معلق',
+      'admin.consult.reviewed': 'تم المراجعة',
+      'admin.consult.contacted': 'تم التواصل',
+      'admin.consult.filter': 'تصفية',
+      'admin.consult.all': 'الكل',
+      'admin.consult.status.pending': 'معلق',
+      'admin.consult.status.reviewed': 'تم المراجعة',
+      'admin.consult.status.contacted': 'تم التواصل',
+      'admin.consult.exportReport': 'تصدير التقرير',
+      'admin.consult.loading': 'جاري تحميل البيانات...',
+      'admin.consult.noRequests': 'لا توجد طلبات بعد',
+      'admin.consult.noRequestsHint': 'ستظهر طلبات الاستشارة هنا عند إرسالها من المستخدمين.',
+      'admin.consult.viewDetails': 'عرض التفاصيل',
+      'admin.consult.requestDetails': 'تفاصيل الطلب',
+      'admin.consult.fullName': 'الاسم الكامل',
+      'admin.consult.email': 'البريد الإلكتروني',
+      'admin.consult.phone': 'الهاتف',
+      'admin.consult.dateSent': 'تاريخ الإرسال',
+      'admin.consult.requestContent': 'محتوى الطلب',
+      'admin.consult.updateStatus': 'تحديث الحالة',
+      'admin.consult.replyEmail': 'الرد عبر البريد',
+      'admin.consult.close': 'إغلاق',
+      'consult.title': 'طلب استشارة',
+    },
+    fr: {
+      // Top bar
+      'admin.topBar.consultations': 'Consultations',
+      'admin.topBar.consultationsSub': 'Voir et gérer les demandes de consultation',
+      // Consultations
+      'admin.consult.title': 'Demandes de consultation',
+      'admin.consult.subtitle': 'Suivez et traitez les demandes de consultation des utilisateurs',
+      'admin.consult.totalRequests': 'Total des demandes',
+      'admin.consult.pending': 'En attente',
+      'admin.consult.reviewed': 'Examiné',
+      'admin.consult.contacted': 'Contacté',
+      'admin.consult.filter': 'Filtrer',
+      'admin.consult.all': 'Tous',
+      'admin.consult.status.pending': 'En attente',
+      'admin.consult.status.reviewed': 'Examiné',
+      'admin.consult.status.contacted': 'Contacté',
+      'admin.consult.exportReport': 'Exporter le rapport',
+      'admin.consult.loading': 'Chargement des données...',
+      'admin.consult.noRequests': 'Aucune demande',
+      'admin.consult.noRequestsHint': 'Les demandes de consultation apparaîtront ici lorsque les utilisateurs les soumettront.',
+      'admin.consult.viewDetails': 'Voir les détails',
+      'admin.consult.requestDetails': 'Détails de la demande',
+      'admin.consult.fullName': 'Nom complet',
+      'admin.consult.email': 'Email',
+      'admin.consult.phone': 'Téléphone',
+      'admin.consult.dateSent': 'Date d\'envoi',
+      'admin.consult.requestContent': 'Contenu de la demande',
+      'admin.consult.updateStatus': 'Mettre à jour le statut',
+      'admin.consult.replyEmail': 'Répondre par Email',
+      'admin.consult.close': 'Fermer',
+      'consult.title': 'Demande de consultation',
+    },
+  };
+  return translations[lang]?.[key] || translations['vi'][key] || key;
+};
 
 export function AdminConsultations() {
   const [requests, setRequests] = useState<Consultation[]>([]);
@@ -11,8 +146,7 @@ export function AdminConsultations() {
   const [selectedRequest, setSelectedRequest] = useState<Consultation | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
-  const { t } = useTranslation();
-  const language = useLanguageStore((s) => s.language);
+  const language = 'vi';
 
   const fetchRequests = async () => {
     try {
@@ -59,21 +193,15 @@ export function AdminConsultations() {
   };
 
   const statusLabels = {
-    pending: t('admin.consult.status.pending'),
-    reviewed: t('admin.consult.status.reviewed'),
-    contacted: t('admin.consult.status.contacted'),
+    pending: tC('admin.consult.status.pending'),
+    reviewed: tC('admin.consult.status.reviewed'),
+    contacted: tC('admin.consult.status.contacted'),
   };
 
   return (
     <AdminLayout
-      title={t('admin.topBar.consultations')}
-      titleEn="Consultation Requests"
-      titleAr="طلبات الاستشارة"
-      titleFr="Demandes de consultation"
-      subtitle={t('admin.topBar.consultationsSub')}
-      subtitleEn="View and process consultation requests from users."
-      subtitleAr="عرض ومعالجة طلبات الاستشارة من المستخدمين."
-      subtitleFr="Voir et traiter les demandes de consultation des utilisateurs."
+      titleKey="admin.topBar.consultations"
+      subtitleKey="admin.topBar.consultationsSub"
       showLayoutTitle={false}
     >
       {/* Hero Banner Section */}
@@ -83,10 +211,10 @@ export function AdminConsultations() {
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-primary/10 via-transparent to-transparent rounded-3xl"></div>
           <div className="max-w-2xl relative z-10 py-8 px-6">
             <h2 className="text-4xl font-black text-on-surface mb-4 tracking-tight flex items-center gap-4">
-              {t('admin.consult.title')}
+              {tC('admin.consult.title')}
             </h2>
             <p className="text-lg font-medium text-on-surface-variant border-l-4 border-primary pl-6 py-2 bg-white/40 backdrop-blur-sm rounded-r-xl">
-              {t('admin.consult.subtitle')}
+              {tC('admin.consult.subtitle')}
             </p>
           </div>
         </div>
@@ -100,7 +228,7 @@ export function AdminConsultations() {
             <span className="material-symbols-outlined text-on-surface text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>inbox</span>
           </div>
           <div>
-            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">{t('admin.consult.totalRequests')}</p>
+            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">{tC('admin.consult.totalRequests')}</p>
             <h3 className="text-xl font-black text-on-surface">{requests.length}</h3>
           </div>
         </div>
@@ -111,7 +239,7 @@ export function AdminConsultations() {
             <span className="material-symbols-outlined text-yellow-600 text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>pending_actions</span>
           </div>
           <div>
-            <p className="text-[10px] font-bold text-yellow-700 uppercase tracking-wider mb-1">{t('admin.consult.pending')}</p>
+            <p className="text-[10px] font-bold text-yellow-700 uppercase tracking-wider mb-1">{tC('admin.consult.pending')}</p>
             <h3 className="text-xl font-black text-yellow-700">{requests.filter(r => r.status === 'pending').length}</h3>
           </div>
         </div>
@@ -122,7 +250,7 @@ export function AdminConsultations() {
             <span className="material-symbols-outlined text-blue-600 text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>visibility</span>
           </div>
           <div>
-            <p className="text-[10px] font-bold text-blue-700 uppercase tracking-wider mb-1">{t('admin.consult.reviewed')}</p>
+            <p className="text-[10px] font-bold text-blue-700 uppercase tracking-wider mb-1">{tC('admin.consult.reviewed')}</p>
             <h3 className="text-xl font-black text-blue-700">{requests.filter(r => r.status === 'reviewed').length}</h3>
           </div>
         </div>
@@ -133,7 +261,7 @@ export function AdminConsultations() {
             <span className="material-symbols-outlined text-green-600 text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
           </div>
           <div>
-            <p className="text-[10px] font-bold text-green-700 uppercase tracking-wider mb-1">{t('admin.consult.contacted')}</p>
+            <p className="text-[10px] font-bold text-green-700 uppercase tracking-wider mb-1">{tC('admin.consult.contacted')}</p>
             <h3 className="text-xl font-black text-green-700">{requests.filter(r => r.status === 'contacted').length}</h3>
           </div>
         </div>
@@ -142,7 +270,7 @@ export function AdminConsultations() {
       {/* Filter & Action Row */}
       <div className="flex items-center justify-between mb-8 flex-wrap gap-4">
         <div className="flex items-center gap-3 p-1.5 bg-white/60 backdrop-blur-xl rounded-full border-2 border-black">
-          <span className="text-on-surface-variant font-medium text-sm ml-4 mr-2">{t('admin.consult.filter')}</span>
+          <span className="text-on-surface-variant font-medium text-sm ml-4 mr-2">{tC('admin.consult.filter')}</span>
           <button
             onClick={() => setStatusFilter('all')}
             className={clsx(
@@ -152,7 +280,7 @@ export function AdminConsultations() {
                 : 'bg-transparent text-on-surface-variant hover:bg-white/80 border-transparent hover:border-black transition-colors'
             )}
           >
-            {t('admin.consult.all')}
+            {tC('admin.consult.all')}
           </button>
           <button
             onClick={() => setStatusFilter('pending')}
@@ -163,7 +291,7 @@ export function AdminConsultations() {
                 : 'bg-transparent text-on-surface-variant hover:bg-yellow-50 border-transparent hover:border-black transition-colors'
             )}
           >
-            {t('admin.consult.status.pending')}
+            {tC('admin.consult.status.pending')}
           </button>
           <button
             onClick={() => setStatusFilter('reviewed')}
@@ -174,7 +302,7 @@ export function AdminConsultations() {
                 : 'bg-transparent text-on-surface-variant hover:bg-blue-50 border-transparent hover:border-black transition-colors'
             )}
           >
-            {t('admin.consult.status.reviewed')}
+            {tC('admin.consult.status.reviewed')}
           </button>
           <button
             onClick={() => setStatusFilter('contacted')}
@@ -185,13 +313,13 @@ export function AdminConsultations() {
                 : 'bg-transparent text-on-surface-variant hover:bg-green-50 border-transparent hover:border-black transition-colors'
             )}
           >
-            {t('admin.consult.status.contacted')}
+            {tC('admin.consult.status.contacted')}
           </button>
         </div>
         <div>
           <button className="flex items-center gap-2 bg-white text-primary px-6 py-2.5 rounded-full font-bold text-sm border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] transition-all group">
             <span className="material-symbols-outlined text-sm transition-transform group-hover:-translate-y-1">cloud_download</span>
-            {t('admin.consult.exportReport')}
+            {tC('admin.consult.exportReport')}
           </button>
         </div>
       </div>
@@ -205,16 +333,16 @@ export function AdminConsultations() {
             <div className="w-16 h-16 rounded-2xl bg-gray-100 border-2 border-black flex items-center justify-center mb-4 shadow-[4px_4px_0px_0px_#000] animate-pulse">
               <span className="material-symbols-outlined text-gray-400 text-3xl">hourglass_empty</span>
             </div>
-            <p className="text-lg font-bold text-gray-500">{t('admin.consult.loading')}</p>
+            <p className="text-lg font-bold text-gray-500">{tC('admin.consult.loading')}</p>
           </div>
         ) : filteredRequests.length === 0 ? (
           <div className="relative z-10 flex flex-col items-center justify-center min-h-[400px]">
             <div className="w-24 h-24 rounded-2xl bg-gray-100 border-2 border-black flex items-center justify-center mb-6 text-gray-400 transform rotate-[-3deg] hover:rotate-0 transition-all duration-300 shadow-[8px_8px_0px_0px_#000]">
               <span className="material-symbols-outlined text-5xl">inbox</span>
             </div>
-            <h4 className="text-2xl font-black text-on-surface mb-2">{t('admin.consult.noRequests')}</h4>
+            <h4 className="text-2xl font-black text-on-surface mb-2">{tC('admin.consult.noRequests')}</h4>
             <p className="text-base font-medium text-on-surface-variant text-center max-w-sm">
-              {t('admin.consult.noRequestsHint')}
+              {tC('admin.consult.noRequestsHint')}
             </p>
           </div>
         ) : (
@@ -260,7 +388,7 @@ export function AdminConsultations() {
                       {statusLabels[request.status]}
                     </span>
                     <button className="px-4 py-2 rounded-full bg-primary text-white text-sm font-bold border-2 border-black shadow-[2px_2px_0px_0px_#000] hover:translate-x-[-1px] hover:-translate-y-[1px] hover:shadow-[3px_3px_0px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all">
-                      {t('admin.consult.viewDetails')}
+                      {tC('admin.consult.viewDetails')}
                     </button>
                   </div>
                 </div>
@@ -300,8 +428,8 @@ export function AdminConsultations() {
                     <span className="material-symbols-outlined text-white text-2xl" style={{ fontVariationSettings: "'FILL' 1" }}>clinical_notes</span>
                   </div>
                   <div>
-                    <h3 className="text-2xl font-black text-on-surface">{t('admin.consult.requestDetails')}</h3>
-                    <p className="text-sm text-on-surface-variant">{t('admin.consult.code')} #{selectedRequest.id.slice(0, 8)}</p>
+                    <h3 className="text-2xl font-black text-on-surface">{tC('admin.consult.requestDetails')}</h3>
+                    <p className="text-sm text-on-surface-variant">{tC('admin.consult.code')} #{selectedRequest.id.slice(0, 8)}</p>
                   </div>
                 </div>
                 <button
@@ -318,18 +446,18 @@ export function AdminConsultations() {
               {/* Info Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="bg-white/60 backdrop-blur-xl rounded-2xl p-4 border-2 border-black shadow-[3px_3px_0px_0px_#000]">
-                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">{t('admin.consult.fullName')}</label>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">{tC('admin.consult.fullName')}</label>
                   <p className="font-bold text-on-surface text-lg">{selectedRequest.name}</p>
                 </div>
                 <div className="bg-white/60 backdrop-blur-xl rounded-2xl p-4 border-2 border-black shadow-[3px_3px_0px_0px_#000]">
-                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">{t('admin.common.email')}</label>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">{tC('admin.common.email')}</label>
                   <a href={`mailto:${selectedRequest.email}`} className="font-bold text-primary hover:underline">
                     {selectedRequest.email}
                   </a>
                 </div>
                 {selectedRequest.phone && (
                   <div className="bg-white/60 backdrop-blur-xl rounded-2xl p-4 border-2 border-black shadow-[3px_3px_0px_0px_#000]">
-                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">{t('admin.consult.phone')}</label>
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">{tC('admin.consult.phone')}</label>
                     <a href={`tel:${selectedRequest.phone}`} className="font-bold text-primary hover:underline flex items-center gap-2">
                       <span className="material-symbols-outlined text-sm">phone</span>
                       {selectedRequest.phone}
@@ -337,7 +465,7 @@ export function AdminConsultations() {
                   </div>
                 )}
                 <div className="bg-white/60 backdrop-blur-xl rounded-2xl p-4 border-2 border-black shadow-[3px_3px_0px_0px_#000]">
-                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">{t('admin.consult.dateSent')}</label>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">{tC('admin.consult.dateSent')}</label>
                   <p className="font-bold text-on-surface">
                     {new Date(selectedRequest.created_at).toLocaleString(language === 'ar' ? 'ar-SA' : language === 'fr' ? 'fr-FR' : language === 'en' ? 'en-US' : 'vi-VN', {
                       day: '2-digit',
@@ -352,7 +480,7 @@ export function AdminConsultations() {
 
               {/* Message Content */}
               <div className="bg-white/60 backdrop-blur-xl rounded-2xl p-6 border-2 border-black shadow-[3px_3px_0px_0px_#000]">
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">{t('admin.consult.requestContent')}</label>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">{tC('admin.consult.requestContent')}</label>
                 <div className="p-4 bg-gray-50/60 rounded-xl border border-black/20">
                   <p className="whitespace-pre-wrap text-on-surface leading-relaxed">{selectedRequest.message}</p>
                 </div>
@@ -360,7 +488,7 @@ export function AdminConsultations() {
 
               {/* Status Update */}
               <div className="bg-white/60 backdrop-blur-xl rounded-2xl p-6 border-2 border-black shadow-[3px_3px_0px_0px_#000]">
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-4">{t('admin.consult.updateStatus')}</label>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-4">{tC('admin.consult.updateStatus')}</label>
                 <div className="flex flex-wrap gap-3">
                   {(['pending', 'reviewed', 'contacted'] as const).map((status) => (
                     <button
@@ -388,18 +516,18 @@ export function AdminConsultations() {
             {/* Modal Footer */}
             <div className="p-6 border-t-2 border-black bg-white/80 backdrop-blur-xl flex flex-col sm:flex-row justify-end gap-3">
               <a
-                href={`mailto:${selectedRequest.email}?subject=Re: ${t('admin.topBar.consultations')}&body=${t('consult.title')}, ${selectedRequest.name},`}
+                href={`mailto:${selectedRequest.email}?subject=Re: ${tC('admin.topBar.consultations')}&body=${tC('consult.title')}, ${selectedRequest.name},`}
                 className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-primary text-white font-bold text-sm border-2 border-black shadow-[4px_4px_0px_0px_#000] hover:-translate-x-1 hover:-translate-y-1 hover:shadow-[5px_5px_0px_0px_#000] active:translate-x-0 active:translate-y-0 active:shadow-none transition-all"
               >
                 <span className="material-symbols-outlined">email</span>
-                {t('admin.consult.replyEmail')}
+                {tC('admin.consult.replyEmail')}
               </a>
               <button
                 onClick={() => setSelectedRequest(null)}
                 className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-white text-on-surface font-bold text-sm border-2 border-black shadow-[4px_4px_0px_0px_#000] hover:-translate-x-1 hover:-translate-y-1 hover:shadow-[5px_5px_0px_0px_#000] active:translate-x-0 active:translate-y-0 active:shadow-none transition-all"
               >
                 <span className="material-symbols-outlined">close</span>
-                {t('admin.consult.close')}
+                {tC('admin.consult.close')}
               </button>
             </div>
           </div>

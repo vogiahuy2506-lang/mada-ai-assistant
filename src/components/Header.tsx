@@ -27,7 +27,7 @@ export function Header() {
 
   // Navigation links với translation
   const navLinks = [
-    { href: '/products', label: 'Sản phẩm' },
+    { href: '/products', label: t('header.products', language) },
   ];
 
   const handleLogout = async () => {
@@ -222,7 +222,7 @@ export function Header() {
               )}
             </div>
             <span className="absolute -bottom-7 left-1/2 -translate-x-1/2 text-[9px] font-medium text-on-surface-variant whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-              {isDark ? 'Sáng' : 'Tối'}
+              {t(isDark ? 'header.themeLight' : 'header.themeDark', language)}
             </span>
           </button>
 

@@ -1,4 +1,6 @@
 import React, { ReactNode } from 'react';
+import { useLanguageStore } from '@/stores';
+import { t } from '@/lib/translations';
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -11,6 +13,9 @@ interface ErrorBoundaryState {
 }
 
 export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  // Use static store access since hooks can't be used in class components
+  private static language = useLanguageStore.getState().language;
+
   constructor(props: ErrorBoundaryProps) {
     super(props);
     this.state = { hasError: false };
@@ -49,9 +54,9 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
             textAlign: 'center',
             maxWidth: '500px',
           }}>
-            <h1 style={{ color: '#ba1a1a', marginBottom: '16px' }}>⚠️ Đã xảy ra lỗi</h1>
+            <h1 style={{ color: '#ba1a1a', marginBottom: '16px' }}>{t('error.title', ErrorBoundary.language)}</h1>
             <p style={{ color: '#666', marginBottom: '20px' }}>
-              {this.state.error?.message || 'Lỗi không xác định'}
+              {this.state.error?.message || t('error.unknown', ErrorBoundary.language)}
             </p>
             <button
               onClick={() => {
@@ -68,7 +73,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
                 fontSize: '14px',
               }}
             >
-              Xóa dữ liệu & Tải lại
+              {t('error.clearAndReload', ErrorBoundary.language)}
             </button>
           </div>
         </div>

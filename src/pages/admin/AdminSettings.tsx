@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import { AdminLayout } from './AdminLayout';
 import { adminApi, UserStats, KnowledgeStats } from './adminApi';
-import { useSystemSettingsStore, useAuthStore } from '@/stores';
-import { useLanguageStore } from '@/stores';
+import { useSystemSettingsStore, useAuthStore, useLanguageStore } from '@/stores';
 import { translations, Language } from '@/lib/translations';
 import clsx from 'clsx';
 import { systemApi } from '@/lib/api';
@@ -10,12 +9,6 @@ import { CheckCircle, Loader2, AlertCircle, Shield, Settings, Lock, Cloud, Credi
 import { PromptTemplates } from './PromptTemplates';
 
 type Tab = 'general' | 'plans' | 'security' | 'ai' | 'integrations' | 'live' | 'system' | 'templates';
-
-// Helper to get current language translations object
-const getLang = () => {
-  const language = useLanguageStore.getState().language as Language;
-  return (translations as any)[language] || (translations as any).vi;
-};
 
 export function AdminSettings() {
   const [tab, setTab] = useState<Tab>('general');
@@ -27,9 +20,9 @@ export function AdminSettings() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
-  // Get current language and translations
+  // Get current language and translations (reactive)
   const language = useLanguageStore((s) => s.language) as Language;
-  const lang = getLang();
+  const lang = translations[language] || translations.vi;
   
   // Get current user role
   const user = useAuthStore((s) => s.user);
@@ -102,8 +95,8 @@ export function AdminSettings() {
 
   return (
     <AdminLayout
-      title={lang['admin.settings.title']}
-      subtitle={lang['admin.settings.subtitle']}
+      titleKey="admin.topBar.settings"
+      subtitleKey="admin.topBar.settingsSub"
       showLayoutTitle={false}
     >
       {/* ===================== HERO BANNER ===================== */}
@@ -227,10 +220,9 @@ export function AdminSettings() {
               <div className="space-y-2">
                 <label className="text-label-sm font-semibold text-on-surface">{lang['admin.settings.general.defaultLanguage']}</label>
                 <select className="w-full px-4 py-3 rounded-xl bg-surface-variant/30 border border-outline-variant text-on-surface text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30 transition-colors">
-                  <option>{lang['admin.settings.languages'][0]}</option>
-                  <option>{lang['admin.settings.languages'][1]}</option>
-                  <option>{lang['admin.settings.languages'][2]}</option>
-                  <option>{lang['admin.settings.languages'][3]}</option>
+                  {(lang['admin.settings.languages'] || ['Tiếng Việt', 'English', 'Français', 'العربية']).map((langName: string, idx: number) => (
+                    <option key={idx}>{langName}</option>
+                  ))}
                 </select>
               </div>
             </div>

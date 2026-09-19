@@ -233,14 +233,8 @@ const FileManagement: React.FC = () => {
 
   return (
     <AdminLayout
-      title="Quản Lý Upload File"
-      titleEn="File Management"
-      titleAr="إدارة الملفات"
-      titleFr="Gestion des fichiers"
-      subtitle="Cấu hình tính năng và giới hạn upload file cho người dùng."
-      subtitleEn="Configure file upload features and limits for users."
-      subtitleAr="تكوين ميزات وحlimits تحميل الملفات للمستخدمين."
-      subtitleFr="Configurer les fonctionnalités et limites de téléchargement."
+      titleKey="admin.topBar.fileManagement"
+      subtitleKey="admin.topBar.fileManagementSub"
       showFab={false}
       showLayoutTitle={false}
     >

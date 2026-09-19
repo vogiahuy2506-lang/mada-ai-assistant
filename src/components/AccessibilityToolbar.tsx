@@ -14,6 +14,8 @@ import {
   Type, Contrast, Pause, Underline, BookOpen, X, RotateCcw, Accessibility
 } from 'lucide-react';
 import clsx from 'clsx';
+import { useLanguageStore } from '@/stores';
+import { t } from '@/lib/translations';
 
 type FontSize = 'small' | 'normal' | 'large' | 'xlarge';
 type ContrastMode = 'normal' | 'high';
@@ -94,6 +96,7 @@ function applyPrefs(prefs: A11yPrefs) {
 export function AccessibilityToolbar() {
   const [open, setOpen] = useState(false);
   const [prefs, setPrefs] = useState<A11yPrefs>(DEFAULTS);
+  const language = useLanguageStore((s) => s.language);
 
   useEffect(() => {
     const loaded = loadPrefs();
@@ -120,7 +123,7 @@ export function AccessibilityToolbar() {
       <button
         onClick={() => setOpen(!open)}
         className="fixed bottom-4 left-4 z-40 w-12 h-12 rounded-full bg-primary text-on-primary border-2 border-on-background shadow-lg hover:scale-110 transition-transform flex items-center justify-center focus:outline-none focus:ring-4 focus:ring-primary/30"
-        aria-label="Mở tùy chọn trợ năng"
+        aria-label={t('a11y.openPanel', language)}
         aria-expanded={open}
         aria-controls="a11y-panel"
         title="Accessibility options (Alt+A)"
@@ -149,12 +152,12 @@ export function AccessibilityToolbar() {
             <div className="flex items-center justify-between mb-4">
               <h2 id="a11y-title" className="text-lg font-black flex items-center gap-2">
                 <Accessibility className="w-5 h-5 text-primary" aria-hidden="true" />
-                Trợ năng
+                {t('a11y.accessibilityOptions', language)}
               </h2>
               <button
                 onClick={() => setOpen(false)}
                 className="p-1.5 rounded-lg hover:bg-slate-100"
-                aria-label="Đóng"
+                aria-label={t('a11y.close', language)}
               >
                 <X className="w-5 h-5" aria-hidden="true" />
               </button>
@@ -164,9 +167,9 @@ export function AccessibilityToolbar() {
             <div className="mb-5">
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 mb-2 flex items-center gap-1.5">
                 <Type className="w-4 h-4" aria-hidden="true" />
-                Cỡ chữ
+                {t('a11y.fontSize', language)}
               </h3>
-              <div className="grid grid-cols-4 gap-1.5" role="radiogroup" aria-label="Cỡ chữ">
+              <div className="grid grid-cols-4 gap-1.5" role="radiogroup" aria-label={t('a11y.fontSizeAria', language)}>
                 {(['small', 'normal', 'large', 'xlarge'] as FontSize[]).map((size) => (
                   <button
                     key={size}
@@ -193,9 +196,9 @@ export function AccessibilityToolbar() {
             <div className="mb-5">
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 mb-2 flex items-center gap-1.5">
                 <Contrast className="w-4 h-4" aria-hidden="true" />
-                Tương phản
+                {t('a11y.contrast', language)}
               </h3>
-              <div className="grid grid-cols-2 gap-1.5" role="radiogroup" aria-label="Chế độ tương phản">
+              <div className="grid grid-cols-2 gap-1.5" role="radiogroup" aria-label={t('a11y.contrastAria', language)}>
                 <button
                   role="radio"
                   aria-checked={prefs.contrast === 'normal'}
@@ -207,7 +210,7 @@ export function AccessibilityToolbar() {
                       : 'bg-white border-outline hover:border-primary'
                   )}
                 >
-                  Bình thường
+                  {t('a11y.normal', language)}
                 </button>
                 <button
                   role="radio"
@@ -220,7 +223,7 @@ export function AccessibilityToolbar() {
                       : 'bg-white border-outline hover:border-black'
                   )}
                 >
-                  Cao
+                  {t('a11y.high', language)}
                 </button>
               </div>
             </div>
@@ -229,22 +232,22 @@ export function AccessibilityToolbar() {
             <div className="space-y-2.5">
               <ToggleRow
                 icon={<Pause className="w-4 h-4" />}
-                label="Giảm chuyển động"
-                hint="Tắt hiệu ứng animation"
+                label={t('a11y.reduceMotion', language)}
+                hint={t('a11y.reduceMotionHint', language)}
                 checked={prefs.reduceMotion}
                 onChange={(v) => update({ reduceMotion: v })}
               />
               <ToggleRow
                 icon={<Underline className="w-4 h-4" />}
-                label="Gạch chân liên kết"
-                hint="Dễ nhận biết link hơn"
+                label={t('a11y.underlineLinks', language)}
+                hint={t('a11y.underlineLinksHint', language)}
                 checked={prefs.underlineLinks}
                 onChange={(v) => update({ underlineLinks: v })}
               />
               <ToggleRow
                 icon={<BookOpen className="w-4 h-4" />}
-                label="Font dyslexia"
-                hint="OpenDyslexic - dễ đọc hơn"
+                label={t('a11y.dyslexiaFont', language)}
+                hint={t('a11y.dyslexiaFontHint', language)}
                 checked={prefs.dyslexiaFont}
                 onChange={(v) => update({ dyslexiaFont: v })}
               />
@@ -256,11 +259,11 @@ export function AccessibilityToolbar() {
               className="mt-5 w-full px-4 py-2.5 bg-slate-100 text-slate-700 text-xs font-bold rounded-lg hover:bg-slate-200 flex items-center justify-center gap-1.5 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-400"
             >
               <RotateCcw className="w-3.5 h-3.5" aria-hidden="true" />
-              Đặt lại mặc định
+              {t('a11y.resetDefaults', language)}
             </button>
 
             <p className="mt-4 text-[10px] text-slate-500 leading-relaxed">
-              Tùy chọn được lưu trên trình duyệt của bạn. Tuân thủ WCAG 2.2 AA.
+              {t('a11y.savedNote', language)}
             </p>
           </aside>
         </>

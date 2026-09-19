@@ -927,14 +927,8 @@ export function AdminLogs() {
 
   return (
     <AdminLayout
-      title={lang.title}
-      titleEn="System Logs"
-      titleAr="سجلات النظام"
-      titleFr="Journaux système"
-      subtitle={lang.subtitle}
-      subtitleEn="Real-time monitoring of events, errors and alerts from all MADA AI microservices."
-      subtitleAr="مراقبة في الوقت الفعلي للأحداث والأخطاء والتنبيهات."
-      subtitleFr="Surveillance en temps réel des événements, erreurs et alertes."
+      titleKey="admin.topBar.logs"
+      subtitleKey="admin.topBar.logsSub"
       showLayoutTitle={false}
     >
       {/* Hero Banner Section */}

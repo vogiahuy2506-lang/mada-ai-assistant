@@ -81,13 +81,9 @@ export function AuthModal() {
 
     setLoading(true);
     try {
-      console.log('🔐 Auth request:', tab, form.email);
-      
       const result = tab === 'login'
         ? await loginWithEmail(form.email, form.password)
         : await registerWithEmail(form.email, form.password, form.name);
-
-      console.log('📦 Auth result:', result);
 
       if (!result.success) {
         setError(result.error || t('auth.loginError', language));
@@ -100,7 +96,6 @@ export function AuthModal() {
 
       setTimeout(() => {
         const u = useAuthStore.getState().user;
-        console.log('👤 User after login:', u);
         if (u?.role === 'admin') navigate('/admin');
         else if (u?.role === 'data_manager') navigate('/data');
         else navigate('/');

@@ -10,7 +10,8 @@ import clsx from 'clsx';
 function useAnalyticsTranslation() {
   const language = useLanguageStore((state) => state.language) as Language;
   const t = (key: string, params?: Record<string, string>) => {
-    let text = translations[language]?.[key as keyof typeof translations[typeof language]] as string || key;
+    // Fallback to Vietnamese if language not found
+    let text = (translations[language]?.[key as keyof typeof translations[typeof language]] || translations.vi[key as keyof typeof translations.vi]) as string || key;
     if (params) {
       Object.entries(params).forEach(([k, v]) => {
         text = text.replace(`{${k}}`, v);
@@ -171,14 +172,8 @@ export function AdminAnalytics() {
   const rangeLabel = (r: TimeRange) => t(`admin.analytics.range.${r}`);
   return (
     <AdminLayout
-      title={t('admin.topBar.analytics')}
-      titleEn="System Analytics"
-      titleAr="تحليلات النظام"
-      titleFr="Analytique système"
-      subtitle={t('admin.topBar.analyticsSub')}
-      subtitleEn="Detailed reports on traffic, user behavior and MADA AI performance."
-      subtitleAr="تقارير مفصلة عن حركة المرور وسلوك المستخدمين وأداء MADA AI."
-      subtitleFr="Rapports détaillés sur le trafic, le comportement et les performances."
+      titleKey="admin.topBar.analytics"
+      subtitleKey="admin.topBar.analyticsSub"
       showLayoutTitle={false}
     >
       {/* Hero Banner Section */}

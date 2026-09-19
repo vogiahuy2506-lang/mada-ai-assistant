@@ -1,6 +1,10 @@
 import madaLogo from '../assets/mada-logo.png';
+import { t } from '@/lib/translations';
+import { useLanguageStore } from '@/stores';
 
 export function Footer() {
+  const language = useLanguageStore((s) => s.language);
+
   return (
     <footer className="w-full flex flex-col md:flex-row justify-between items-start md:items-end p-6 md:p-8 gap-6 bg-zinc-900 text-zinc-100">
       <div className="flex flex-col gap-3 max-w-md">
@@ -9,25 +13,25 @@ export function Footer() {
           <div className="font-black text-2xl tracking-tight">MADA AI</div>
         </div>
         <p className="text-sm text-zinc-400">
-          Tiên phong trong việc ứng dụng trí tuệ nhân tạo để nâng tầm cuộc sống cho mọi người thông qua công nghệ hỗ trợ chuẩn hóa.
+          {t('footer.tagline', language)}
         </p>
         <p className="text-xs text-zinc-500 uppercase tracking-wider">
-          © 2024 MADA AI
+          {t('footer.copyright', language)}
         </p>
       </div>
 
       <div className="flex gap-12">
         <div className="flex flex-col gap-3">
-          <span className="text-xs font-semibold uppercase text-violet-400 tracking-wider">Tài nguyên</span>
-          <a className="text-sm text-zinc-400 hover:text-white transition-colors" href="#">Đạo đức AI</a>
-          <a className="text-sm text-zinc-400 hover:text-white transition-colors" href="#">Bảo mật</a>
-          <a className="text-sm text-zinc-400 hover:text-white transition-colors" href="#">Github</a>
+          <span className="text-xs font-semibold uppercase text-violet-400 tracking-wider">{t('footer.resources', language)}</span>
+          <a className="text-sm text-zinc-400 hover:text-white transition-colors" href="#">{t('footer.aiEthics', language)}</a>
+          <a className="text-sm text-zinc-400 hover:text-white transition-colors" href="#">{t('footer.security', language)}</a>
+          <a className="text-sm text-zinc-400 hover:text-white transition-colors" href="#">{t('footer.github', language)}</a>
         </div>
         <div className="flex flex-col gap-3">
-          <span className="text-xs font-semibold uppercase text-violet-400 tracking-wider">Liên kết</span>
-          <a className="text-sm text-zinc-400 hover:text-white transition-colors" href="#">Hỗ trợ</a>
-          <a className="text-sm text-zinc-400 hover:text-white transition-colors" href="#">Cập nhật</a>
-          <a className="text-sm text-zinc-400 hover:text-white transition-colors" href="#">ISO 9999</a>
+          <span className="text-xs font-semibold uppercase text-violet-400 tracking-wider">{t('footer.links', language)}</span>
+          <a className="text-sm text-zinc-400 hover:text-white transition-colors" href="#">{t('footer.support', language)}</a>
+          <a className="text-sm text-zinc-400 hover:text-white transition-colors" href="#">{t('footer.updates', language)}</a>
+          <a className="text-sm text-zinc-400 hover:text-white transition-colors" href="#">{t('footer.iso9999', language)}</a>
         </div>
       </div>
     </footer>

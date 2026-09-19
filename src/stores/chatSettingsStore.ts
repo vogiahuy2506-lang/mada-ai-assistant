@@ -319,7 +319,6 @@ export const useChatSettingsStore = create<ChatSettingsState>()(
         try {
           const token = localStorage.getItem('mada-access-token');
           if (!token) {
-            console.error('No access token found');
             return;
           }
 

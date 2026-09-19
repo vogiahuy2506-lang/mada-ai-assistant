@@ -52,6 +52,11 @@ const permissionsTranslations: Record<string, Record<Language, string>> = {
   'permissions.reset': { vi: 'Reset', en: 'Reset', ar: 'إعادة تعيين', fr: 'Réinitialiser' },
   'permissions.save': { vi: 'Lưu', en: 'Save', ar: 'حفظ', fr: 'Enregistrer' },
 
+  // Group names
+  'permissions.group.users': { vi: 'Người dùng', en: 'Users', ar: 'المستخدمين', fr: 'Utilisateurs' },
+  'permissions.group.knowledgeBase': { vi: 'Knowledge Base', en: 'Knowledge Base', ar: 'قاعدة المعرفة', fr: 'Base de connaissances' },
+  'permissions.group.products': { vi: 'Sản phẩm', en: 'Products', ar: 'المنتجات', fr: 'Produits' },
+
   // Error messages
   'permissions.error.requestInterrupted': { vi: 'Yêu cầu bị gián đoạn. Vui lòng thử lại.', en: 'Request interrupted. Please try again.', ar: 'انقطع الطلب. يرجى المحاولة مرة أخرى.', fr: 'Demande interrompue. Veuillez réessayer.' },
   'permissions.error.sessionExpired': { vi: 'Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.', en: 'Session expired. Please login again.', ar: 'انتهت الجلسة. يرجى تسجيل الدخول مرة أخرى.', fr: 'Session expirée. Veuillez vous reconnecter.' },
@@ -88,12 +93,22 @@ export default function PermissionsPage() {
   const [selectedUserId, setSelectedUserId] = useState<string>('');
   const [userPermissions, setUserPermissions] = useState<UserPermissions | null>(null);
   const [userCustomPerms, setUserCustomPerms] = useState<{ granted: string[]; denied: string[] }>({ granted: [], denied: [] });
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['Người dùng', 'Knowledge Base', 'Sản phẩm']));
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set<string>());
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const currentUser = useAuthStore((s) => s.user);
   const isSuperAdmin = currentUser?.role === 'super_admin';
   const { language } = useLanguageStore();
+
+  // Update expanded groups when language changes
+  useEffect(() => {
+    const lang = (language || 'vi') as Language;
+    setExpandedGroups(new Set([
+      tPerm('permissions.group.users', lang),
+      tPerm('permissions.group.knowledgeBase', lang),
+      tPerm('permissions.group.products', lang),
+    ]));
+  }, [language]);
 
   // ─── Auth helper ───
   const adminFetch = useCallback(async (path: string, init: RequestInit = {}, retry = true): Promise<any> => {

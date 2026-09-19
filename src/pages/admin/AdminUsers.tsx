@@ -2,7 +2,6 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { AdminLayout } from './AdminLayout';
 import { getAccessToken, getRefreshToken } from '../../lib/api';
 import { useAuthStore, useLanguageStore } from '@/stores';
-import { useTranslation, Language } from '@/lib/translations';
 import clsx from 'clsx';
 import {
   Users, Search, Shield, ShieldOff, Trash2,
@@ -10,6 +9,473 @@ import {
   Mail, Calendar, Clock, UserPlus, Copy, Check, Eye, EyeOff, X,
   KeyRound, RefreshCw, Sparkles, AlertTriangle, ShieldCheck,
 } from 'lucide-react';
+
+// Admin Users translations - supports all languages via useLanguageStore
+const tU = (key: string, params?: Record<string, string>): string => {
+  const lang = useLanguageStore.getState().language;
+  const translations: Record<string, Record<string, string>> = {
+    vi: {
+      // Common
+      'admin.common.loading': 'Đang tải...',
+      'admin.common.error': 'Có lỗi xảy ra',
+      'admin.common.active': 'Hoạt động',
+      'admin.common.cancel': 'Hủy',
+      'admin.common.save': 'Lưu',
+      'admin.common.all': 'Tất cả',
+      'admin.common.selected': 'đã chọn',
+      'admin.common.selectAll': 'Chọn tất cả',
+      'admin.common.deselect': 'Bỏ chọn',
+      'admin.common.previous': 'Trước',
+      'admin.common.next': 'Tiếp',
+      'admin.common.page': 'Trang',
+      'admin.common.edit': 'Sửa',
+      'admin.common.add': 'Thêm',
+      'admin.common.delete': 'Xóa',
+      'admin.common.success': 'Thành công',
+      // Users specific
+      'admin.users.title': 'Quản lý Người dùng',
+      'admin.users.heroTitle': 'Quản lý Người dùng',
+      'admin.users.heroSubtitle': 'Quản lý tài khoản, phân quyền và theo dõi hoạt động của người dùng trong hệ thống.',
+      'admin.users.totalUsers': 'Tổng người dùng',
+      'admin.users.activeUsers': 'Đang hoạt động',
+      'admin.users.pendingUsers': 'Chờ duyệt',
+      'admin.users.lockedUsers': 'Bị khóa',
+      'admin.users.searchPlaceholder': 'Tìm kiếm theo tên, email...',
+      'admin.users.allStatus': 'Tất cả trạng thái',
+      'admin.users.active': 'Hoạt động',
+      'admin.users.pending': 'Chờ duyệt',
+      'admin.users.locked': 'Bị khóa',
+      'admin.users.allRoles': 'Tất cả vai trò',
+      'admin.users.admin': 'Quản trị',
+      'admin.users.user': 'Người dùng',
+      'admin.users.staff': 'Nhân viên',
+      'admin.users.superAdmin': 'Super Admin',
+      'admin.users.limited': '(giới hạn)',
+      'admin.users.createUser': 'Tạo người dùng',
+      'admin.users.userCol': 'Người dùng',
+      'admin.users.statusCol': 'Trạng thái',
+      'admin.users.roleCol': 'Vai trò',
+      'admin.users.planCol': 'Gói',
+      'admin.users.loginCol': 'Đăng nhập cuối',
+      'admin.users.createdCol': 'Tạo lúc',
+      'admin.users.actionsCol': 'Hành động',
+      'admin.users.noUsers': 'Chưa có người dùng nào',
+      'admin.users.prev': '← Trước',
+      'admin.users.next': 'Tiếp →',
+      'admin.users.page': 'Trang',
+      'admin.users.superAdminBadge': 'Super Admin',
+      'admin.users.planFree': 'Miễn phí',
+      'admin.users.planPro': 'Pro',
+      'admin.users.planEnterprise': 'Enterprise',
+      'admin.users.lockAccount': 'Khóa tài khoản',
+      'admin.users.unlockAccount': 'Mở khóa tài khoản',
+      'admin.users.approveAccount': 'Phê duyệt tài khoản',
+      'admin.users.promoteToAdmin': 'Nâng cấp lên Admin',
+      'admin.users.demoteToUser': 'Hạ cấp xuống User',
+      'admin.users.resetPassword': 'Đặt lại mật khẩu',
+      'admin.users.deleteAccount': 'Xóa tài khoản',
+      'admin.users.createAccountTitle': 'Tạo tài khoản mới',
+      'admin.users.fullName': 'Họ tên',
+      'admin.users.namePlaceholder': 'Nhập họ tên',
+      'admin.users.email': 'Email',
+      'admin.users.emailPlaceholder': 'user@example.com',
+      'admin.users.password': 'Mật khẩu',
+      'admin.users.autoGenerate': 'Tự động tạo',
+      'admin.users.autoGenPlaceholder': 'Mật khẩu sẽ được tạo tự động',
+      'admin.users.enterManually': 'Nhập thủ công',
+      'admin.users.generateNew': 'Tạo mới',
+      'admin.users.hidePassword': 'Ẩn mật khẩu',
+      'admin.users.showPassword': 'Hiện mật khẩu',
+      'admin.users.autoGenDesc': 'Mật khẩu an toàn sẽ được tạo tự động',
+      'admin.users.manualEntryDesc': 'Nhập mật khẩu theo ý muốn',
+      'admin.users.creating': 'Đang tạo...',
+      'admin.users.create': 'Tạo',
+      'admin.users.accountCreatedSuccess': 'Tài khoản đã được tạo!',
+      'admin.users.loginEmail': 'Email đăng nhập',
+      'admin.users.tempPassword': 'Mật khẩu tạm',
+      'admin.users.titleCopyEmail': 'Sao chép email',
+      'admin.users.titleCopyPassword': 'Sao chép mật khẩu',
+      'admin.users.passwordShownOnce': 'Mật khẩu chỉ hiển thị một lần. Hãy sao chép ngay!',
+      'admin.users.copyForChat': 'Copy để gửi chat',
+      'admin.users.copiedAllInfo': 'Đã copy!',
+      'admin.users.chatTemplate': 'Email: {email}\nMật khẩu: {password}\nĐăng nhập tại: {url}',
+      'admin.users.close': 'Đóng',
+      'admin.users.resetPasswordTitle': 'Đặt lại mật khẩu',
+      'admin.users.newPasswordCreated': 'Mật khẩu mới đã được tạo cho',
+      'admin.users.newPassword': 'Mật khẩu mới',
+      'admin.users.requestInterrupted': 'Yêu cầu bị gián đoạn. Vui lòng thử lại.',
+      'admin.users.sessionExpired': 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
+      'admin.users.error': 'Lỗi',
+      'admin.users.noPermission': 'Bạn không có quyền thực hiện hành động này.',
+      'admin.users.emailExists': 'Email đã tồn tại trong hệ thống.',
+      'admin.users.nameRequired': 'Vui lòng nhập họ tên.',
+      'admin.users.pwdMinChars': 'Mật khẩu phải có ít nhất 6 ký tự.',
+      'admin.users.createFailed': 'Tạo người dùng thất bại.',
+      'admin.users.connectionError': 'Lỗi kết nối. Vui lòng kiểm tra mạng.',
+      'admin.users.resetFail': 'Đặt lại mật khẩu thất bại.',
+      'admin.users.confirmDeleteUser': 'Xác nhận xóa người dùng {name} ({email})?',
+      'admin.users.confirmDeleteAdmin': 'Đây là tài khoản Admin. Bạn có chắc muốn xóa?',
+      'admin.users.confirmRoleChange': 'Xác nhận thay đổi vai trò thành {role}?',
+      'admin.users.confirmResetPwd': 'Đặt lại mật khẩu cho {name} ({email})?',
+      'admin.users.neverLogin': 'Chưa đăng nhập',
+      'admin.users.superAdminOnly': '(Chỉ Super Admin)',
+      'admin.users.plan': 'Gói',
+      'admin.users.free': 'Miễn phí',
+      'admin.users.freeQuota': '100 tin nhắn',
+      'admin.users.pro': 'Pro',
+      'admin.users.proQuota': '1000 tin nhắn',
+      'admin.users.enterprise': 'Enterprise',
+      'admin.users.enterpriseQuota': 'Không giới hạn',
+    },
+    en: {
+      // Common
+      'admin.common.loading': 'Loading...',
+      'admin.common.error': 'An error occurred',
+      'admin.common.active': 'Active',
+      'admin.common.cancel': 'Cancel',
+      'admin.common.save': 'Save',
+      'admin.common.all': 'All',
+      'admin.common.selected': 'selected',
+      'admin.common.selectAll': 'Select all',
+      'admin.common.deselect': 'Deselect',
+      'admin.common.previous': 'Previous',
+      'admin.common.next': 'Next',
+      'admin.common.page': 'Page',
+      'admin.common.edit': 'Edit',
+      'admin.common.add': 'Add',
+      'admin.common.delete': 'Delete',
+      'admin.common.success': 'Success',
+      // Users specific
+      'admin.users.title': 'User Management',
+      'admin.users.heroTitle': 'User Management',
+      'admin.users.heroSubtitle': 'Manage accounts, permissions and monitor user activities in the system.',
+      'admin.users.totalUsers': 'Total Users',
+      'admin.users.activeUsers': 'Active',
+      'admin.users.pendingUsers': 'Pending',
+      'admin.users.lockedUsers': 'Locked',
+      'admin.users.searchPlaceholder': 'Search by name, email...',
+      'admin.users.allStatus': 'All statuses',
+      'admin.users.active': 'Active',
+      'admin.users.pending': 'Pending',
+      'admin.users.locked': 'Locked',
+      'admin.users.allRoles': 'All roles',
+      'admin.users.admin': 'Admin',
+      'admin.users.user': 'User',
+      'admin.users.staff': 'Staff',
+      'admin.users.superAdmin': 'Super Admin',
+      'admin.users.limited': '(limited)',
+      'admin.users.createUser': 'Create User',
+      'admin.users.userCol': 'User',
+      'admin.users.statusCol': 'Status',
+      'admin.users.roleCol': 'Role',
+      'admin.users.planCol': 'Plan',
+      'admin.users.loginCol': 'Last Login',
+      'admin.users.createdCol': 'Created',
+      'admin.users.actionsCol': 'Actions',
+      'admin.users.noUsers': 'No users yet',
+      'admin.users.prev': '← Prev',
+      'admin.users.next': 'Next →',
+      'admin.users.page': 'Page',
+      'admin.users.superAdminBadge': 'Super Admin',
+      'admin.users.planFree': 'Free',
+      'admin.users.planPro': 'Pro',
+      'admin.users.planEnterprise': 'Enterprise',
+      'admin.users.lockAccount': 'Lock Account',
+      'admin.users.unlockAccount': 'Unlock Account',
+      'admin.users.approveAccount': 'Approve Account',
+      'admin.users.promoteToAdmin': 'Promote to Admin',
+      'admin.users.demoteToUser': 'Demote to User',
+      'admin.users.resetPassword': 'Reset Password',
+      'admin.users.deleteAccount': 'Delete Account',
+      'admin.users.createAccountTitle': 'Create New Account',
+      'admin.users.fullName': 'Full Name',
+      'admin.users.namePlaceholder': 'Enter full name',
+      'admin.users.email': 'Email',
+      'admin.users.emailPlaceholder': 'user@example.com',
+      'admin.users.password': 'Password',
+      'admin.users.autoGenerate': 'Auto generate',
+      'admin.users.autoGenPlaceholder': 'Password will be auto-generated',
+      'admin.users.enterManually': 'Enter manually',
+      'admin.users.generateNew': 'Generate New',
+      'admin.users.hidePassword': 'Hide password',
+      'admin.users.showPassword': 'Show password',
+      'admin.users.autoGenDesc': 'A secure password will be auto-generated',
+      'admin.users.manualEntryDesc': 'Enter password as you wish',
+      'admin.users.creating': 'Creating...',
+      'admin.users.create': 'Create',
+      'admin.users.accountCreatedSuccess': 'Account created!',
+      'admin.users.loginEmail': 'Login Email',
+      'admin.users.tempPassword': 'Temporary Password',
+      'admin.users.titleCopyEmail': 'Copy email',
+      'admin.users.titleCopyPassword': 'Copy password',
+      'admin.users.passwordShownOnce': 'Password is shown only once. Copy now!',
+      'admin.users.copyForChat': 'Copy to send chat',
+      'admin.users.copiedAllInfo': 'Copied!',
+      'admin.users.chatTemplate': 'Email: {email}\nPassword: {password}\nLogin at: {url}',
+      'admin.users.close': 'Close',
+      'admin.users.resetPasswordTitle': 'Reset Password',
+      'admin.users.newPasswordCreated': 'New password created for',
+      'admin.users.newPassword': 'New Password',
+      'admin.users.requestInterrupted': 'Request interrupted. Please try again.',
+      'admin.users.sessionExpired': 'Session expired. Please login again.',
+      'admin.users.error': 'Error',
+      'admin.users.noPermission': 'You do not have permission to perform this action.',
+      'admin.users.emailExists': 'Email already exists in the system.',
+      'admin.users.nameRequired': 'Please enter full name.',
+      'admin.users.pwdMinChars': 'Password must be at least 6 characters.',
+      'admin.users.createFailed': 'Failed to create user.',
+      'admin.users.connectionError': 'Connection error. Please check your network.',
+      'admin.users.resetFail': 'Failed to reset password.',
+      'admin.users.confirmDeleteUser': 'Confirm delete user {name} ({email})?',
+      'admin.users.confirmDeleteAdmin': 'This is an Admin account. Are you sure you want to delete?',
+      'admin.users.confirmRoleChange': 'Confirm change role to {role}?',
+      'admin.users.confirmResetPwd': 'Reset password for {name} ({email})?',
+      'admin.users.neverLogin': 'Never logged in',
+      'admin.users.superAdminOnly': '(Super Admin only)',
+      'admin.users.plan': 'Plan',
+      'admin.users.free': 'Free',
+      'admin.users.freeQuota': '100 messages',
+      'admin.users.pro': 'Pro',
+      'admin.users.proQuota': '1000 messages',
+      'admin.users.enterprise': 'Enterprise',
+      'admin.users.enterpriseQuota': 'Unlimited',
+    },
+    ar: {
+      // Common
+      'admin.common.loading': 'جاري التحميل...',
+      'admin.common.error': 'حدث خطأ',
+      'admin.common.active': 'نشط',
+      'admin.common.cancel': 'إلغاء',
+      'admin.common.save': 'حفظ',
+      'admin.common.all': 'الكل',
+      'admin.common.selected': 'محدد',
+      'admin.common.selectAll': 'تحديد الكل',
+      'admin.common.deselect': 'إلغاء التحديد',
+      'admin.common.previous': 'السابق',
+      'admin.common.next': 'التالي',
+      'admin.common.page': 'صفحة',
+      'admin.common.edit': 'تعديل',
+      'admin.common.add': 'إضافة',
+      'admin.common.delete': 'حذف',
+      'admin.common.success': 'نجاح',
+      // Users specific
+      'admin.users.title': 'إدارة المستخدمين',
+      'admin.users.heroTitle': 'إدارة المستخدمين',
+      'admin.users.heroSubtitle': 'إدارة الحسابات والأذونات ومراقبة أنشطة المستخدمين في النظام.',
+      'admin.users.totalUsers': 'إجمالي المستخدمين',
+      'admin.users.activeUsers': 'نشط',
+      'admin.users.pendingUsers': 'معلق',
+      'admin.users.lockedUsers': 'مقفل',
+      'admin.users.searchPlaceholder': 'البحث بالاسم أو البريد...',
+      'admin.users.allStatus': 'جميع الحالات',
+      'admin.users.active': 'نشط',
+      'admin.users.pending': 'معلق',
+      'admin.users.locked': 'مقفل',
+      'admin.users.allRoles': 'جميع الأدوار',
+      'admin.users.admin': 'مدير',
+      'admin.users.user': 'مستخدم',
+      'admin.users.staff': 'موظف',
+      'admin.users.superAdmin': 'مدير أعلى',
+      'admin.users.limited': '(محدد)',
+      'admin.users.createUser': 'إنشاء مستخدم',
+      'admin.users.userCol': 'مستخدم',
+      'admin.users.statusCol': 'حالة',
+      'admin.users.roleCol': 'دور',
+      'admin.users.planCol': 'خطة',
+      'admin.users.loginCol': 'آخر تسجيل دخول',
+      'admin.users.createdCol': 'تاريخ الإنشاء',
+      'admin.users.actionsCol': 'إجراءات',
+      'admin.users.noUsers': 'لا يوجد مستخدمون بعد',
+      'admin.users.prev': '→ السابق',
+      'admin.users.next': 'التالي ←',
+      'admin.users.page': 'صفحة',
+      'admin.users.superAdminBadge': 'مدير أعلى',
+      'admin.users.planFree': 'مجاني',
+      'admin.users.planPro': 'احترافي',
+      'admin.users.planEnterprise': 'مؤسساتي',
+      'admin.users.lockAccount': 'قفل الحساب',
+      'admin.users.unlockAccount': 'فتح الحساب',
+      'admin.users.approveAccount': 'الموافقة على الحساب',
+      'admin.users.promoteToAdmin': 'ترقية إلى مدير',
+      'admin.users.demoteToUser': 'تخفيض إلى مستخدم',
+      'admin.users.resetPassword': 'إعادة تعيين كلمة المرور',
+      'admin.users.deleteAccount': 'حذف الحساب',
+      'admin.users.createAccountTitle': 'إنشاء حساب جديد',
+      'admin.users.fullName': 'الاسم الكامل',
+      'admin.users.namePlaceholder': 'أدخل الاسم الكامل',
+      'admin.users.email': 'البريد الإلكتروني',
+      'admin.users.emailPlaceholder': 'user@example.com',
+      'admin.users.password': 'كلمة المرور',
+      'admin.users.autoGenerate': 'توليد تلقائي',
+      'admin.users.autoGenPlaceholder': 'سيتم توليد كلمة المرور تلقائياً',
+      'admin.users.enterManually': 'إدخال يدوي',
+      'admin.users.generateNew': 'توليد جديد',
+      'admin.users.hidePassword': 'إخفاء كلمة المرور',
+      'admin.users.showPassword': 'إظهار كلمة المرور',
+      'admin.users.autoGenDesc': 'سيتم توليد كلمة مرور آمنة تلقائياً',
+      'admin.users.manualEntryDesc': 'أدخل كلمة المرور حسب رغبتك',
+      'admin.users.creating': 'جاري الإنشاء...',
+      'admin.users.create': 'إنشاء',
+      'admin.users.accountCreatedSuccess': 'تم إنشاء الحساب!',
+      'admin.users.loginEmail': 'بريد تسجيل الدخول',
+      'admin.users.tempPassword': 'كلمة المرور المؤقتة',
+      'admin.users.titleCopyEmail': 'نسخ البريد',
+      'admin.users.titleCopyPassword': 'نسخ كلمة المرور',
+      'admin.users.passwordShownOnce': 'كلمة المرور تظهر مرة واحدة فقط. انسخها الآن!',
+      'admin.users.copyForChat': 'نسخ للإرسال',
+      'admin.users.copiedAllInfo': 'تم النسخ!',
+      'admin.users.chatTemplate': 'البريد: {email}\nكلمة المرور: {password}\nتسجيل الدخول في: {url}',
+      'admin.users.close': 'إغلاق',
+      'admin.users.resetPasswordTitle': 'إعادة تعيين كلمة المرور',
+      'admin.users.newPasswordCreated': 'تم إنشاء كلمة مرور جديدة لـ',
+      'admin.users.newPassword': 'كلمة المرور الجديدة',
+      'admin.users.requestInterrupted': 'تم مقاطعة الطلب. يرجى المحاولة مرة أخرى.',
+      'admin.users.sessionExpired': 'انتهت صلاحية الجلسة. يرجى تسجيل الدخول مرة أخرى.',
+      'admin.users.error': 'خطأ',
+      'admin.users.noPermission': 'ليس لديك صلاحية لتنفيذ هذا الإجراء.',
+      'admin.users.emailExists': 'البريد الإلكتروني موجود بالفعل في النظام.',
+      'admin.users.nameRequired': 'يرجى إدخال الاسم الكامل.',
+      'admin.users.pwdMinChars': 'يجب أن تكون كلمة المرور 6 أحرف على الأقل.',
+      'admin.users.createFailed': 'فشل في إنشاء المستخدم.',
+      'admin.users.connectionError': 'خطأ في الاتصال. يرجى التحقق من الشبكة.',
+      'admin.users.resetFail': 'فشل في إعادة تعيين كلمة المرور.',
+      'admin.users.confirmDeleteUser': 'تأكيد حذف المستخدم {name} ({email})؟',
+      'admin.users.confirmDeleteAdmin': 'هذا حساب مدير. هل أنت متأكد من الحذف؟',
+      'admin.users.confirmRoleChange': 'تأكيد تغيير الدور إلى {role}؟',
+      'admin.users.confirmResetPwd': 'إعادة تعيين كلمة المرور لـ {name} ({email})؟',
+      'admin.users.neverLogin': 'لم يسجل الدخول أبداً',
+      'admin.users.superAdminOnly': '(المدير الأعلى فقط)',
+      'admin.users.plan': 'خطة',
+      'admin.users.free': 'مجاني',
+      'admin.users.freeQuota': '100 رسالة',
+      'admin.users.pro': 'احترافي',
+      'admin.users.proQuota': '1000 رسالة',
+      'admin.users.enterprise': 'مؤسساتي',
+      'admin.users.enterpriseQuota': 'غير محدود',
+    },
+    fr: {
+      // Common
+      'admin.common.loading': 'Chargement...',
+      'admin.common.error': 'Une erreur est survenue',
+      'admin.common.active': 'Actif',
+      'admin.common.cancel': 'Annuler',
+      'admin.common.save': 'Enregistrer',
+      'admin.common.all': 'Tous',
+      'admin.common.selected': 'sélectionné',
+      'admin.common.selectAll': 'Tout sélectionner',
+      'admin.common.deselect': 'Tout désélectionner',
+      'admin.common.previous': 'Précédent',
+      'admin.common.next': 'Suivant',
+      'admin.common.page': 'Page',
+      'admin.common.edit': 'Modifier',
+      'admin.common.add': 'Ajouter',
+      'admin.common.delete': 'Supprimer',
+      'admin.common.success': 'Succès',
+      // Users specific
+      'admin.users.title': 'Gestion des utilisateurs',
+      'admin.users.heroTitle': 'Gestion des utilisateurs',
+      'admin.users.heroSubtitle': 'Gérer les comptes, les permissions et surveiller les activités des utilisateurs.',
+      'admin.users.totalUsers': 'Total utilisateurs',
+      'admin.users.activeUsers': 'Actifs',
+      'admin.users.pendingUsers': 'En attente',
+      'admin.users.lockedUsers': 'Verrouillés',
+      'admin.users.searchPlaceholder': 'Rechercher par nom, email...',
+      'admin.users.allStatus': 'Tous les statuts',
+      'admin.users.active': 'Actif',
+      'admin.users.pending': 'En attente',
+      'admin.users.locked': 'Verrouillé',
+      'admin.users.allRoles': 'Tous les rôles',
+      'admin.users.admin': 'Admin',
+      'admin.users.user': 'Utilisateur',
+      'admin.users.staff': 'Personnel',
+      'admin.users.superAdmin': 'Super Admin',
+      'admin.users.limited': '(limité)',
+      'admin.users.createUser': 'Créer un utilisateur',
+      'admin.users.userCol': 'Utilisateur',
+      'admin.users.statusCol': 'Statut',
+      'admin.users.roleCol': 'Rôle',
+      'admin.users.planCol': 'Plan',
+      'admin.users.loginCol': 'Dernière connexion',
+      'admin.users.createdCol': 'Créé le',
+      'admin.users.actionsCol': 'Actions',
+      'admin.users.noUsers': 'Pas encore d\'utilisateurs',
+      'admin.users.prev': '← Préc',
+      'admin.users.next': 'Suiv →',
+      'admin.users.page': 'Page',
+      'admin.users.superAdminBadge': 'Super Admin',
+      'admin.users.planFree': 'Gratuit',
+      'admin.users.planPro': 'Pro',
+      'admin.users.planEnterprise': 'Entreprise',
+      'admin.users.lockAccount': 'Verrouiller le compte',
+      'admin.users.unlockAccount': 'Déverrouiller le compte',
+      'admin.users.approveAccount': 'Approuver le compte',
+      'admin.users.promoteToAdmin': 'Promouvoir Admin',
+      'admin.users.demoteToUser': 'Rétrograder Utilisateur',
+      'admin.users.resetPassword': 'Réinitialiser le mot de passe',
+      'admin.users.deleteAccount': 'Supprimer le compte',
+      'admin.users.createAccountTitle': 'Créer un nouveau compte',
+      'admin.users.fullName': 'Nom complet',
+      'admin.users.namePlaceholder': 'Entrez le nom complet',
+      'admin.users.email': 'Email',
+      'admin.users.emailPlaceholder': 'user@example.com',
+      'admin.users.password': 'Mot de passe',
+      'admin.users.autoGenerate': 'Génération auto',
+      'admin.users.autoGenPlaceholder': 'Le mot de passe sera généré automatiquement',
+      'admin.users.enterManually': 'Saisie manuelle',
+      'admin.users.generateNew': 'Générer nouveau',
+      'admin.users.hidePassword': 'Masquer le mot de passe',
+      'admin.users.showPassword': 'Afficher le mot de passe',
+      'admin.users.autoGenDesc': 'Un mot de passe sécurisé sera généré automatiquement',
+      'admin.users.manualEntryDesc': 'Entrez le mot de passe à votre guise',
+      'admin.users.creating': 'Création...',
+      'admin.users.create': 'Créer',
+      'admin.users.accountCreatedSuccess': 'Compte créé!',
+      'admin.users.loginEmail': 'Email de connexion',
+      'admin.users.tempPassword': 'Mot de passe temporaire',
+      'admin.users.titleCopyEmail': 'Copier l\'email',
+      'admin.users.titleCopyPassword': 'Copier le mot de passe',
+      'admin.users.passwordShownOnce': 'Le mot de passe n\'est affiché qu\'une fois. Copiez-le maintenant!',
+      'admin.users.copyForChat': 'Copier pour envoyer',
+      'admin.users.copiedAllInfo': 'Copié!',
+      'admin.users.chatTemplate': 'Email: {email}\nMot de passe: {password}\nConnexion sur: {url}',
+      'admin.users.close': 'Fermer',
+      'admin.users.resetPasswordTitle': 'Réinitialiser le mot de passe',
+      'admin.users.newPasswordCreated': 'Nouveau mot de passe créé pour',
+      'admin.users.newPassword': 'Nouveau mot de passe',
+      'admin.users.requestInterrupted': 'Demande interrompue. Veuillez réessayer.',
+      'admin.users.sessionExpired': 'Session expirée. Veuillez vous reconnecter.',
+      'admin.users.error': 'Erreur',
+      'admin.users.noPermission': 'Vous n\'avez pas la permission d\'effectuer cette action.',
+      'admin.users.emailExists': 'L\'email existe déjà dans le système.',
+      'admin.users.nameRequired': 'Veuillez entrer le nom complet.',
+      'admin.users.pwdMinChars': 'Le mot de passe doit contenir au moins 6 caractères.',
+      'admin.users.createFailed': 'Échec de la création de l\'utilisateur.',
+      'admin.users.connectionError': 'Erreur de connexion. Veuillez vérifier votre réseau.',
+      'admin.users.resetFail': 'Échec de la réinitialisation du mot de passe.',
+      'admin.users.confirmDeleteUser': 'Confirmer la suppression de {name} ({email})?',
+      'admin.users.confirmDeleteAdmin': 'Ceci est un compte Admin. Êtes-vous sûr de vouloir supprimer?',
+      'admin.users.confirmRoleChange': 'Confirmer le changement de rôle en {role}?',
+      'admin.users.confirmResetPwd': 'Réinitialiser le mot de passe pour {name} ({email})?',
+      'admin.users.neverLogin': 'Jamais connecté',
+      'admin.users.superAdminOnly': '(Super Admin uniquement)',
+      'admin.users.plan': 'Plan',
+      'admin.users.free': 'Gratuit',
+      'admin.users.freeQuota': '100 messages',
+      'admin.users.pro': 'Pro',
+      'admin.users.proQuota': '1000 messages',
+      'admin.users.enterprise': 'Entreprise',
+      'admin.users.enterpriseQuota': 'Illimité',
+    },
+  };
+  
+  let text = translations[lang]?.[key] || translations['vi'][key] || key;
+  if (params) {
+    Object.entries(params).forEach(([k, v]) => {
+      text = text.replace(`{${k}}`, v);
+    });
+  }
+  return text;
+};
 
 interface User {
   id: string;
@@ -34,35 +500,19 @@ interface CreatedUserResult {
   message: string;
 }
 
-// ─── Translation helper function ───
+// Translation helper for Admin Users
 function useAdminUsersTranslation() {
-  const language = useLanguageStore((state) => state.language);
-  const { t } = useTranslation();
-
-  // Get locale code for date formatting
-  const getLocale = (): string => {
-    switch (language) {
-      case 'vi': return 'vi-VN';
-      case 'en': return 'en-US';
-      case 'ar': return 'ar-SA';
-      case 'fr': return 'fr-FR';
-      default: return 'en-US';
-    }
-  };
-
-  // Format date based on current language
+  // Format date
   const formatDate = (date: string | null): string => {
     if (!date) return '—';
-    return new Date(date).toLocaleDateString(getLocale(), {
+    return new Date(date).toLocaleDateString('vi-VN', {
       day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
     });
   };
 
   return {
-    t,
-    language,
+    t: tU,
     formatDate,
-    getLocale,
   };
 }
 
@@ -81,7 +531,7 @@ export default function AdminUsers() {
   const currentUser = useAuthStore((s) => s.user);
   const isSuperAdmin = currentUser?.role === 'super_admin';
 
-  const { t, language, formatDate } = useAdminUsersTranslation();
+  const { t, formatDate } = useAdminUsersTranslation();
 
   // ─── Auth helper with auto-refresh + friendly error ───
   const adminFetch = useCallback(async (path: string, init: RequestInit = {}, retry = true): Promise<any> => {
@@ -97,7 +547,7 @@ export default function AdminUsers() {
       res = await fetch(`/api${path}`, { ...init, headers });
     } catch (err: any) {
       if (err?.name === 'AbortError' || err?.message === 'Failed to fetch' || err instanceof TypeError) {
-        throw new Error(t('admin.users.requestInterrupted'));
+        throw new Error(tU('admin.users.requestInterrupted'));
       }
       throw err;
     }
@@ -113,7 +563,7 @@ export default function AdminUsers() {
       } catch (err: any) {
         localStorage.removeItem('mada-access-token');
         localStorage.removeItem('mada-refresh-token');
-        throw new Error(t('admin.users.sessionExpired'));
+        throw new Error(tU('admin.users.sessionExpired'));
       }
       if (refreshRes.ok) {
         const data = await refreshRes.json();
@@ -126,16 +576,16 @@ export default function AdminUsers() {
       // Refresh failed → logout
       localStorage.removeItem('mada-access-token');
       localStorage.removeItem('mada-refresh-token');
-      throw new Error(t('admin.users.sessionExpired'));
+      throw new Error(tU('admin.users.sessionExpired'));
     }
 
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       // Make Vietnamese error messages friendly
-      let msg = data.error || `${t('admin.users.error')} ${res.status}`;
-      if (res.status === 401) msg = t('admin.users.sessionExpired');
-      if (res.status === 403) msg = t('admin.users.noPermission');
-      if (res.status === 409) msg = data.error || t('admin.users.emailExists');
+      let msg = data.error || `${tU('admin.users.error')} ${res.status}`;
+      if (res.status === 401) msg = tU('admin.users.sessionExpired');
+      if (res.status === 403) msg = tU('admin.users.noPermission');
+      if (res.status === 409) msg = data.error || tU('admin.users.emailExists');
       throw new Error(msg);
     }
     return data;
@@ -201,25 +651,25 @@ export default function AdminUsers() {
       });
       await loadUsers();
     } catch (e: any) {
-      alert(e.message || t('admin.common.error'));
+      alert(e.message || tU('admin.common.error'));
     } finally { setActionLoading(null); }
   };
 
   const handleDelete = async (user: User) => {
-    if (!confirm(t('admin.users.confirmDeleteUser', { name: user.name, email: user.email }))) return;
-    if (user.role === 'admin' && !confirm(t('admin.users.confirmDeleteAdmin'))) return;
+    if (!confirm(tU('admin.users.confirmDeleteUser', { name: user.name, email: user.email }))) return;
+    if (user.role === 'admin' && !confirm(tU('admin.users.confirmDeleteAdmin'))) return;
 
     setActionLoading(user.id);
     try {
       await adminFetch(`/admin/users/${user.id}`, { method: 'DELETE' });
       await loadUsers();
     } catch (e: any) {
-      alert(e.message || t('admin.common.error'));
+      alert(e.message || tU('admin.common.error'));
     } finally { setActionLoading(null); }
   };
 
   const handleUpdateRole = async (userId: string, role: 'admin' | 'user') => {
-    if (!confirm(t('admin.users.confirmRoleChange', { role }))) return;
+    if (!confirm(tU('admin.users.confirmRoleChange', { role }))) return;
     setActionLoading(userId);
     try {
       await adminFetch(`/admin/users/${userId}/role`, {
@@ -228,7 +678,7 @@ export default function AdminUsers() {
       });
       await loadUsers();
     } catch (e: any) {
-      alert(e.message || t('admin.common.error'));
+      alert(e.message || tU('admin.common.error'));
     } finally { setActionLoading(null); }
   };
 
@@ -245,7 +695,7 @@ export default function AdminUsers() {
     for (let i = 0; i < 9; i++) {
       pwd += all.charAt(Math.floor(Math.random() * all.length));
     }
-    return pwd.split('').sort(() => Math.random() - 0.5).join('');
+    return pwd.splitU('').sort(() => Math.random() - 0.5).join('');
   };
 
   // ─── Create user ───
@@ -254,11 +704,11 @@ export default function AdminUsers() {
     setCreateError('');
 
     if (!createForm.name.trim() || !createForm.email.trim()) {
-      setCreateError(t('admin.users.nameRequired'));
+      setCreateError(tU('admin.users.nameRequired'));
       return;
     }
     if (!autoGenPassword && createForm.password.length < 6) {
-      setCreateError(t('admin.users.pwdMinChars'));
+      setCreateError(tU('admin.users.pwdMinChars'));
       return;
     }
 
@@ -288,10 +738,10 @@ export default function AdminUsers() {
         setAutoGenPassword(true);
         await loadUsers();
       } else {
-        setCreateError(data.error || t('admin.users.createFailed'));
+        setCreateError(data.error || tU('admin.users.createFailed'));
       }
     } catch (err: any) {
-      setCreateError(err.message || t('admin.users.connectionError'));
+      setCreateError(err.message || tU('admin.users.connectionError'));
     } finally {
       setCreateLoading(false);
     }
@@ -299,7 +749,7 @@ export default function AdminUsers() {
 
   // ─── Reset password ───
   const handleResetPassword = async (user: User) => {
-    if (!confirm(t('admin.users.confirmResetPwd', { name: user.name, email: user.email }))) return;
+    if (!confirm(tU('admin.users.confirmResetPwd', { name: user.name, email: user.email }))) return;
     setResetTarget(user);
     setResetResult(null);
     setResetLoading(true);
@@ -308,11 +758,11 @@ export default function AdminUsers() {
       if (data.success) {
         setResetResult({ email: data.data.email, tempPassword: data.data.tempPassword });
       } else {
-        alert(data.error || t('admin.users.resetFail'));
+        alert(data.error || tU('admin.users.resetFail'));
         setResetTarget(null);
       }
     } catch (err: any) {
-      alert(err.message || t('admin.users.connectionError'));
+      alert(err.message || tU('admin.users.connectionError'));
       setResetTarget(null);
     } finally {
       setResetLoading(false);
@@ -327,7 +777,7 @@ export default function AdminUsers() {
       setTimeout(() => setCopiedField(null), 2000);
     } catch {
       // Fallback
-      const ta = document.createElement('textarea');
+      const ta = document.createElementU('textarea');
       ta.value = text;
       document.body.appendChild(ta);
       ta.select();
@@ -347,9 +797,9 @@ export default function AdminUsers() {
       suspended: 'bg-red-100 text-red-700 border-red-300',
     };
     const labelKeys = {
-      active: t('admin.users.activeUsers'),
-      pending: t('admin.users.pending'),
-      suspended: t('admin.users.locked'),
+      active: tU('admin.users.activeUsers'),
+      pending: tU('admin.users.pending'),
+      suspended: tU('admin.users.locked'),
     };
     return (
       <span className={clsx('px-2 py-0.5 rounded-full text-[10px] font-bold border whitespace-nowrap shrink-0', styles[status])}>
@@ -367,7 +817,7 @@ export default function AdminUsers() {
         ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white'
         : 'bg-slate-100 text-slate-600'
     )}>
-      {role === 'super_admin' ? t('admin.users.superAdminBadge') : role === 'admin' ? `👑 ${t('admin.users.admin')}` : `👤 ${t('admin.users.staff')}`}
+      {role === 'super_admin' ? tU('admin.users.superAdminBadge') : role === 'admin' ? `👑 ${tU('admin.users.admin')}` : `👤 ${tU('admin.users.staff')}`}
     </span>
   );
 
@@ -378,9 +828,9 @@ export default function AdminUsers() {
       enterprise: 'bg-gradient-to-r from-amber-400 to-orange-500 text-white',
     };
     const planLabels = {
-      free: t('admin.users.planFree'),
-      pro: t('admin.users.planPro'),
-      enterprise: t('admin.users.planEnterprise'),
+      free: tU('admin.users.planFree'),
+      pro: tU('admin.users.planPro'),
+      enterprise: tU('admin.users.planEnterprise'),
     };
     return (
       <span className={clsx('px-2 py-0.5 rounded-full text-[10px] font-bold whitespace-nowrap shrink-0', styles[plan])}>
@@ -391,14 +841,8 @@ export default function AdminUsers() {
 
   return (
     <AdminLayout
-      title={t('admin.users.title')}
-      titleEn={t('admin.users.titleEn')}
-      titleAr={t('admin.users.titleAr')}
-      titleFr={t('admin.users.titleFr')}
-      subtitle={t('admin.users.subtitle')}
-      subtitleEn={t('admin.users.subtitleEn')}
-      subtitleAr={t('admin.users.subtitleAr')}
-      subtitleFr={t('admin.users.subtitleFr')}
+      titleKey="admin.topBar.users"
+      subtitleKey="admin.topBar.usersSub"
       showFab={false}
       showLayoutTitle={false}
     >
@@ -409,10 +853,10 @@ export default function AdminUsers() {
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-primary/10 via-transparent to-transparent rounded-3xl"></div>
           <div className="max-w-2xl relative z-10 py-6 px-6">
             <h2 className="text-3xl md:text-4xl font-black text-on-surface mb-2 tracking-tight">
-              {t('admin.users.heroTitle')}
+              {tU('admin.users.heroTitle')}
             </h2>
             <p className="text-sm md:text-base font-medium text-on-surface-variant border-l-4 border-primary pl-4 py-1 bg-white/40 backdrop-blur-sm rounded-r-xl"
-               dangerouslySetInnerHTML={{ __html: t('admin.users.heroSubtitle') }}
+               dangerouslySetInnerHTML={{ __html: tU('admin.users.heroSubtitle') }}
             />
           </div>
           {/* Role Badge + Create User Button */}
@@ -421,13 +865,13 @@ export default function AdminUsers() {
             {isSuperAdmin ? (
               <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gradient-to-r from-amber-400 to-orange-500 text-white shadow">
                 <ShieldCheck className="w-4 h-4" />
-                <span className="font-bold text-sm">{t('admin.users.superAdmin')}</span>
+                <span className="font-bold text-sm">{tU('admin.users.superAdmin')}</span>
               </div>
             ) : (
               <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-primary/10 border border-primary/30 text-primary">
                 <Shield className="w-4 h-4" />
-                <span className="font-bold text-sm">{t('admin.users.admin')}</span>
-                <span className="text-xs opacity-70">{t('admin.users.limited')}</span>
+                <span className="font-bold text-sm">{tU('admin.users.admin')}</span>
+                <span className="text-xs opacity-70">{tU('admin.users.limited')}</span>
               </div>
             )}
             <button
@@ -438,7 +882,7 @@ export default function AdminUsers() {
               className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-gradient-to-r from-violet-500 to-blue-500 text-white font-bold text-sm border-2 border-black shadow-[3px_3px_0px_0px_#000] hover:shadow-[5px_5px_0px_0px_#000] hover:-translate-x-[1px] hover:-translate-y-[1px] transition-all"
             >
               <UserPlus className="w-4 h-4" />
-              {t('admin.users.createUser')}
+              {tU('admin.users.createUser')}
             </button>
           </div>
         </div>
@@ -446,21 +890,21 @@ export default function AdminUsers() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <StatCard label={t('admin.users.totalUsers')} value={totalUsers} icon={<Users className="w-5 h-5" />} color="bg-indigo-500" />
+        <StatCard label={tU('admin.users.totalUsers')} value={totalUsers} icon={<Users className="w-5 h-5" />} color="bg-indigo-500" />
         <StatCard
-          label={t('admin.users.activeUsers')}
+          label={tU('admin.users.activeUsers')}
           value={users.filter(u => u.status === 'active').length}
           icon={<CheckCircle2 className="w-5 h-5" />}
           color="bg-emerald-500"
         />
         <StatCard
-          label={t('admin.users.pendingUsers')}
+          label={tU('admin.users.pendingUsers')}
           value={users.filter(u => u.status === 'pending').length}
           icon={<Clock className="w-5 h-5" />}
           color="bg-amber-500"
         />
         <StatCard
-          label={t('admin.users.lockedUsers')}
+          label={tU('admin.users.lockedUsers')}
           value={users.filter(u => u.status === 'suspended').length}
           icon={<XCircle className="w-5 h-5" />}
           color="bg-red-500"
@@ -474,7 +918,7 @@ export default function AdminUsers() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input
               type="text"
-              placeholder={t('admin.users.searchPlaceholder')}
+              placeholder={tU('admin.users.searchPlaceholder')}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full pl-10 pr-4 py-2 rounded-lg border-2 border-black font-medium text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
@@ -486,10 +930,10 @@ export default function AdminUsers() {
             onChange={(e) => setFilterStatus(e.target.value as FilterStatus)}
             className="px-3 py-2 rounded-lg border-2 border-black font-medium text-sm bg-white"
           >
-            <option value="all">{t('admin.users.allStatus')}</option>
-            <option value="active">{t('admin.users.active')}</option>
-            <option value="pending">{t('admin.users.pending')}</option>
-            <option value="suspended">{t('admin.users.locked')}</option>
+            <option value="all">{tU('admin.users.allStatus')}</option>
+            <option value="active">{tU('admin.users.active')}</option>
+            <option value="pending">{tU('admin.users.pending')}</option>
+            <option value="suspended">{tU('admin.users.locked')}</option>
           </select>
 
           <select
@@ -497,9 +941,9 @@ export default function AdminUsers() {
             onChange={(e) => setFilterRole(e.target.value as FilterRole)}
             className="px-3 py-2 rounded-lg border-2 border-black font-medium text-sm bg-white"
           >
-            <option value="all">{t('admin.users.allRoles')}</option>
-            <option value="admin">{t('admin.users.admin')}</option>
-            <option value="user">{t('admin.users.user')}</option>
+            <option value="all">{tU('admin.users.allRoles')}</option>
+            <option value="admin">{tU('admin.users.admin')}</option>
+            <option value="user">{tU('admin.users.user')}</option>
           </select>
         </div>
       </div>
@@ -512,7 +956,7 @@ export default function AdminUsers() {
       ) : users.length === 0 ? (
         <div className="text-center py-20 bg-white rounded-xl border-2 border-black">
           <Users className="w-16 h-16 mx-auto mb-4 text-slate-300" />
-          <p className="text-slate-500 font-medium">{t('admin.users.noUsers')}</p>
+          <p className="text-slate-500 font-medium">{tU('admin.users.noUsers')}</p>
         </div>
       ) : (
         <>
@@ -521,13 +965,13 @@ export default function AdminUsers() {
               <table className="w-full">
                 <thead className="bg-slate-50 border-b-2 border-black">
                   <tr>
-                    <th className="text-left px-4 py-3 font-black text-xs uppercase tracking-wider text-slate-600">{t('admin.users.userCol')}</th>
-                    <th className="text-left px-4 py-3 font-black text-xs uppercase tracking-wider text-slate-600">{t('admin.users.statusCol')}</th>
-                    <th className="text-left px-4 py-3 font-black text-xs uppercase tracking-wider text-slate-600">{t('admin.users.roleCol')}</th>
-                    <th className="text-left px-4 py-3 font-black text-xs uppercase tracking-wider text-slate-600">{t('admin.users.planCol')}</th>
-                    <th className="text-left px-4 py-3 font-black text-xs uppercase tracking-wider text-slate-600">{t('admin.users.loginCol')}</th>
-                    <th className="text-left px-4 py-3 font-black text-xs uppercase tracking-wider text-slate-600">{t('admin.users.createdCol')}</th>
-                    <th className="text-right px-4 py-3 font-black text-xs uppercase tracking-wider text-slate-600">{t('admin.users.actionsCol')}</th>
+                    <th className="text-left px-4 py-3 font-black text-xs uppercase tracking-wider text-slate-600">{tU('admin.users.userCol')}</th>
+                    <th className="text-left px-4 py-3 font-black text-xs uppercase tracking-wider text-slate-600">{tU('admin.users.statusCol')}</th>
+                    <th className="text-left px-4 py-3 font-black text-xs uppercase tracking-wider text-slate-600">{tU('admin.users.roleCol')}</th>
+                    <th className="text-left px-4 py-3 font-black text-xs uppercase tracking-wider text-slate-600">{tU('admin.users.planCol')}</th>
+                    <th className="text-left px-4 py-3 font-black text-xs uppercase tracking-wider text-slate-600">{tU('admin.users.loginCol')}</th>
+                    <th className="text-left px-4 py-3 font-black text-xs uppercase tracking-wider text-slate-600">{tU('admin.users.createdCol')}</th>
+                    <th className="text-right px-4 py-3 font-black text-xs uppercase tracking-wider text-slate-600">{tU('admin.users.actionsCol')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -569,7 +1013,7 @@ export default function AdminUsers() {
                               onClick={() => handleUpdateStatus(user.id, 'suspended')}
                               disabled={actionLoading === user.id}
                               className="p-2 rounded-lg bg-amber-100 text-amber-700 hover:bg-amber-200 transition-all border-2 border-black disabled:opacity-50"
-                              title={t('admin.users.lockAccount')}
+                              title={tU('admin.users.lockAccount')}
                             >
                               <ShieldOff className="w-4 h-4" />
                             </button>
@@ -578,7 +1022,7 @@ export default function AdminUsers() {
                               onClick={() => handleUpdateStatus(user.id, 'active')}
                               disabled={actionLoading === user.id}
                               className="p-2 rounded-lg bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-all border-2 border-black disabled:opacity-50"
-                              title={user.status === 'suspended' ? t('admin.users.unlockAccount') : t('admin.users.approveAccount')}
+                              title={user.status === 'suspended' ? tU('admin.users.unlockAccount') : tU('admin.users.approveAccount')}
                             >
                               <Shield className="w-4 h-4" />
                             </button>
@@ -589,7 +1033,7 @@ export default function AdminUsers() {
                               onClick={() => handleUpdateRole(user.id, 'admin')}
                               disabled={actionLoading === user.id}
                               className="p-2 rounded-lg bg-purple-100 text-purple-700 hover:bg-purple-200 transition-all border-2 border-black disabled:opacity-50"
-                              title={t('admin.users.promoteToAdmin')}
+                              title={tU('admin.users.promoteToAdmin')}
                             >
                               <Shield className="w-4 h-4" />
                             </button>
@@ -598,7 +1042,7 @@ export default function AdminUsers() {
                               onClick={() => handleUpdateRole(user.id, 'user')}
                               disabled={actionLoading === user.id}
                               className="p-2 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all border-2 border-black disabled:opacity-50"
-                              title={t('admin.users.demoteToUser')}
+                              title={tU('admin.users.demoteToUser')}
                             >
                               <ShieldOff className="w-4 h-4" />
                             </button>
@@ -609,7 +1053,7 @@ export default function AdminUsers() {
                             onClick={() => handleResetPassword(user)}
                             disabled={actionLoading === user.id}
                             className="p-2 rounded-lg bg-blue-100 text-blue-700 hover:bg-blue-200 transition-all border-2 border-black disabled:opacity-50"
-                            title={t('admin.users.resetPassword')}
+                            title={tU('admin.users.resetPassword')}
                           >
                             <KeyRound className="w-4 h-4" />
                           </button>
@@ -618,7 +1062,7 @@ export default function AdminUsers() {
                             onClick={() => handleDelete(user)}
                             disabled={actionLoading === user.id}
                             className="p-2 rounded-lg bg-red-100 text-red-700 hover:bg-red-200 transition-all border-2 border-black disabled:opacity-50"
-                            title={t('admin.users.deleteAccount')}
+                            title={tU('admin.users.deleteAccount')}
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -639,17 +1083,17 @@ export default function AdminUsers() {
                 disabled={page === 0}
                 className="px-5 py-2.5 rounded-xl border-2 border-black bg-white text-black font-bold shadow-[2px_2px_0px_0px_#000] hover:shadow-[3px_3px_0px_0px_#000] hover:-translate-x-[1px] hover:-translate-y-[1px] transition-all disabled:opacity-30 disabled:shadow-none"
               >
-                ← {t('admin.users.prev')}
+                ← {tU('admin.users.prev')}
               </button>
               <span className="px-5 py-2.5 rounded-xl border-2 border-black bg-white text-black font-bold">
-                {t('admin.users.page')} {page + 1} / {totalPages}
+                {tU('admin.users.page')} {page + 1} / {totalPages}
               </span>
               <button
                 onClick={() => setPage(Math.min(totalPages - 1, page + 1))}
                 disabled={page >= totalPages - 1}
                 className="px-5 py-2.5 rounded-xl border-2 border-black bg-white text-black font-bold shadow-[2px_2px_0px_0px_#000] hover:shadow-[3px_3px_0px_0px_#000] hover:-translate-x-[1px] hover:-translate-y-[1px] transition-all disabled:opacity-30 disabled:shadow-none"
               >
-                {t('admin.users.next')} →
+                {tU('admin.users.next')} →
               </button>
             </div>
           )}
@@ -666,7 +1110,7 @@ export default function AdminUsers() {
             <div className="sticky top-0 bg-gradient-to-r from-violet-500 to-blue-500 text-white px-6 py-4 border-b-2 border-black flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <UserPlus className="w-5 h-5" />
-                <h3 className="font-black text-lg">{t('admin.users.createAccountTitle')}</h3>
+                <h3 className="font-black text-lg">{tU('admin.users.createAccountTitle')}</h3>
               </div>
               <button
                 onClick={() => setShowCreateModal(false)}
@@ -680,14 +1124,14 @@ export default function AdminUsers() {
               {/* Name */}
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-                  {t('admin.users.fullName')} <span className="text-red-500">*</span>
+                  {tU('admin.users.fullName')} <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
                   required
                   value={createForm.name}
                   onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}
-                  placeholder={t('admin.users.namePlaceholder')}
+                  placeholder={tU('admin.users.namePlaceholder')}
                   className="w-full px-4 py-2.5 rounded-lg border-2 border-black font-medium text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
@@ -695,14 +1139,14 @@ export default function AdminUsers() {
               {/* Email */}
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-                  {t('admin.users.email')} <span className="text-red-500">*</span>
+                  {tU('admin.users.email')} <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="email"
                   required
                   value={createForm.email}
                   onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })}
-                  placeholder={t('admin.users.emailPlaceholder')}
+                  placeholder={tU('admin.users.emailPlaceholder')}
                   className="w-full px-4 py-2.5 rounded-lg border-2 border-black font-medium text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
@@ -711,33 +1155,33 @@ export default function AdminUsers() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-                    Role {!isSuperAdmin && <span className="text-amber-500 text-[10px]">{t('admin.users.superAdminOnly')}</span>}
+                    Role {!isSuperAdmin && <span className="text-amber-500 text-[10px]">{tU('admin.users.superAdminOnly')}</span>}
                   </label>
                   <select
                     value={createForm.role}
                     onChange={(e) => setCreateForm({ ...createForm, role: e.target.value as any })}
                     className="w-full px-3 py-2.5 rounded-lg border-2 border-black font-medium text-sm bg-white"
                   >
-                    <option value="user">👤 {t('admin.users.staff')}</option>
+                    <option value="user">👤 {tU('admin.users.staff')}</option>
                     {isSuperAdmin && (
                       <>
-                        <option value="admin">👑 {t('admin.users.admin')}</option>
+                        <option value="admin">👑 {tU('admin.users.admin')}</option>
                       </>
                     )}
                   </select>
                 </div>
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-                    {t('admin.users.plan')}
+                    {tU('admin.users.plan')}
                   </label>
                   <select
                     value={createForm.plan}
                     onChange={(e) => setCreateForm({ ...createForm, plan: e.target.value as any })}
                     className="w-full px-3 py-2.5 rounded-lg border-2 border-black font-medium text-sm bg-white"
                   >
-                    <option value="free">� {t('admin.users.free')} ({t('admin.users.freeQuota')})</option>
-                    <option value="pro">⭐ {t('admin.users.pro')} ({t('admin.users.proQuota')})</option>
-                    <option value="enterprise">🏢 {t('admin.users.enterprise')} ({t('admin.users.enterpriseQuota')})</option>
+                    <option value="free">� {tU('admin.users.free')} ({tU('admin.users.freeQuota')})</option>
+                    <option value="pro">⭐ {tU('admin.users.pro')} ({tU('admin.users.proQuota')})</option>
+                    <option value="enterprise">🏢 {tU('admin.users.enterprise')} ({tU('admin.users.enterpriseQuota')})</option>
                   </select>
                 </div>
               </div>
@@ -746,7 +1190,7 @@ export default function AdminUsers() {
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-600">
-                    {t('admin.users.password')}
+                    {tU('admin.users.password')}
                   </label>
                   <label className="flex items-center gap-1.5 cursor-pointer">
                     <input
@@ -765,7 +1209,7 @@ export default function AdminUsers() {
                       className="w-3.5 h-3.5 accent-violet-500"
                     />
                     <span className="text-[10px] font-bold text-violet-700 uppercase tracking-wider">
-                      {t('admin.users.autoGenerate')}
+                      {tU('admin.users.autoGenerate')}
                     </span>
                   </label>
                 </div>
@@ -776,8 +1220,8 @@ export default function AdminUsers() {
                     onChange={(e) => setCreateForm({ ...createForm, password: e.target.value })}
                     placeholder={
                       autoGenPassword
-                        ? t('admin.users.autoGenPlaceholder')
-                        : t('admin.users.enterManually')
+                        ? tU('admin.users.autoGenPlaceholder')
+                        : tU('admin.users.enterManually')
                     }
                     disabled={autoGenPassword}
                     className="w-full px-4 py-2.5 pr-20 rounded-lg border-2 border-black font-mono text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-slate-50 disabled:text-slate-700"
@@ -788,7 +1232,7 @@ export default function AdminUsers() {
                       onClick={() => setShowCreatePassword(!showCreatePassword)}
                       className="p-1.5 rounded hover:bg-slate-100"
                       tabIndex={-1}
-                      title={showCreatePassword ? t('admin.users.hidePassword') : t('admin.users.showPassword')}
+                      title={showCreatePassword ? tU('admin.users.hidePassword') : tU('admin.users.showPassword')}
                     >
                       {showCreatePassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                     </button>
@@ -798,7 +1242,7 @@ export default function AdminUsers() {
                         onClick={() => setCreateForm({ ...createForm, password: generatePassword() })}
                         className="p-1.5 rounded hover:bg-slate-100"
                         tabIndex={-1}
-                        title={t('admin.users.generateNew')}
+                        title={tU('admin.users.generateNew')}
                       >
                         <RefreshCw className="w-3.5 h-3.5" />
                       </button>
@@ -808,12 +1252,12 @@ export default function AdminUsers() {
                 {autoGenPassword ? (
                   <p className="mt-1.5 text-[11px] text-slate-500 flex items-center gap-1">
                     <ShieldCheck className="w-3 h-3 text-emerald-500" />
-                    {t('admin.users.autoGenDesc')}
+                    {tU('admin.users.autoGenDesc')}
                   </p>
                 ) : (
                   <p className="mt-1.5 text-[11px] text-blue-600 flex items-center gap-1">
                     <KeyRound className="w-3 h-3" />
-                    {t('admin.users.manualEntryDesc')}
+                    {tU('admin.users.manualEntryDesc')}
                   </p>
                 )}
               </div>
@@ -831,7 +1275,7 @@ export default function AdminUsers() {
                   onClick={() => setShowCreateModal(false)}
                   className="flex-1 py-2.5 rounded-lg border-2 border-black bg-white text-black font-bold text-sm hover:bg-slate-50"
                 >
-                  {t('admin.users.cancel')}
+                  {tU('admin.users.cancel')}
                 </button>
                 <button
                   type="submit"
@@ -841,12 +1285,12 @@ export default function AdminUsers() {
                   {createLoading ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      {t('admin.users.creating')}
+                      {tU('admin.users.creating')}
                     </>
                   ) : (
                     <>
                       <Sparkles className="w-4 h-4" />
-                      {t('admin.users.create')}
+                      {tU('admin.users.create')}
                     </>
                   )}
                 </button>
@@ -863,7 +1307,7 @@ export default function AdminUsers() {
             <div className="bg-gradient-to-r from-emerald-500 to-teal-500 text-white px-6 py-4 border-b-2 border-black flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="w-5 h-5" />
-                <h3 className="font-black text-lg">{t('admin.users.accountCreatedSuccess')}</h3>
+                <h3 className="font-black text-lg">{tU('admin.users.accountCreatedSuccess')}</h3>
               </div>
               <button
                 onClick={() => setCreatedResult(null)}
@@ -883,7 +1327,7 @@ export default function AdminUsers() {
               {/* Email + Password blocks */}
               <div>
                 <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1.5">
-                  {t('admin.users.loginEmail')}
+                  {tU('admin.users.loginEmail')}
                 </label>
                 <div className="flex items-center gap-2">
                   <div className="flex-1 px-3 py-2.5 rounded-lg border-2 border-black bg-slate-50 font-mono text-sm font-bold">
@@ -892,7 +1336,7 @@ export default function AdminUsers() {
                   <button
                     onClick={() => copyToClipboard(createdResult.user.email, 'email')}
                     className="p-2.5 rounded-lg border-2 border-black bg-white hover:bg-slate-50"
-                    title={t('admin.users.titleCopyEmail')}
+                    title={tU('admin.users.titleCopyEmail')}
                   >
                     {copiedField === 'email' ? (
                       <Check className="w-4 h-4 text-emerald-500" />
@@ -905,7 +1349,7 @@ export default function AdminUsers() {
 
               <div>
                 <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1.5">
-                  {t('admin.users.tempPassword')}
+                  {tU('admin.users.tempPassword')}
                 </label>
                 <div className="flex items-center gap-2">
                   <div className="flex-1 px-3 py-2.5 rounded-lg border-2 border-black bg-amber-50 font-mono text-sm font-bold text-amber-900">
@@ -914,7 +1358,7 @@ export default function AdminUsers() {
                   <button
                     onClick={() => copyToClipboard(createdResult.tempPassword, 'password')}
                     className="p-2.5 rounded-lg border-2 border-black bg-white hover:bg-slate-50"
-                    title={t('admin.users.titleCopyPassword')}
+                    title={tU('admin.users.titleCopyPassword')}
                   >
                     {copiedField === 'password' ? (
                       <Check className="w-4 h-4 text-emerald-500" />
@@ -925,7 +1369,7 @@ export default function AdminUsers() {
                 </div>
                 <p className="mt-2 text-[11px] text-amber-700 font-medium flex items-center gap-1">
                   <AlertTriangle className="w-3 h-3" />
-                  {t('admin.users.passwordShownOnce')}
+                  {tU('admin.users.passwordShownOnce')}
                 </p>
               </div>
 
@@ -933,7 +1377,7 @@ export default function AdminUsers() {
               <button
                 onClick={() =>
                   copyToClipboard(
-                    t('admin.users.chatTemplate', { email: createdResult.user.email, password: createdResult.tempPassword, url: window.location.origin }),
+                    tU('admin.users.chatTemplate', { email: createdResult.user.email, password: createdResult.tempPassword, url: window.location.origin }),
                     'all'
                   )
                 }
@@ -942,12 +1386,12 @@ export default function AdminUsers() {
                 {copiedField === 'all' ? (
                   <>
                     <Check className="w-4 h-4 text-emerald-500" />
-                    {t('admin.users.copiedAllInfo')}
+                    {tU('admin.users.copiedAllInfo')}
                   </>
                 ) : (
                   <>
                     <Copy className="w-4 h-4" />
-                    {t('admin.users.copyForChat')}
+                    {tU('admin.users.copyForChat')}
                   </>
                 )}
               </button>
@@ -956,7 +1400,7 @@ export default function AdminUsers() {
                 onClick={() => setCreatedResult(null)}
                 className="w-full py-2.5 rounded-lg bg-slate-900 text-white font-bold text-sm hover:bg-slate-700"
               >
-                {t('admin.users.close')}
+                {tU('admin.users.close')}
               </button>
             </div>
           </div>
@@ -970,7 +1414,7 @@ export default function AdminUsers() {
             <div className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white px-6 py-4 border-b-2 border-black flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <KeyRound className="w-5 h-5" />
-                <h3 className="font-black text-lg">{t('admin.users.resetPasswordTitle')}</h3>
+                <h3 className="font-black text-lg">{tU('admin.users.resetPasswordTitle')}</h3>
               </div>
               <button
                 onClick={() => { setResetTarget(null); setResetResult(null); }}
@@ -989,13 +1433,13 @@ export default function AdminUsers() {
                 <>
                   <div className="p-4 rounded-xl bg-blue-50 border-2 border-blue-200">
                     <p className="text-sm text-blue-800 font-medium">
-                      {t('admin.users.newPasswordCreated')} <b>{resetResult.email}</b>.
+                      {tU('admin.users.newPasswordCreated')} <b>{resetResult.email}</b>.
                     </p>
                   </div>
 
                   <div>
                     <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1.5">
-                      {t('admin.users.newPassword')}
+                      {tU('admin.users.newPassword')}
                     </label>
                     <div className="flex items-center gap-2">
                       <div className="flex-1 px-3 py-2.5 rounded-lg border-2 border-black bg-amber-50 font-mono text-sm font-bold text-amber-900">
@@ -1018,7 +1462,7 @@ export default function AdminUsers() {
                     onClick={() => { setResetTarget(null); setResetResult(null); }}
                     className="w-full py-2.5 rounded-lg bg-slate-900 text-white font-bold text-sm"
                   >
-                    {t('admin.users.close')}
+                    {tU('admin.users.close')}
                   </button>
                 </>
               ) : null}

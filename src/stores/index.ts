@@ -321,10 +321,10 @@ export const usePaywallModalStore = create<PaywallModalState>((set) => ({
   close: () => set({ isOpen: false }),
 }));
 
-// Language Store
+// Language Store - VI/EN/AR/FR
 interface LanguageState {
-  language: Language;
-  setLanguage: (lang: Language) => void;
+  language: 'vi' | 'en' | 'ar' | 'fr';
+  setLanguage: (lang: 'vi' | 'en' | 'ar' | 'fr') => void;
 }
 
 export const useLanguageStore = create<LanguageState>()(

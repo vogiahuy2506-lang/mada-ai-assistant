@@ -1,9 +1,51 @@
 import { useState, useEffect } from 'react';
-import { useChatSettingsStore, useLanguageStore, type SuggestedPrompt } from '@/stores';
+import { useChatSettingsStore, type SuggestedPrompt } from '@/stores';
 import type { Language, UserRole } from '@/types';
 import { CheckCircle, Loader2, AlertCircle, Shield, Bot as BotIcon, ChevronDown, ChevronUp, Zap } from 'lucide-react';
 import { EmotionCustomization } from './EmotionCustomization';
 import { PromptTemplates } from './PromptTemplates';
+
+// Chat Customization translations - hardcoded Vietnamese
+const tChat = (key: string): string => {
+  const translations: Record<string, string> = {
+    'admin.chatCustomization.error': 'Có lỗi xảy ra',
+    'admin.chatCustomization.loading': 'Đang tải...',
+    'admin.chatCustomization.title': 'Tùy chỉnh Chat',
+    'admin.chatCustomization.subtitle': 'Cấu hình giao diện và hành vi chat',
+    'admin.chatCustomization.save': 'Lưu',
+    'admin.chatCustomization.saving': 'Đang lưu...',
+    'admin.chatCustomization.saved': 'Đã lưu!',
+    'admin.chatCustomization.ai.notSuperAdmin': 'Bạn không có quyền chỉnh sửa cấu hình AI. Liên hệ Super Admin.',
+    'admin.chatCustomization.greeting.title': 'Lời chào & Mô tả',
+    'admin.chatCustomization.greeting.greetingLabel': 'Lời chào',
+    'admin.chatCustomization.greeting.descLabel': 'Mô tả',
+    'admin.chatCustomization.prompts.title': 'Câu hỏi gợi ý',
+    'admin.chatCustomization.prompts.hint': 'Các câu hỏi hiển thị khi bắt đầu trò chuyện',
+    'admin.chatCustomization.promptNumber': 'Câu hỏi #{number}',
+    'admin.chatCustomization.prompts.textLabel': 'Nội dung',
+    'admin.chatCustomization.prompts.descLabel': 'Mô tả',
+    'admin.chatCustomization.prompts.iconLabel': 'Icon',
+    'admin.chatCustomization.feature.title': 'Tính năng',
+    'admin.chatCustomization.feature.fileAttachment': 'Cho phép đính kèm file',
+    'admin.chatCustomization.fileEnabled': 'Đã bật - Người dùng có thể gửi file',
+    'admin.chatCustomization.fileDisabled': 'Đã tắt - Người dùng không thể gửi file',
+    'admin.chatCustomization.ai.emotion': 'Cảm xúc AI',
+    'admin.chatCustomization.ai.emotionDesc': 'Tùy chỉnh phong cách giao tiếp của AI',
+    'admin.chatCustomization.aiInstructions': 'Hướng dẫn AI',
+    'admin.chatCustomization.ai.coreIdentity': 'Bản sắc cốt lõi',
+    'admin.chatCustomization.ai.coreIdentityDesc': 'Mô tả AI là ai, vai trò của AI',
+    'admin.chatCustomization.ai.responseFormat': 'Định dạng phản hồi',
+    'admin.chatCustomization.ai.responseFormatDesc': 'Cách AI trình bày thông tin',
+    'admin.chatCustomization.ai.behaviorRules': 'Quy tắc hành vi',
+    'admin.chatCustomization.ai.behaviorRulesDesc': 'Các quy tắc AI phải tuân thủ',
+    'admin.chatCustomization.ai.tone': 'Giọng điệu',
+    'admin.chatCustomization.ai.toneDesc': 'Phong cách ngôn ngữ của AI',
+    'admin.chatCustomization.promptTemplates': 'Mẫu Prompt',
+    'admin.chatCustomization.promptTemplatesHint': 'Sử dụng mẫu có sẵn',
+    'admin.chatCustomization.ai.disclaimer': 'Các thay đổi sẽ có hiệu lực ngay lập tức cho tất cả người dùng.',
+  };
+  return translations[key] || key;
+};
 
 const LANGUAGES: { key: Language; label: string }[] = [
   { key: 'vi', label: 'Tiếng Việt' },
@@ -25,162 +67,10 @@ interface ChatCustomizationProps {
   onClose?: () => void;
 }
 
-// Translation helper hook using useLanguageStore
-function useTranslation() {
-  const storeLanguage = useLanguageStore((state) => state.language);
-  const language = storeLanguage || 'vi';
+export function ChatCustomization({ userRole = 'admin', onClose: _onClose }: Omit<ChatCustomizationProps, 'language'>) {
+  const globalLanguage = 'vi';
+  const language = globalLanguage;
   
-  const t = {
-    vi: {
-      title: 'Tùy chỉnh Chat',
-      subtitle: 'Thay đổi lời chào, mô tả và cách AI trả lời.',
-      tabs: { ui: 'Giao diện', ai: 'Hành vi AI' },
-      greeting: { title: 'Lời chào & Mô tả', greetingLabel: 'Lời chào', descLabel: 'Mô tả' },
-      prompts: { title: 'Prompts gợi ý', hint: 'Các nút quick action trên trang chat', textLabel: 'Tiêu đề', descLabel: 'Mô tả', iconLabel: 'Icon' },
-      feature: { title: 'Tính năng', fileAttachment: 'Đính kèm file' },
-      ai: {
-        title: 'Cài đặt AI',
-        subtitle: 'Thay đổi cách AI trả lời, phong cách và cảm xúc. Chỉ Super Admin mới có quyền sửa.',
-        notSuperAdmin: 'Bạn không có quyền thay đổi. Liên hệ Super Admin.',
-        coreIdentity: 'Danh tính AI',
-        coreIdentityDesc: 'Định nghĩa AI là ai, vai trò, ngôn ngữ giao tiếp mặc định.',
-        responseFormat: 'Định dạng trả lời',
-        responseFormatDesc: 'Quy tắc về cách AI trả lời: danh sách, bảng, đoạn văn...',
-        behaviorRules: 'Quy tắc ứng xử',
-        behaviorRulesDesc: 'Các quy tắc AI cần tuân thủ khi trả lời người dùng.',
-        tone: 'Giọng văn',
-        toneDesc: 'Phong cách giao tiếp của AI.',
-        emotion: 'Cảm xúc AI',
-        emotionDesc: 'Tùy chỉnh phong cách và cường độ cảm xúc.',
-        disclaimer: 'Lưu ý: Thay đổi cần cẩn thận để tránh ảnh hưởng chất lượng trả lời.',
-        saved: 'Đã lưu!',
-      },
-      save: 'Lưu thay đổi',
-      saving: 'Đang lưu...',
-      saved: 'Đã lưu!',
-      error: 'Lưu thất bại',
-      loading: 'Đang tải...',
-      promptNumber: 'Prompt {number}',
-      aiInstructions: 'Hướng dẫn AI',
-      promptTemplates: 'Mẫu Prompt',
-      promptTemplatesHint: 'Các mẫu có sẵn theo ngành để áp dụng nhanh',
-      fileEnabled: 'Đang bật - người dùng có thể đính kèm file',
-      fileDisabled: 'Đang tắt - nút đính kèm file sẽ bị ẩn',
-    },
-    en: {
-      title: 'Chat Customization',
-      subtitle: 'Change greeting, description and how AI responds.',
-      tabs: { ui: 'Interface', ai: 'AI Behavior' },
-      greeting: { title: 'Greeting & Description', greetingLabel: 'Greeting', descLabel: 'Description' },
-      prompts: { title: 'Suggested Prompts', hint: 'Quick action buttons on chat page', textLabel: 'Title', descLabel: 'Description', iconLabel: 'Icon' },
-      feature: { title: 'Features', fileAttachment: 'File Attachment' },
-      ai: {
-        title: 'AI Settings',
-        subtitle: 'Change how AI responds, style and emotions. Only Super Admin can edit.',
-        notSuperAdmin: 'You do not have permission. Contact Super Admin.',
-        coreIdentity: 'AI Identity',
-        coreIdentityDesc: 'Define who the AI is, role, and default communication language.',
-        responseFormat: 'Response Format',
-        responseFormatDesc: 'Rules about how AI responds: lists, tables, paragraphs...',
-        behaviorRules: 'Behavior Rules',
-        behaviorRulesDesc: 'Rules the AI must follow when responding to users.',
-        tone: 'Tone of Voice',
-        toneDesc: 'Communication style of the AI.',
-        emotion: 'AI Emotions',
-        emotionDesc: 'Customize style and emotional intensity.',
-        disclaimer: 'Note: Changes should be made carefully to avoid affecting response quality.',
-        saved: 'Saved!',
-      },
-      save: 'Save Changes',
-      saving: 'Saving...',
-      saved: 'Saved!',
-      error: 'Save failed',
-      loading: 'Loading...',
-      promptNumber: 'Prompt {number}',
-      aiInstructions: 'AI Instructions',
-      promptTemplates: 'Prompt Templates',
-      promptTemplatesHint: 'Pre-built templates by industry for quick application',
-      fileEnabled: 'Enabled - users can attach files',
-      fileDisabled: 'Disabled - attach button will be hidden',
-    },
-    ar: {
-      title: 'تخصيص المحادثة',
-      subtitle: 'تغيير التحية والوصف وكيفية استجابة الذكاء.',
-      tabs: { ui: 'الواجهة', ai: 'سلوك الذكاء' },
-      greeting: { title: 'التحية والوصف', greetingLabel: 'التحية', descLabel: 'الوصف' },
-      prompts: { title: 'العبارات المقترحة', hint: 'أزرار الإجراءات السريعة', textLabel: 'العنوان', descLabel: 'الوصف', iconLabel: 'الأيقونة' },
-      feature: { title: 'الميزات', fileAttachment: 'إرفاق الملفات' },
-      ai: {
-        title: 'إعدادات الذكاء',
-        subtitle: 'تغيير كيفية استجابة الذكاء. المشرف الأعلى فقط.',
-        notSuperAdmin: 'ليس لديك إذن. اتصل بالمشرف الأعلى.',
-        coreIdentity: 'هوية الذكاء',
-        coreIdentityDesc: 'حدد من هو الذكاء الاصطناعي.',
-        responseFormat: 'تنسيق الاستجابة',
-        responseFormatDesc: 'قواعد حول كيفية الاستجابة.',
-        behaviorRules: 'قواعد السلوك',
-        behaviorRulesDesc: 'القواعد التي يجب على الذكاء الاصطناعي اتباعها.',
-        tone: 'نبرة الصوت',
-        toneDesc: 'أسلوب الاتصال.',
-        emotion: 'مشاعر الذكاء',
-        emotionDesc: 'تخصيص الأسلوب والشعور.',
-        disclaimer: 'ملاحظة: يجب إجراء التغييرات بعناية.',
-        saved: 'تم الحفظ!',
-      },
-      save: 'حفظ التغييرات',
-      saving: 'جاري الحفظ...',
-      saved: 'تم الحفظ!',
-      error: 'فشل الحفظ',
-      loading: 'جار التحميل...',
-      promptNumber: 'المحفز {number}',
-      aiInstructions: 'تعليمات الذكاء',
-      promptTemplates: 'قوالب المحفزات',
-      promptTemplatesHint: 'قوالب جاهزة حسب المجال للتطبيق السريع',
-      fileEnabled: 'مفعل - يمكن للمستخدمين إرفاق ملفات',
-      fileDisabled: 'معطل - سيتم إخفاء زر الإرفاق',
-    },
-    fr: {
-      title: 'Personnalisation du Chat',
-      subtitle: 'Modifier la salutation et comment IA répond.',
-      tabs: { ui: 'Interface', ai: 'Comportement IA' },
-      greeting: { title: 'Salutation et Description', greetingLabel: 'Salutation', descLabel: 'Description' },
-      prompts: { title: 'Prompts suggérés', hint: "Boutons d'action rapide", textLabel: 'Titre', descLabel: 'Description', iconLabel: 'Icône' },
-      feature: { title: 'Fonctionnalités', fileAttachment: 'Pièces jointes' },
-      ai: {
-        title: "Paramètres de l'IA",
-        subtitle: "Changer comment l'IA répond. Seul le Super Admin peut modifier.",
-        notSuperAdmin: "Vous n'avez pas la permission. Contactez le Super Admin.",
-        coreIdentity: 'Identité IA',
-        coreIdentityDesc: "Définissez qui est l'IA.",
-        responseFormat: "Format de réponse",
-        responseFormatDesc: "Règles sur la façon dont l'IA répond.",
-        behaviorRules: 'Règles de comportement',
-        behaviorRulesDesc: "Règles que l'IA doit suivre.",
-        tone: 'Ton de voix',
-        toneDesc: "Style de communication.",
-        emotion: 'Émotions IA',
-        emotionDesc: 'Personnaliser le style émotionnel.',
-        disclaimer: "Note: Les modifications doivent être effectuées avec soin.",
-        saved: "Enregistré!",
-      },
-      save: 'Enregistrer',
-      saving: 'Enregistrement...',
-      saved: 'Enregistré!',
-      error: 'Échec',
-      loading: 'Chargement...',
-      promptNumber: 'Prompt {number}',
-      aiInstructions: "Instructions de l'IA",
-      promptTemplates: 'Modèles de Prompts',
-      promptTemplatesHint: 'Modèles prédéfinis par secteur pour application rapide',
-      fileEnabled: 'Activé - les utilisateurs peuvent joindre des fichiers',
-      fileDisabled: 'Désactivé - le bouton de pièce jointe sera masqué',
-    },
-  };
-  
-  return t[language as keyof typeof t] || t.vi;
-}
-
-export function ChatCustomization({ language: propLanguage, userRole = 'admin', onClose: _onClose }: ChatCustomizationProps) {
   // Check both 'superadmin' (DB) and 'super_admin' (code) for backward compatibility
   const isSuperAdmin = userRole === 'super_admin' || (userRole as unknown) === 'superadmin';
   
@@ -214,7 +104,7 @@ export function ChatCustomization({ language: propLanguage, userRole = 'admin', 
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
     } catch (e: any) {
-      setSaveError(e.message || lang.error);
+      setSaveError(e.message || tChat('admin.chatCustomization.error'));
     } finally {
       setSaving(false);
     }
@@ -234,133 +124,11 @@ export function ChatCustomization({ language: propLanguage, userRole = 'admin', 
     updateSettings({ suggestedPrompts: updated });
   };
 
-  const t = {
-    vi: {
-      title: 'Tùy chỉnh Chat',
-      subtitle: 'Thay đổi lời chào, mô tả và cách AI trả lời.',
-      tabs: { ui: 'Giao diện', ai: 'Hành vi AI' },
-      greeting: { title: 'Lời chào & Mô tả', greetingLabel: 'Lời chào', descLabel: 'Mô tả' },
-      prompts: { title: 'Prompts gợi ý', hint: 'Các nút quick action trên trang chat', textLabel: 'Tiêu đề', descLabel: 'Mô tả', iconLabel: 'Icon' },
-      feature: { title: 'Tính năng', fileAttachment: 'Đính kèm file' },
-      ai: {
-        title: 'Cài đặt AI',
-        subtitle: 'Thay đổi cách AI trả lời, phong cách và cảm xúc. Chỉ Super Admin mới có quyền sửa.',
-        notSuperAdmin: 'Bạn không có quyền thay đổi. Liên hệ Super Admin.',
-        coreIdentity: 'Danh tính AI',
-        coreIdentityDesc: 'Định nghĩa AI là ai, vai trò, ngôn ngữ giao tiếp mặc định.',
-        responseFormat: 'Định dạng trả lời',
-        responseFormatDesc: 'Quy tắc về cách AI trả lời: danh sách, bảng, đoạn văn...',
-        behaviorRules: 'Quy tắc ứng xử',
-        behaviorRulesDesc: 'Các quy tắc AI cần tuân thủ khi trả lời người dùng.',
-        tone: 'Giọng văn',
-        toneDesc: 'Phong cách giao tiếp của AI.',
-        emotion: 'Cảm xúc AI',
-        emotionDesc: 'Tùy chỉnh phong cách và cường độ cảm xúc.',
-        disclaimer: 'Lưu ý: Thay đổi cần cẩn thận để tránh ảnh hưởng chất lượng trả lời.',
-        saved: 'Đã lưu!',
-      },
-      save: 'Lưu thay đổi',
-      saving: 'Đang lưu...',
-      saved: 'Đã lưu!',
-      error: 'Lưu thất bại',
-    },
-    en: {
-      title: 'Chat Customization',
-      subtitle: 'Change greeting, description and how AI responds.',
-      tabs: { ui: 'Interface', ai: 'AI Behavior' },
-      greeting: { title: 'Greeting & Description', greetingLabel: 'Greeting', descLabel: 'Description' },
-      prompts: { title: 'Suggested Prompts', hint: 'Quick action buttons on chat page', textLabel: 'Title', descLabel: 'Description', iconLabel: 'Icon' },
-      feature: { title: 'Features', fileAttachment: 'File Attachment' },
-      ai: {
-        title: 'AI Settings',
-        subtitle: 'Change how AI responds, style and emotions. Only Super Admin can edit.',
-        notSuperAdmin: 'You do not have permission. Contact Super Admin.',
-        coreIdentity: 'AI Identity',
-        coreIdentityDesc: 'Define who the AI is, role, and default communication language.',
-        responseFormat: 'Response Format',
-        responseFormatDesc: 'Rules about how AI responds: lists, tables, paragraphs...',
-        behaviorRules: 'Behavior Rules',
-        behaviorRulesDesc: 'Rules the AI must follow when responding to users.',
-        tone: 'Tone of Voice',
-        toneDesc: 'Communication style of the AI.',
-        emotion: 'AI Emotions',
-        emotionDesc: 'Customize style and emotional intensity.',
-        disclaimer: 'Note: Changes should be made carefully to avoid affecting response quality.',
-        saved: 'Saved!',
-      },
-      save: 'Save Changes',
-      saving: 'Saving...',
-      saved: 'Saved!',
-      error: 'Save failed',
-    },
-    ar: {
-      title: 'تخصيص المحادثة',
-      subtitle: 'تغيير التحية والوصف وكيفية استجابة الذكاء.',
-      tabs: { ui: 'الواجهة', ai: 'سلوك الذكاء' },
-      greeting: { title: 'التحية والوصف', greetingLabel: 'التحية', descLabel: 'الوصف' },
-      prompts: { title: 'العبارات المقترحة', hint: 'أزرار الإجراءات السريعة', textLabel: 'العنوان', descLabel: 'الوصف', iconLabel: 'الأيقونة' },
-      feature: { title: 'الميزات', fileAttachment: 'إرفاق الملفات' },
-      ai: {
-        title: 'إعدادات الذكاء',
-        subtitle: 'تغيير كيفية استجابة الذكاء. المشرف الأعلى فقط.',
-        notSuperAdmin: 'ليس لديك إذن. اتصل بالمشرف الأعلى.',
-        coreIdentity: 'هوية الذكاء',
-        coreIdentityDesc: 'حدد من هو الذكاء الاصطناعي.',
-        responseFormat: 'تنسيق الاستجابة',
-        responseFormatDesc: 'قواعد حول كيفية الاستجابة.',
-        behaviorRules: 'قواعد السلوك',
-        behaviorRulesDesc: 'القواعد التي يجب على الذكاء الاصطناعي اتباعها.',
-        tone: 'نبرة الصوت',
-        toneDesc: 'أسلوب الاتصال.',
-        emotion: 'مشاعر الذكاء',
-        emotionDesc: 'تخصيص الأسلوب والشعور.',
-        disclaimer: 'ملاحظة: يجب إجراء التغييرات بعناية.',
-        saved: 'تم الحفظ!',
-      },
-      save: 'حفظ التغييرات',
-      saving: 'جاري الحفظ...',
-      saved: 'تم الحفظ!',
-      error: 'فشل الحفظ',
-    },
-    fr: {
-      title: 'Personnalisation du Chat',
-      subtitle: 'Modifier la salutation et comment IA répond.',
-      tabs: { ui: 'Interface', ai: 'Comportement IA' },
-      greeting: { title: 'Salutation et Description', greetingLabel: 'Salutation', descLabel: 'Description' },
-      prompts: { title: 'Prompts suggérés', hint: "Boutons d'action rapide", textLabel: 'Titre', descLabel: 'Description', iconLabel: 'Icône' },
-      feature: { title: 'Fonctionnalités', fileAttachment: 'Pièces jointes' },
-      ai: {
-        title: "Paramètres de l'IA",
-        subtitle: "Changer comment l'IA répond. Seul le Super Admin peut modifier.",
-        notSuperAdmin: "Vous n'avez pas la permission. Contactez le Super Admin.",
-        coreIdentity: 'Identité IA',
-        coreIdentityDesc: "Définissez qui est l'IA.",
-        responseFormat: "Format de réponse",
-        responseFormatDesc: "Règles sur la façon dont l'IA répond.",
-        behaviorRules: 'Règles de comportement',
-        behaviorRulesDesc: "Règles que l'IA doit suivre.",
-        tone: 'Ton de voix',
-        toneDesc: "Style de communication.",
-        emotion: 'Émotions IA',
-        emotionDesc: 'Personnaliser le style émotionnel.',
-        disclaimer: "Note: Les modifications doivent être effectuées avec soin.",
-        saved: "Enregistré!",
-      },
-      save: 'Enregistrer',
-      saving: 'Enregistrement...',
-      saved: 'Enregistré!',
-      error: 'Échec',
-    },
-  };
-
-  // Use the translation hook that gets language from useLanguageStore
-  const lang = useTranslation();
-
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
-        <span className="ml-3">{lang.loading}</span>
+        <span className="ml-3">{tChat('admin.chatCustomization.loading')}</span>
       </div>
     );
   }
@@ -370,8 +138,8 @@ export function ChatCustomization({ language: propLanguage, userRole = 'admin', 
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h3 className="text-lg font-bold text-on-surface">{lang.title}</h3>
-          <p className="text-sm text-on-surface-variant mt-1">{lang.subtitle}</p>
+          <h3 className="text-lg font-bold text-on-surface">{tChat('admin.chatCustomization.title')}</h3>
+          <p className="text-sm text-on-surface-variant mt-1">{tChat('admin.chatCustomization.subtitle')}</p>
         </div>
         <div className="flex items-center gap-3">
           <button
@@ -380,11 +148,11 @@ export function ChatCustomization({ language: propLanguage, userRole = 'admin', 
             className="px-6 py-3 rounded-xl bg-primary text-white font-bold text-sm border-2 border-black shadow-[4px_4px_0px_0px_#000] hover:-translate-y-0.5 hover:shadow-[5px_5px_0px_0px_#000] transition-all disabled:opacity-50 flex items-center gap-2"
           >
             {saving ? (
-              <><Loader2 className="w-4 h-4 animate-spin" /> {lang.saving}</>
+              <><Loader2 className="w-4 h-4 animate-spin" /> {tChat('admin.chatCustomization.saving')}</>
             ) : saveSuccess ? (
-              <><CheckCircle className="w-4 h-4" /> {lang.saved}</>
+              <><CheckCircle className="w-4 h-4" /> {tChat('admin.chatCustomization.saved')}</>
             ) : (
-              lang.save
+              tChat('admin.chatCustomization.save')
             )}
           </button>
         </div>
@@ -402,7 +170,7 @@ export function ChatCustomization({ language: propLanguage, userRole = 'admin', 
         <div className="p-4 rounded-xl bg-amber-50 border-2 border-amber-300 flex items-start gap-3">
           <Shield className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
           <div>
-            <p className="font-bold text-amber-800">{lang.ai.notSuperAdmin}</p>
+            <p className="font-bold text-amber-800">{tChat('admin.chatCustomization.ai.notSuperAdmin')}</p>
           </div>
         </div>
       )}
@@ -411,14 +179,14 @@ export function ChatCustomization({ language: propLanguage, userRole = 'admin', 
       <div className="p-6 rounded-2xl bg-white/60 border-2 border-black shadow-[4px_4px_0px_0px_#000]">
         <div className="flex items-center gap-2 mb-4">
           <span className="text-2xl">👋</span>
-          <h4 className="font-bold text-on-surface">{lang.greeting.title}</h4>
+          <h4 className="font-bold text-on-surface">{tChat('admin.chatCustomization.greeting.title')}</h4>
         </div>
         
         <div className="space-y-4">
           {LANGUAGES.map((langOption) => (
             <div key={langOption.key} className="space-y-2">
               <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest">
-                {langOption.label} - {lang.greeting.greetingLabel}
+                {langOption.label} - {tChat('admin.chatCustomization.greeting.greetingLabel')}
               </label>
               <input
                 type="text"
@@ -434,13 +202,13 @@ export function ChatCustomization({ language: propLanguage, userRole = 'admin', 
 
       {/* Section 2: Mô tả */}
       <div className="p-6 rounded-2xl bg-white/60 border-2 border-black shadow-[4px_4px_0px_0px_#000]">
-        <h4 className="font-bold text-on-surface mb-4">{lang.greeting.descLabel}</h4>
+        <h4 className="font-bold text-on-surface mb-4">{tChat('admin.chatCustomization.greeting.descLabel')}</h4>
         
         <div className="space-y-4">
           {LANGUAGES.map((langOption) => (
             <div key={langOption.key} className="space-y-2">
               <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest">
-                {langOption.label} - {lang.greeting.descLabel}
+                {langOption.label} - {tChat('admin.chatCustomization.greeting.descLabel')}
               </label>
               <textarea
                 value={description[langOption.key]}
@@ -458,20 +226,20 @@ export function ChatCustomization({ language: propLanguage, userRole = 'admin', 
       <div className="p-6 rounded-2xl bg-white/60 border-2 border-black shadow-[4px_4px_0px_0px_#000]">
         <div className="flex items-center gap-2 mb-2">
           <span className="text-2xl">⚡</span>
-          <h4 className="font-bold text-on-surface">{lang.prompts.title}</h4>
+          <h4 className="font-bold text-on-surface">{tChat('admin.chatCustomization.prompts.title')}</h4>
         </div>
-        <p className="text-sm text-on-surface-variant mb-4">{lang.prompts.hint}</p>
+        <p className="text-sm text-on-surface-variant mb-4">{tChat('admin.chatCustomization.prompts.hint')}</p>
         
         <div className="space-y-4">
           {suggestedPrompts.map((prompt, index) => (
             <div key={index} className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-gray-500 uppercase">{lang.promptNumber.replace('{number}', String(index + 1))}</span>
+                <span className="text-xs font-bold text-gray-500 uppercase">{tChat('admin.chatCustomization.promptNumber', { number: index + 1 })}</span>
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-xs font-semibold text-gray-500">VI - {lang.prompts.textLabel}</label>
+                  <label className="text-xs font-semibold text-gray-500">VI - {tChat('admin.chatCustomization.prompts.textLabel')}</label>
                   <input
                     type="text"
                     value={prompt.text}
@@ -480,7 +248,7 @@ export function ChatCustomization({ language: propLanguage, userRole = 'admin', 
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs font-semibold text-gray-500">EN - {lang.prompts.textLabel}</label>
+                  <label className="text-xs font-semibold text-gray-500">EN - {tChat('admin.chatCustomization.prompts.textLabel')}</label>
                   <input
                     type="text"
                     value={prompt.textEn}
@@ -489,7 +257,7 @@ export function ChatCustomization({ language: propLanguage, userRole = 'admin', 
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs font-semibold text-gray-500">VI - {lang.prompts.descLabel}</label>
+                  <label className="text-xs font-semibold text-gray-500">VI - {tChat('admin.chatCustomization.prompts.descLabel')}</label>
                   <input
                     type="text"
                     value={prompt.desc}
@@ -498,7 +266,7 @@ export function ChatCustomization({ language: propLanguage, userRole = 'admin', 
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs font-semibold text-gray-500">EN - {lang.prompts.descLabel}</label>
+                  <label className="text-xs font-semibold text-gray-500">EN - {tChat('admin.chatCustomization.prompts.descLabel')}</label>
                   <input
                     type="text"
                     value={prompt.descEn}
@@ -507,7 +275,7 @@ export function ChatCustomization({ language: propLanguage, userRole = 'admin', 
                   />
                 </div>
                 <div className="space-y-1 md:col-span-2">
-                  <label className="text-xs font-semibold text-gray-500">{lang.prompts.iconLabel}</label>
+                  <label className="text-xs font-semibold text-gray-500">{tChat('admin.chatCustomization.prompts.iconLabel')}</label>
                   <div className="flex flex-wrap gap-2">
                     {ICON_OPTIONS.map((icon) => (
                       <button
@@ -535,14 +303,14 @@ export function ChatCustomization({ language: propLanguage, userRole = 'admin', 
       <div className="p-6 rounded-2xl bg-white/60 border-2 border-black shadow-[4px_4px_0px_0px_#000]">
         <div className="flex items-center gap-2 mb-4">
           <span className="text-2xl">⚙️</span>
-          <h4 className="font-bold text-on-surface">{lang.feature.title}</h4>
+          <h4 className="font-bold text-on-surface">{tChat('admin.chatCustomization.feature.title')}</h4>
         </div>
         
         <div className="flex items-center justify-between p-4 rounded-xl bg-slate-50 border border-slate-200">
           <div className="pr-4">
-            <p className="font-bold text-on-surface">{lang.feature.fileAttachment}</p>
+            <p className="font-bold text-on-surface">{tChat('admin.chatCustomization.feature.fileAttachment')}</p>
             <p className="text-sm text-on-surface-variant">
-              {fileAttachmentEnabled ? lang.fileEnabled : lang.fileDisabled}
+              {fileAttachmentEnabled ? tChat('admin.chatCustomization.fileEnabled') : tChat('admin.chatCustomization.fileDisabled')}
             </p>
           </div>
           <button
@@ -565,8 +333,8 @@ export function ChatCustomization({ language: propLanguage, userRole = 'admin', 
         <div className="flex items-center gap-2 mb-4">
           <span className="text-xl">🎯</span>
           <div>
-            <h4 className="font-bold text-slate-800">{lang.ai.emotion}</h4>
-            <p className="text-xs text-slate-500">{lang.ai.emotionDesc}</p>
+            <h4 className="font-bold text-slate-800">{tChat('admin.chatCustomization.ai.emotion')}</h4>
+            <p className="text-xs text-slate-500">{tChat('admin.chatCustomization.ai.emotionDesc')}</p>
           </div>
         </div>
         
@@ -582,13 +350,13 @@ export function ChatCustomization({ language: propLanguage, userRole = 'admin', 
       <div className="p-6 rounded-2xl bg-white/60 border-2 border-black shadow-[4px_4px_0px_0px_#000]">
         <div className="flex items-center gap-2 mb-4">
           <BotIcon className="w-5 h-5 text-amber-600" />
-          <h4 className="font-bold text-on-surface">{lang.aiInstructions}</h4>
+          <h4 className="font-bold text-on-surface">{tChat('admin.chatCustomization.aiInstructions')}</h4>
         </div>
 
         {/* Core Identity */}
         <div className="mb-6">
-          <label className="block text-sm font-bold text-slate-700 mb-2">{lang.ai.coreIdentity}</label>
-          <p className="text-xs text-slate-500 mb-2">{lang.ai.coreIdentityDesc}</p>
+          <label className="block text-sm font-bold text-slate-700 mb-2">{tChat('admin.chatCustomization.ai.coreIdentity')}</label>
+          <p className="text-xs text-slate-500 mb-2">{tChat('admin.chatCustomization.ai.coreIdentityDesc')}</p>
           <textarea
             value={aiInstructions.coreIdentity || ''}
             onChange={(e) => updateSettings({ aiInstructions: { ...aiInstructions, coreIdentity: e.target.value } })}
@@ -600,8 +368,8 @@ export function ChatCustomization({ language: propLanguage, userRole = 'admin', 
 
         {/* Response Format */}
         <div className="mb-6">
-          <label className="block text-sm font-bold text-slate-700 mb-2">{lang.ai.responseFormat}</label>
-          <p className="text-xs text-slate-500 mb-2">{lang.ai.responseFormatDesc}</p>
+          <label className="block text-sm font-bold text-slate-700 mb-2">{tChat('admin.chatCustomization.ai.responseFormat')}</label>
+          <p className="text-xs text-slate-500 mb-2">{tChat('admin.chatCustomization.ai.responseFormatDesc')}</p>
           <textarea
             value={aiInstructions.responseFormat || ''}
             onChange={(e) => updateSettings({ aiInstructions: { ...aiInstructions, responseFormat: e.target.value } })}
@@ -613,8 +381,8 @@ export function ChatCustomization({ language: propLanguage, userRole = 'admin', 
 
         {/* Behavior Rules */}
         <div className="mb-6">
-          <label className="block text-sm font-bold text-slate-700 mb-2">{lang.ai.behaviorRules}</label>
-          <p className="text-xs text-slate-500 mb-2">{lang.ai.behaviorRulesDesc}</p>
+          <label className="block text-sm font-bold text-slate-700 mb-2">{tChat('admin.chatCustomization.ai.behaviorRules')}</label>
+          <p className="text-xs text-slate-500 mb-2">{tChat('admin.chatCustomization.ai.behaviorRulesDesc')}</p>
           <textarea
             value={aiInstructions.behaviorRules || ''}
             onChange={(e) => updateSettings({ aiInstructions: { ...aiInstructions, behaviorRules: e.target.value } })}
@@ -626,8 +394,8 @@ export function ChatCustomization({ language: propLanguage, userRole = 'admin', 
 
         {/* Tone */}
         <div className="mb-6">
-          <label className="block text-sm font-bold text-slate-700 mb-2">{lang.ai.tone}</label>
-          <p className="text-xs text-slate-500 mb-2">{lang.ai.toneDesc}</p>
+          <label className="block text-sm font-bold text-slate-700 mb-2">{tChat('admin.chatCustomization.ai.tone')}</label>
+          <p className="text-xs text-slate-500 mb-2">{tChat('admin.chatCustomization.ai.toneDesc')}</p>
           <textarea
             value={aiInstructions.tone || ''}
             onChange={(e) => updateSettings({ aiInstructions: { ...aiInstructions, tone: e.target.value } })}
@@ -649,8 +417,8 @@ export function ChatCustomization({ language: propLanguage, userRole = 'admin', 
               <Zap className="w-5 h-5 text-white" />
             </div>
             <div className="text-left">
-              <h4 className="font-bold text-slate-800">{lang.promptTemplates}</h4>
-              <p className="text-xs text-slate-500">{lang.promptTemplatesHint}</p>
+              <h4 className="font-bold text-slate-800">{tChat('admin.chatCustomization.promptTemplates')}</h4>
+              <p className="text-xs text-slate-500">{tChat('admin.chatCustomization.promptTemplatesHint')}</p>
             </div>
           </div>
           {showTemplates ? (
@@ -669,7 +437,7 @@ export function ChatCustomization({ language: propLanguage, userRole = 'admin', 
 
       {/* Disclaimer */}
       <div className="p-4 rounded-xl bg-blue-50 border-2 border-blue-200">
-        <p className="text-sm text-blue-700 font-medium">{lang.ai.disclaimer}</p>
+        <p className="text-sm text-blue-700 font-medium">{tChat('admin.chatCustomization.ai.disclaimer')}</p>
       </div>
 
       {/* Save Button */}
@@ -680,11 +448,11 @@ export function ChatCustomization({ language: propLanguage, userRole = 'admin', 
           className="px-8 py-4 rounded-xl bg-gradient-to-r from-primary to-cyan-500 text-white font-bold text-sm border-2 border-black shadow-[4px_4px_0px_0px_#000] hover:-translate-y-0.5 hover:shadow-[5px_5px_0px_0px_#000] transition-all disabled:opacity-50 flex items-center gap-2"
         >
           {saving ? (
-            <><Loader2 className="w-4 h-4 animate-spin" /> {lang.saving}</>
+            <><Loader2 className="w-4 h-4 animate-spin" /> {tChat('admin.chatCustomization.saving')}</>
           ) : saveSuccess ? (
-            <><CheckCircle className="w-4 h-4" /> {lang.saved}</>
+            <><CheckCircle className="w-4 h-4" /> {tChat('admin.chatCustomization.saved')}</>
           ) : (
-            lang.save
+            tChat('admin.chatCustomization.save')
           )}
         </button>
       </div>

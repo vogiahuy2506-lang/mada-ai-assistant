@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Loader2, Search, Star, X, Check, Zap, FileText, ArrowRight } from 'lucide-react';
+import { AdminLayout } from './AdminLayout';
 import { adminApi } from './adminApi';
 import { usePromptStore, useLanguageStore } from '@/stores';
 
@@ -603,9 +604,13 @@ export function PromptTemplates({ onSelectTemplate, onClose, isInline = false }:
   }
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <AdminLayout
+      titleKey="promptTemplate.title"
+      subtitleKey="promptTemplate.subtitle"
+      showLayoutTitle={false}
+    >
       {content}
-    </div>
+    </AdminLayout>
   );
 }
 

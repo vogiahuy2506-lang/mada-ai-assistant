@@ -24,34 +24,34 @@ interface SuggestedQuestion {
 }
 
 // ============== CONSTANTS ==============
-const CATEGORIES: { value: ATCategory; label: string; labelEn: string; icon: string }[] = [
-  { value: 'vision', label: 'Thị giác', labelEn: 'Vision', icon: '👁️' },
-  { value: 'hearing', label: 'Thính giác', labelEn: 'Hearing', icon: '👂' },
-  { value: 'mobility', label: 'Vận động', labelEn: 'Mobility', icon: '🦴' },
-  { value: 'cognition', label: 'Nhận thức', labelEn: 'Cognition', icon: '🧠' },
-  { value: 'communication', label: 'Giao tiếp', labelEn: 'Communication', icon: '💬' },
-  { value: 'daily_living', label: 'Sinh hoạt', labelEn: 'Daily Living', icon: '🦽' },
-  { value: 'education', label: 'Giáo dục', labelEn: 'Education', icon: '📋' },
-  { value: 'general', label: 'Tổng quát', labelEn: 'General', icon: '📦' },
+const CATEGORIES: { value: ATCategory; label: string; labelEn: string; labelAr: string; labelFr: string; icon: string }[] = [
+  { value: 'vision', label: 'Thị giác', labelEn: 'Vision', labelAr: 'البصر', labelFr: 'Vision', icon: '👁️' },
+  { value: 'hearing', label: 'Thính giác', labelEn: 'Hearing', labelAr: 'السمع', labelFr: 'Audition', icon: '👂' },
+  { value: 'mobility', label: 'Vận động', labelEn: 'Mobility', labelAr: 'التنقل', labelFr: 'Mobilité', icon: '🦴' },
+  { value: 'cognition', label: 'Nhận thức', labelEn: 'Cognition', labelAr: 'الإدراك', labelFr: 'Cognition', icon: '🧠' },
+  { value: 'communication', label: 'Giao tiếp', labelEn: 'Communication', labelAr: 'التواصل', labelFr: 'Communication', icon: '💬' },
+  { value: 'daily_living', label: 'Sinh hoạt', labelEn: 'Daily Living', labelAr: 'الحياة اليومية', labelFr: 'Vie quotidienne', icon: '🦽' },
+  { value: 'education', label: 'Giáo dục', labelEn: 'Education', labelAr: 'التعليم', labelFr: 'Éducation', icon: '📋' },
+  { value: 'general', label: 'Tổng quát', labelEn: 'General', labelAr: 'عام', labelFr: 'Général', icon: '📦' },
 ];
 
-const VIEW_MODES: { value: ViewMode; label: string; labelEn: string }[] = [
-  { value: 'end_user', label: 'Người dùng', labelEn: 'End-User' },
-  { value: 'at_specialist', label: 'Chuyên gia AT', labelEn: 'AT Specialist' },
+const VIEW_MODES: { value: ViewMode; label: string; labelEn: string; labelAr: string; labelFr: string }[] = [
+  { value: 'end_user', label: 'Người dùng', labelEn: 'End-User', labelAr: 'المستخدم النهائي', labelFr: 'Utilisateur final' },
+  { value: 'at_specialist', label: 'Chuyên gia AT', labelEn: 'AT Specialist', labelAr: 'متخصص التقنية المساعدة', labelFr: 'Spécialiste AT' },
 ];
 
-const LANGUAGES: { value: LanguageType; label: string; labelEn: string; flag: string }[] = [
-  { value: 'vi', label: 'Tiếng Việt', labelEn: 'Vietnamese', flag: '🇻🇳' },
-  { value: 'en', label: 'English', labelEn: 'English', flag: '🇬🇧' },
-  { value: 'ar', label: 'العربية', labelEn: 'Arabic', flag: '🇸🇦' },
-  { value: 'fr', label: 'Français', labelEn: 'French', flag: '🇫🇷' },
+const LANGUAGES: { value: LanguageType; label: string; labelEn: string; labelAr: string; labelFr: string; flag: string }[] = [
+  { value: 'vi', label: 'Tiếng Việt', labelEn: 'Vietnamese', labelAr: 'الفيتنامية', labelFr: 'Vietnamien', flag: '🇻🇳' },
+  { value: 'en', label: 'English', labelEn: 'English', labelAr: 'الإنجليزية', labelFr: 'Anglais', flag: '🇬🇧' },
+  { value: 'ar', label: 'العربية', labelEn: 'Arabic', labelAr: 'العربية', labelFr: 'Arabe', flag: '🇸🇦' },
+  { value: 'fr', label: 'Français', labelEn: 'French', labelAr: 'الفرنسية', labelFr: 'Français', flag: '🇫🇷' },
 ];
 
 // ============== TRANSLATION HELPER ==============
 function useSuggestedQuestionsTranslation() {
   const language = useLanguageStore((state) => state.language) as Language;
   const t = (key: string, params?: Record<string, string | number>) => {
-    let text = translations[language]?.[key as keyof typeof translations[typeof language]] as string || key;
+    let text = (translations[language]?.[key as keyof typeof translations[typeof language]] || translations.vi[key as keyof typeof translations.vi]) as string || key;
     if (params) {
       Object.entries(params).forEach(([k, v]) => {
         text = text.replace(new RegExp(`\\{${k}\\}`, 'g'), String(v));
@@ -457,20 +457,36 @@ export default function AdminSuggestedQuestions() {
     }
   };
 
-  const getCategoryLabel = (cat: string) => CATEGORIES.find(c => c.value === cat)?.label || cat;
-  const getCategoryLabelEn = (cat: string) => CATEGORIES.find(c => c.value === cat)?.labelEn || cat;
+  const getCategoryLabelByLang = (cat: string) => {
+    const c = CATEGORIES.find(x => x.value === cat);
+    if (!c) return cat;
+    if (language === 'ar') return c.labelAr;
+    if (language === 'fr') return c.labelFr;
+    if (language === 'en') return c.labelEn;
+    return c.label;
+  };
   const getCategoryIcon = (cat: string) => CATEGORIES.find(c => c.value === cat)?.icon || '📦';
-  const getViewModeLabel = (mode: string) => VIEW_MODES.find(v => v.value === mode)?.label || mode;
-  const getLanguageLabel = (lang: string) => LANGUAGES.find(l => l.value === lang)?.label || lang;
+  const getViewModeLabelByLang = (mode: string) => {
+    const v = VIEW_MODES.find(x => x.value === mode);
+    if (!v) return mode;
+    if (language === 'ar') return v.labelAr;
+    if (language === 'fr') return v.labelFr;
+    if (language === 'en') return v.labelEn;
+    return v.label;
+  };
+  const getLanguageLabelByLang = (lang: string) => {
+    const l = LANGUAGES.find(x => x.value === lang);
+    if (!l) return lang;
+    if (language === 'ar') return l.labelAr;
+    if (language === 'fr') return l.labelFr;
+    if (language === 'en') return l.labelEn;
+    return l.label;
+  };
 
   return (
     <AdminLayout
-      title={t('adminSuggested.title')}
-      titleEn="Suggested Questions"
-      titleAr="الأسئلة المقترحة"
-      titleFr="Questions suggérées"
-      subtitle={t('adminSuggested.subtitle')}
-      subtitleEn="Manage suggested questions for agents by category, view mode and language"
+      titleKey="admin.topBar.suggestedQuestions"
+      subtitleKey="admin.topBar.suggestedQuestionsSub"
       showLayoutTitle={false}
     >
       {/* Hero Section */}
@@ -559,7 +575,7 @@ export default function AdminSuggestedQuestions() {
             >
               <option value="">{t('adminSuggested.all')}</option>
               {CATEGORIES.map(c => (
-                <option key={c.value} value={c.value}>{c.icon} {language === 'en' ? c.labelEn : c.label}</option>
+                <option key={c.value} value={c.value}>{c.icon} {getCategoryLabelByLang(c.value)}</option>
               ))}
             </select>
           </div>
@@ -572,7 +588,7 @@ export default function AdminSuggestedQuestions() {
             >
               <option value="">{t('adminSuggested.all')}</option>
               {VIEW_MODES.map(v => (
-                <option key={v.value} value={v.value}>{language === 'en' ? v.labelEn : v.label}</option>
+                <option key={v.value} value={v.value}>{getViewModeLabelByLang(v.value)}</option>
               ))}
             </select>
           </div>
@@ -585,7 +601,7 @@ export default function AdminSuggestedQuestions() {
             >
               <option value="">{t('adminSuggested.all')}</option>
               {LANGUAGES.map(l => (
-                <option key={l.value} value={l.value}>{l.flag} {language === 'en' ? l.labelEn : l.label}</option>
+                <option key={l.value} value={l.value}>{l.flag} {getLanguageLabelByLang(l.value)}</option>
               ))}
             </select>
           </div>
@@ -767,7 +783,7 @@ export default function AdminSuggestedQuestions() {
                       </td>
                       <td className="px-4 py-3">
                         <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-bold border border-blue-300">
-                          {getCategoryIcon(q.category)} {language === 'en' ? getCategoryLabelEn(q.category) : getCategoryLabel(q.category)}
+                          {getCategoryIcon(q.category)} {getCategoryLabelByLang(q.category)}
                         </span>
                       </td>
                       <td className="px-4 py-3">
@@ -777,12 +793,12 @@ export default function AdminSuggestedQuestions() {
                             ? 'bg-purple-100 text-purple-700 border-purple-300'
                             : 'bg-green-100 text-green-700 border-green-300'
                         )}>
-                          {getViewModeLabel(q.view_mode)}
+                          {getViewModeLabelByLang(q.view_mode)}
                         </span>
                       </td>
                       <td className="px-4 py-3">
                         <span className="px-2 py-1 rounded bg-gray-100 text-gray-700 text-xs font-medium border border-gray-300">
-                          {getLanguageLabel(q.language)}
+                          {getLanguageLabelByLang(q.language)}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-600">{q.sort_order}</td>
@@ -895,7 +911,7 @@ export default function AdminSuggestedQuestions() {
                   className="w-full px-3 py-2 rounded-lg bg-white border-2 border-black text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
                 >
                   {CATEGORIES.map(c => (
-                    <option key={c.value} value={c.value}>{c.icon} {language === 'en' ? c.labelEn : c.label}</option>
+                    <option key={c.value} value={c.value}>{c.icon} {getCategoryLabelByLang(c.value)}</option>
                   ))}
                 </select>
               </div>
@@ -911,7 +927,7 @@ export default function AdminSuggestedQuestions() {
                   className="w-full px-3 py-2 rounded-lg bg-white border-2 border-black text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
                 >
                   {VIEW_MODES.map(v => (
-                    <option key={v.value} value={v.value}>{language === 'en' ? v.labelEn : v.label}</option>
+                    <option key={v.value} value={v.value}>{getViewModeLabelByLang(v.value)}</option>
                   ))}
                 </select>
               </div>
@@ -927,7 +943,7 @@ export default function AdminSuggestedQuestions() {
                   className="w-full px-3 py-2 rounded-lg bg-white border-2 border-black text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
                 >
                   {LANGUAGES.map(l => (
-                    <option key={l.value} value={l.value}>{l.flag} {language === 'en' ? l.labelEn : l.label}</option>
+                    <option key={l.value} value={l.value}>{l.flag} {getLanguageLabelByLang(l.value)}</option>
                   ))}
                 </select>
               </div>
@@ -1062,7 +1078,7 @@ export default function AdminSuggestedQuestions() {
                         className="w-full px-2 py-1.5 rounded-lg bg-white border border-black text-xs focus:outline-none focus:ring-2 focus:ring-primary/30"
                       >
                         {CATEGORIES.map(c => (
-                          <option key={c.value} value={c.value}>{c.icon} {language === 'en' ? c.labelEn : c.label}</option>
+                          <option key={c.value} value={c.value}>{c.icon} {getCategoryLabelByLang(c.value)}</option>
                         ))}
                       </select>
                     </div>
@@ -1075,7 +1091,7 @@ export default function AdminSuggestedQuestions() {
                         className="w-full px-2 py-1.5 rounded-lg bg-white border border-black text-xs focus:outline-none focus:ring-2 focus:ring-primary/30"
                       >
                         {VIEW_MODES.map(v => (
-                          <option key={v.value} value={v.value}>{language === 'en' ? v.labelEn : v.label}</option>
+                          <option key={v.value} value={v.value}>{getViewModeLabelByLang(v.value)}</option>
                         ))}
                       </select>
                     </div>
@@ -1088,7 +1104,7 @@ export default function AdminSuggestedQuestions() {
                         className="w-full px-2 py-1.5 rounded-lg bg-white border border-black text-xs focus:outline-none focus:ring-2 focus:ring-primary/30"
                       >
                         {LANGUAGES.map(l => (
-                          <option key={l.value} value={l.value}>{l.flag} {language === 'en' ? l.labelEn : l.label}</option>
+                          <option key={l.value} value={l.value}>{l.flag} {getLanguageLabelByLang(l.value)}</option>
                         ))}
                       </select>
                     </div>

@@ -1,20 +1,18 @@
 import { useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { EmbedWidget } from '@/components/widget/EmbedWidget';
-import { useLanguageStore } from '@/stores';
 import type { Language } from '@/types';
-import { translations } from '@/lib/translations';
 
-// Translation helper function using useLanguageStore
-const useTranslation = () => {
-  const language = useLanguageStore((state) => state.language) as Language;
-  return (key: string): string => {
-    return translations[language]?.[key] || translations.vi[key] || key;
-  };
+// Simple language store subscription for reactivity
+import { useLanguageStore } from '@/stores';
+
+// Translation helper - just to subscribe to language changes
+const _useTranslation = () => {
+  useLanguageStore((s) => s.language);
 };
 
 export function WidgetPage() {
-  const t = useTranslation();
+  _useTranslation(); // Subscribe to language changes for reactivity
   const [searchParams] = useSearchParams();
   
   // Get configuration from URL params or defaults

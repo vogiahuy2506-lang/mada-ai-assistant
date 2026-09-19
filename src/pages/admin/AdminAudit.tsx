@@ -142,14 +142,8 @@ export function AdminAudit() {
 
   return (
     <AdminLayout
-      title={t('admin.audit.title')}
-      titleEn="Activity Logs"
-      titleAr="سجل النشاط"
-      titleFr="Journal d'activité"
-      subtitle={t('admin.audit.subtitle')}
-      subtitleEn="Track every user & admin action across the MADA AI system."
-      subtitleAr="تتبع كل إجراء للمستخدم والمشرف في نظام MADA AI."
-      subtitleFr="Tracer chaque action utilisateur & admin dans le système MADA AI."
+      titleKey="admin.topBar.audit"
+      subtitleKey="admin.topBar.auditSub"
       showLayoutTitle={false}
     >
       {/* Hero Banner */}

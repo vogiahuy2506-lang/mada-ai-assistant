@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { getAccessToken } from '@/lib/api';
+import { getAccessToken, validateLocalToken } from '@/lib/api';
 
 export interface Agent {
   id: string;
@@ -145,7 +145,6 @@ const clearSyncInterval = () => {
 const startSyncInterval = (loadFn: () => Promise<void>, intervalMs = 30_000) => {
   clearSyncInterval();
   syncIntervalId = setInterval(() => {
-    console.log('[agentStore] Periodic sync — reloading agents from backend...');
     loadFn();
   }, intervalMs);
 };
@@ -171,22 +170,49 @@ const agentStore = create<AgentState>()(
           try {
             res = await apiRequest<{ success: boolean; data: any[] }>('/public/agents');
           } catch (pubErr) {
-            const token = getAccessToken();
-            if (token) {
+            // ⭐ Fix: Validate token locally before falling back to /admin/agents
+            // This prevents 401 errors when the stored token is expired or invalid
+            const tokenCheck = validateLocalToken();
+            if (tokenCheck.valid) {
               console.warn('[agentStore] /public/agents failed, falling back to /admin/agents:', pubErr);
               try {
                 res = await apiRequest<{ success: boolean; data: any[] }>('/admin/agents');
               } catch (adminErr) {
+                // If admin endpoint also fails, use cached agents instead of throwing
+                const existingAgents = get().agents;
+                const hasRealAgents = existingAgents.length > 0 && existingAgents[0]?.id !== '__loading__';
+                if (hasRealAgents) {
+                  console.warn('[agentStore] /admin/agents also failed, keeping cached agents');
+                  set({
+                    isLoading: false,
+                    isSyncing: false,
+                    backendConnected: false,
+                    syncError: 'Using cached agents',
+                  });
+                  return;
+                }
                 throw adminErr;
               }
             } else {
+              console.warn('[agentStore] Token invalid, skipping /admin/agents fallback:', tokenCheck.reason);
+              // Use cached agents instead of making a request that will fail with 401
+              const existingAgents = get().agents;
+              const hasRealAgents = existingAgents.length > 0 && existingAgents[0]?.id !== '__loading__';
+              if (hasRealAgents) {
+                set({
+                  isLoading: false,
+                  isSyncing: false,
+                  backendConnected: false,
+                  syncError: 'Using cached agents (token expired)',
+                });
+                return;
+              }
               throw pubErr;
             }
           }
 
           if (res && res.success && Array.isArray(res.data)) {
             const agents = res.data.map(mapBackendAgent);
-            console.log(`[agentStore] ✅ Loaded ${agents.length} agents from backend`);
 
             set({
               agents,

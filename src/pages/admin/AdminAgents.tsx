@@ -4,8 +4,85 @@ import { adminApi } from './adminApi';
 import { MADA_BOTS } from '@/lib/madaBots';
 import { broadcastAgentChange } from '@/lib/agentBroadcast';
 import { useAuthStore, usePromptStore, useAgentStore, useLanguageStore } from '@/stores';
-import { useTranslation } from '@/lib/translations';
 import clsx from 'clsx';
+
+// ============== GLOBAL TRANSLATION HELPER ==============
+const t = (key: string): string => {
+  const lang = useLanguageStore.getState().language;
+  const translations: Record<string, Record<string, string>> = {
+    vi: {
+      'admin.overview.totalUsers': 'Tổng người dùng',
+      'admin.common.active': 'Hoạt động',
+      'admin.common.disabled': 'Tắt',
+      'admin.common.on': 'BẬT',
+      'admin.common.off': 'TẮT',
+      'admin.common.edit': 'Sửa',
+      'admin.common.noPermission': 'Bạn không có quyền thực hiện hành động này',
+    },
+    en: {
+      'admin.overview.totalUsers': 'Total users',
+      'admin.common.active': 'Active',
+      'admin.common.disabled': 'Disabled',
+      'admin.common.on': 'ON',
+      'admin.common.off': 'OFF',
+      'admin.common.edit': 'Edit',
+      'admin.common.noPermission': 'You do not have permission to perform this action',
+    },
+    ar: {
+      'admin.overview.totalUsers': 'إجمالي المستخدمين',
+      'admin.common.active': 'نشط',
+      'admin.common.disabled': 'معطل',
+      'admin.common.on': 'تشغيل',
+      'admin.common.off': 'إيقاف',
+      'admin.common.edit': 'تعديل',
+      'admin.common.noPermission': 'ليس لديك إذن لتنفيذ هذا الإجراء',
+    },
+    fr: {
+      'admin.overview.totalUsers': 'Total utilisateurs',
+      'admin.common.active': 'Actif',
+      'admin.common.disabled': 'Désactivé',
+      'admin.common.on': 'ON',
+      'admin.common.off': 'OFF',
+      'admin.common.edit': 'Modifier',
+      'admin.common.noPermission': 'Vous n\'avez pas la permission d\'effectuer cette action',
+    },
+  };
+  return translations[lang]?.[key] || translations['vi'][key] || key;
+};
+
+// ============== SUGGESTED QUESTIONS TYPES ==============
+type ATCategory = 'vision' | 'hearing' | 'mobility' | 'cognition' | 'communication' | 'daily_living' | 'education' | 'general';
+type ViewMode = 'end_user' | 'at_specialist';
+type LanguageType = 'vi' | 'en' | 'ar' | 'fr';
+
+interface SuggestedQuestion {
+  id: string;
+  agent_id: string | null;
+  category: ATCategory;
+  view_mode: ViewMode;
+  language: LanguageType;
+  question: string;
+  sort_order: number;
+  is_active: number;
+}
+
+const SQ_CATEGORIES: { value: ATCategory; label: string; icon: string }[] = [
+  { value: 'vision', label: 'Thị giác', icon: '👁️' },
+  { value: 'hearing', label: 'Thính giác', icon: '👂' },
+  { value: 'mobility', label: 'Vận động', icon: '🦴' },
+  { value: 'cognition', label: 'Nhận thức', icon: '🧠' },
+  { value: 'communication', label: 'Giao tiếp', icon: '💬' },
+  { value: 'daily_living', label: 'Sinh hoạt', icon: '🦽' },
+  { value: 'education', label: 'Giáo dục', icon: '📋' },
+  { value: 'general', label: 'Tổng quát', icon: '📦' },
+];
+
+const SQ_LANGUAGES: { value: LanguageType; label: string; flag: string }[] = [
+  { value: 'vi', label: 'Tiếng Việt', flag: '🇻🇳' },
+  { value: 'en', label: 'English', flag: '🇬🇧' },
+  { value: 'ar', label: 'العربية', flag: '🇸🇦' },
+  { value: 'fr', label: 'Français', flag: '🇫🇷' },
+];
 
 // ============== TYPES ==============
 type Language = 'vi' | 'en' | 'ar' | 'fr';
@@ -198,8 +275,12 @@ const agentTranslations: Record<string, Record<Language, string>> = {
 };
 
 // ============== TRANSLATION HELPER ==============
-const tAgent = (key: string, lang: Language = 'vi'): string => {
-  return agentTranslations[key]?.[lang] || agentTranslations[key]?.['vi'] || key;
+// This will be set from inside the component using the global language store
+let globalLanguage: Language = 'vi';
+
+const tAgent = (key: string, lang?: Language): string => {
+  const activeLang = lang || globalLanguage;
+  return agentTranslations[key]?.[activeLang] || agentTranslations[key]?.['vi'] || key;
 };
 
 // ============== TYPES ==============
@@ -267,10 +348,13 @@ function AgentAvatar({
 export function AdminAgents() {
   const { user } = useAuthStore();
   const isSuperAdmin = user?.role === 'super_admin';
+  const isReadOnly = !isSuperAdmin;
+  const language: Language = 'vi';
   const loadAgentsForChat = useAgentStore((s) => s.loadAgents);
   const removeAgentForChat = useAgentStore((s) => s.removeAgent);
-  const { language } = useLanguageStore();
-  const { t } = useTranslation();
+
+  // Always use Vietnamese
+  globalLanguage = 'vi';
 
   const [agents, setAgents] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -391,6 +475,117 @@ export function AdminAgents() {
   const [crawling, setCrawling] = useState(false);
   const [crawlResult, setCrawlResult] = useState<{ totalDocs: number; results: CrawlResult[] } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // ============== SUGGESTED QUESTIONS STATE ==============
+  const [sqQuestions, setSqQuestions] = useState<SuggestedQuestion[]>([]);
+  const [sqLoading, setSqLoading] = useState(false);
+  const [sqShowForm, setSqShowForm] = useState(false);
+  const [sqEditingId, setSqEditingId] = useState<string | null>(null);
+  const [sqFormData, setSqFormData] = useState({
+    category: 'general' as ATCategory,
+    view_mode: 'end_user' as ViewMode,
+    language: 'vi' as LanguageType,
+    question: '',
+    sort_order: 0,
+    is_active: true,
+  });
+
+  // Load questions when editing an agent
+  useEffect(() => {
+    if (editingId) {
+      loadSqQuestions(editingId);
+    } else {
+      setSqQuestions([]);
+    }
+  }, [editingId]);
+
+  const loadSqQuestions = async (agentId: string) => {
+    setSqLoading(true);
+    try {
+      const res = await adminApi.getSuggestedQuestions({ agent_id: agentId });
+      if (res.success && res.data) {
+        setSqQuestions(res.data);
+      }
+    } catch (err) {
+      console.error('Failed to load questions:', err);
+    } finally {
+      setSqLoading(false);
+    }
+  };
+
+  const resetSqForm = () => {
+    setSqFormData({
+      category: 'general',
+      view_mode: 'end_user',
+      language: 'vi',
+      question: '',
+      sort_order: 0,
+      is_active: true,
+    });
+    setSqEditingId(null);
+  };
+
+  const handleSqSubmit = async () => {
+    if (!sqFormData.question.trim()) {
+      alert('Vui lòng nhập câu hỏi');
+      return;
+    }
+    if (!editingId) {
+      alert('Vui lòng lưu Agent trước khi thêm câu hỏi');
+      return;
+    }
+
+    try {
+      if (sqEditingId) {
+        await adminApi.updateSuggestedQuestion(sqEditingId, {
+          ...sqFormData,
+          is_active: sqFormData.is_active ? 1 : 0,
+        });
+      } else {
+        await adminApi.createSuggestedQuestion({
+          ...sqFormData,
+          agent_id: editingId,
+        });
+      }
+      setSqShowForm(false);
+      resetSqForm();
+      loadSqQuestions(editingId);
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
+  const handleSqEdit = (q: SuggestedQuestion) => {
+    setSqFormData({
+      category: q.category,
+      view_mode: q.view_mode,
+      language: q.language,
+      question: q.question,
+      sort_order: q.sort_order,
+      is_active: q.is_active === 1,
+    });
+    setSqEditingId(q.id);
+    setSqShowForm(true);
+  };
+
+  const handleSqDelete = async (id: string) => {
+    if (!confirm('Xóa câu hỏi này?')) return;
+    try {
+      await adminApi.deleteSuggestedQuestion(id);
+      if (editingId) loadSqQuestions(editingId);
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
+  const handleSqToggle = async (q: SuggestedQuestion) => {
+    try {
+      await adminApi.updateSuggestedQuestion(q.id, { is_active: q.is_active !== 1 ? 1 : 0 });
+      if (editingId) loadSqQuestions(editingId);
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
 
   // ============== DATA LOAD ==============
   const loadAgents = async () => {
@@ -933,14 +1128,8 @@ export function AdminAgents() {
   // ============== RENDER ==============
   return (
     <AdminLayout
-      title={t('admin.topBar.agents')}
-      titleEn="Agent Management"
-      titleAr="إدارة الوكلاء"
-      titleFr="Gestion des agents"
-      subtitle={t('admin.topBar.agentsSub')}
-      subtitleEn="Create and manage AI Agents. Users can select an Agent to chat with."
-      subtitleAr="إنشاء وإدارة وكلاء الذكاء الاصطناعي. يمكن للمستخدمين اختيار وكيل للدردشة."
-      subtitleFr="Créer et gérer les agents IA. Les utilisateurs peuvent choisir un agent."
+      titleKey="admin.topBar.agents"
+      subtitleKey="admin.topBar.agentsSub"
       showLayoutTitle={false}
     >
       {/* Hero Banner Section */}
@@ -980,7 +1169,7 @@ export function AdminAgents() {
 
         <div className="relative bg-gradient-to-br from-green-50 to-green-100/40 backdrop-blur-xl rounded-xl p-3 border-2 border-black flex items-center gap-2 shadow-[4px_4px_0px_0px_#000]">
           <div className="w-8 h-8 rounded-lg bg-green-200 border-2 border-black flex items-center justify-center shadow-[2px_2px_0px_0px_#000]">
-            <span className="material-symbols-outlined text-green-600 text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
+            <span className="material-symbols-outlined text-green-600 text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>toggle_on</span>
           </div>
           <div>
             <p className="text-[9px] font-bold text-green-700 uppercase tracking-wider">{t('admin.common.active').split(' ')[0].toUpperCase()}</p>
@@ -1424,30 +1613,161 @@ export function AdminAgents() {
                 </div>
               </div>
 
-              {/* Suggested Questions Section */}
-              <details className="p-3 rounded-xl bg-gradient-to-br from-indigo-50 to-violet-50/40 border-2 border-indigo-200">
-                <summary className="cursor-pointer text-[10px] font-bold text-indigo-700 uppercase tracking-wider flex items-center gap-1.5 select-none">
-                  <span className="material-symbols-outlined text-indigo-600 text-base">quiz</span>
-                  {tAgent('agent.form.suggestedQuestions', language)}
-                  <span className="ml-auto text-[9px] font-normal normal-case">{tAgent('agent.form.suggestedQuestionsManage', language)}</span>
-                </summary>
-                <div className="mt-3 space-y-2">
-                  <p className="text-[10px] text-indigo-700/80 bg-white/60 rounded-lg p-2 border border-indigo-200">
-                    💡 {tAgent('agent.form.suggestedQuestionsHint', language)}
-                  </p>
-                  <p className="text-[10px] text-indigo-600/70">
-                    {tAgent('agent.form.suggestedQuestionsFilterHint', language)} <code className="bg-indigo-100 px-1 rounded">{editingId || 'agent_id_khi_tao'}</code>
-                  </p>
-                  <a
-                    href="/admin/suggested-questions"
-                    target="_blank"
-                    className="flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-indigo-500 text-white font-bold text-xs border-2 border-black shadow-[2px_2px_0px_0px_#000] hover:shadow-[3px_3px_0px_0px_#000] transition-all"
-                  >
-                    <span className="material-symbols-outlined text-sm">open_in_new</span>
-                    {tAgent('agent.form.openSuggestedQuestionsPage', language)}
-                  </a>
+              {/* Suggested Questions Section - Inline */}
+              <div className="p-3 rounded-xl bg-gradient-to-br from-indigo-50 to-violet-50/40 border-2 border-indigo-200">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-indigo-600 text-base">quiz</span>
+                    <span className="text-[10px] font-bold text-indigo-700 uppercase tracking-wider">
+                      {tAgent('agent.form.suggestedQuestions', language)}
+                    </span>
+                    <span className="text-[10px] text-indigo-500">({sqQuestions.length})</span>
+                  </div>
+                  {!isReadOnly && editingId && (
+                    <button
+                      type="button"
+                      onClick={() => { resetSqForm(); setSqShowForm(true); }}
+                      className="px-2 py-1 rounded-lg bg-indigo-500 text-white text-[10px] font-bold border border-indigo-600 hover:bg-indigo-600"
+                    >
+                      + Thêm
+                    </button>
+                  )}
                 </div>
-              </details>
+
+                {/* Add/Edit Form */}
+                {sqShowForm && (
+                  <div className="bg-white/80 rounded-lg p-3 mb-3 border border-indigo-200 space-y-2">
+                    <div className="grid grid-cols-3 gap-2">
+                      <select
+                        value={sqFormData.category}
+                        onChange={(e) => setSqFormData(prev => ({ ...prev, category: e.target.value as ATCategory }))}
+                        className="px-2 py-1.5 rounded-lg border border-indigo-200 text-[10px]"
+                      >
+                        {SQ_CATEGORIES.map(c => (
+                          <option key={c.value} value={c.value}>{c.icon} {c.label}</option>
+                        ))}
+                      </select>
+                      <select
+                        value={sqFormData.language}
+                        onChange={(e) => setSqFormData(prev => ({ ...prev, language: e.target.value as LanguageType }))}
+                        className="px-2 py-1.5 rounded-lg border border-indigo-200 text-[10px]"
+                      >
+                        {SQ_LANGUAGES.map(l => (
+                          <option key={l.value} value={l.value}>{l.flag} {l.label}</option>
+                        ))}
+                      </select>
+                      <input
+                        type="number"
+                        value={sqFormData.sort_order}
+                        onChange={(e) => setSqFormData(prev => ({ ...prev, sort_order: parseInt(e.target.value) || 0 }))}
+                        placeholder="Thứ tự"
+                        className="px-2 py-1.5 rounded-lg border border-indigo-200 text-[10px]"
+                      />
+                    </div>
+                    <textarea
+                      value={sqFormData.question}
+                      onChange={(e) => setSqFormData(prev => ({ ...prev, question: e.target.value }))}
+                      placeholder="Nhập câu hỏi gợi ý..."
+                      rows={2}
+                      className="w-full px-2 py-1.5 rounded-lg border border-indigo-200 text-[10px] resize-none"
+                    />
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="sq_active"
+                        checked={sqFormData.is_active}
+                        onChange={(e) => setSqFormData(prev => ({ ...prev, is_active: e.target.checked }))}
+                        className="w-3 h-3"
+                      />
+                      <label 
+                        htmlFor="sq_active" 
+                        className={clsx(
+                          'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-bold border-2 border-black cursor-pointer transition-all shadow-[2px_2px_0px_0px_#000]',
+                          sqFormData.is_active 
+                            ? 'bg-green-500 text-white translate-y-[-1px] hover:bg-green-600' 
+                            : 'bg-white text-gray-500 hover:bg-gray-50'
+                        )}
+                      >
+                        <span className="material-symbols-outlined text-xs" style={{ fontVariationSettings: "'FILL' 1" }}>
+                          {sqFormData.is_active ? 'check_circle' : 'radio_button_unchecked'}
+                        </span>
+                        {sqFormData.is_active ? 'Hoạt động' : 'Tắt'}
+                      </label>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => { setSqShowForm(false); resetSqForm(); }}
+                        className="px-3 py-1.5 rounded-lg bg-gray-200 text-gray-700 text-[10px] font-medium"
+                      >
+                        Hủy
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleSqSubmit}
+                        className="px-3 py-1.5 rounded-lg bg-indigo-500 text-white text-[10px] font-medium hover:bg-indigo-600"
+                      >
+                        {sqEditingId ? 'Cập nhật' : 'Thêm mới'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Questions List */}
+                {sqLoading ? (
+                  <p className="text-[10px] text-indigo-500 text-center py-2">Đang tải...</p>
+                ) : sqQuestions.length === 0 ? (
+                  <p className="text-[10px] text-indigo-400 text-center py-2">
+                    {editingId ? 'Chưa có câu hỏi gợi ý nào' : 'Lưu Agent trước để thêm câu hỏi'}
+                  </p>
+                ) : (
+                  <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                    {sqQuestions.map((q) => (
+                      <div key={q.id} className="flex items-start gap-2 p-2 bg-white/60 rounded-lg border border-indigo-100">
+                        <span className="text-sm">{SQ_CATEGORIES.find(c => c.value === q.category)?.icon || '📦'}</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[11px] text-gray-800 line-clamp-2">{q.question}</p>
+                          <div className="flex items-center gap-1 mt-0.5">
+                            <span className="text-[9px] text-gray-400">{SQ_LANGUAGES.find(l => l.value === q.language)?.flag}</span>
+                            <span className="text-[9px] text-gray-400">•</span>
+                            <span className={clsx('text-[9px] px-1 rounded', q.is_active === 1 ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400')}>
+                              {q.is_active === 1 ? '✓' : '✕'}
+                            </span>
+                          </div>
+                        </div>
+                        {!isReadOnly && (
+                          <div className="flex gap-0.5">
+                            <button
+                              type="button"
+                              onClick={() => handleSqToggle(q)}
+                              className="w-5 h-5 rounded hover:bg-indigo-100 flex items-center justify-center text-[10px]"
+                              title={q.is_active === 1 ? 'Tắt' : 'Bật'}
+                            >
+                              {q.is_active === 1 ? '🔴' : '⚪'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleSqEdit(q)}
+                              className="w-5 h-5 rounded hover:bg-indigo-100 flex items-center justify-center"
+                              title="Sửa"
+                            >
+                              <span className="text-[9px]">✏️</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleSqDelete(q.id)}
+                              className="w-5 h-5 rounded hover:bg-red-100 flex items-center justify-center"
+                              title="Xóa"
+                            >
+                              <span className="text-[9px]">🗑️</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </form>
 
             {/* Modal Footer */}
@@ -1599,7 +1919,7 @@ export function AdminAgents() {
                     onClick={() => toggleAgentActive(agent.id)}
                     disabled={!isSuperAdmin}
                     className={clsx(
-                      'flex-1 py-1.5 rounded-lg font-bold text-xs border border-black transition-all shadow-[2px_2px_0px_0px_#000]',
+                      'flex-none min-w-[60px] py-1.5 px-2 rounded-lg font-bold text-xs border border-black transition-all shadow-[2px_2px_0px_0px_#000]',
                       (agent.is_active || agent.isActive)
                         ? 'bg-yellow-100 text-yellow-700 hover:shadow-[3px_3px_0px_0px_#000] disabled:opacity-50'
                         : 'bg-green-100 text-green-700 hover:shadow-[3px_3px_0px_0px_#000] disabled:opacity-50'
@@ -1611,7 +1931,7 @@ export function AdminAgents() {
                   <button
                     onClick={() => handleEdit(agent)}
                     disabled={!isSuperAdmin}
-                    className="flex-1 py-1.5 rounded-lg bg-primary text-white font-bold text-xs border border-black shadow-[2px_2px_0px_0px_#000] hover:shadow-[3px_3px_0px_0px_#000] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex-none min-w-[60px] py-1.5 px-2 rounded-lg bg-primary text-white font-bold text-xs border border-black shadow-[2px_2px_0px_0px_#000] hover:shadow-[3px_3px_0px_0px_#000] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     title={isSuperAdmin ? t('admin.common.edit') : t('admin.common.noPermission')}
                   >
                     {isSuperAdmin ? t('admin.common.edit') : (
@@ -2009,7 +2329,7 @@ export function AdminAgents() {
               {/* Empty state */}
               {getImportableAgents().filter(item => !agents.some(a => a.id === item.id)).length === 0 && (
                 <div className="text-center py-8 text-on-surface-variant">
-                  <span className="material-symbols-outlined text-4xl text-gray-300 mb-2">check_circle</span>
+                  <span className="material-symbols-outlined text-2xl text-gray-300 mb-2">check_circle</span>
                   <p className="text-sm font-medium">{tAgent('agent.importAllBotsImported', language)}</p>
                 </div>
               )}

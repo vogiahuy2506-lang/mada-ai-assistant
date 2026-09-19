@@ -54,6 +54,37 @@ export function AdminScraper() {
   const isAr = language === 'ar';
   const isFr = language === 'fr';
 
+  // Category name helper based on language
+  const getCategoryName = (cat: MadaCategory): string => {
+    if (isAr) {
+      // Arabic translations for categories
+      const arNames: Record<string, string> = {
+        vision: 'الرؤية',
+        hearing: 'السمع',
+        mobility: 'الحركة',
+        cognition: 'الإدراك',
+        communication: 'التواصل',
+        daily_living: 'الحياة اليومية',
+      };
+      return arNames[cat.slug] || cat.nameVi;
+    }
+    if (isFr) {
+      const frNames: Record<string, string> = {
+        vision: 'Vision',
+        hearing: 'Audition',
+        mobility: 'Mobilité',
+        cognition: 'Cognition',
+        communication: 'Communication',
+        daily_living: 'Vie quotidienne',
+      };
+      return frNames[cat.slug] || cat.nameVi;
+    }
+    if (isVi || !isAr) {
+      return cat.nameVi;
+    }
+    return cat.name;
+  };
+
   const [categories, setCategories] = useState<MadaCategory[]>([]);
   const [jobs, setJobs] = useState<CrawlJob[]>([]);
   const [fileStats, setFileStats] = useState<{ files: Record<string, FileStat>; chunkCount: number; productCount: number } | null>(null);
@@ -309,10 +340,8 @@ export function AdminScraper() {
 
   return (
     <AdminLayout
-      title={tr('admin.scraper.layout.title')}
-      titleEn={tr('admin.scraper.layout.title')}
-      subtitle={tr('admin.scraper.layout.subtitle')}
-      subtitleEn={tr('admin.scraper.layout.subtitle')}
+      titleKey="admin.topBar.scraper"
+      subtitleKey="admin.topBar.scraperSub"
       showLayoutTitle={false}
     >
       {/* Hero Banner */}
@@ -438,7 +467,7 @@ export function AdminScraper() {
                        'category'}
                     </span>
                   </div>
-                  <span className="font-bold text-sm">{cat.nameVi}</span>
+                  <span className="font-bold text-sm">{getCategoryName(cat)}</span>
                   <span className="text-xs text-on-surface-variant">/ {cat.name}</span>
                   <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 font-mono border-2 border-slate-300">{cat.botId}</span>
                 </div>

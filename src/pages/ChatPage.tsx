@@ -1098,11 +1098,6 @@ export function ChatPage() {
     }
   }, []);
   
-  // DEBUG: Log selectedFiles changes
-  useEffect(() => {
-    console.log('[MADA DEBUG] selectedFiles changed:', selectedFiles);
-  }, [selectedFiles]);
-  
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -1441,15 +1436,10 @@ export function ChatPage() {
     const attachmentsForApi: any[] = [];
     
     if (selectedFiles.length > 0) {
-      console.log('[DEBUG] Processing files:', selectedFiles.length);
-      
       // Chuẩn bị attachments để hiển thị và gửi lên server
       for (const f of selectedFiles) {
-        console.log('[DEBUG] Processing file:', f.name, '| type:', f.type, '| isLoading:', f.isLoading, '| hasOriginalFile:', !!f.originalFile);
-        
         // Chỉ xử lý file đã load xong
         if (f.isLoading) {
-          console.log('[DEBUG] Skipping file still loading:', f.name);
           continue;
         }
         
@@ -1469,7 +1459,6 @@ export function ChatPage() {
             type: f.type,
             content: f.content,
           });
-          console.log('[DEBUG] Sent as parsed content:', f.name, '| type:', f.type, '| length:', f.content.length);
         }
         // Nếu không có content nhưng có originalFile - gửi base64 để server parse
         else if (f.originalFile) {
@@ -1487,14 +1476,12 @@ export function ChatPage() {
               type: f.type,
               base64: base64,
             });
-            console.log('[DEBUG] Sent as base64:', f.name, '| type:', f.type);
           } catch (e) {
-            console.error('[DEBUG] Failed to read file:', f.name, e);
+            console.error('Error reading file:', f.name, e);
           }
         }
       }
       
-      console.log('[DEBUG] Total attachments prepared:', attachmentsForMessage.length);
       fullMessage = userMessage;
     }
 

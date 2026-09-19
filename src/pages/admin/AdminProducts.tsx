@@ -4,7 +4,6 @@ import { adminApi, Product, Category } from './adminApi';
 import { AIImportCard } from './AIImportCard';
 import { formatPrice } from '../../lib/formatPrice';
 import { getImageUrl } from '../../lib/imageProxy';
-import { useTranslation, translations, type Language } from '@/lib/translations';
 import { useLanguageStore } from '@/stores';
 import {
  Plus, RefreshCw, Loader2, CheckCircle2, AlertCircle,
@@ -12,23 +11,528 @@ import {
 } from 'lucide-react';
 import clsx from 'clsx';
 
-// Translation helper function using useLanguageStore
-function useProductTranslation() {
- const language = useLanguageStore((state) => state.language) as Language;
- const t = (key: string, params?: Record<string, string>) => {
-   let text = translations[language]?.[key as keyof typeof translations[typeof language]] as string || key;
-   if (params) {
-     Object.entries(params).forEach(([k, v]) => {
-       text = text.replace(`{${k}}`, v);
-     });
-   }
-   return text;
- };
- return { t, language };
-}
-
-// ==================== ICONS ====================
-// (Icons removed - unused)
+// Products translations - supports all languages via useLanguageStore
+const t = (key: string): string => {
+  const lang = useLanguageStore.getState().language;
+  const translations: Record<string, Record<string, string>> = {
+    vi: {
+      // Admin common
+      'admin.common.cancel': 'Hủy',
+      'admin.common.save': 'Lưu',
+      'admin.common.edit': 'Sửa',
+      'admin.common.add': 'Thêm',
+      'admin.common.delete': 'Xóa',
+      'admin.common.all': 'Tất cả',
+      'admin.common.loading': 'Đang tải...',
+      'admin.common.error': 'Có lỗi xảy ra',
+      'admin.common.success': 'Thành công',
+      'admin.common.selectAll': 'Chọn tất cả',
+      'admin.common.selected': 'đã chọn',
+      'admin.common.deselect': 'Bỏ chọn',
+      'admin.common.previous': '← Trước',
+      'admin.common.next': 'Tiếp →',
+      'admin.common.page': 'Trang',
+      // Top bar
+      'admin.topBar.products': 'Sản phẩm',
+      'admin.topBar.productsSub': 'Quản lý danh mục và sản phẩm hỗ trợ người khuyết tật',
+      // Products
+      'products.title2': 'Quản lý Sản phẩm',
+      'products.subtitle2': 'Danh sách các sản phẩm hỗ trợ người khuyết tật',
+      'products.pleaseEnterBothNames': 'Vui lòng nhập cả tên tiếng Việt và tiếng Anh',
+      'products.categoryEdit': 'Sửa Danh mục',
+      'products.categoryNew': 'Tạo Danh mục mới',
+      'products.categoryUpdateHint': 'Cập nhật thông tin danh mục',
+      'products.categoryAddHint': 'Thêm danh mục mới vào hệ thống',
+      'products.categoryIcon': 'Icon danh mục',
+      'products.descVi': 'Mô tả (VI)',
+      'products.descEn': 'Mô tả (EN)',
+      'products.docLink': 'Link tài liệu',
+      'products.productLink': 'Link sản phẩm',
+      'products.saving': 'Đang lưu...',
+      'products.tabProducts': 'Sản phẩm',
+      'products.tabCategories': 'Danh mục',
+      'products.addProduct': 'Thêm sản phẩm',
+      'products.basicInfo': 'Thông tin cơ bản',
+      'products.required': 'Bắt buộc',
+      'products.productCategory': 'Danh mục',
+      'products.chooseCategory': 'Chọn danh mục',
+      'products.productNameVi': 'Tên sản phẩm (VI)',
+      'products.pleaseEnterName': 'Vui lòng nhập tên sản phẩm',
+      'products.productNameEn': 'Tên sản phẩm (EN)',
+      'products.englishNamePlaceholder': 'English product name',
+      'products.brand': 'Thương hiệu',
+      'products.priceRange': 'Khoảng giá',
+      'products.pricePlaceholder': 'VD: 5.000.000 - 50.000.000 VND',
+      'products.descSection': 'Mô tả',
+      'products.descShortVi': 'Mô tả ngắn (VI)',
+      'products.descShortEn': 'Mô tả ngắn (EN)',
+      'products.linksTech': 'Liên kết & Thông số',
+      'products.importUrl': 'Import từ URL',
+      'products.metadataFetched': 'Đã lấy được thông tin!',
+      'products.openChat': 'Mở Chat',
+      'products.continueEditing': 'Tiếp tục sửa',
+      'products.sourceLink': 'Link nguồn',
+      'products.buyLink': 'Link mua hàng',
+      'products.imageLink': 'Link hình ảnh',
+      'products.isoCode': 'Mã ISO',
+      'products.wcagLevel': 'Mức độ WCAG',
+      'products.wcagA': 'A',
+      'products.wcagAA': 'AA',
+      'products.wcagAAA': 'AAA',
+      'products.none': 'Không có',
+      'products.whoGateArea': 'Khu vực WHO',
+    },
+    en: {
+      // Admin common
+      'admin.common.cancel': 'Cancel',
+      'admin.common.save': 'Save',
+      'admin.common.edit': 'Edit',
+      'admin.common.add': 'Add',
+      'admin.common.delete': 'Delete',
+      'admin.common.all': 'All',
+      'admin.common.loading': 'Loading...',
+      'admin.common.error': 'An error occurred',
+      'admin.common.success': 'Success',
+      'admin.common.selectAll': 'Select all',
+      'admin.common.selected': 'selected',
+      'admin.common.deselect': 'Deselect',
+      'admin.common.previous': '← Prev',
+      'admin.common.next': 'Next →',
+      'admin.common.page': 'Page',
+      // Top bar
+      'admin.topBar.products': 'Products',
+      'admin.topBar.productsSub': 'Manage categories and products for people with disabilities',
+      // Products
+      'products.title2': 'Products Management',
+      'products.subtitle2': 'List of assistive products for people with disabilities',
+      'products.pleaseEnterBothNames': 'Please enter both Vietnamese and English names',
+      'products.categoryEdit': 'Edit Category',
+      'products.categoryNew': 'Create New Category',
+      'products.categoryUpdateHint': 'Update category information',
+      'products.categoryAddHint': 'Add new category to the system',
+      'products.categoryIcon': 'Category Icon',
+      'products.descVi': 'Description (VI)',
+      'products.descEn': 'Description (EN)',
+      'products.docLink': 'Document Link',
+      'products.productLink': 'Product Link',
+      'products.saving': 'Saving...',
+      'products.tabProducts': 'Products',
+      'products.tabCategories': 'Categories',
+      'products.addProduct': 'Add Product',
+      'products.basicInfo': 'Basic Information',
+      'products.required': 'Required',
+      'products.productCategory': 'Category',
+      'products.chooseCategory': 'Choose category',
+      'products.productNameVi': 'Product Name (VI)',
+      'products.pleaseEnterName': 'Please enter product name',
+      'products.productNameEn': 'Product Name (EN)',
+      'products.englishNamePlaceholder': 'English product name',
+      'products.brand': 'Brand',
+      'products.priceRange': 'Price Range',
+      'products.pricePlaceholder': 'E.g: 100 - 5000 USD',
+      'products.descSection': 'Description',
+      'products.descShortVi': 'Short Description (VI)',
+      'products.descShortEn': 'Short Description (EN)',
+      'products.linksTech': 'Links & Specifications',
+      'products.importUrl': 'Import from URL',
+      'products.metadataFetched': 'Metadata fetched!',
+      'products.openChat': 'Open Chat',
+      'products.continueEditing': 'Continue editing',
+      'products.sourceLink': 'Source Link',
+      'products.buyLink': 'Buy Link',
+      'products.imageLink': 'Image Link',
+      'products.isoCode': 'ISO Code',
+      'products.wcagLevel': 'WCAG Level',
+      'products.wcagA': 'A',
+      'products.wcagAA': 'AA',
+      'products.wcagAAA': 'AAA',
+      'products.none': 'None',
+      'products.whoGateArea': 'WHO Area',
+    },
+    ar: {
+      // Admin common
+      'admin.common.cancel': 'إلغاء',
+      'admin.common.save': 'حفظ',
+      'admin.common.edit': 'تعديل',
+      'admin.common.add': 'إضافة',
+      'admin.common.delete': 'حذف',
+      'admin.common.all': 'الكل',
+      'admin.common.loading': 'جاري التحميل...',
+      'admin.common.error': 'حدث خطأ',
+      'admin.common.success': 'نجاح',
+      'admin.common.selectAll': 'تحديد الكل',
+      'admin.common.selected': 'محدد',
+      'admin.common.deselect': 'إلغاء التحديد',
+      'admin.common.previous': '→ السابق',
+      'admin.common.next': 'التالي ←',
+      'admin.common.page': 'صفحة',
+      // Top bar
+      'admin.topBar.products': 'المنتجات',
+      'admin.topBar.productsSub': 'إدارة الفئات والمنتجات للأشخاص ذوي الإعاقة',
+      // Products
+      'products.title2': 'إدارة المنتجات',
+      'products.subtitle2': 'قائمة المنتجات المساعدة للأشخاص ذوي الإعاقة',
+      'products.pleaseEnterBothNames': 'يرجى إدخال الأسماء بالفيينامية والإنجليزية',
+      'products.categoryEdit': 'تعديل الفئة',
+      'products.categoryNew': 'إنشاء فئة جديدة',
+      'products.categoryUpdateHint': 'تحديث معلومات الفئة',
+      'products.categoryAddHint': 'إضافة فئة جديدة للنظام',
+      'products.categoryIcon': 'أيقونة الفئة',
+      'products.descVi': 'الوصف (VI)',
+      'products.descEn': 'الوصف (EN)',
+      'products.docLink': 'رابط المستند',
+      'products.productLink': 'رابط المنتج',
+      'products.saving': 'جاري الحفظ...',
+      'products.tabProducts': 'المنتجات',
+      'products.tabCategories': 'الفئات',
+      'products.addProduct': 'إضافة منتج',
+      'products.basicInfo': 'المعلومات الأساسية',
+      'products.required': 'مطلوب',
+      'products.productCategory': 'الفئة',
+      'products.chooseCategory': 'اختر الفئة',
+      'products.productNameVi': 'اسم المنتج (VI)',
+      'products.pleaseEnterName': 'يرجى إدخال اسم المنتج',
+      'products.productNameEn': 'اسم المنتج (EN)',
+      'products.englishNamePlaceholder': 'اسم المنتج بالإنجليزية',
+      'products.brand': 'العلامة التجارية',
+      'products.priceRange': 'نطاق السعر',
+      'products.pricePlaceholder': 'مثال: 100 - 5000 دولار',
+      'products.descSection': 'الوصف',
+      'products.descShortVi': 'وصف مختصر (VI)',
+      'products.descShortEn': 'وصف مختصر (EN)',
+      'products.linksTech': 'الروابط والمواصفات',
+      'products.importUrl': 'استيراد من URL',
+      'products.metadataFetched': 'تم جلب البيانات الوصفية!',
+      'products.openChat': 'فتح المحادثة',
+      'products.continueEditing': 'متابعة التحرير',
+      'products.sourceLink': 'رابط المصدر',
+      'products.buyLink': 'رابط الشراء',
+      'products.imageLink': 'رابط الصورة',
+      'products.isoCode': 'رمز ISO',
+      'products.wcagLevel': 'مستوى WCAG',
+      'products.wcagA': 'A',
+      'products.wcagAA': 'AA',
+      'products.wcagAAA': 'AAA',
+      'products.none': 'لا شيء',
+      'products.whoGateArea': 'منطقة WHO',
+    },
+    fr: {
+      // Admin common
+      'admin.common.cancel': 'Annuler',
+      'admin.common.save': 'Enregistrer',
+      'admin.common.edit': 'Modifier',
+      'admin.common.add': 'Ajouter',
+      'admin.common.delete': 'Supprimer',
+      'admin.common.all': 'Tous',
+      'admin.common.loading': 'Chargement...',
+      'admin.common.error': 'Une erreur est survenue',
+      'admin.common.success': 'Succès',
+      'admin.common.selectAll': 'Tout sélectionner',
+      'admin.common.selected': 'sélectionné',
+      'admin.common.deselect': 'Tout désélectionner',
+      'admin.common.previous': '← Préc',
+      'admin.common.next': 'Suiv →',
+      'admin.common.page': 'Page',
+      // Top bar
+      'admin.topBar.products': 'Produits',
+      'admin.topBar.productsSub': 'Gérer les catégories et produits pour personnes handicapées',
+      // Products
+      'products.title2': 'Gestion des produits',
+      'products.subtitle2': 'Liste des produits d\'assistance pour personnes handicapées',
+      'products.pleaseEnterBothNames': 'Veuillez entrer les noms en vietnamien et anglais',
+      'products.categoryEdit': 'Modifier la catégorie',
+      'products.categoryNew': 'Créer une nouvelle catégorie',
+      'products.categoryUpdateHint': 'Mettre à jour les informations de la catégorie',
+      'products.categoryAddHint': 'Ajouter une nouvelle catégorie au système',
+      'products.categoryIcon': 'Icône de la catégorie',
+      'products.descVi': 'Description (VI)',
+      'products.descEn': 'Description (EN)',
+      'products.docLink': 'Lien du document',
+      'products.productLink': 'Lien du produit',
+      'products.saving': 'Sauvegarde...',
+      'products.tabProducts': 'Produits',
+      'products.tabCategories': 'Catégories',
+      'products.addProduct': 'Ajouter un produit',
+      'products.basicInfo': 'Informations de base',
+      'products.required': 'Requis',
+      'products.productCategory': 'Catégorie',
+      'products.chooseCategory': 'Choisir une catégorie',
+      'products.productNameVi': 'Nom du produit (VI)',
+      'products.pleaseEnterName': 'Veuillez entrer le nom du produit',
+      'products.productNameEn': 'Nom du produit (EN)',
+      'products.englishNamePlaceholder': 'Nom du produit en anglais',
+      'products.brand': 'Marque',
+      'products.priceRange': 'Gamme de prix',
+      'products.pricePlaceholder': 'Ex: 100 - 5000 USD',
+      'products.descSection': 'Description',
+      'products.descShortVi': 'Description courte (VI)',
+      'products.descShortEn': 'Description courte (EN)',
+      'products.linksTech': 'Liens & Spécifications',
+      'products.importUrl': 'Importer depuis URL',
+      'products.metadataFetched': 'Métadonnées récupérées!',
+      'products.openChat': 'Ouvrir le chat',
+      'products.continueEditing': 'Continuer la modification',
+      'products.sourceLink': 'Lien source',
+      'products.buyLink': 'Lien d\'achat',
+      'products.imageLink': 'Lien de l\'image',
+      'products.isoCode': 'Code ISO',
+      'products.wcagLevel': 'Niveau WCAG',
+      'products.wcagA': 'A',
+      'products.wcagAA': 'AA',
+      'products.wcagAAA': 'AAA',
+      'products.none': 'Không có',
+      'products.whoGateArea': 'Khu vực WHO',
+      // Category names
+      'products.vision': 'Thị giác',
+      'products.hearing': 'Thính giác',
+      'products.mobility': 'Vận động',
+      'products.cognition': 'Nhận thức',
+      'products.communication': 'Giao tiếp',
+      'products.selfCare': 'Tự chăm sóc',
+      'products.choose': 'Chọn',
+      'products.config': 'Cấu hình',
+      'products.productStatus': 'Trạng thái',
+      'products.draft': 'Bản nháp',
+      'products.published': 'Đã xuất bản',
+      'products.archived': 'Lưu trữ',
+      'products.lang': 'Ngôn ngữ',
+      'products.langVi': 'Tiếng Việt',
+      'products.langEn': 'English',
+      'products.featured': 'Nổi bật',
+      'products.featuredYes': 'Có',
+      'products.featuredNo': 'Không',
+      'products.statProducts': 'Tổng sản phẩm',
+      'products.statCategories': 'Danh mục',
+      'products.statPublished': 'Đã xuất bản',
+      'products.count': 'sản phẩm',
+      'products.loadCatFail': 'Không thể tải danh mục',
+      'products.loadCatHint': 'Thử tải lại trang',
+      'products.publishAll': 'Xuất bản tất cả',
+      'products.publishSelected': 'Xuất bản đã chọn',
+      'products.unpublishSelected': 'Hủy xuất bản đã chọn',
+      'products.confirmDelete': 'Xác nhận xóa sản phẩm này?',
+      'products.noUnpublished': 'Không có sản phẩm nào chưa xuất bản',
+      'products.bulkPublishFailed': 'Xuất bản hàng loạt thất bại',
+      'products.bulkUnpublishFailed': 'Hủy xuất bản hàng loạt thất bại',
+      'products.emptyTitle': 'Chưa có sản phẩm nào',
+      'products.emptyHint': 'Bắt đầu bằng cách thêm sản phẩm mới',
+      'products.empty': 'Điền thông tin sản phẩm',
+      'products.pleaseEnterUrl': 'Vui lòng nhập URL',
+      'products.urlMustStartWithHttp': 'URL phải bắt đầu bằng http:// hoặc https://',
+      'products.fetchFailed': 'Không thể lấy dữ liệu từ URL',
+      // Placeholders
+      'placeholder.categoryVi': 'VD: Thiết bị thính giác',
+      'placeholder.categoryEn': 'E.g.: Hearing devices',
+      'placeholder.brand': 'VD: Phonak, Oticon',
+      'placeholder.descVi': 'VD: Máy trợ thính kỹ thuật số',
+      'placeholder.descEn': 'E.g.: Digital hearing aids',
+      'placeholder.iso': 'VD: ISO 9999',
+      // Product extras
+      'product.hot': 'Nổi bật',
+      'product.aiTranslate': 'Dịch với AI',
+      'product.countShort': 'sản phẩm',
+      'product.inSystem': 'trong hệ thống',
+      'product.active': 'đang hoạt động',
+      'product.retry': 'Thử lại',
+      'product.syncContent': 'Đồng bộ nội dung từ backend?',
+      'product.syncComplete': 'Đồng bộ hoàn tất!',
+      'product.syncError': 'Lỗi đồng bộ',
+      'product.errorBatch': 'Lỗi xử lý hàng loạt',
+      'product.search': 'Tìm kiếm...',
+      'product.translateConfirm': 'Dịch sang tiếng Anh cho "{title}"?',
+      'product.translateSuccess': 'Đã dịch thành công!',
+    },
+    en: {
+      // Category names
+      'products.vision': 'Vision',
+      'products.hearing': 'Hearing',
+      'products.mobility': 'Mobility',
+      'products.cognition': 'Cognition',
+      'products.communication': 'Communication',
+      'products.selfCare': 'Self-care',
+      'products.choose': 'Choose',
+      'products.config': 'Config',
+      'products.productStatus': 'Status',
+      'products.draft': 'Draft',
+      'products.published': 'Published',
+      'products.archived': 'Archived',
+      'products.lang': 'Language',
+      'products.langVi': 'Tiếng Việt',
+      'products.langEn': 'English',
+      'products.featured': 'Featured',
+      'products.featuredYes': 'Yes',
+      'products.featuredNo': 'No',
+      'products.statProducts': 'Total Products',
+      'products.statCategories': 'Categories',
+      'products.statPublished': 'Published',
+      'products.count': 'products',
+      'products.loadCatFail': 'Failed to load categories',
+      'products.loadCatHint': 'Try reloading the page',
+      'products.publishAll': 'Publish all',
+      'products.publishSelected': 'Publish selected',
+      'products.unpublishSelected': 'Unpublish selected',
+      'products.confirmDelete': 'Confirm delete this product?',
+      'products.noUnpublished': 'No unpublished products',
+      'products.bulkPublishFailed': 'Bulk publish failed',
+      'products.bulkUnpublishFailed': 'Bulk unpublish failed',
+      'products.emptyTitle': 'No products yet',
+      'products.emptyHint': 'Start by adding a new product',
+      'products.empty': 'Fill product information',
+      'products.pleaseEnterUrl': 'Please enter URL',
+      'products.urlMustStartWithHttp': 'URL must start with http:// or https://',
+      'products.fetchFailed': 'Cannot fetch data from URL',
+      // Placeholders
+      'placeholder.categoryVi': 'E.g.: Hearing devices',
+      'placeholder.categoryEn': 'E.g.: Hearing devices',
+      'placeholder.brand': 'E.g.: Phonak, Oticon',
+      'placeholder.descVi': 'E.g.: Digital hearing aids',
+      'placeholder.descEn': 'E.g.: Digital hearing aids',
+      'placeholder.iso': 'E.g.: ISO 9999',
+      // Product extras
+      'product.hot': 'Featured',
+      'product.aiTranslate': 'Translate with AI',
+      'product.countShort': 'products',
+      'product.inSystem': 'in system',
+      'product.active': 'active',
+      'product.retry': 'Retry',
+      'product.syncContent': 'Sync content from backend?',
+      'product.syncComplete': 'Sync complete!',
+      'product.syncError': 'Sync error',
+      'product.errorBatch': 'Batch processing error',
+      'product.search': 'Search...',
+      'product.translateConfirm': 'Translate to English for "{title}"?',
+      'product.translateSuccess': 'Translated successfully!',
+    },
+    ar: {
+      // Category names
+      'products.vision': 'الرؤية',
+      'products.hearing': 'السمع',
+      'products.mobility': 'الحركة',
+      'products.cognition': 'الإدراك',
+      'products.communication': 'التواصل',
+      'products.selfCare': 'الرعاية الذاتية',
+      'products.choose': 'اختيار',
+      'products.config': 'تكوين',
+      'products.productStatus': 'الحالة',
+      'products.draft': 'مسودة',
+      'products.published': 'منشور',
+      'products.archived': 'مؤرشف',
+      'products.lang': 'اللغة',
+      'products.langVi': 'Tiếng Việt',
+      'products.langEn': 'English',
+      'products.featured': 'مميز',
+      'products.featuredYes': 'نعم',
+      'products.featuredNo': 'لا',
+      'products.statProducts': 'إجمالي المنتجات',
+      'products.statCategories': 'الفئات',
+      'products.statPublished': 'منشور',
+      'products.count': 'منتج',
+      'products.loadCatFail': 'فشل تحميل الفئات',
+      'products.loadCatHint': 'حاول إعادة تحميل الصفحة',
+      'products.publishAll': 'نشر الكل',
+      'products.publishSelected': 'نشر المحدد',
+      'products.unpublishSelected': 'إلغاء نشر المحدد',
+      'products.confirmDelete': 'تأكيد حذف هذا المنتج؟',
+      'products.noUnpublished': 'لا توجد منتجات غير منشورة',
+      'products.bulkPublishFailed': 'فشل النشر بالجملة',
+      'products.bulkUnpublishFailed': 'فشل إلغاء النشر بالجملة',
+      'products.emptyTitle': 'لا توجد منتجات بعد',
+      'products.emptyHint': 'ابدأ بإضافة منتج جديد',
+      'products.empty': 'املأ معلومات المنتج',
+      'products.pleaseEnterUrl': 'يرجى إدخال URL',
+      'products.urlMustStartWithHttp': 'يجب أن يبدأ URL بـ http:// أو https://',
+      'products.fetchFailed': 'لا يمكن جلب البيانات من URL',
+      // Placeholders
+      'placeholder.categoryVi': 'مثال: أجهزة السمع',
+      'placeholder.categoryEn': 'مثال: أجهزة السمع',
+      'placeholder.brand': 'مثال: Phonak, Oticon',
+      'placeholder.descVi': 'مثال: أجهزة السمع الرقمية',
+      'placeholder.descEn': 'مثال: أجهزة السمع الرقمية',
+      'placeholder.iso': 'مثال: ISO 9999',
+      // Product extras
+      'product.hot': 'مميز',
+      'product.aiTranslate': 'ترجمة بالذكاء الاصطناعي',
+      'product.countShort': 'منتج',
+      'product.inSystem': 'في النظام',
+      'product.active': 'نشط',
+      'product.retry': 'إعادة المحاولة',
+      'product.syncContent': 'مزامنة المحتوى من الخادم؟',
+      'product.syncComplete': 'اكتملت المزامنة!',
+      'product.syncError': 'خطأ في المزامنة',
+      'product.errorBatch': 'خطأ في المعالجة بالجملة',
+      'product.search': 'بحث...',
+      'product.translateConfirm': 'ترجمة إلى الإنجليزية لـ "{title}"؟',
+      'product.translateSuccess': 'تم الترجمة بنجاح!',
+    },
+    fr: {
+      // Category names
+      'products.vision': 'Vision',
+      'products.hearing': 'Audition',
+      'products.mobility': 'Mobilité',
+      'products.cognition': 'Cognition',
+      'products.communication': 'Communication',
+      'products.selfCare': 'Soins personnels',
+      'products.choose': 'Choisir',
+      'products.config': 'Config',
+      'products.productStatus': 'Statut',
+      'products.draft': 'Brouillon',
+      'products.published': 'Publié',
+      'products.archived': 'Archivé',
+      'products.lang': 'Langue',
+      'products.langVi': 'Tiếng Việt',
+      'products.langEn': 'English',
+      'products.featured': 'En vedette',
+      'products.featuredYes': 'Oui',
+      'products.featuredNo': 'Non',
+      'products.statProducts': 'Total produits',
+      'products.statCategories': 'Catégories',
+      'products.statPublished': 'Publié',
+      'products.count': 'produits',
+      'products.loadCatFail': 'Échec du chargement des catégories',
+      'products.loadCatHint': 'Essayez de recharger la page',
+      'products.publishAll': 'Tout publier',
+      'products.publishSelected': 'Publier la sélection',
+      'products.unpublishSelected': 'Dépublier la sélection',
+      'products.confirmDelete': 'Confirmer la suppression de ce produit?',
+      'products.noUnpublished': 'Aucun produit non publié',
+      'products.bulkPublishFailed': 'Échec de la publication en masse',
+      'products.bulkUnpublishFailed': 'Échec de la dépublication en masse',
+      'products.emptyTitle': 'Pas encore de produits',
+      'products.emptyHint': 'Commencez par ajouter un nouveau produit',
+      'products.empty': 'Remplissez les informations du produit',
+      'products.pleaseEnterUrl': 'Veuillez entrer l\'URL',
+      'products.urlMustStartWithHttp': 'L\'URL doit commencer par http:// ou https://',
+      'products.fetchFailed': 'Impossible de récupérer les données de l\'URL',
+      // Placeholders
+      'placeholder.categoryVi': 'Ex: Appareils auditifs',
+      'placeholder.categoryEn': 'Ex: Appareils auditifs',
+      'placeholder.brand': 'Ex: Phonak, Oticon',
+      'placeholder.descVi': 'Ex: Appareils auditifs numériques',
+      'placeholder.descEn': 'Ex: Appareils auditifs numériques',
+      'placeholder.iso': 'Ex: ISO 9999',
+      // Product extras
+      'product.hot': 'En vedette',
+      'product.aiTranslate': 'Traduire avec IA',
+      'product.countShort': 'produits',
+      'product.inSystem': 'dans le système',
+      'product.active': 'actif',
+      'product.retry': 'Réessayer',
+      'product.syncContent': 'Synchroniser le contenu depuis le backend?',
+      'product.syncComplete': 'Synchronisation terminée!',
+      'product.syncError': 'Erreur de synchronisation',
+      'product.errorBatch': 'Erreur de traitement par lots',
+      'product.search': 'Rechercher...',
+      'product.translateConfirm': 'Traduire en anglais pour "{title}"?',
+      'product.translateSuccess': 'Traduit avec succès!',
+    },
+  };
+  let text = translations[lang]?.[key] || translations['vi'][key] || key;
+  // Replace placeholders
+  if (text.includes('{title}')) {
+    text = text.replace('{title}', '');
+  }
+  return text;
+};
 
 // ==================== MODALS ====================
 function CategoryModal({ category, onSave, onClose }: {
@@ -36,8 +540,6 @@ function CategoryModal({ category, onSave, onClose }: {
  onSave: (data: Partial<Category> & { id?: string }) => Promise<void>;
  onClose: () => void;
 }) {
- const { t } = useTranslation();
- const { t: pt } = useProductTranslation();
  const [form, setForm] = useState({
   id: category?.id || '',
   name_vi: category?.name_vi || '',
@@ -53,7 +555,7 @@ function CategoryModal({ category, onSave, onClose }: {
  const [error, setError] = useState('');
 
  const handleSave = async () => {
-  if (!form.name_vi || !form.name_en) { setError(t('admin.products.pleaseEnterBothNames')); return; }
+  if (!form.name_vi || !form.name_en) { setError(t('products.pleaseEnterBothNames')); return; }
   setSaving(true); setError('');
   try { await onSave(form); } catch (e: any) { setError(e.message); } finally { setSaving(false); }
  };
@@ -64,8 +566,8 @@ function CategoryModal({ category, onSave, onClose }: {
    <div className="relative w-full max-w-xl rounded-2xl overflow-hidden bg-white border-[4px] border-black shadow-[1px_1px_0px_0px_#000]">
     <div className="flex items-center justify-between p-5 border-b-[3px] border-black bg-yellow-200">
      <div>
-      <h2 className="text-lg font-black text-black">{category ? t('admin.products.categoryEdit') : t('admin.products.categoryNew')}</h2>
-      <p className="text-xs text-black/70 mt-0.5">{category ? t('admin.products.categoryUpdateHint') : t('admin.products.categoryAddHint')}</p>
+      <h2 className="text-lg font-black text-black">{category ? t('products.categoryEdit') : t('products.categoryNew')}</h2>
+      <p className="text-xs text-black/70 mt-0.5">{category ? t('products.categoryUpdateHint') : t('products.categoryAddHint')}</p>
      </div>
      <button onClick={onClose} className="w-9 h-9 rounded-xl bg-white border-2 border-black flex items-center justify-center text-black hover:bg-red-200 transition-all">
       <span className="material-symbols-outlined">close</span>
@@ -82,7 +584,7 @@ function CategoryModal({ category, onSave, onClose }: {
      )}
 
      <div>
-       <label className="block text-xs font-black text-black uppercase tracking-wider mb-1.5 ml-1">{t('admin.products.categoryIcon')}</label>
+       <label className="block text-xs font-black text-black uppercase tracking-wider mb-1.5 ml-1">{t('products.categoryIcon')}</label>
       <div className="flex items-center gap-3">
        <div className="w-11 h-11 rounded-xl bg-yellow-300 border-2 border-black shadow-[1px_1px_0px_0px_#000] flex items-center justify-center text-black font-black">
         M
@@ -94,24 +596,24 @@ function CategoryModal({ category, onSave, onClose }: {
      <div className="grid grid-cols-2 gap-4">
       <div>
        <label className="block text-xs font-black text-black uppercase tracking-wider mb-1.5 ml-1">Tên (VI) <span className="text-error">*</span></label>
-       <input type="text" value={form.name_vi} onChange={(e) => setForm({...form, name_vi: e.target.value})} placeholder={pt('product.placeholder.categoryVi')} 
+       <input type="text" value={form.name_vi} onChange={(e) => setForm({...form, name_vi: e.target.value})} placeholder={t('placeholder.categoryVi')} 
         className="w-full px-4 py-3 rounded-xl border border-outline bg-surface-container-low font-label-md text-on-surface placeholder:text-on-surface-variant/60 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all" />
       </div>
       <div>
        <label className="block text-xs font-black text-black uppercase tracking-wider mb-1.5 ml-1">Tên (EN) <span className="text-error">*</span></label>
-       <input type="text" value={form.name_en} onChange={(e) => setForm({...form, name_en: e.target.value})} placeholder={pt('product.placeholder.categoryEn')} 
+       <input type="text" value={form.name_en} onChange={(e) => setForm({...form, name_en: e.target.value})} placeholder={t('placeholder.categoryEn')} 
         className="w-full px-4 py-3 rounded-xl border border-outline bg-surface-container-low font-label-md text-on-surface placeholder:text-on-surface-variant/60 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all" />
       </div>
      </div>
 
      <div className="grid grid-cols-2 gap-4">
       <div>
-       <label className="block text-xs font-black text-black uppercase tracking-wider mb-1.5 ml-1">{t('admin.products.descVi')}</label>
+       <label className="block text-xs font-black text-black uppercase tracking-wider mb-1.5 ml-1">{t('products.descVi')}</label>
        <textarea value={form.description_vi} onChange={(e) => setForm({...form, description_vi: e.target.value})} rows={2} 
         className="w-full px-4 py-3 rounded-xl border border-outline bg-surface-container-low font-label-md text-on-surface placeholder:text-on-surface-variant/60 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all resize-none" />
       </div>
       <div>
-       <label className="block text-xs font-black text-black uppercase tracking-wider mb-1.5 ml-1">{t('admin.products.descEn')}</label>
+       <label className="block text-xs font-black text-black uppercase tracking-wider mb-1.5 ml-1">{t('products.descEn')}</label>
        <textarea value={form.description_en} onChange={(e) => setForm({...form, description_en: e.target.value})} rows={2} 
         className="w-full px-4 py-3 rounded-xl border border-outline bg-surface-container-low font-label-md text-on-surface placeholder:text-on-surface-variant/60 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all resize-none" />
       </div>
@@ -119,12 +621,12 @@ function CategoryModal({ category, onSave, onClose }: {
 
      <div className="grid grid-cols-2 gap-4">
       <div>
-       <label className="block text-xs font-black text-black uppercase tracking-wider mb-1.5 ml-1">{t('admin.products.docLink')}</label>
+       <label className="block text-xs font-black text-black uppercase tracking-wider mb-1.5 ml-1">{t('products.docLink')}</label>
        <input type="url" value={form.related_url} onChange={(e) => setForm({...form, related_url: e.target.value})} placeholder="https://..." 
         className="w-full px-4 py-3 rounded-xl border border-outline bg-surface-container-low font-label-md text-on-surface placeholder:text-on-surface-variant/60 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all" />
       </div>
       <div>
-       <label className="block text-xs font-black text-black uppercase tracking-wider mb-1.5 ml-1">{t('admin.products.productLink')}</label>
+       <label className="block text-xs font-black text-black uppercase tracking-wider mb-1.5 ml-1">{t('products.productLink')}</label>
        <input type="url" value={form.product_link} onChange={(e) => setForm({...form, product_link: e.target.value})} placeholder="https://..." 
         className="w-full px-4 py-3 rounded-xl border border-outline bg-surface-container-low font-label-md text-on-surface placeholder:text-on-surface-variant/60 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all" />
       </div>
@@ -139,10 +641,10 @@ function CategoryModal({ category, onSave, onClose }: {
     </div>
 
     <div className="flex justify-end gap-3 p-4 border-t-2 border-black bg-slate-100">
-     <button onClick={onClose} className="px-5 py-2.5 rounded-xl border-2 border-black font-bold text-black bg-white shadow-[1px_1px_0px_0px_#000]  transition-all">{t('admin.common.cancel')}</button>
-     <button onClick={handleSave} disabled={saving} className="px-5 py-2.5 rounded-xl bg-black text-white border-2 border-black font-bold shadow-[1px_1px_0px_0px_#000]  flex items-center gap-2 transition-all disabled:opacity-50">
+     <button onClick={onClose} className="px-5 py-2.5 rounded-xl border-2 border-black font-bold text-black bg-white shadow-[1px_1px_0px_0px_#000] transition-all">{t('admin.common.cancel')}</button>
+     <button onClick={handleSave} disabled={saving} className="px-5 py-2.5 rounded-xl bg-black text-white border-2 border-black font-bold shadow-[1px_1px_0px_0px_#000] flex items-center gap-2 transition-all disabled:opacity-50">
       {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-      {saving ? t('admin.products.saving') : t('admin.common.save')}
+      {saving ? t('products.saving') : t('admin.common.save')}
      </button>
     </div>
    </div>
@@ -158,8 +660,6 @@ function ProductModal({ product, categories, defaultCategory, onSave, onClose }:
  onSave: (data: Partial<Product>) => Promise<void>;
  onClose: () => void;
 }) {
- const { t: tp } = useTranslation();
- const { t: pt } = useProductTranslation();
  const [form, setForm] = useState({
   title: product?.title || '', title_en: product?.title_en || '',
   description: product?.description || '', description_en: product?.description_en || '',
@@ -172,29 +672,28 @@ function ProductModal({ product, categories, defaultCategory, onSave, onClose }:
   status: product?.status || 'draft', featured: product?.featured || false,
   sort_order: product?.sort_order || 0, language: product?.language || 'vi',
  });
-const [saving, setSaving] = useState(false);
-const [error, setError] = useState('');
-const [importing, setImporting] = useState(false);
-const [importError, setImportError] = useState('');
-const [importSuccess, setImportSuccess] = useState(false);
-const [importMeta, setImportMeta] = useState<{title: string; description: string; image: string; siteName: string} | null>(null);
+ const [saving, setSaving] = useState(false);
+ const [error, setError] = useState('');
+ const [importing, setImporting] = useState(false);
+ const [importError, setImportError] = useState('');
+ const [importSuccess, setImportSuccess] = useState(false);
+ const [importMeta, setImportMeta] = useState<{title: string; description: string; image: string; siteName: string} | null>(null);
 
-const handleSave = async () => {
-  if (!form.title.trim()) { setError(tp('admin.products.pleaseEnterName')); return; }
-  if (!form.category) { setError(tp('admin.products.chooseCategory')); return; }
+ const handleSave = async () => {
+  if (!form.title.trim()) { setError(t('products.pleaseEnterName')); return; }
+  if (!form.category) { setError(t('products.chooseCategory')); return; }
   setSaving(true); setError('');
   try {
    const iso_codes = form.iso_codes.split(',').map(s => s.trim()).filter(Boolean);
    await onSave({ ...form, iso_codes: iso_codes as any, featured: !!form.featured });
-  } catch (e) { setError((e as Error)?.message || tp('admin.common.error')); } finally { setSaving(false); }
+  } catch (e) { setError((e as Error)?.message || t('admin.common.error')); } finally { setSaving(false); }
  };
 
-// ============== URL IMPORT ==============
-const handleImportFromUrl = async () => {
+ const handleImportFromUrl = async () => {
   const url = (form.source_url || form.product_url || '').trim();
-  if (!url) { setImportError(tp('admin.products.pleaseEnterUrl')); return; }
+  if (!url) { setImportError(t('products.pleaseEnterUrl')); return; }
   if (!/^https?:\/\//i.test(url)) {
-    setImportError(tp('admin.products.urlMustStartWithHttp'));
+    setImportError(t('products.urlMustStartWithHttp'));
     return;
   }
   setImporting(true); setImportError(''); setImportSuccess(false);
@@ -207,18 +706,17 @@ const handleImportFromUrl = async () => {
       if (meta.image && !form.image_url) setForm((f) => ({ ...f, image_url: meta.image }));
       if (meta.title && !form.title_en) setForm((f) => ({ ...f, title_en: meta.title }));
       if (meta.description && !form.description_en) setForm((f) => ({ ...f, description_en: meta.description }));
-      // Hỏi người dùng: muốn import vào con chat không?
       setImportMeta(meta);
       setImportSuccess(true);
     } else {
-      setImportError(res.error || tp('admin.products.fetchFailed'));
+      setImportError(res.error || t('products.fetchFailed'));
     }
   } catch (e) {
-    setImportError((e as Error)?.message || tp('admin.common.error'));
+    setImportError((e as Error)?.message || t('admin.common.error'));
   } finally {
     setImporting(false);
   }
-};
+ };
 
  return (
   <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -227,8 +725,8 @@ const handleImportFromUrl = async () => {
    <div className="relative w-full max-w-3xl max-h-[90vh] flex flex-col rounded-xl overflow-hidden bg-white border border-slate-200 shadow-xl">
     <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 bg-slate-50">
      <div>
-      <h2 className="text-base font-semibold text-black">{product ? tp('admin.common.edit') + ' ' + tp('admin.products.tabProducts') : tp('admin.products.addProduct')}</h2>
-      <p className="text-xs text-slate-500 mt-0.5">{product ? tp('admin.products.categoryUpdateHint') : tp('admin.products.empty')}</p>
+      <h2 className="text-base font-semibold text-black">{product ? t('admin.common.edit') + ' ' + t('products.tabProducts') : t('products.addProduct')}</h2>
+      <p className="text-xs text-slate-500 mt-0.5">{product ? t('products.categoryUpdateHint') : t('products.empty')}</p>
      </div>
      <button onClick={onClose} className="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-100 transition-colors">
       <span className="material-symbols-outlined text-base">close</span>
@@ -236,87 +734,84 @@ const handleImportFromUrl = async () => {
     </div>
 
     <div className="flex-1 overflow-y-auto p-5 space-y-4">
-     {/* Section 1: Thông tin cơ bản */}
      <section className="p-4 rounded-lg bg-white border border-slate-200">
       <h3 className="text-sm font-semibold text-black mb-3 flex items-center gap-2">
        <span className="material-symbols-outlined text-base text-slate-400">info</span>
-       {tp('admin.products.basicInfo')}
-       <span className="ml-auto text-[10px] font-medium text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{tp('admin.products.required')}</span>
+       {t('products.basicInfo')}
+       <span className="ml-auto text-[10px] font-medium text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{t('products.required')}</span>
       </h3>
       <div className="grid grid-cols-2 gap-3">
        <div className="col-span-2">
-        <label className="block text-xs font-medium text-slate-600 mb-1">{tp('admin.products.productCategory')} <span className="text-red-500">*</span></label>
+        <label className="block text-xs font-medium text-slate-600 mb-1">{t('products.productCategory')} <span className="text-red-500">*</span></label>
         <select value={form.category} onChange={(e) => setForm({...form, category: e.target.value})}
          className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm text-black focus:outline-none focus:border-primary transition-colors">
-         <option value="">{tp('admin.products.chooseCategory')}</option>
+         <option value="">{t('products.chooseCategory')}</option>
          {categories.map((c) => (<option key={c.id} value={c.id}>{c.icon} {c.name_vi}</option>))}
         </select>
        </div>
 
        <div className="col-span-2">
-        <label className="block text-xs font-medium text-slate-600 mb-1">{tp('admin.products.productNameVi')} <span className="text-red-500">*</span></label>
+        <label className="block text-xs font-medium text-slate-600 mb-1">{t('products.productNameVi')} <span className="text-red-500">*</span></label>
         <input type="text" value={form.title} onChange={(e) => setForm({...form, title: e.target.value})}
-         placeholder={tp('admin.products.pleaseEnterName')}
+         placeholder={t('products.pleaseEnterName')}
          className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm text-black placeholder:text-slate-400 focus:outline-none focus:border-primary transition-colors" />
        </div>
 
        <div>
-        <label className="block text-xs font-medium text-slate-600 mb-1">{tp('admin.products.productNameEn')}</label>
+        <label className="block text-xs font-medium text-slate-600 mb-1">{t('products.productNameEn')}</label>
         <input type="text" value={form.title_en} onChange={(e) => setForm({...form, title_en: e.target.value})}
-         placeholder={tp('admin.products.englishNamePlaceholder')}
+         placeholder={t('products.englishNamePlaceholder')}
          className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm text-black placeholder:text-slate-400 focus:outline-none focus:border-primary transition-colors" />
        </div>
 
        <div>
-        <label className="block text-xs font-medium text-slate-600 mb-1">{tp('admin.products.brand')}</label>
+        <label className="block text-xs font-medium text-slate-600 mb-1">{t('products.brand')}</label>
         <input type="text" value={form.brand} onChange={(e) => setForm({...form, brand: e.target.value})}
-         placeholder={pt('product.placeholder.brand')}
+         placeholder={t('placeholder.brand')}
          className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm text-black placeholder:text-slate-400 focus:outline-none focus:border-primary transition-colors" />
        </div>
 
        <div>
-        <label className="block text-xs font-medium text-slate-600 mb-1">{tp('admin.products.priceRange')}</label>
+        <label className="block text-xs font-medium text-slate-600 mb-1">{t('products.priceRange')}</label>
         <input type="text" value={form.price_range} onChange={(e) => setForm({...form, price_range: e.target.value})}
-         placeholder={tp('admin.products.pricePlaceholder')}
+         placeholder={t('products.pricePlaceholder')}
          className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm text-black placeholder:text-slate-400 focus:outline-none focus:border-primary transition-colors" />
        </div>
       </div>
      </section>
 
-     {/* Section 2: Mô tả */}
      <section className="p-4 rounded-lg bg-white border border-slate-200">
       <h3 className="text-sm font-semibold text-black mb-3 flex items-center gap-2">
        <span className="material-symbols-outlined text-base text-slate-400">description</span>
-       {tp('admin.products.descSection')}
+       {t('products.descSection')}
       </h3>
       <div className="space-y-3">
        <div>
-        <label className="block text-xs font-medium text-slate-600 mb-1">{tp('admin.products.descShortVi')}</label>
+        <label className="block text-xs font-medium text-slate-600 mb-1">{t('products.descShortVi')}</label>
         <textarea value={form.description} onChange={(e) => setForm({...form, description: e.target.value})}
-         rows={2} placeholder={pt('product.placeholder.descVi')}
+         rows={2} placeholder={t('placeholder.descVi')}
          className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm text-black placeholder:text-slate-400 focus:outline-none focus:border-primary transition-colors resize-none" />
        </div>
        <div>
-        <label className="block text-xs font-medium text-slate-600 mb-1">{tp('admin.products.descShortEn')}</label>
+        <label className="block text-xs font-medium text-slate-600 mb-1">{t('products.descShortEn')}</label>
         <textarea value={form.description_en} onChange={(e) => setForm({...form, description_en: e.target.value})}
-         rows={2} placeholder={pt('product.placeholder.descEn')}
+         rows={2} placeholder={t('placeholder.descEn')}
          className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm text-black placeholder:text-slate-400 focus:outline-none focus:border-primary transition-colors resize-none" />
        </div>
       </div>
      </section>
 
-      {/* Section 3: Liên kết */}
      <section className="p-4 rounded-lg bg-white border border-slate-200">
       <div className="flex items-center justify-between mb-3">
        <h3 className="text-sm font-semibold text-black flex items-center gap-2">
         <span className="material-symbols-outlined text-base text-slate-400">link</span>
-        {tp('admin.products.linksTech')}
+        {t('products.linksTech')}
        </h3>
        {!product && (
          <button type="button" onClick={handleImportFromUrl} disabled={importing}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-white text-xs font-medium hover:bg-primary/90 transition-colors disabled:opacity-50">
           {importing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <span className="material-symbols-outlined text-sm">download</span>}
-          {tp('admin.products.importUrl')}
+          {t('products.importUrl')}
          </button>
        )}
       </div>
@@ -328,15 +823,15 @@ const handleImportFromUrl = async () => {
         <div className="flex items-start gap-3">
          <span className="material-symbols-outlined text-green-600 text-lg mt-0.5" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
          <div className="flex-1">
-          <p className="text-sm font-medium text-green-800 mb-1">{tp('admin.products.metadataFetched')}</p>
+          <p className="text-sm font-medium text-green-800 mb-1">{t('products.metadataFetched')}</p>
           <div className="flex gap-2">
 <button type="button" onClick={() => window.open(`${window.location.origin}/chat`, '_blank')}
             className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-green-600 text-white text-xs font-medium hover:bg-green-700">
-            <span className="material-symbols-outlined text-sm">chat</span> {tp('admin.products.openChat')}
+            <span className="material-symbols-outlined text-sm">chat</span> {t('products.openChat')}
           </button>
            <button type="button" onClick={() => { setImportSuccess(false); setImportMeta(null); }}
             className="px-3 py-1.5 rounded-lg bg-white border border-green-300 text-green-700 text-xs font-medium hover:bg-green-50">
-            {tp('admin.products.continueEditing')}
+            {t('products.continueEditing')}
            </button>
           </div>
          </div>
@@ -345,19 +840,19 @@ const handleImportFromUrl = async () => {
       )}
       <div className="grid grid-cols-3 gap-3">
        <div>
-        <label className="block text-xs font-medium text-slate-600 mb-1">{tp('admin.products.sourceLink')}</label>
+        <label className="block text-xs font-medium text-slate-600 mb-1">{t('products.sourceLink')}</label>
         <input type="url" value={form.source_url} onChange={(e) => setForm({...form, source_url: e.target.value})}
          placeholder="https://"
          className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm text-black placeholder:text-slate-400 focus:outline-none focus:border-primary transition-colors" />
        </div>
        <div>
-        <label className="block text-xs font-medium text-slate-600 mb-1">{tp('admin.products.buyLink')}</label>
+        <label className="block text-xs font-medium text-slate-600 mb-1">{t('products.buyLink')}</label>
         <input type="url" value={form.product_url} onChange={(e) => setForm({...form, product_url: e.target.value})}
          placeholder="https://"
          className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm text-black placeholder:text-slate-400 focus:outline-none focus:border-primary transition-colors" />
        </div>
        <div>
-        <label className="block text-xs font-medium text-slate-600 mb-1">{tp('admin.products.imageLink')}</label>
+        <label className="block text-xs font-medium text-slate-600 mb-1">{t('products.imageLink')}</label>
         <input type="url" value={form.image_url} onChange={(e) => setForm({...form, image_url: e.target.value})}
          placeholder="https://"
          className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm text-black placeholder:text-slate-400 focus:outline-none focus:border-primary transition-colors" />
@@ -367,74 +862,73 @@ const handleImportFromUrl = async () => {
         )}
        </div>
       </div>
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-3 gap-3 mt-3">
        <div>
-        <label className="block text-xs font-medium text-slate-600 mb-1">{tp('admin.products.isoCode')}</label>
+        <label className="block text-xs font-medium text-slate-600 mb-1">{t('products.isoCode')}</label>
         <input type="text" value={form.iso_codes} onChange={(e) => setForm({...form, iso_codes: e.target.value})}
-         placeholder={pt('product.placeholder.iso')}
+         placeholder={t('placeholder.iso')}
          className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm text-black placeholder:text-slate-400 focus:outline-none focus:border-primary transition-colors" />
        </div>
        <div>
-        <label className="block text-xs font-medium text-slate-600 mb-1">{tp('admin.products.wcagLevel')}</label>
+        <label className="block text-xs font-medium text-slate-600 mb-1">{t('products.wcagLevel')}</label>
         <select value={form.wcag_level} onChange={(e) => setForm({...form, wcag_level: e.target.value})}
          className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm text-black focus:outline-none focus:border-primary transition-colors">
-         <option value="">{tp('admin.products.none')}</option>
-         <option value="A">{tp('admin.products.wcagA')}</option>
-         <option value="AA">{tp('admin.products.wcagAA')}</option>
-         <option value="AAA">{tp('admin.products.wcagAAA')}</option>
+         <option value="">{t('products.none')}</option>
+         <option value="A">{t('products.wcagA')}</option>
+         <option value="AA">{t('products.wcagAA')}</option>
+         <option value="AAA">{t('products.wcagAAA')}</option>
         </select>
        </div>
        <div>
-        <label className="block text-xs font-medium text-slate-600 mb-1">{tp('admin.products.whoGateArea')}</label>
+        <label className="block text-xs font-medium text-slate-600 mb-1">{t('products.whoGateArea')}</label>
         <select value={form.who_gate_area} onChange={(e) => setForm({...form, who_gate_area: e.target.value})}
          className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm text-black focus:outline-none focus:border-primary transition-colors">
-         <option value="">{tp('admin.products.choose')}</option>
-         <option value="vision">{tp('admin.products.vision')}</option>
-         <option value="hearing">{tp('admin.products.hearing')}</option>
-         <option value="mobility">{tp('admin.products.mobility')}</option>
-         <option value="cognition">{tp('admin.products.cognition')}</option>
-         <option value="communication">{tp('admin.products.communication')}</option>
-         <option value="self_care">{tp('admin.products.selfCare')}</option>
+         <option value="">{t('products.choose')}</option>
+         <option value="vision">{t('products.vision')}</option>
+         <option value="hearing">{t('products.hearing')}</option>
+         <option value="mobility">{t('products.mobility')}</option>
+         <option value="cognition">{t('products.cognition')}</option>
+         <option value="communication">{t('products.communication')}</option>
+         <option value="self_care">{t('products.selfCare')}</option>
         </select>
        </div>
       </div>
      </section>
 
-     {/* Section 4: Cấu hình */}
      <section className="p-4 rounded-lg bg-white border border-slate-200">
       <h3 className="text-sm font-semibold text-black mb-3 flex items-center gap-2">
        <span className="material-symbols-outlined text-base text-slate-400">tune</span>
-       {tp('admin.products.config')}
+       {t('products.config')}
       </h3>
       <div className="grid grid-cols-3 gap-3">
        <div>
-        <label className="block text-xs font-medium text-slate-600 mb-2">{tp('admin.products.productStatus')}</label>
+        <label className="block text-xs font-medium text-slate-600 mb-2">{t('products.productStatus')}</label>
         <div className="flex gap-1">
          {(['draft', 'published', 'archived'] as const).map((s) => (
           <button key={s} type="button" onClick={() => setForm({...form, status: s})}
            className={clsx('flex-1 py-1.5 rounded-lg text-xs font-medium border transition-colors',
             form.status === s ? 'bg-black text-white border-black' : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50')}>
-           {s === 'draft' ? tp('admin.products.draft') : s === 'published' ? tp('admin.products.published') : tp('admin.products.archived')}
+           {s === 'draft' ? t('products.draft') : s === 'published' ? t('products.published') : t('products.archived')}
           </button>
          ))}
         </div>
        </div>
 
        <div>
-        <label className="block text-xs font-medium text-slate-600 mb-2">{tp('admin.products.lang')}</label>
+        <label className="block text-xs font-medium text-slate-600 mb-2">{t('products.lang')}</label>
         <select value={form.language} onChange={(e) => setForm({...form, language: e.target.value})}
          className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm text-black focus:outline-none focus:border-primary">
-         <option value="vi">{tp('admin.products.langVi')}</option>
-         <option value="en">{tp('admin.products.langEn')}</option>
+         <option value="vi">{t('products.langVi')}</option>
+         <option value="en">{t('products.langEn')}</option>
         </select>
        </div>
 
        <div>
-        <label className="block text-xs font-medium text-slate-600 mb-2">{tp('admin.products.featured')}</label>
+        <label className="block text-xs font-medium text-slate-600 mb-2">{t('products.featured')}</label>
         <button type="button" onClick={() => setForm({...form, featured: !form.featured})}
          className={clsx('w-full py-2 rounded-lg text-xs font-medium border transition-colors',
           form.featured ? 'bg-amber-400 text-black border-amber-400' : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50')}>
-         {form.featured ? tp('admin.products.featuredYes') : tp('admin.products.featuredNo')}
+         {form.featured ? t('products.featuredYes') : t('products.featuredNo')}
         </button>
        </div>
       </div>
@@ -449,11 +943,11 @@ const handleImportFromUrl = async () => {
     </div>
 
     <div className="flex items-center justify-end gap-3 px-5 py-4 border-t border-slate-200 bg-slate-50">
-     <button onClick={onClose} className="px-4 py-2 rounded-lg border border-slate-300 text-slate-600 text-sm font-medium hover:bg-slate-100 transition-colors">{tp('admin.common.cancel')}</button>
+     <button onClick={onClose} className="px-4 py-2 rounded-lg border border-slate-300 text-slate-600 text-sm font-medium hover:bg-slate-100 transition-colors">{t('admin.common.cancel')}</button>
      <button onClick={handleSave} disabled={saving}
       className="px-5 py-2 rounded-lg bg-primary text-white text-sm font-medium flex items-center gap-2 hover:bg-primary/90 transition-colors disabled:opacity-50">
       {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-      {saving ? tp('admin.products.saving') : tp('admin.common.save')}
+      {saving ? t('products.saving') : t('admin.common.save')}
      </button>
     </div>
    </div>
@@ -467,8 +961,6 @@ function ProductCard({ product, categoryName, onEdit, onDelete, onTogglePublish,
  onEdit: (p: Product) => void; onDelete: (p: Product) => void; onTogglePublish: (p: Product) => void;
  onTranslate: (p: Product) => void;
 }) {
- const { t } = useTranslation();
- const { t: pt } = useProductTranslation();
  const isPublished = product.status === 'published';
  const catColors: Record<string, { bg: string; text: string }> = {
   vision: { bg: 'bg-blue-100', text: 'text-blue-700' },
@@ -484,7 +976,6 @@ function ProductCard({ product, categoryName, onEdit, onDelete, onTogglePublish,
 
  return (
   <div className="bg-white rounded-xl border border-slate-200 overflow-hidden group hover:shadow-md transition-shadow">
-   {/* Ảnh */}
    <div className="relative aspect-square bg-slate-50">
     {product.image_url ? (
      <img
@@ -499,25 +990,23 @@ function ProductCard({ product, categoryName, onEdit, onDelete, onTogglePublish,
      </div>
     )}
 
-    {/* Status badges */}
     <div className="absolute top-2 left-2 flex gap-1">
      {product.featured && (
       <span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-amber-400 text-black border border-black/20">
-       {pt('product.hot')}
+       {t('product.hot')}
       </span>
      )}
      {!isPublished && (
       <span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-slate-500 text-white border border-black/20">
-       {t('admin.products.draft')}
+       {t('products.draft')}
       </span>
      )}
     </div>
 
-    {/* Actions */}
     <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
      <button onClick={(e) => { e.stopPropagation(); onTranslate(product); }}
       className="w-7 h-7 rounded bg-white/90 border border-slate-300 flex items-center justify-center text-slate-600 hover:bg-purple-100 hover:text-purple-600 transition-colors"
-      title={pt('product.aiTranslate')}>
+      title={t('product.aiTranslate')}>
       <Languages className="w-4 h-4" />
      </button>
      <button onClick={(e) => { e.stopPropagation(); onEdit(product); }}
@@ -533,7 +1022,6 @@ function ProductCard({ product, categoryName, onEdit, onDelete, onTogglePublish,
     </div>
    </div>
 
-   {/* Nội dung */}
    <div className="p-3">
     <h3 className="text-sm font-semibold text-black line-clamp-2 leading-snug mb-1">
      {product.title}
@@ -554,7 +1042,7 @@ function ProductCard({ product, categoryName, onEdit, onDelete, onTogglePublish,
         : 'bg-white text-slate-600 border-slate-300 hover:bg-blue-100 hover:text-blue-600'
       )}
      >
-      {isPublished ? '✓ ' + t('admin.products.published') : t('admin.products.draft')}
+      {isPublished ? '✓ ' + t('products.published') : t('products.draft')}
      </button>
     </div>
    </div>
@@ -566,8 +1054,6 @@ function ProductCard({ product, categoryName, onEdit, onDelete, onTogglePublish,
 function CategoryCard({ category, productCount, onEdit, onAddProduct }: {
  category: Category; productCount: number; onEdit: (c: Category) => void; onAddProduct: (c: Category) => void;
 }) {
- const { t } = useTranslation();
- const { t: pt } = useProductTranslation();
  const catColors: Record<string, { bg: string; text: string; icon: string }> = {
   vision: { bg: 'bg-blue-100 text-blue-600', text: 'text-blue-700', icon: 'visibility' },
   hearing: { bg: 'bg-amber-100 text-amber-600', text: 'text-amber-700', icon: 'hearing' },
@@ -594,7 +1080,7 @@ function CategoryCard({ category, productCount, onEdit, onAddProduct }: {
     </div>
 
     <div className="flex items-center gap-2 text-xs">
-     <span className={clsx('px-2 py-1 rounded font-medium', colors.bg)}>{productCount} {pt('product.countShort')}</span>
+     <span className={clsx('px-2 py-1 rounded font-medium', colors.bg)}>{productCount} {t('product.countShort')}</span>
      <span className="px-2 py-1 rounded bg-slate-100 text-slate-600 font-mono">#{category.sort_order}</span>
     </div>
 
@@ -623,7 +1109,6 @@ export function AdminProducts() {
  const [search, setSearch] = useState('');
  const [filterCategory, setFilterCategory] = useState('');
  const [showFeatured, setShowFeatured] = useState(false);
- // ⭐ NEW: ISO/WHO filter
  const [filterIso, setFilterIso] = useState('');
  const [filterWho, setFilterWho] = useState('');
  const [page, setPage] = useState(0);
@@ -643,7 +1128,6 @@ export function AdminProducts() {
    const res = await adminApi.getCategories();
    if (res.success && res.data) setCategories(Array.isArray(res.data) ? res.data : []);
   } catch (e: unknown) {
-   // Ignore AbortError (timeout)
    if (e instanceof Error && e.name === 'AbortError') {
     console.warn('AdminProducts: Failed to load categories (timeout)');
    } else {
@@ -661,7 +1145,6 @@ export function AdminProducts() {
    });
    if (res.success && res.data) {
     let items = res.data.items || [];
-    // ⭐ NEW: client-side filter ISO/WHO
     if (filterIso) {
      items = items.filter((p: any) => {
       const iso = (p.iso_codes || '').toString();
@@ -675,7 +1158,6 @@ export function AdminProducts() {
     setTotalProducts(items.length);
    }
   } catch (e: unknown) {
-   // Ignore AbortError (timeout)
    if (e instanceof Error && e.name === 'AbortError') {
     console.warn('AdminProducts: Failed to load products (timeout)');
    } else {
@@ -702,80 +1184,80 @@ export function AdminProducts() {
   await loadProducts();
  };
 
-const handleDeleteProduct = async (prod: Product) => {
-  if (!confirm(t('admin.products.confirmDelete'))) return;
+ const handleDeleteProduct = async (prod: Product) => {
+  if (!confirm(t('products.confirmDelete'))) return;
   const res = await adminApi.deleteProduct(prod.id);
   if (!res.success) alert(res.error);
   else await loadProducts();
-};
+ };
 
-const handleTogglePublish = async (prod: Product) => {
+ const handleTogglePublish = async (prod: Product) => {
   const newStatus = prod.status === 'published' ? 'draft' : 'published';
   await adminApi.publishProduct(prod.id, newStatus as any);
   await loadProducts();
-};
+ };
 
-const handleTranslate = async (prod: Product) => {
-  if (!confirm(pt('product.translateConfirm', { title: prod.title }))) return;
+ const handleTranslate = async (prod: Product) => {
+  if (!confirm(t('product.translateConfirm').replace('{title}', prod.title))) return;
   try {
     const result = await adminApi.translateProduct(prod.id);
     if (result.success) {
-      alert(pt('product.translateSuccess'));
+      alert(t('product.translateSuccess'));
       await loadProducts();
     } else {
-      alert(`${pt('product.syncError')} ${result.error}`);
+      alert(t('product.syncError') + ' ' + result.error);
     }
   } catch (e) {
-    alert(`${pt('product.syncError')} ${(e as Error)?.message}`);
+    alert(t('product.syncError') + ' ' + (e as Error)?.message);
   }
-};
+ };
 
-const handlePublishAll = async () => {
-  if (!confirm(t('admin.products.publishAll'))) return;
+ const handlePublishAll = async () => {
+  if (!confirm(t('products.publishAll'))) return;
   const unpublished = products.filter(p => p.status !== 'published');
   if (unpublished.length === 0) {
-    alert(t('admin.products.noUnpublished'));
+    alert(t('products.noUnpublished'));
     return;
   }
   try {
     const result = await adminApi.bulkPublish({ scope: 'all_unpublished' });
-    const msg = result?.message || pt('product.syncComplete');
+    const msg = result?.message || t('product.syncComplete');
     alert(msg);
     await loadProducts();
   } catch (e) {
-    alert(`${pt('product.syncError')} ${(e as Error)?.message || pt('product.errorBatch')}`);
+    alert(t('product.syncError') + ' ' + (e as Error)?.message || t('product.errorBatch'));
   }
-};
+ };
 
-const handleBulkPublish = async () => {
+ const handleBulkPublish = async () => {
   if (selectedProducts.size === 0) return;
-  if (!confirm(t('admin.products.publishSelected'))) return;
+  if (!confirm(t('products.publishSelected'))) return;
   try {
     const result = await adminApi.bulkPublish({ ids: Array.from(selectedProducts), scope: 'selected' });
-    const msg = result?.message || `${t('admin.common.success')}: ${selectedProducts.size} ${t('admin.products.count')}`;
+    const msg = result?.message || t('admin.common.success') + ': ' + selectedProducts.size + ' ' + t('products.count');
     alert(msg);
     setSelectedProducts(new Set());
     await loadProducts();
   } catch (e) {
-    alert(`${t('admin.common.error')}: ${(e as Error)?.message || t('admin.products.bulkPublishFailed')}`);
+    alert(t('admin.common.error') + ': ' + (e as Error)?.message || t('products.bulkPublishFailed'));
   }
-};
+ };
 
-const handleBulkUnpublish = async () => {
+ const handleBulkUnpublish = async () => {
   if (selectedProducts.size === 0) return;
-  if (!confirm(t('admin.products.unpublishSelected'))) return;
+  if (!confirm(t('products.unpublishSelected'))) return;
   try {
     const result = await adminApi.bulkUnpublish({ ids: Array.from(selectedProducts), scope: 'selected' });
-    const msg = result?.message || `${t('admin.common.success')}: ${selectedProducts.size} ${t('admin.products.count')}`;
+    const msg = result?.message || t('admin.common.success') + ': ' + selectedProducts.size + ' ' + t('products.count');
     alert(msg);
     setSelectedProducts(new Set());
     await loadProducts();
   } catch (e) {
-    alert(`${t('admin.common.error')}: ${(e as Error)?.message || t('admin.products.bulkUnpublishFailed')}`);
+    alert(t('admin.common.error') + ': ' + (e as Error)?.message || t('products.bulkUnpublishFailed'));
   }
-};
+ };
 
-const totalPages = Math.ceil(totalProducts / pageSize);
+ const totalPages = Math.ceil(totalProducts / pageSize);
 
  const getCategoryName = (id: string) => categories.find((c) => c.id === id)?.name_vi || id;
  const getProductCount = (catId: string) => products.filter(p => p.category === catId).length;
@@ -786,52 +1268,41 @@ const totalPages = Math.ceil(totalProducts / pageSize);
   setShowProductModal(true);
  };
 
-  const { t } = useTranslation();
-  const { t: pt } = useProductTranslation();
-
   return (
    <AdminLayout
-    title={t('admin.topBar.products')}
-    titleEn="Product Management"
-    titleAr="إدارة المنتجات"
-    titleFr="Gestion des produits"
-    subtitle={t('admin.topBar.productsSub')}
-    subtitleEn="Central operating system for the MADA AI knowledge base."
-    subtitleAr="نظام التشغيل المركزي لقاعدة معرفة MADA AI."
-    subtitleFr="Système d'exploitation central pour la base de connaissances MADA AI."
+    titleKey="admin.topBar.products"
+    subtitleKey="admin.topBar.productsSub"
     showFab={false}
     showLayoutTitle={false}
    >
-   {/* Hero Banner */}
    <section className="mb-8">
     <div className="flex justify-between items-end mb-6 relative">
      <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-white to-amber-500/10 backdrop-blur-xl rounded-3xl"></div>
      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-primary/10 via-transparent to-transparent rounded-3xl"></div>
      <div className="max-w-2xl relative z-10 py-6 px-6">
       <h2 className="text-3xl font-black text-on-surface mb-3 tracking-tight">
-       {t('admin.products.title2')}
+       {t('products.title2')}
       </h2>
       <p className="text-base font-medium text-on-surface-variant border-l-4 border-primary pl-5 py-2 bg-white/40 backdrop-blur-sm rounded-r-xl">
-       {t('admin.products.subtitle2')}
+       {t('products.subtitle2')}
       </p>
      </div>
     </div>
    </section>
 
-   {/* Metrics Row */}
    <section className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
     <div className="relative bg-gradient-to-br from-primary/10 to-primary/5 backdrop-blur-xl rounded-2xl p-4 border-[3px] border-black shadow-[4px_4px_0px_0px_#000] transform rotate-[-0.3deg] hover:rotate-0 transition-all flex items-center gap-3">
      <div className="w-10 h-10 rounded-xl border-2 border-black flex items-center justify-center shadow-[2px_2px_0px_0px_#000] bg-primary/20">
       <span className="material-symbols-outlined text-lg text-primary" style={{ fontVariationSettings: "'FILL' 1" }}>inventory_2</span>
      </div>
      <div>
-      <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">{t('admin.products.statProducts')}</p>
+      <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">{t('products.statProducts')}</p>
       {loading ? (
        <div className="w-16 h-6 bg-gray-200 rounded animate-pulse"></div>
       ) : (
        <h3 className="text-xl font-black text-on-surface">{totalProducts.toLocaleString()}</h3>
       )}
-      <p className="text-[10px] text-on-surface-variant mt-0.5">{pt('product.inSystem')}</p>
+      <p className="text-[10px] text-on-surface-variant mt-0.5">{t('product.inSystem')}</p>
      </div>
     </div>
     <div className="relative bg-gradient-to-br from-amber-50/80 to-amber-100/40 backdrop-blur-xl rounded-2xl p-4 border-[3px] border-black shadow-[4px_4px_0px_0px_#000] transform rotate-[0.3deg] hover:rotate-0 transition-all flex items-center gap-3">
@@ -839,13 +1310,13 @@ const totalPages = Math.ceil(totalProducts / pageSize);
       <span className="material-symbols-outlined text-lg text-amber-600" style={{ fontVariationSettings: "'FILL' 1" }}>category</span>
      </div>
      <div>
-      <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">{t('admin.products.statCategories')}</p>
+      <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">{t('products.statCategories')}</p>
       {loading ? (
        <div className="w-10 h-6 bg-gray-200 rounded animate-pulse"></div>
       ) : (
        <h3 className="text-xl font-black text-on-surface">{categories.length}</h3>
       )}
-      <p className="text-[10px] text-on-surface-variant mt-0.5">{pt('product.active')}</p>
+      <p className="text-[10px] text-on-surface-variant mt-0.5">{t('product.active')}</p>
      </div>
     </div>
     <div className="relative bg-gradient-to-br from-emerald-50/80 to-emerald-100/40 backdrop-blur-xl rounded-2xl p-4 border-[3px] border-black shadow-[4px_4px_0px_0px_#000] transform rotate-[-0.3deg] hover:rotate-0 transition-all flex items-center gap-3">
@@ -853,59 +1324,56 @@ const totalPages = Math.ceil(totalProducts / pageSize);
       <span className="material-symbols-outlined text-lg text-emerald-600" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
      </div>
      <div>
-      <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">{t('admin.products.statPublished')}</p>
+      <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">{t('products.statPublished')}</p>
       {loading ? (
        <div className="w-10 h-6 bg-gray-200 rounded animate-pulse"></div>
       ) : (
        <h3 className="text-xl font-black text-on-surface">{products.filter(p => p.status === 'published').length}</h3>
       )}
-      <p className="text-[10px] text-on-surface-variant mt-0.5">{t('admin.products.count')}</p>
+      <p className="text-[10px] text-on-surface-variant mt-0.5">{t('products.count')}</p>
      </div>
     </div>
    </section>
 
-   {/* Error Banner */}
    {!loading && categories.length === 0 && (
     <div className="mb-6 p-4 bg-red-50 border-2 border-red-300 rounded-xl flex items-center gap-3">
      <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
      <div>
-      <p className="font-semibold text-red-700">{t('admin.products.loadCatFail')}</p>
-      <p className="text-sm text-red-600">{t('admin.products.loadCatHint')}</p>
+      <p className="font-semibold text-red-700">{t('products.loadCatFail')}</p>
+      <p className="text-sm text-red-600">{t('products.loadCatHint')}</p>
      </div>
      <button onClick={() => { loadCategories(); loadProducts(); }}
       className="ml-auto px-3 py-1 bg-red-500 text-white text-sm rounded-lg hover:bg-red-600">
-      {pt('product.retry')}
+      {t('product.retry')}
      </button>
     </div>
    )}
 
-   {/* AI Import Card */}
    <AIImportCard categories={categories} onImportSuccess={loadProducts} />
 
-   {/* Header với tabs */}
    <div className="flex items-center justify-between mb-6">
      <div>
-      <h1 className="text-2xl font-black text-black">{t('admin.products.title2')}</h1>
-      <p className="text-sm text-slate-500 mt-0.5">{totalProducts} {t('admin.products.count')} · {categories.length} {t('admin.products.tabCategories')}</p>
+      <h1 className="text-2xl font-black text-black">{t('products.title2')}</h1>
+      <p className="text-sm text-slate-500 mt-0.5">{totalProducts} {t('products.count')} · {categories.length} {t('products.tabCategories')}</p>
      </div>
      <div className="flex items-center gap-2">
       {products.some(p => p.status !== 'published') && (
        <button onClick={handlePublishAll}
         className="px-4 py-2 rounded-lg bg-emerald-500 text-white font-bold text-sm border-2 border-black hover:bg-emerald-600 transition-all flex items-center gap-2 shadow-[2px_2px_0px_0px_#000]">
-        <CheckCircle2 className="w-4 h-4" /> {t('admin.products.publishAll')}
+        <CheckCircle2 className="w-4 h-4" /> {t('products.publishAll')}
        </button>
       )}
       <button onClick={async () => {
-        if (!confirm(pt('product.syncContent'))) return;
+        if (!confirm(t('product.syncContent'))) return;
         try {
           const result = await (adminApi as any).syncAndIndex();
           if (result?.success) {
-            alert(result.message || pt('product.syncComplete'));
+            alert(result.message || t('product.syncComplete'));
           } else {
-            alert(pt('product.syncError') + ' ' + (result?.error || ''));
+            alert(t('product.syncError') + ' ' + (result?.error || ''));
           }
         } catch (e) {
-          alert(pt('product.syncError') + ' ' + (e as Error)?.message);
+          alert(t('product.syncError') + ' ' + (e as Error)?.message);
         }
       }}
        className="px-4 py-2 rounded-lg bg-violet-500 text-white font-bold text-sm border-2 border-black hover:bg-violet-600 transition-all flex items-center gap-2 shadow-[2px_2px_0px_0px_#000]">
@@ -916,14 +1384,14 @@ const totalPages = Math.ceil(totalProducts / pageSize);
         viewMode === 'products' 
          ? 'bg-black text-white' 
          : 'bg-white text-black hover:bg-slate-50')}>
-       {t('admin.products.tabProducts')}
+       {t('products.tabProducts')}
       </button>
       <button onClick={() => setViewMode('categories')} 
        className={clsx('px-4 py-2 rounded-lg font-bold text-sm transition-all border-2 border-black',
         viewMode === 'categories' 
          ? 'bg-black text-white' 
          : 'bg-white text-black hover:bg-slate-50')}>
-       {t('admin.products.tabCategories')}
+       {t('products.tabCategories')}
       </button>
       <button onClick={() => handleOpenAddProduct()}
        className="px-4 py-2 rounded-lg bg-primary text-white font-bold text-sm border-2 border-black hover:bg-primary/90 transition-all flex items-center gap-2">
@@ -932,11 +1400,9 @@ const totalPages = Math.ceil(totalProducts / pageSize);
      </div>
     </div>
 
-   {/* Filter Bar - compact */}
    {viewMode === 'products' && (
     <>
      <div className="flex flex-wrap items-center gap-3 mb-5">
-      {/* Category Pills */}
       <div className="flex flex-wrap gap-1.5">
        <button onClick={() => setFilterCategory('')}
         className={clsx('px-3 py-1.5 rounded-lg font-bold text-xs transition-all border border-slate-300',
@@ -967,7 +1433,6 @@ const totalPages = Math.ceil(totalProducts / pageSize);
        })}
       </div>
 
-      {/* Search & Filters */}
       <div className="flex items-center gap-2 ml-auto">
        <select
         value={filterWho}
@@ -991,7 +1456,7 @@ const totalPages = Math.ceil(totalProducts / pageSize);
        <div className="relative">
         <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-base">search</span>
         <input className="h-8 pl-8 pr-3 rounded-lg bg-white border border-slate-300 font-medium text-sm text-black placeholder:text-slate-400 focus:outline-none focus:border-black w-48"
-         placeholder={pt('product.search')} value={search} onChange={(e) => setSearch(e.target.value)} />
+         placeholder={t('product.search')} value={search} onChange={(e) => setSearch(e.target.value)} />
        </div>
        <button onClick={() => setShowFeatured(!showFeatured)}
         className={clsx('px-3 h-8 rounded-lg font-bold text-xs flex items-center gap-1 transition-all border border-slate-300',
@@ -1005,7 +1470,6 @@ const totalPages = Math.ceil(totalProducts / pageSize);
       </div>
      </div>
 
-     {/* Products Grid */}
      {loading ? (
       <div className="min-h-[200px] flex items-center justify-center">
        <div className="w-12 h-12 rounded-full border-2 border-primary/20 border-t-primary animate-spin"></div>
@@ -1015,11 +1479,11 @@ const totalPages = Math.ceil(totalProducts / pageSize);
        <div className="w-16 h-16 rounded-xl border-[3px] border-black shadow-[1px_1px_0px_0px_#000] bg-white flex items-center justify-center mb-4">
         <span className="material-symbols-outlined text-3xl text-black">inventory_2</span>
        </div>
-       <h3 className="text-title-md font-black text-black mb-1">{t('admin.products.emptyTitle')}</h3>
-       <p className="text-body-md text-slate-600 mb-4">{t('admin.products.emptyHint')}</p>
+       <h3 className="text-title-md font-black text-black mb-1">{t('products.emptyTitle')}</h3>
+       <p className="text-body-md text-slate-600 mb-4">{t('products.emptyHint')}</p>
        <button onClick={() => handleOpenAddProduct()}
-        className="px-6 py-3 bg-black text-white rounded-xl font-bold border-[3px] border-black shadow-[1px_1px_0px_0px_#000]  transition-all flex items-center gap-2">
-        <Plus className="w-5 h-5" /> {t('admin.products.addProduct')}
+        className="px-6 py-3 bg-black text-white rounded-xl font-bold border-[3px] border-black shadow-[1px_1px_0px_0px_#000] transition-all flex items-center gap-2">
+        <Plus className="w-5 h-5" /> {t('products.addProduct')}
        </button>
       </div>
      ) : (
@@ -1042,11 +1506,11 @@ const totalPages = Math.ceil(totalProducts / pageSize);
            <span className="text-sm font-bold text-slate-600">{selectedProducts.size} {t('admin.common.selected')}</span>
            <button onClick={handleBulkPublish}
             className="px-3 py-1.5 rounded-lg bg-emerald-500 text-white font-bold text-xs border-2 border-black hover:bg-emerald-600 transition-all">
-            ✓ {t('admin.products.publishSelected')}
+            ✓ {t('products.publishSelected')}
            </button>
            <button onClick={handleBulkUnpublish}
             className="px-3 py-1.5 rounded-lg bg-amber-500 text-white font-bold text-xs border-2 border-black hover:bg-amber-600 transition-all">
-            ✗ {t('admin.products.unpublishSelected')}
+            ✗ {t('products.unpublishSelected')}
            </button>
            <button onClick={() => setSelectedProducts(new Set())}
             className="px-3 py-1.5 rounded-lg bg-slate-200 text-black font-bold text-xs border-2 border-black hover:bg-slate-300 transition-all">
@@ -1081,12 +1545,12 @@ const totalPages = Math.ceil(totalProducts / pageSize);
        {totalPages > 1 && (
         <div className="flex items-center justify-center gap-3 mt-8">
 <button onClick={() => setPage(Math.max(0, page - 1))} disabled={page === 0}
-         className="px-5 py-2.5 rounded-xl border-2 border-black bg-white text-black font-bold shadow-[1px_1px_0px_0px_#000]  transition-all disabled:opacity-30 disabled:shadow-none disabled:translate-x-0 disabled:translate-y-0">
+         className="px-5 py-2.5 rounded-xl border-2 border-black bg-white text-black font-bold shadow-[1px_1px_0px_0px_#000] transition-all disabled:opacity-30 disabled:shadow-none disabled:translate-x-0 disabled:translate-y-0">
          ← {t('admin.common.previous')}
         </button>
         <span className="px-5 py-2.5 rounded-xl border-2 border-black bg-white text-black font-bold shadow-[1px_1px_0px_0px_#000]">{t('admin.common.page')} {page + 1} / {totalPages}</span>
         <button onClick={() => setPage(Math.min(totalPages - 1, page + 1))} disabled={page >= totalPages - 1}
-         className="px-5 py-2.5 rounded-xl border-2 border-black bg-white text-black font-bold shadow-[1px_1px_0px_0px_#000]  transition-all disabled:opacity-30 disabled:shadow-none disabled:translate-x-0 disabled:translate-y-0">
+         className="px-5 py-2.5 rounded-xl border-2 border-black bg-white text-black font-bold shadow-[1px_1px_0px_0px_#000] transition-all disabled:opacity-30 disabled:shadow-none disabled:translate-x-0 disabled:translate-y-0">
          {t('admin.common.next')} →
         </button>
         </div>
@@ -1096,7 +1560,6 @@ const totalPages = Math.ceil(totalProducts / pageSize);
     </>
    )}
 
-   {/* CATEGORIES VIEW */}
    {viewMode === 'categories' && (
     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
      {categories.map((cat) => (
@@ -1106,10 +1569,8 @@ const totalPages = Math.ceil(totalProducts / pageSize);
     </div>
    )}
 
-   {/* Modals */}
    {showCategoryModal && <CategoryModal category={editingCategory} onSave={handleSaveCategory} onClose={() => { setShowCategoryModal(false); setEditingCategory(null); }} />}
-   {showProductModal && <ProductModal product={editingProduct} categories={categories} defaultCategory={defaultCategory} onSave={handleSaveProduct} onClose={() => { setShowProductModal(false); setEditingProduct(null); setDefaultCategory(''); }} />}
-  </AdminLayout>
- );
+   {showProductModal && <ProductModal product={editingProduct} categories={categories} defaultCategory={defaultCategory} onSave={handleSaveProduct} onClose={() => { setShowProductModal(false); setEditingProduct(null); }} />}
+   </AdminLayout>
+  );
 }
-export default AdminProducts;

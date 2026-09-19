@@ -4,20 +4,301 @@ import { AdminLayout } from './AdminLayout';
 import { Loader2, Search, Plus, Edit2, Trash2, ToggleLeft, ToggleRight, FileText, X, AlertTriangle } from 'lucide-react';
 import { adminApi } from './adminApi';
 import { getAccessToken } from '@/lib/api';
-import { usePromptStore, useAuthStore, useLanguageStore, type SystemPromptRow } from '@/stores';
-import { useTranslation } from '@/lib/translations';
+import { usePromptStore, useAuthStore, type SystemPromptRow, useLanguageStore } from '@/stores';
 import { PromptsEditor } from './PromptsEditor';
 import { ChatCustomization } from './ChatCustomization';
+
+// Admin Prompts translations - supports all languages via useLanguageStore
+// Note: tPr is used in render so we pass language as parameter to ensure reactivity
+const tPr = (key: string, lang: string): string => {
+  const translations: Record<string, Record<string, string>> = {
+    vi: {
+      // Top bar
+      'admin.topBar.prompts': 'System Prompts',
+      'admin.topBar.promptsSub': 'Quản lý prompts cho AI agents',
+      // Prompts
+      'admin.prompts.title': 'Quản lý System Prompts',
+      'admin.prompts.subtitle': 'Tạo và quản lý các prompt cho AI agents trong hệ thống',
+      'admin.prompts.totalPrompts': 'Tổng Prompts',
+      'admin.prompts.active': 'Đang hoạt động',
+      'admin.prompts.systemPrompts': 'System Prompts',
+      'admin.prompts.createNew': 'Tạo Prompt mới',
+      'admin.prompts.promptTemplates': 'Mẫu Prompts',
+      'admin.prompts.cannotDeleteSystem': 'Không thể xóa System Prompt',
+      'admin.prompts.usedByAgents': 'Prompt này đang được sử dụng bởi',
+      'admin.prompts.agents': 'agents',
+      'admin.prompts.removeFirst': 'Vui lòng gỡ prompt khỏi các agents trước khi xóa.',
+      'admin.prompts.understood': 'Đã hiểu',
+      'admin.prompts.systemDb': 'Database hệ thống',
+      'admin.prompts.systemDbDesc': 'Truy cập file cấu hình',
+      'admin.prompts.systemPromptsBtn': 'System Prompts',
+      'admin.prompts.systemPromptsBtnDesc': 'Chỉnh sửa nhanh',
+      'admin.prompts.editing': 'Đang chỉnh sửa',
+      'admin.prompts.chatCustomization': 'Tùy chỉnh Chat',
+      'admin.prompts.chatCustomizationDesc': 'Cấu hình giao diện chat',
+      'admin.prompts.quickEditTitle': 'Chỉnh sửa nhanh',
+      'admin.prompts.close': 'Đóng',
+      'admin.prompts.prompts': 'Prompts',
+      'admin.prompts.search': 'Tìm kiếm prompts...',
+      'admin.prompts.category': 'Danh mục',
+      'admin.prompts.all': 'Tất cả',
+      'admin.prompts.language': 'Ngôn ngữ',
+      'admin.prompts.empty': 'Chưa có prompt nào',
+      'admin.prompts.systemPrompt': 'System Prompt',
+      'admin.prompts.noDescription': 'Không có mô tả',
+      'admin.prompts.id': 'ID',
+      'admin.prompts.idSlug': 'slug không dấu',
+      'admin.prompts.idPlaceholder': 'VD: my-prompt',
+      'admin.prompts.promptName': 'Tên Prompt',
+      'admin.prompts.namePlaceholder': 'VD: Prompt chào hỏi',
+      'admin.prompts.description': 'Mô tả',
+      'admin.prompts.descPlaceholder': 'Mô tả ngắn về prompt',
+      'admin.prompts.promptContentReq': 'Nội dung Prompt',
+      'admin.prompts.contentPlaceholder': 'Nhập nội dung prompt...',
+      'admin.prompts.create': 'Tạo',
+      'admin.prompts.save': 'Lưu',
+      'admin.prompts.cancel': 'Hủy',
+      'admin.prompts.edit': 'Sửa',
+      'admin.prompts.deleteConfirm': 'Xóa',
+      'admin.prompts.systemCannotDelete': 'System Prompt không thể xóa',
+      'admin.prompts.enabled': 'Đã bật',
+      'admin.prompts.disabled': 'Đã tắt',
+      'admin.prompts.created': 'Tạo lúc',
+      'admin.prompts.updated': 'Cập nhật',
+      'admin.prompts.selectPrompt': 'Chọn một Prompt',
+      'admin.prompts.selectPromptDesc': 'Chọn prompt từ danh sách bên trái để xem chi tiết',
+      'admin.prompts.promptContent': 'Nội dung Prompt',
+      'admin.prompts.categoryGeneral': 'Tổng quát',
+      'admin.prompts.categoryMedical': 'Y tế',
+      'admin.prompts.categoryLegal': 'Pháp lý',
+      'admin.prompts.categoryFinance': 'Tài chính',
+      'admin.prompts.categorySupport': 'Hỗ trợ',
+      'admin.prompts.categorySales': 'Bán hàng',
+      'admin.prompts.categoryTechnical': 'Kỹ thuật',
+      'admin.prompts.alertCannotDeleteSystem': 'Không thể xóa System Prompt!',
+      'admin.prompts.alertDeleteFailed': 'Xóa prompt thất bại',
+    },
+    en: {
+      // Top bar
+      'admin.topBar.prompts': 'System Prompts',
+      'admin.topBar.promptsSub': 'Manage AI agent prompts',
+      // Prompts
+      'admin.prompts.title': 'System Prompts Management',
+      'admin.prompts.subtitle': 'Create and manage prompts for AI agents in the system',
+      'admin.prompts.totalPrompts': 'Total Prompts',
+      'admin.prompts.active': 'Active',
+      'admin.prompts.systemPrompts': 'System Prompts',
+      'admin.prompts.createNew': 'Create New Prompt',
+      'admin.prompts.promptTemplates': 'Prompt Templates',
+      'admin.prompts.cannotDeleteSystem': 'Cannot delete System Prompt',
+      'admin.prompts.usedByAgents': 'This prompt is being used by',
+      'admin.prompts.agents': 'agents',
+      'admin.prompts.removeFirst': 'Please remove the prompt from agents before deleting.',
+      'admin.prompts.understood': 'Understood',
+      'admin.prompts.systemDb': 'System Database',
+      'admin.prompts.systemDbDesc': 'Access configuration files',
+      'admin.prompts.systemPromptsBtn': 'System Prompts',
+      'admin.prompts.systemPromptsBtnDesc': 'Quick edit',
+      'admin.prompts.editing': 'Editing',
+      'admin.prompts.chatCustomization': 'Chat Customization',
+      'admin.prompts.chatCustomizationDesc': 'Configure chat interface',
+      'admin.prompts.quickEditTitle': 'Quick Edit',
+      'admin.prompts.close': 'Close',
+      'admin.prompts.prompts': 'Prompts',
+      'admin.prompts.search': 'Search prompts...',
+      'admin.prompts.category': 'Category',
+      'admin.prompts.all': 'All',
+      'admin.prompts.language': 'Language',
+      'admin.prompts.empty': 'No prompts yet',
+      'admin.prompts.systemPrompt': 'System Prompt',
+      'admin.prompts.noDescription': 'No description',
+      'admin.prompts.id': 'ID',
+      'admin.prompts.idSlug': 'slug',
+      'admin.prompts.idPlaceholder': 'E.g: my-prompt',
+      'admin.prompts.promptName': 'Prompt Name',
+      'admin.prompts.namePlaceholder': 'E.g: Greeting prompt',
+      'admin.prompts.description': 'Description',
+      'admin.prompts.descPlaceholder': 'Short description about the prompt',
+      'admin.prompts.promptContentReq': 'Prompt Content',
+      'admin.prompts.contentPlaceholder': 'Enter prompt content...',
+      'admin.prompts.create': 'Create',
+      'admin.prompts.save': 'Save',
+      'admin.prompts.cancel': 'Cancel',
+      'admin.prompts.edit': 'Edit',
+      'admin.prompts.deleteConfirm': 'Delete',
+      'admin.prompts.systemCannotDelete': 'System Prompt cannot be deleted',
+      'admin.prompts.enabled': 'Enabled',
+      'admin.prompts.disabled': 'Disabled',
+      'admin.prompts.created': 'Created',
+      'admin.prompts.updated': 'Updated',
+      'admin.prompts.selectPrompt': 'Select a Prompt',
+      'admin.prompts.selectPromptDesc': 'Select a prompt from the list on the left to view details',
+      'admin.prompts.promptContent': 'Prompt Content',
+      'admin.prompts.categoryGeneral': 'General',
+      'admin.prompts.categoryMedical': 'Medical',
+      'admin.prompts.categoryLegal': 'Legal',
+      'admin.prompts.categoryFinance': 'Finance',
+      'admin.prompts.categorySupport': 'Support',
+      'admin.prompts.categorySales': 'Sales',
+      'admin.prompts.categoryTechnical': 'Technical',
+      'admin.prompts.alertCannotDeleteSystem': 'Cannot delete System Prompt!',
+      'admin.prompts.alertDeleteFailed': 'Failed to delete prompt',
+    },
+    ar: {
+      // Top bar
+      'admin.topBar.prompts': 'طلبات النظام',
+      'admin.topBar.promptsSub': 'إدارة طلبات الوكلاء الذكيين',
+      // Prompts
+      'admin.prompts.title': 'إدارة طلبات النظام',
+      'admin.prompts.subtitle': 'إنشاء وإدارة الطلبات لوكلاء الذكاء الاصطناعي في النظام',
+      'admin.prompts.totalPrompts': 'إجمالي الطلبات',
+      'admin.prompts.active': 'نشط',
+      'admin.prompts.systemPrompts': 'طلبات النظام',
+      'admin.prompts.createNew': 'إنشاء طلب جديد',
+      'admin.prompts.promptTemplates': 'قوالب الطلبات',
+      'admin.prompts.cannotDeleteSystem': 'لا يمكن حذف طلب النظام',
+      'admin.prompts.usedByAgents': 'هذا الطلب قيد الاستخدام من قبل',
+      'admin.prompts.agents': 'وكلاء',
+      'admin.prompts.removeFirst': 'يرجى إزالة الطلب من الوكلاء قبل الحذف.',
+      'admin.prompts.understood': 'فهمت',
+      'admin.prompts.systemDb': 'قاعدة بيانات النظام',
+      'admin.prompts.systemDbDesc': 'الوصول لملفات التكوين',
+      'admin.prompts.systemPromptsBtn': 'طلبات النظام',
+      'admin.prompts.systemPromptsBtnDesc': 'تعديل سريع',
+      'admin.prompts.editing': 'جاري التعديل',
+      'admin.prompts.chatCustomization': 'تخصيص المحادثة',
+      'admin.prompts.chatCustomizationDesc': 'تكوين واجهة المحادثة',
+      'admin.prompts.quickEditTitle': 'تعديل سريع',
+      'admin.prompts.close': 'إغلاق',
+      'admin.prompts.prompts': 'الطلبات',
+      'admin.prompts.search': 'البحث في الطلبات...',
+      'admin.prompts.category': 'الفئة',
+      'admin.prompts.all': 'الكل',
+      'admin.prompts.language': 'اللغة',
+      'admin.prompts.empty': 'لا توجد طلبات بعد',
+      'admin.prompts.systemPrompt': 'طلب النظام',
+      'admin.prompts.noDescription': 'لا يوجد وصف',
+      'admin.prompts.id': 'المعرف',
+      'admin.prompts.idSlug': 'المعرف المختصر',
+      'admin.prompts.idPlaceholder': 'مثال: my-prompt',
+      'admin.prompts.promptName': 'اسم الطلب',
+      'admin.prompts.namePlaceholder': 'مثال: طلب الترحيب',
+      'admin.prompts.description': 'الوصف',
+      'admin.prompts.descPlaceholder': 'وصف مختصر عن الطلب',
+      'admin.prompts.promptContentReq': 'محتوى الطلب',
+      'admin.prompts.contentPlaceholder': 'أدخل محتوى الطلب...',
+      'admin.prompts.create': 'إنشاء',
+      'admin.prompts.save': 'حفظ',
+      'admin.prompts.cancel': 'إلغاء',
+      'admin.prompts.edit': 'تعديل',
+      'admin.prompts.deleteConfirm': 'حذف',
+      'admin.prompts.systemCannotDelete': 'لا يمكن حذف طلب النظام',
+      'admin.prompts.enabled': 'مفعل',
+      'admin.prompts.disabled': 'معطل',
+      'admin.prompts.created': 'تاريخ الإنشاء',
+      'admin.prompts.updated': 'تاريخ التحديث',
+      'admin.prompts.selectPrompt': 'اختر طلباً',
+      'admin.prompts.selectPromptDesc': 'اختر طلباً من القائمة على اليسار لعرض التفاصيل',
+      'admin.prompts.promptContent': 'محتوى الطلب',
+      'admin.prompts.categoryGeneral': 'عام',
+      'admin.prompts.categoryMedical': 'طبي',
+      'admin.prompts.categoryLegal': 'قانوني',
+      'admin.prompts.categoryFinance': 'مالي',
+      'admin.prompts.categorySupport': 'دعم',
+      'admin.prompts.categorySales': 'مبيعات',
+      'admin.prompts.categoryTechnical': 'تقني',
+      'admin.prompts.alertCannotDeleteSystem': 'لا يمكن حذف طلب النظام!',
+      'admin.prompts.alertDeleteFailed': 'فشل حذف الطلب',
+    },
+    fr: {
+      // Top bar
+      'admin.topBar.prompts': 'Prompts système',
+      'admin.topBar.promptsSub': 'Gérer les prompts des agents IA',
+      // Prompts
+      'admin.prompts.title': 'Gestion des Prompts Système',
+      'admin.prompts.subtitle': 'Créer et gérer les prompts pour les agents IA du système',
+      'admin.prompts.totalPrompts': 'Total Prompts',
+      'admin.prompts.active': 'Actif',
+      'admin.prompts.systemPrompts': 'Prompts Système',
+      'admin.prompts.createNew': 'Créer un Nouveau Prompt',
+      'admin.prompts.promptTemplates': 'Modèles de Prompts',
+      'admin.prompts.cannotDeleteSystem': 'Impossible de supprimer le Prompt Système',
+      'admin.prompts.usedByAgents': 'Ce prompt est utilisé par',
+      'admin.prompts.agents': 'agents',
+      'admin.prompts.removeFirst': 'Veuillez retirer le prompt des agents avant de supprimer.',
+      'admin.prompts.understood': 'Compris',
+      'admin.prompts.systemDb': 'Base de données système',
+      'admin.prompts.systemDbDesc': 'Accéder aux fichiers de configuration',
+      'admin.prompts.systemPromptsBtn': 'Prompts Système',
+      'admin.prompts.systemPromptsBtnDesc': 'Édition rapide',
+      'admin.prompts.editing': 'En cours d\'édition',
+      'admin.prompts.chatCustomization': 'Personnalisation du Chat',
+      'admin.prompts.chatCustomizationDesc': 'Configurer l\'interface de chat',
+      'admin.prompts.quickEditTitle': 'Édition rapide',
+      'admin.prompts.close': 'Fermer',
+      'admin.prompts.prompts': 'Prompts',
+      'admin.prompts.search': 'Rechercher des prompts...',
+      'admin.prompts.category': 'Catégorie',
+      'admin.prompts.all': 'Tous',
+      'admin.prompts.language': 'Langue',
+      'admin.prompts.empty': 'Pas encore de prompts',
+      'admin.prompts.systemPrompt': 'Prompt Système',
+      'admin.prompts.noDescription': 'Pas de description',
+      'admin.prompts.id': 'ID',
+      'admin.prompts.idSlug': 'slug',
+      'admin.prompts.idPlaceholder': 'Ex: my-prompt',
+      'admin.prompts.promptName': 'Nom du Prompt',
+      'admin.prompts.namePlaceholder': 'Ex: Prompt de salutation',
+      'admin.prompts.description': 'Description',
+      'admin.prompts.descPlaceholder': 'Description courte du prompt',
+      'admin.prompts.promptContentReq': 'Contenu du Prompt',
+      'admin.prompts.contentPlaceholder': 'Entrez le contenu du prompt...',
+      'admin.prompts.create': 'Créer',
+      'admin.prompts.save': 'Enregistrer',
+      'admin.prompts.cancel': 'Annuler',
+      'admin.prompts.edit': 'Modifier',
+      'admin.prompts.deleteConfirm': 'Supprimer',
+      'admin.prompts.systemCannotDelete': 'Le Prompt Système ne peut pas être supprimé',
+      'admin.prompts.enabled': 'Activé',
+      'admin.prompts.disabled': 'Désactivé',
+      'admin.prompts.created': 'Créé le',
+      'admin.prompts.updated': 'Mis à jour',
+      'admin.prompts.selectPrompt': 'Sélectionner un Prompt',
+      'admin.prompts.selectPromptDesc': 'Sélectionnez un prompt dans la liste à gauche pour voir les détails',
+      'admin.prompts.promptContent': 'Contenu du Prompt',
+      'admin.prompts.categoryGeneral': 'Général',
+      'admin.prompts.categoryMedical': 'Médical',
+      'admin.prompts.categoryLegal': 'Juridique',
+      'admin.prompts.categoryFinance': 'Finance',
+      'admin.prompts.categorySupport': 'Support',
+      'admin.prompts.categorySales': 'Ventes',
+      'admin.prompts.categoryTechnical': 'Technique',
+      'admin.prompts.alertCannotDeleteSystem': 'Impossible de supprimer le Prompt Système!',
+      'admin.prompts.alertDeleteFailed': 'Échec de la suppression du prompt',
+    },
+  };
+  return translations[lang]?.[key] || translations['vi'][key] || key;
+};
 
 type SystemPrompt = SystemPromptRow;
 
 const CATEGORIES = ['general', 'medical', 'legal', 'finance', 'support', 'sales', 'technical'];
-const LANGUAGES = [
-  { value: 'vi', label: 'Tiếng Việt' },
-  { value: 'en', label: 'English' },
-  { value: 'ar', label: 'العربية' },
-  { value: 'fr', label: 'Français' },
+const LANGUAGES: { value: string; label: string; labelEn: string; labelAr: string; labelFr: string }[] = [
+  { value: 'vi', label: 'Tiếng Việt', labelEn: 'Tiếng Việt', labelAr: 'الفيتنامية', labelFr: 'Vietnamien' },
+  { value: 'en', label: 'English', labelEn: 'English', labelAr: 'الإنجليزية', labelFr: 'Anglais' },
+  { value: 'ar', label: 'العربية', labelEn: 'العربية', labelAr: 'العربية', labelFr: 'Arabe' },
+  { value: 'fr', label: 'Français', labelEn: 'Français', labelAr: 'الفرنسية', labelFr: 'Français' },
 ];
+
+// Language-aware label helper
+const getLanguageLabel = (langValue: string, language: string): string => {
+  const l = LANGUAGES.find(x => x.value === langValue);
+  if (!l) return langValue;
+  if (language === 'ar') return l.labelAr;
+  if (language === 'fr') return l.labelFr;
+  if (language === 'en') return l.labelEn;
+  return l.label;
+};
 
 // Category labels are now dynamically generated using translation helper
 
@@ -32,23 +313,24 @@ const CATEGORY_CONFIG: Record<string, { bg: string; text: string; border: string
 };
 
 export function AdminPrompts() {
+  // Use proper reactive hook instead of getState()
+  const language = useLanguageStore((state) => state.language);
   const upsertPromptStore = usePromptStore((s) => s.upsertPrompt);
   const removePromptStore = usePromptStore((s) => s.removePrompt);
   const setStorePrompts = usePromptStore((s) => s.setPrompts);
 
-  // Get current language from store
-  useLanguageStore((s) => s.language); // Keep subscription to store
-  const { t } = useTranslation();
-
-  // Category labels based on language
-  const CATEGORY_LABELS: Record<string, string> = {
-    general: t('admin.prompts.categoryGeneral'),
-    medical: t('admin.prompts.categoryMedical'),
-    legal: t('admin.prompts.categoryLegal'),
-    finance: t('admin.prompts.categoryFinance'),
-    support: t('admin.prompts.categorySupport'),
-    sales: t('admin.prompts.categorySales'),
-    technical: t('admin.prompts.categoryTechnical'),
+  // Category labels - using a function to ensure reactivity
+  const getCategoryLabel = (cat: string): string => {
+    const labels: Record<string, Record<string, string>> = {
+      general: { vi: 'Tổng quát', en: 'General', ar: 'عام', fr: 'Général' },
+      medical: { vi: 'Y tế', en: 'Medical', ar: 'طبي', fr: 'Médical' },
+      legal: { vi: 'Pháp lý', en: 'Legal', ar: 'قانوني', fr: 'Juridique' },
+      finance: { vi: 'Tài chính', en: 'Finance', ar: 'مالي', fr: 'Finance' },
+      support: { vi: 'Hỗ trợ', en: 'Support', ar: 'دعم', fr: 'Support' },
+      sales: { vi: 'Bán hàng', en: 'Sales', ar: 'مبيعات', fr: 'Ventes' },
+      technical: { vi: 'Kỹ thuật', en: 'Technical', ar: 'تقني', fr: 'Technique' },
+    };
+    return labels[cat]?.[language] || labels[cat]?.['vi'] || cat;
   };
 
   const [prompts, setPrompts] = useState<SystemPrompt[]>([]);
@@ -196,7 +478,7 @@ export function AdminPrompts() {
     if (!prompt) return;
 
     if (prompt.isSystem) {
-      alert(t('admin.prompts.alertCannotDeleteSystem'));
+      alert(tPr('admin.prompts.alertCannotDeleteSystem', language));
       return;
     }
 
@@ -220,13 +502,13 @@ export function AdminPrompts() {
         if (rawJson.usingAgents && rawJson.usingAgents.length > 0) {
           setDeleteWarning({ usingAgents: rawJson.usingAgents });
         } else {
-          alert(rawJson.error || res.error || t('admin.prompts.alertDeleteFailed'));
+          alert(rawJson.error || res.error || tPr('admin.prompts.alertDeleteFailed', language));
         }
       } catch (e) {
-        alert(res.error || t('admin.prompts.alertDeleteFailed'));
+        alert(res.error || tPr('admin.prompts.alertDeleteFailed', language));
       }
     } else {
-      alert(res.error || t('admin.prompts.alertDeleteFailed'));
+      alert(res.error || tPr('admin.prompts.alertDeleteFailed', language));
     }
   };
 
@@ -260,14 +542,8 @@ export function AdminPrompts() {
 
   return (
     <AdminLayout
-      title={t('admin.topBar.prompts')}
-      titleEn="System Prompts"
-      titleAr="التعليمات النظامية"
-      titleFr="Prompts système"
-      subtitle={t('admin.topBar.promptsSub')}
-      subtitleEn="Manage system prompts used for AI Agents and RAG."
-      subtitleAr="إدارة التعليمات النظامية المستخدمة للوكلاء و RAG."
-      subtitleFr="Gérer les prompts système utilisés pour les agents IA et RAG."
+      titleKey="admin.topBar.prompts"
+      subtitleKey="admin.topBar.promptsSub"
       showLayoutTitle={false}
     >
       {/* Beautiful Banner */}
@@ -288,10 +564,10 @@ export function AdminPrompts() {
                 
                 <div>
                   <h1 className="text-3xl md:text-4xl font-black text-slate-800 tracking-tight">
-                    {t('admin.prompts.title')}
+                    {tPr('admin.prompts.title', language)}
                   </h1>
                   <p className="text-slate-500 text-sm mt-1">
-                    {t('admin.prompts.subtitle')}
+                    {tPr('admin.prompts.subtitle', language)}
                   </p>
                 </div>
               </div>
@@ -301,21 +577,21 @@ export function AdminPrompts() {
                 <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 shadow-sm">
                   <span className="material-symbols-outlined text-xl text-primary">format_list_bulleted</span>
                   <div>
-                    <p className="text-slate-400 text-xs">{t('admin.prompts.totalPrompts')}</p>
+                    <p className="text-slate-400 text-xs">{tPr('admin.prompts.totalPrompts', language)}</p>
                     <p className="text-slate-800 font-bold text-lg">{prompts.length}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 shadow-sm">
                   <span className="material-symbols-outlined text-xl text-green-500">check_circle</span>
                   <div>
-                    <p className="text-slate-400 text-xs">{t('admin.prompts.active')}</p>
+                    <p className="text-slate-400 text-xs">{tPr('admin.prompts.active', language)}</p>
                     <p className="text-slate-800 font-bold text-lg">{prompts.filter(p => p.isActive).length}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 shadow-sm">
                   <span className="material-symbols-outlined text-xl text-amber-500">smart_toy</span>
                   <div>
-                    <p className="text-slate-400 text-xs">{t('admin.prompts.systemPrompts')}</p>
+                    <p className="text-slate-400 text-xs">{tPr('admin.prompts.systemPrompts', language)}</p>
                     <p className="text-slate-800 font-bold text-lg">{prompts.filter(p => p.isSystem).length}</p>
                   </div>
                 </div>
@@ -329,7 +605,7 @@ export function AdminPrompts() {
                 className="group flex items-center gap-3 px-6 py-3.5 bg-primary text-white rounded-xl font-bold shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-200"
               >
                 <span className="material-symbols-outlined text-xl">add</span>
-                {t('admin.prompts.createNew')}
+                {tPr('admin.prompts.createNew', language)}
                 <span className="material-symbols-outlined text-xl opacity-0 group-hover:opacity-100 transition-opacity">arrow_forward</span>
               </button>
               <button
@@ -337,7 +613,7 @@ export function AdminPrompts() {
                 className="flex items-center gap-2 px-5 py-2.5 text-slate-600 hover:text-primary hover:bg-slate-100 rounded-lg transition-all"
               >
                 <span className="material-symbols-outlined text-xl">auto_awesome</span>
-                {t('admin.prompts.promptTemplates')}
+                {tPr('admin.prompts.promptTemplates', language)}
                 <span className="material-symbols-outlined text-lg">chevron_right</span>
               </button>
             </div>
@@ -356,10 +632,10 @@ export function AdminPrompts() {
               <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
                 <AlertTriangle className="w-5 h-5 text-amber-600" />
               </div>
-              <h3 className="text-lg font-bold text-slate-800">{t('admin.prompts.cannotDeleteSystem')}</h3>
+              <h3 className="text-lg font-bold text-slate-800">{tPr('admin.prompts.cannotDeleteSystem', language)}</h3>
             </div>
             <p className="text-slate-600 mb-3">
-              {t('admin.prompts.usedByAgents')} <strong>{deleteWarning.usingAgents.length} {t('admin.prompts.agents')}</strong>:
+              {tPr('admin.prompts.usedByAgents', language)} <strong>{deleteWarning.usingAgents.length} {tPr('admin.prompts.agents', language)}</strong>:
             </p>
             <ul className="space-y-1 mb-4">
               {deleteWarning.usingAgents.map(a => (
@@ -367,13 +643,13 @@ export function AdminPrompts() {
               ))}
             </ul>
             <p className="text-sm text-slate-500 mb-4">
-              {t('admin.prompts.removeFirst')}
+              {tPr('admin.prompts.removeFirst', language)}
             </p>
             <button
               onClick={() => setDeleteWarning(null)}
               className="w-full px-4 py-2 bg-primary text-white rounded-xl hover:bg-primary/90 transition-colors text-sm font-medium"
             >
-              {t('admin.prompts.understood')}
+              {tPr('admin.prompts.understood', language)}
             </button>
           </div>
         </div>
@@ -390,8 +666,8 @@ export function AdminPrompts() {
             <span className="material-symbols-outlined text-2xl text-amber-500">storage</span>
           </div>
           <div>
-            <p className="font-bold text-sm text-slate-800">{t('admin.prompts.systemDb')}</p>
-            <p className="text-xs text-slate-400 mt-0.5">{t('admin.prompts.systemDbDesc')}</p>
+            <p className="font-bold text-sm text-slate-800">{tPr('admin.prompts.systemDb', language)}</p>
+            <p className="text-xs text-slate-400 mt-0.5">{tPr('admin.prompts.systemDbDesc', language)}</p>
           </div>
         </button>
 
@@ -413,10 +689,10 @@ export function AdminPrompts() {
           </div>
           <div>
             <p className="font-bold text-sm" style={{ color: showPromptsEditor ? '#6366f1' : '#1e293b' }}>
-              {t('admin.prompts.systemPromptsBtn')}
+              {tPr('admin.prompts.systemPromptsBtn', language)}
             </p>
             <p className="text-xs mt-0.5" style={{ color: showPromptsEditor ? 'rgba(99,102,241,0.6)' : '#94a3b8' }}>
-              {showPromptsEditor ? t('admin.prompts.editing') : t('admin.prompts.systemPromptsBtnDesc')}
+              {showPromptsEditor ? tPr('admin.prompts.editing', language) : tPr('admin.prompts.systemPromptsBtnDesc', language)}
             </p>
           </div>
           <div className="absolute top-3 right-3 w-2 h-2 rounded-full" style={{
@@ -443,10 +719,10 @@ export function AdminPrompts() {
           </div>
           <div>
             <p className="font-bold text-sm" style={{ color: showChatCustomization ? '#0ea5e9' : '#1e293b' }}>
-              {t('admin.prompts.chatCustomization')}
+              {tPr('admin.prompts.chatCustomization', language)}
             </p>
             <p className="text-xs mt-0.5" style={{ color: showChatCustomization ? 'rgba(14,165,233,0.6)' : '#94a3b8' }}>
-              {showChatCustomization ? t('admin.prompts.editing') : t('admin.prompts.chatCustomizationDesc')}
+              {showChatCustomization ? tPr('admin.prompts.editing', language) : tPr('admin.prompts.chatCustomizationDesc', language)}
             </p>
           </div>
           <div className="absolute top-3 right-3 w-2 h-2 rounded-full" style={{
@@ -461,14 +737,14 @@ export function AdminPrompts() {
           <div className="p-5 border-b border-slate-100 flex items-center justify-between">
             <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
               <span className="material-symbols-outlined text-xl text-primary">edit_note</span>
-              {t('admin.prompts.quickEditTitle')}
+              {tPr('admin.prompts.quickEditTitle', language)}
             </h2>
             <button
               onClick={() => setShowPromptsEditor(false)}
               className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
             >
               <X className="w-4 h-4" />
-              {t('admin.prompts.close')}
+              {tPr('admin.prompts.close', language)}
             </button>
           </div>
           <div className="p-5">
@@ -480,14 +756,14 @@ export function AdminPrompts() {
           <div className="p-5 border-b border-slate-100 flex items-center justify-between">
             <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
               <span className="material-symbols-outlined text-xl" style={{ color: '#0ea5e9' }}>chat</span>
-              {t('admin.prompts.chatCustomization')}
+              {tPr('admin.prompts.chatCustomization', language)}
             </h2>
             <button
               onClick={() => setShowChatCustomization(false)}
               className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
             >
               <X className="w-4 h-4" />
-              {t('admin.prompts.cancel')}
+              {tPr('admin.prompts.cancel', language)}
             </button>
           </div>
           <div className="p-5">
@@ -497,12 +773,12 @@ export function AdminPrompts() {
       ) : (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 mb-4 flex flex-col" style={{ height: 'calc(100vh - 340px)' }}>
           <div className="flex items-center gap-3 mb-3">
-            <h2 className="text-base font-bold text-slate-800 shrink-0">{t('admin.prompts.prompts')}</h2>
+            <h2 className="text-base font-bold text-slate-800 shrink-0">{tPr('admin.prompts.prompts', language)}</h2>
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input
                 type="text"
-                placeholder={t('admin.prompts.search')}
+                placeholder={tPr('admin.prompts.search', language)}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:bg-white transition-colors"
@@ -513,12 +789,12 @@ export function AdminPrompts() {
               className="flex items-center gap-1.5 px-3 py-2 bg-primary text-white rounded-xl text-sm font-medium hover:bg-primary/90 transition-colors shrink-0"
             >
               <Plus className="w-4 h-4" />
-              {t('admin.prompts.createNew')}
+              {tPr('admin.prompts.createNew', language)}
             </button>
           </div>
 
           <div className="flex flex-wrap gap-2 items-center shrink-0">
-            <span className="text-xs font-medium text-slate-400 shrink-0">{t('admin.prompts.category')}:</span>
+            <span className="text-xs font-medium text-slate-400 shrink-0">{tPr('admin.prompts.category', language)}:</span>
             <button
               onClick={() => setFilterCategory('all')}
               className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
@@ -527,7 +803,7 @@ export function AdminPrompts() {
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
-              {t('admin.prompts.all')}
+              {tPr('admin.prompts.all', language)}
             </button>
             {CATEGORIES.map((cat) => (
               <button
@@ -545,7 +821,7 @@ export function AdminPrompts() {
           </div>
 
           <div className="flex flex-wrap gap-2 items-center mt-2 shrink-0">
-            <span className="text-xs font-medium text-slate-400 shrink-0">{t('admin.prompts.language')}:</span>
+            <span className="text-xs font-medium text-slate-400 shrink-0">{tPr('admin.prompts.language', language)}:</span>
             <button
               onClick={() => setFilterLanguage('all')}
               className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
@@ -554,7 +830,7 @@ export function AdminPrompts() {
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
-              {t('admin.prompts.all')}
+              {tPr('admin.prompts.all', language)}
             </button>
             {LANGUAGES.map((lang) => (
               <button
@@ -566,7 +842,7 @@ export function AdminPrompts() {
                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                 }`}
               >
-                {lang.label}
+                {getLanguageLabel(lang.value, language)}
               </button>
             ))}
           </div>
@@ -586,13 +862,13 @@ export function AdminPrompts() {
                 ) : filteredPrompts.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-32 text-slate-400">
                     <FileText className="w-8 h-8 mb-2 opacity-50" />
-                    <p className="text-sm">{t('admin.prompts.empty')}</p>
+                    <p className="text-sm">{tPr('admin.prompts.empty', language)}</p>
                   </div>
                 ) : (
                   <div className="space-y-2">
                     {filteredPrompts.map((prompt) => {
                       const catConfig = CATEGORY_CONFIG[prompt.category] || CATEGORY_CONFIG.general;
-                      const langLabel = LANGUAGES.find(l => l.value === prompt.language)?.label || prompt.language;
+                      const langLabel = getLanguageLabel(prompt.language, language);
                       return (
                         <div
                           key={prompt.id}
@@ -609,15 +885,15 @@ export function AdminPrompts() {
                                 <h3 className="font-semibold text-slate-800 text-sm truncate">{prompt.name}</h3>
                                 {prompt.isSystem && (
                                   <span className="shrink-0 px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded text-[10px] font-medium">
-                                    {t('admin.prompts.systemPrompt')}
+                                    {tPr('admin.prompts.systemPrompt', language)}
                                   </span>
                                 )}
                                 <span className={`shrink-0 px-2 py-0.5 rounded text-[10px] font-medium ${catConfig.bg} ${catConfig.text}`}>
-                                  {CATEGORY_LABELS[prompt.category]}
+                                  {getCategoryLabel(prompt.category)}
                                 </span>
                               </div>
                               <p className="text-xs text-slate-500 line-clamp-1">
-                                {langLabel} • {prompt.description || t('admin.prompts.noDescription')}
+                                {langLabel} • {prompt.description || tPr('admin.prompts.noDescription', language)}
                               </p>
                             </div>
                             <button
@@ -644,7 +920,7 @@ export function AdminPrompts() {
               {showCreate ? (
                 <div className="flex-1 flex flex-col">
                   <div className="p-5 border-b border-slate-100 flex items-center justify-between">
-                    <h2 className="text-lg font-bold text-slate-800">{t('admin.prompts.createNew')}</h2>
+                    <h2 className="text-lg font-bold text-slate-800">{tPr('admin.prompts.createNew', language)}</h2>
                     <button onClick={() => setShowCreate(false)} className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors">
                       <X className="w-5 h-5 text-slate-400" />
                     </button>
@@ -652,42 +928,42 @@ export function AdminPrompts() {
                   <div className="flex-1 overflow-y-auto p-5 space-y-4">
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                        {t('admin.prompts.id')} <span className="text-red-500">*</span>
-                        <span className="text-xs text-slate-400 font-normal ml-2">({t('admin.prompts.idSlug')})</span>
+                        {tPr('admin.prompts.id', language)} <span className="text-red-500">*</span>
+                        <span className="text-xs text-slate-400 font-normal ml-2">({tPr('admin.prompts.idSlug', language)})</span>
                       </label>
                       <input
                         type="text"
                         value={newPrompt.id}
                         onChange={(e) => setNewPrompt({ ...newPrompt, id: e.target.value })}
                         className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 font-mono"
-                        placeholder={t('admin.prompts.idPlaceholder')}
+                        placeholder={tPr('admin.prompts.idPlaceholder', language)}
                       />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                        {t('admin.prompts.promptName')} <span className="text-red-500">*</span>
+                        {tPr('admin.prompts.promptName', language)} <span className="text-red-500">*</span>
                       </label>
                       <input
                         type="text"
                         value={newPrompt.name}
                         onChange={(e) => setNewPrompt({ ...newPrompt, name: e.target.value })}
                         className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-                        placeholder={t('admin.prompts.namePlaceholder')}
+                        placeholder={tPr('admin.prompts.namePlaceholder', language)}
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1.5">{t('admin.prompts.description')}</label>
+                      <label className="block text-sm font-medium text-slate-700 mb-1.5">{tPr('admin.prompts.description', language)}</label>
                       <input
                         type="text"
                         value={newPrompt.description}
                         onChange={(e) => setNewPrompt({ ...newPrompt, description: e.target.value })}
                         className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-                        placeholder={t('admin.prompts.descPlaceholder')}
+                        placeholder={tPr('admin.prompts.descPlaceholder', language)}
                       />
                     </div>
                     <div className="flex gap-3">
                       <div className="flex-1">
-                        <label className="block text-sm font-medium text-slate-700 mb-1.5">{t('admin.prompts.category')}</label>
+                        <label className="block text-sm font-medium text-slate-700 mb-1.5">{tPr('admin.prompts.category', language)}</label>
                         <select
                           value={newPrompt.category}
                           onChange={(e) => setNewPrompt({ ...newPrompt, category: e.target.value })}
@@ -699,27 +975,27 @@ export function AdminPrompts() {
                         </select>
                       </div>
                       <div className="flex-1">
-                        <label className="block text-sm font-medium text-slate-700 mb-1.5">{t('admin.prompts.language')}</label>
+                        <label className="block text-sm font-medium text-slate-700 mb-1.5">{tPr('admin.prompts.language', language)}</label>
                         <select
                           value={newPrompt.language}
                           onChange={(e) => setNewPrompt({ ...newPrompt, language: e.target.value })}
                           className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 bg-white"
                         >
                           {LANGUAGES.map((lang) => (
-                            <option key={lang.value} value={lang.value}>{lang.label}</option>
+                            <option key={lang.value} value={lang.value}>{getLanguageLabel(lang.value, language)}</option>
                           ))}
                         </select>
                       </div>
                     </div>
                     <div className="flex-1">
                       <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                        {t('admin.prompts.promptContentReq')} <span className="text-red-500">*</span>
+                        {tPr('admin.prompts.promptContentReq', language)} <span className="text-red-500">*</span>
                       </label>
                       <textarea
                         value={newPrompt.prompt}
                         onChange={(e) => setNewPrompt({ ...newPrompt, prompt: e.target.value })}
                         className="w-full h-56 px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none font-mono bg-slate-50"
-                        placeholder={t('admin.prompts.contentPlaceholder')}
+                        placeholder={tPr('admin.prompts.contentPlaceholder', language)}
                       />
                     </div>
                   </div>
@@ -728,14 +1004,14 @@ export function AdminPrompts() {
                       onClick={() => setShowCreate(false)}
                       className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl transition-colors text-sm font-medium"
                     >
-                      {t('admin.prompts.cancel')}
+                      {tPr('admin.prompts.cancel', language)}
                     </button>
                     <button
                       onClick={handleCreate}
                       disabled={saving || !newPrompt.id || !newPrompt.name || !newPrompt.prompt}
                       className="px-5 py-2 bg-primary text-white rounded-xl hover:bg-primary/90 transition-colors text-sm font-medium disabled:opacity-50"
                     >
-                      {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : t('admin.prompts.create')}
+                      {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : tPr('admin.prompts.create', language)}
                     </button>
                   </div>
                 </div>
@@ -743,14 +1019,14 @@ export function AdminPrompts() {
                 isEditing ? (
                   <div className="flex-1 flex flex-col">
                     <div className="p-5 border-b border-slate-100 flex items-center justify-between">
-                      <h2 className="text-lg font-bold text-slate-800">{t('admin.prompts.edit')}</h2>
+                      <h2 className="text-lg font-bold text-slate-800">{tPr('admin.prompts.edit', language)}</h2>
                       <button onClick={() => setIsEditing(false)} className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors">
                         <X className="w-5 h-5 text-slate-400" />
                       </button>
                     </div>
                     <div className="flex-1 overflow-y-auto p-5 space-y-4">
                       <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1.5">{t('admin.prompts.id')}</label>
+                        <label className="block text-sm font-medium text-slate-700 mb-1.5">{tPr('admin.prompts.id', language)}</label>
                         <input
                           type="text"
                           value={selectedPrompt.id}
@@ -760,7 +1036,7 @@ export function AdminPrompts() {
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                          {t('admin.prompts.promptName')} <span className="text-red-500">*</span>
+                          {tPr('admin.prompts.promptName', language)} <span className="text-red-500">*</span>
                         </label>
                         <input
                           type="text"
@@ -770,7 +1046,7 @@ export function AdminPrompts() {
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1.5">{t('admin.prompts.description')}</label>
+                        <label className="block text-sm font-medium text-slate-700 mb-1.5">{tPr('admin.prompts.description', language)}</label>
                         <input
                           type="text"
                           value={editForm.description || ''}
@@ -780,7 +1056,7 @@ export function AdminPrompts() {
                       </div>
                       <div className="flex gap-3">
                         <div className="flex-1">
-                          <label className="block text-sm font-medium text-slate-700 mb-1.5">{t('admin.prompts.category')}</label>
+                          <label className="block text-sm font-medium text-slate-700 mb-1.5">{tPr('admin.prompts.category', language)}</label>
                           <select
                             value={editForm.category || 'general'}
                             onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
@@ -792,7 +1068,7 @@ export function AdminPrompts() {
                           </select>
                         </div>
                         <div className="flex-1">
-                          <label className="block text-sm font-medium text-slate-700 mb-1.5">{t('admin.prompts.language')}</label>
+                          <label className="block text-sm font-medium text-slate-700 mb-1.5">{tPr('admin.prompts.language', language)}</label>
                           <select
                             value={editForm.language || 'vi'}
                             onChange={(e) => setEditForm({ ...editForm, language: e.target.value })}
@@ -806,7 +1082,7 @@ export function AdminPrompts() {
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                          {t('admin.prompts.promptContentReq')} <span className="text-red-500">*</span>
+                          {tPr('admin.prompts.promptContentReq', language)} <span className="text-red-500">*</span>
                         </label>
                         <textarea
                           value={editForm.prompt || ''}
@@ -820,14 +1096,14 @@ export function AdminPrompts() {
                         onClick={() => setIsEditing(false)}
                         className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl transition-colors text-sm font-medium"
                       >
-                        {t('admin.prompts.cancel')}
+                        {tPr('admin.prompts.cancel', language)}
                       </button>
                       <button
                         onClick={handleSave}
                         disabled={saving || !editForm.name || !editForm.prompt}
                         className="px-5 py-2 bg-primary text-white rounded-xl hover:bg-primary/90 transition-colors text-sm font-medium disabled:opacity-50"
                       >
-                        {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : t('admin.prompts.save')}
+                        {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : tPr('admin.prompts.save', language)}
                       </button>
                     </div>
                   </div>
@@ -839,19 +1115,19 @@ export function AdminPrompts() {
                           <h2 className="text-xl font-bold text-slate-800">{selectedPrompt.name}</h2>
                           {selectedPrompt.isSystem && (
                             <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
-                              {t('admin.prompts.systemPrompt')}
+                              {tPr('admin.prompts.systemPrompt', language)}
                             </span>
                           )}
                           <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${CATEGORY_CONFIG[selectedPrompt.category]?.bg || 'bg-slate-100'} ${CATEGORY_CONFIG[selectedPrompt.category]?.text || 'text-slate-600'}`}>
                             {CATEGORY_LABELS[selectedPrompt.category]}
                           </span>
                           <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-600">
-                            {LANGUAGES.find(l => l.value === selectedPrompt.language)?.label || selectedPrompt.language}
+                            {getLanguageLabel(selectedPrompt.language, language)}
                           </span>
                           <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${
                             selectedPrompt.isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-500'
                           }`}>
-                            {selectedPrompt.isActive ? t('admin.prompts.enabled') : t('admin.prompts.disabled')}
+                            {selectedPrompt.isActive ? tPr('admin.prompts.enabled', language) : tPr('admin.prompts.disabled', language)}
                           </span>
                         </div>
                         <div className="flex items-center gap-2">
@@ -860,16 +1136,16 @@ export function AdminPrompts() {
                             className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-primary hover:bg-primary/10 rounded-lg transition-colors"
                           >
                             <Edit2 className="w-4 h-4" />
-                            {t('admin.prompts.edit')}
+                            {tPr('admin.prompts.edit', language)}
                           </button>
                           <button
                             onClick={() => handleDelete(selectedPrompt.id)}
                             disabled={selectedPrompt.isSystem}
                             className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                            title={selectedPrompt.isSystem ? t('admin.prompts.systemCannotDelete') : t('admin.prompts.deleteConfirm')}
+                            title={selectedPrompt.isSystem ? tPr('admin.prompts.systemCannotDelete', language) : tPr('admin.prompts.deleteConfirm', language)}
                           >
                             <Trash2 className="w-4 h-4" />
-                            {t('admin.prompts.deleteConfirm')}
+                            {tPr('admin.prompts.deleteConfirm', language)}
                           </button>
                         </div>
                       </div>
@@ -877,11 +1153,11 @@ export function AdminPrompts() {
                     </div>
                     <div className="flex-1 overflow-y-auto p-5">
                       <div className="mb-5">
-                        <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">{t('admin.prompts.description')}</h3>
-                        <p className="text-slate-700">{selectedPrompt.description || t('admin.prompts.noDescription')}</p>
+                        <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">{tPr('admin.prompts.description', language)}</h3>
+                        <p className="text-slate-700">{selectedPrompt.description || tPr('admin.prompts.noDescription', language)}</p>
                       </div>
                       <div className="mb-5">
-                        <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">{t('admin.prompts.promptContent')}</h3>
+                        <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">{tPr('admin.prompts.promptContent', language)}</h3>
                         <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 max-h-64 overflow-y-auto">
                           <pre className="whitespace-pre-wrap font-mono text-sm text-slate-700 leading-relaxed">
                             {selectedPrompt.prompt}
@@ -889,8 +1165,8 @@ export function AdminPrompts() {
                         </div>
                       </div>
                       <div className="flex gap-6 text-xs text-slate-400 pt-2">
-                        <span>{t('admin.prompts.created')}: {formatDate(selectedPrompt.createdAt)}</span>
-                        <span>{t('admin.prompts.updated')}: {formatDate(selectedPrompt.updatedAt)}</span>
+                        <span>{tPr('admin.prompts.created', language)}: {formatDate(selectedPrompt.createdAt)}</span>
+                        <span>{tPr('admin.prompts.updated', language)}: {formatDate(selectedPrompt.updatedAt)}</span>
                       </div>
                     </div>
                   </div>
@@ -901,16 +1177,16 @@ export function AdminPrompts() {
                     <div className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-slate-100 flex items-center justify-center">
                       <FileText className="w-10 h-10 text-slate-400" />
                     </div>
-                    <h3 className="text-lg font-semibold text-slate-700 mb-2">{t('admin.prompts.selectPrompt')}</h3>
+                    <h3 className="text-lg font-semibold text-slate-700 mb-2">{tPr('admin.prompts.selectPrompt', language)}</h3>
                     <p className="text-sm text-slate-500 mb-4">
-                      {t('admin.prompts.selectPromptDesc')}
+                      {tPr('admin.prompts.selectPromptDesc', language)}
                     </p>
                     <button
                       onClick={() => setShowCreate(true)}
                       className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary text-white rounded-xl hover:bg-primary/90 transition-colors text-sm font-medium"
                     >
                       <Plus className="w-4 h-4" />
-                      {t('admin.prompts.createNew')}
+                      {tPr('admin.prompts.createNew', language)}
                     </button>
                   </div>
                 </div>

@@ -22,16 +22,20 @@ async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs = 1
 }
 
 async function request<T>(path: string, options: RequestInit = {}, retry = true): Promise<{ success: boolean; data?: T; error?: string }> {
-  // Pre-check: if token is locally invalid, skip the API call to avoid 401 errors
+  // Pre-check: skip API call if token is invalid (missing, expired, or malformed)
+  // to avoid unnecessary 401 errors hitting the browser console
   const tokenCheck = validateLocalToken();
-  if (!tokenCheck.valid && tokenCheck.reason !== 'missing') {
-    // Token expired or malformed — clear it
-    clearTokens();
+  if (!tokenCheck.valid) {
+    // Token missing, expired, or malformed — clear it silently and skip
+    if (tokenCheck.reason !== 'missing') {
+      clearTokens();
+    }
     return { success: false, error: 'Session expired. Please login again.' };
   }
 
   const token = getAccessToken();
   const refreshToken = localStorage.getItem('mada-refresh-token');
+  
   try {
     const res = await fetchWithTimeout(`${API_BASE}${path}`, {
       ...options,

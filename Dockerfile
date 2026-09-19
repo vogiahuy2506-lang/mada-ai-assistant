@@ -22,7 +22,7 @@ COPY --from=builder /app/node_modules ./node_modules
 # Stage 2: Production
 FROM node:22-alpine AS production
 
-RUN apk add --no-cache python3 make g++ cairo pango jpeg giflib librsvg tini wget curl sqlite3 && \
+RUN apk add --no-cache python3 make g++ cairo pango jpeg giflib librsvg tini wget curl sqlite && \
     apk add --no-cache poppler-utils  # PDF to image conversion for OCR fallback
 
 RUN addgroup -g 1001 -S nodejs && adduser -S nodejs -u 1001

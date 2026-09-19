@@ -807,7 +807,7 @@ export default function AdminSuggestedQuestions() {
                           <button
                             onClick={() => handleToggleActive(q)}
                             className={clsx(
-                              'group relative inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border-2 transition-all duration-200',
+                              'group relative inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border transition-all duration-200',
                               q.is_active === 1
                                 ? 'bg-gradient-to-r from-green-50 to-emerald-50 text-emerald-700 border-emerald-200 hover:from-green-100 hover:to-emerald-100 hover:border-emerald-300 hover:shadow-[0_0_0_2px_rgba(16,185,129,0.15)] active:scale-95'
                                 : 'bg-gradient-to-r from-gray-50 to-slate-50 text-gray-500 border-gray-200 hover:from-gray-100 hover:to-slate-100 hover:border-gray-300 hover:shadow-[0_0_0_2px_rgba(107,114,128,0.15)] active:scale-95',
@@ -815,14 +815,14 @@ export default function AdminSuggestedQuestions() {
                           >
                             {/* Animated dot indicator */}
                             <span className={clsx(
-                              'relative flex h-2 w-2',
+                              'relative flex h-1.5 w-1.5',
                             )}>
                               <span className={clsx(
                                 'animate-ping absolute inline-flex h-full w-full rounded-full opacity-75',
                                 q.is_active === 1 ? 'bg-emerald-400' : 'bg-gray-400'
                               )} />
                               <span className={clsx(
-                                'relative inline-flex rounded-full h-2 w-2',
+                                'relative inline-flex rounded-full h-1.5 w-1.5',
                                 q.is_active === 1 ? 'bg-emerald-500' : 'bg-gray-400'
                               )} />
                             </span>
@@ -830,20 +830,20 @@ export default function AdminSuggestedQuestions() {
                           </button>
                         ) : (
                           <span className={clsx(
-                            'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border-2',
+                            'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border',
                             q.is_active === 1
                               ? 'bg-gradient-to-r from-green-50 to-emerald-50 text-emerald-700 border-emerald-200'
                               : 'bg-gradient-to-r from-gray-50 to-slate-50 text-gray-500 border-gray-200',
                           )}>
                             <span className={clsx(
-                              'relative flex h-2 w-2',
+                              'relative flex h-1.5 w-1.5',
                             )}>
                               <span className={clsx(
                                 'absolute inline-flex h-full w-full rounded-full',
                                 q.is_active === 1 ? 'bg-emerald-400' : 'bg-gray-400'
                               )} />
                               <span className={clsx(
-                                'relative inline-flex rounded-full h-2 w-2',
+                                'relative inline-flex rounded-full h-1.5 w-1.5',
                                 q.is_active === 1 ? 'bg-emerald-500' : 'bg-gray-400'
                               )} />
                             </span>

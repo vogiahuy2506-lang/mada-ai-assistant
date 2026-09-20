@@ -15,7 +15,7 @@ import {
   Settings, Smartphone, Brain, Eye, Accessibility,
   Users, MoreHorizontal, Gift, Wallet, CreditCard,
   PiggyBank, Handshake, ZoomIn, PlusCircle, Monitor,
-  Ear, Edit2
+  Ear, Edit2, Globe
 } from 'lucide-react';
 import clsx from 'clsx';
 import ReactMarkdown from 'react-markdown';
@@ -825,6 +825,7 @@ export function ChatPage() {
   const [inputValue, setInputValue] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isRecording, setIsRecording] = useState(false);
+  const [showLanguageMenu, setShowLanguageMenu] = useState(false);
   const [showAttachmentMenu, setShowAttachmentMenu] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<{ fileId: string; name: string; type: string; size: number; content?: string; originalFile?: File; isLoading?: boolean; isCancelling?: boolean }[]>([]);
@@ -1128,9 +1129,29 @@ export function ChatPage() {
   // Close menus when clicking outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (attachmentMenuRef.current && !attachmentMenuRef.current.contains(e.target as Node)) {
-        setShowAttachmentMenu(false);
+      // Get all dropdown elements
+      const dropdowns = document.querySelectorAll('[data-language-dropdown], [data-attachment-dropdown]');
+      let shouldCloseLang = true;
+      let shouldCloseAttach = true;
+      
+      dropdowns.forEach(dropdown => {
+        if (dropdown.contains(e.target as Node)) {
+          if (dropdown.getAttribute('data-language-dropdown') !== null) {
+            shouldCloseLang = false;
+          }
+          if (dropdown.getAttribute('data-attachment-dropdown') !== null) {
+            shouldCloseAttach = false;
+          }
+        }
+      });
+      
+      // Also check ref elements
+      if (attachmentMenuRef.current && attachmentMenuRef.current.contains(e.target as Node)) {
+        shouldCloseAttach = false;
       }
+      
+      if (shouldCloseLang) setShowLanguageMenu(false);
+      if (shouldCloseAttach) setShowAttachmentMenu(false);
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -2721,23 +2742,50 @@ export function ChatPage() {
             {/* Divider */}
             <div className="w-px h-6 bg-outline-variant/50"></div>
             
-            {/* Language Selector - Compact Pill Style */}
-            <div className="flex items-center gap-1 p-1 bg-white/60 rounded-full border border-white/80">
-              {LANGUAGES.map((lang) => (
-                <button
-                  key={lang.code}
-                  onClick={() => setLanguage(lang.code as Language)}
-                  className={clsx(
-                    'flex items-center gap-1 px-2.5 py-1.5 rounded-full text-sm font-medium transition-all duration-200',
-                    language === lang.code
-                      ? 'bg-blue-500 text-white shadow-sm'
-                      : 'text-slate-600 hover:bg-white/80'
-                  )}
-                >
-                  <span className="text-base">{lang.flag}</span>
-                  <span className="hidden xl:inline">{lang.name}</span>
-                </button>
-              ))}
+            {/* Language Selector - Dropdown Style */}
+            <div className="relative" data-language-dropdown>
+              <button
+                onClick={() => setShowLanguageMenu(!showLanguageMenu)}
+                className="flex items-center gap-2 bg-white/60 px-3 py-2 rounded-full border border-white/80 hover:bg-white/80 transition-colors"
+              >
+                <Globe className="w-4 h-4 text-slate-600" />
+                <span className="text-base">{LANGUAGES.find(l => l.code === language)?.flag}</span>
+                <span className="text-sm font-medium text-on-background hidden lg:inline">{LANGUAGES.find(l => l.code === language)?.name}</span>
+                <ChevronDown className={clsx('w-4 h-4 text-on-surface-variant transition-transform', showLanguageMenu && 'rotate-180')} />
+              </button>
+
+              {showLanguageMenu && (
+                <div className="absolute right-0 top-full mt-2 w-64 bg-white border border-slate-200 rounded-2xl shadow-lg overflow-hidden z-50">
+                  <div className="px-4 py-3 bg-gradient-to-r from-blue-500 to-indigo-500">
+                    <p className="text-sm font-semibold text-white">{language === 'vi' ? 'Chọn ngôn ngữ' : language === 'en' ? 'Select language' : 'اختر اللغة'}</p>
+                  </div>
+                  <div className="p-2">
+                    {LANGUAGES.map((lang) => (
+                      <button
+                        key={lang.code}
+                        onClick={() => {
+                          setLanguage(lang.code as Language);
+                          setShowLanguageMenu(false);
+                        }}
+                        className={clsx(
+                          'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors',
+                          language === lang.code
+                            ? 'bg-blue-50 text-blue-700'
+                            : 'hover:bg-slate-50 text-slate-700'
+                        )}
+                      >
+                        <span className="text-xl">{lang.flag}</span>
+                        <div className="flex-1 text-left">
+                          <span className="font-medium text-sm">{lang.name}</span>
+                        </div>
+                        {language === lang.code && (
+                          <Check className="w-4 h-4 text-blue-500" />
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
           </div>
@@ -2764,24 +2812,53 @@ export function ChatPage() {
                     {description[language] || description.vi}
                   </p>
                   
-                  {/* Language Selector - Prominent Pill Style */}
+                  {/* Language Selector - Prominent Dropdown Style */}
                   <div className="mt-6 flex justify-center">
-                    <div className="inline-flex items-center gap-1 p-1.5 bg-white rounded-full border border-slate-200 shadow-sm">
-                      {LANGUAGES.map((lang) => (
-                        <button
-                          key={lang.code}
-                          onClick={() => setLanguage(lang.code as Language)}
-                          className={clsx(
-                            'flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-medium transition-all duration-200',
-                            language === lang.code
-                              ? 'bg-blue-500 text-white shadow-sm'
-                              : 'text-slate-600 hover:bg-slate-100'
-                          )}
-                        >
-                          <span className="text-base">{lang.flag}</span>
-                          <span className="hidden sm:inline">{lang.name}</span>
-                        </button>
-                      ))}
+                    <div className="relative inline-block" data-language-dropdown>
+                      <button
+                        onClick={() => setShowLanguageMenu(!showLanguageMenu)}
+                        className="flex items-center gap-3 px-5 py-3 bg-white rounded-full border-2 border-slate-200 shadow-sm hover:border-blue-400 hover:shadow-md transition-all duration-200"
+                      >
+                        <Globe className="w-5 h-5 text-blue-500" />
+                        <span className="text-xl">{LANGUAGES.find(l => l.code === language)?.flag}</span>
+                        <div className="text-left">
+                          <span className="block text-sm font-semibold text-slate-700">{LANGUAGES.find(l => l.code === language)?.name}</span>
+                        </div>
+                        <ChevronDown className={clsx('w-4 h-4 text-slate-400 transition-transform', showLanguageMenu && 'rotate-180')} />
+                      </button>
+
+                      {showLanguageMenu && (
+                        <div className="absolute left-1/2 -translate-x-1/2 top-full mt-2 w-64 bg-white border border-slate-200 rounded-2xl shadow-lg overflow-hidden z-50">
+                          <div className="px-4 py-3 bg-gradient-to-r from-blue-500 to-indigo-500">
+                            <p className="text-sm font-semibold text-white">{language === 'vi' ? 'Chọn ngôn ngữ' : language === 'en' ? 'Select language' : 'اختر اللغة'}</p>
+                          </div>
+                          <div className="p-2">
+                            {LANGUAGES.map((lang) => (
+                              <button
+                                key={lang.code}
+                                onClick={() => {
+                                  setLanguage(lang.code as Language);
+                                  setShowLanguageMenu(false);
+                                }}
+                                className={clsx(
+                                  'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors',
+                                  language === lang.code
+                                    ? 'bg-blue-50 text-blue-700'
+                                    : 'hover:bg-slate-50 text-slate-700'
+                                )}
+                              >
+                                <span className="text-xl">{lang.flag}</span>
+                                <div className="flex-1 text-left">
+                                  <span className="font-medium text-sm">{lang.name}</span>
+                                </div>
+                                {language === lang.code && (
+                                  <Check className="w-4 h-4 text-blue-500" />
+                                )}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

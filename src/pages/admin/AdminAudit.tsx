@@ -406,22 +406,6 @@ export function AdminAudit() {
           </div>
         )}
       </section>
-
-      {/* Info Card */}
-      <div className="mt-8 relative bg-gradient-to-br from-blue-50/80 to-cyan-50/40 backdrop-blur-xl rounded-2xl border-[3px] border-black shadow-[4px_4px_0px_0px_#000] p-5 flex gap-4 items-start">
-        <div className="w-12 h-12 rounded-xl bg-blue-100 border-2 border-black flex items-center justify-center shadow-[2px_2px_0px_0px_#000] shrink-0">
-          <span className="material-symbols-outlined text-blue-600" style={{ fontVariationSettings: "'FILL' 1" }}>info</span>
-        </div>
-        <div className="text-sm text-blue-900">
-          <p className="font-bold mb-1.5 flex items-center gap-2">
-            <span className="material-symbols-outlined text-base" style={{ fontVariationSettings: "'FILL' 1" }}>history_edu</span>
-            {t('admin.audit.howItWorks')}
-          </p>
-          <p className="leading-relaxed">
-            {t('admin.audit.howItWorksDesc1')} <code className="px-1.5 py-0.5 bg-white/60 rounded font-mono text-xs border border-blue-200">{t('admin.audit.codeInsert')}</code> {t('admin.audit.howItWorksDesc2')} <code className="px-1.5 py-0.5 bg-white/60 rounded font-mono text-xs border border-blue-200">{t('admin.audit.codeRoutes')}</code>.
-          </p>
-        </div>
-      </div>
     </AdminLayout>
   );
 }

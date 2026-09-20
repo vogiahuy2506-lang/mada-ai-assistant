@@ -825,7 +825,6 @@ export function ChatPage() {
   const [inputValue, setInputValue] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isRecording, setIsRecording] = useState(false);
-  const [showLanguageMenu, setShowLanguageMenu] = useState(false);
   const [showAttachmentMenu, setShowAttachmentMenu] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<{ fileId: string; name: string; type: string; size: number; content?: string; originalFile?: File; isLoading?: boolean; isCancelling?: boolean }[]>([]);
@@ -1103,10 +1102,8 @@ export function ChatPage() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
-  const languageMenuRef = useRef<HTMLDivElement>(null);
   const attachmentMenuRef = useRef<HTMLDivElement>(null);
 
-  const currentLanguage = LANGUAGES.find((l) => l.code === language) || LANGUAGES[0];
   const isEndUser = viewMode === 'end_user';
   const currentQuestions = activeCategory 
     ? getSampleQuestionsByLang(activeCategory, language)
@@ -1123,9 +1120,6 @@ export function ChatPage() {
         e.preventDefault();
         handleNewChat();
       }
-      if (e.key === 'Escape') {
-        setShowLanguageMenu(false);
-      }
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
@@ -1134,9 +1128,6 @@ export function ChatPage() {
   // Close menus when clicking outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (languageMenuRef.current && !languageMenuRef.current.contains(e.target as Node)) {
-        setShowLanguageMenu(false);
-      }
       if (attachmentMenuRef.current && !attachmentMenuRef.current.contains(e.target as Node)) {
         setShowAttachmentMenu(false);
       }
@@ -2730,47 +2721,23 @@ export function ChatPage() {
             {/* Divider */}
             <div className="w-px h-6 bg-outline-variant/50"></div>
             
-            {/* Language Selector */}
-            <div className="relative" ref={languageMenuRef}>
-              <button
-                onClick={() => {
-                  setShowLanguageMenu(!showLanguageMenu);
-                }}
-                className="flex items-center gap-2 bg-white/60 px-3 py-2 rounded-full border border-white/80 hover:bg-white/80 transition-colors"
-              >
-                <span className="text-lg">{currentLanguage.flag}</span>
-                <span className="text-sm font-medium text-on-background hidden lg:inline">{currentLanguage.name}</span>
-                <ChevronDown className={clsx('w-4 h-4 text-on-surface-variant transition-transform', showLanguageMenu && 'rotate-180')} />
-              </button>
-
-              {showLanguageMenu && (
-                <div className="absolute right-0 top-full mt-2 w-56 bg-white border border-white/80 backdrop-blur-xl rounded-2xl shadow-[4px_4px_0_0_rgba(25,27,35,1)] z-50 overflow-hidden">
-                  <div className="px-3 py-2 border-b border-outline-variant/50 bg-surface-container-low">
-                    <p className="text-sm font-semibold text-on-surface-variant">{language === 'vi' ? 'Ngôn ngữ' : language === 'en' ? 'Language' : language === 'ar' ? 'اللغة' : 'Langue'}</p>
-                  </div>
-                  <div className="p-1">
-                    {LANGUAGES.map((lang) => (
-                      <button
-                        key={lang.code}
-                        onClick={() => {
-                          setLanguage(lang.code as Language);
-                          setShowLanguageMenu(false);
-                        }}
-                        className={clsx(
-                          'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors',
-                          language === lang.code
-                            ? 'bg-primary text-white'
-                            : 'hover:bg-surface-container-low text-on-background'
-                        )}
-                      >
-                        <span className="text-lg">{lang.flag}</span>
-                        <span className="font-medium">{lang.name}</span>
-                        {language === lang.code && <Check className="w-4 h-4 ml-auto" />}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
+            {/* Language Selector - Compact Pill Style */}
+            <div className="flex items-center gap-1 p-1 bg-white/60 rounded-full border border-white/80">
+              {LANGUAGES.map((lang) => (
+                <button
+                  key={lang.code}
+                  onClick={() => setLanguage(lang.code as Language)}
+                  className={clsx(
+                    'flex items-center gap-1 px-2.5 py-1.5 rounded-full text-sm font-medium transition-all duration-200',
+                    language === lang.code
+                      ? 'bg-blue-500 text-white shadow-sm'
+                      : 'text-slate-600 hover:bg-white/80'
+                  )}
+                >
+                  <span className="text-base">{lang.flag}</span>
+                  <span className="hidden xl:inline">{lang.name}</span>
+                </button>
+              ))}
             </div>
 
           </div>
@@ -2796,6 +2763,27 @@ export function ChatPage() {
                   <p className="text-sm text-on-surface-variant">
                     {description[language] || description.vi}
                   </p>
+                  
+                  {/* Language Selector - Prominent Pill Style */}
+                  <div className="mt-6 flex justify-center">
+                    <div className="inline-flex items-center gap-1 p-1.5 bg-white rounded-full border border-slate-200 shadow-sm">
+                      {LANGUAGES.map((lang) => (
+                        <button
+                          key={lang.code}
+                          onClick={() => setLanguage(lang.code as Language)}
+                          className={clsx(
+                            'flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-medium transition-all duration-200',
+                            language === lang.code
+                              ? 'bg-blue-500 text-white shadow-sm'
+                              : 'text-slate-600 hover:bg-slate-100'
+                          )}
+                        >
+                          <span className="text-base">{lang.flag}</span>
+                          <span className="hidden sm:inline">{lang.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
 
                 {/* Section Header: Câu hỏi gợi ý */}

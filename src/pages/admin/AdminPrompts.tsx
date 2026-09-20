@@ -8,6 +8,19 @@ import { usePromptStore, useAuthStore, type SystemPromptRow, useLanguageStore } 
 import { PromptsEditor } from './PromptsEditor';
 import { ChatCustomization } from './ChatCustomization';
 
+type ATCategory = 'vision' | 'hearing' | 'mobility' | 'cognition' | 'communication' | 'daily_living' | 'education' | 'general';
+
+const CATEGORY_LABELS: Record<ATCategory, string> = {
+  hearing: 'Thính giác',
+  vision: 'Thị giác',
+  mobility: 'Vận động',
+  cognition: 'Nhận thức',
+  communication: 'Giao tiếp',
+  daily_living: 'Sinh hoạt',
+  education: 'Giáo dục',
+  general: 'Chung',
+};
+
 // Admin Prompts translations - supports all languages via useLanguageStore
 // Note: tPr is used in render so we pass language as parameter to ensure reactivity
 const tPr = (key: string, lang: string): string => {

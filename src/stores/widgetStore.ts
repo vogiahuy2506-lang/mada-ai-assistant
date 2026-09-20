@@ -74,7 +74,7 @@ const DEFAULT_WIDGET_CONFIG: WidgetConfig = {
   
   // Chat Bubble Button
   chatBubbleEnabled: true,
-  chatBubbleIcon: '💬',
+  chatBubbleIcon: 'chat',
   
   // Label Settings
   showLabel: true,
@@ -127,7 +127,16 @@ export const useWidgetSettingsStore = create<WidgetSettingsState>()(
           }
           
           if (data.success && data.data) {
-            set({ config: { ...DEFAULT_WIDGET_CONFIG, ...data.data } });
+            // Migration: normalize old emoji chatBubbleIcon to new string values
+            const config = { ...DEFAULT_WIDGET_CONFIG, ...data.data };
+            if (config.chatBubbleIcon && !['chat', 'sparkles', 'bot', 'plus'].includes(config.chatBubbleIcon)) {
+              if (config.chatBubbleIcon === '💬') config.chatBubbleIcon = 'chat';
+              else if (config.chatBubbleIcon === '✨') config.chatBubbleIcon = 'sparkles';
+              else if (config.chatBubbleIcon === '👤' || config.chatBubbleIcon === '🤖') config.chatBubbleIcon = 'bot';
+              else if (config.chatBubbleIcon === '➕') config.chatBubbleIcon = 'plus';
+              else config.chatBubbleIcon = 'chat';
+            }
+            set({ config });
           }
         } catch (e) {
           console.warn('Failed to load widget config from API:', e);

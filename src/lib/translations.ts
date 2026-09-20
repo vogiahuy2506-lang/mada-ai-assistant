@@ -1,6 +1,9 @@
 // Translation system for MADA AI Assistant
 // Supports: Vietnamese (vi), English (en), Arabic (ar), French (fr)
 
+import { useLanguageStore } from '@/stores';
+import { useMemo, useState, useEffect } from 'react';
+
 export type Language = 'vi' | 'en' | 'ar' | 'fr';
 
 export const translations = {
@@ -108,6 +111,11 @@ export const translations = {
     'common.error': 'Lỗi',
     'common.attach': 'Đính kèm',
     'common.upload': 'Upload file',
+
+    // Error Boundary
+    'error.title': 'Đã xảy ra lỗi',
+    'error.unknown': 'Lỗi không xác định',
+    'error.clearAndReload': 'Xóa dữ liệu và tải lại',
 
     // Role Landing
     'roleLanding.loading': 'Đang tải...',
@@ -1876,6 +1884,11 @@ export const translations = {
     'common.pro': 'Pro',
     'common.enterprise': 'Enterprise',
 
+    // Error Boundary
+    'error.title': 'An error occurred',
+    'error.unknown': 'Unknown error',
+    'error.clearAndReload': 'Clear data and reload',
+
     // Time
     'time.secondsAgo': 'seconds ago',
     'time.minutesAgo': 'minutes ago',
@@ -2475,6 +2488,11 @@ export const translations = {
     'common.error': 'خطأ',
     'common.attach': 'إرفاق',
     'common.upload': 'رفع ملف',
+
+    // Error Boundary
+    'error.title': 'حدث خطأ',
+    'error.unknown': 'خطأ غير معروف',
+    'error.clearAndReload': 'مسح البيانات وإعادة التحميل',
 
     // Role Landing
     'roleLanding.loading': 'جارٍ التحميل...',
@@ -5761,9 +5779,6 @@ export function t(key: TranslationKey, languageOrParams?: Language | Record<stri
 }
 
 // React hook for translations
-import { useLanguageStore } from '@/stores';
-import { useMemo, useState, useEffect } from 'react';
-
 export function useTranslation() {
   const language = useLanguageStore((state) => state.language ?? 'vi') as Language;
   

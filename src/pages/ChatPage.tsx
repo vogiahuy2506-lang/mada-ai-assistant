@@ -2812,62 +2812,14 @@ export function ChatPage() {
                     {description[language] || description.vi}
                   </p>
                   
-                  {/* Language Selector - Prominent Dropdown Style */}
-                  <div className="mt-6 flex justify-center">
-                    <div className="relative inline-block" data-language-dropdown>
-                      <button
-                        onClick={() => setShowLanguageMenu(!showLanguageMenu)}
-                        className="flex items-center gap-3 px-5 py-3 bg-white rounded-full border-2 border-slate-200 shadow-sm hover:border-blue-400 hover:shadow-md transition-all duration-200"
-                      >
-                        <Globe className="w-5 h-5 text-blue-500" />
-                        <span className="text-xl">{LANGUAGES.find(l => l.code === language)?.flag}</span>
-                        <div className="text-left">
-                          <span className="block text-sm font-semibold text-slate-700">{LANGUAGES.find(l => l.code === language)?.name}</span>
-                        </div>
-                        <ChevronDown className={clsx('w-4 h-4 text-slate-400 transition-transform', showLanguageMenu && 'rotate-180')} />
-                      </button>
-
-                      {showLanguageMenu && (
-                        <div className="absolute left-1/2 -translate-x-1/2 top-full mt-2 w-64 bg-white border border-slate-200 rounded-2xl shadow-lg overflow-hidden z-50">
-                          <div className="px-4 py-3 bg-gradient-to-r from-blue-500 to-indigo-500">
-                            <p className="text-sm font-semibold text-white">{language === 'vi' ? 'Chọn ngôn ngữ' : language === 'en' ? 'Select language' : 'اختر اللغة'}</p>
-                          </div>
-                          <div className="p-2">
-                            {LANGUAGES.map((lang) => (
-                              <button
-                                key={lang.code}
-                                onClick={() => {
-                                  setLanguage(lang.code as Language);
-                                  setShowLanguageMenu(false);
-                                }}
-                                className={clsx(
-                                  'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors',
-                                  language === lang.code
-                                    ? 'bg-blue-50 text-blue-700'
-                                    : 'hover:bg-slate-50 text-slate-700'
-                                )}
-                              >
-                                <span className="text-xl">{lang.flag}</span>
-                                <div className="flex-1 text-left">
-                                  <span className="font-medium text-sm">{lang.name}</span>
-                                </div>
-                                {language === lang.code && (
-                                  <Check className="w-4 h-4 text-blue-500" />
-                                )}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                  {/* Language Selector đã được chuyển lên Header Bar - chỉ giữ 1 chỗ duy nhất */}
                 </div>
 
                 {/* Section Header: Câu hỏi gợi ý */}
                 <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <span className="material-symbols-outlined text-blue-500 text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>forum</span>
-                    <h3 className="text-sm font-bold text-slate-600 uppercase tracking-wide">
+                  <div className="flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-blue-500 text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>forum</span>
+                    <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide">
                       {language === 'vi' ? 'Câu hỏi gợi ý' : language === 'en' ? 'Suggested Questions' : language === 'ar' ? 'الأسئلة المقترحة' : 'Questions suggérées'}
                     </h3>
                   </div>

@@ -88,7 +88,13 @@ async function request<T>(
   options: RequestInit = {},
   retry = true
 ): Promise<{ success: true; data: T } | ApiError> {
-  // Pre-check: skip API call if token is invalid (missing, expired, or malformed)
+  // Skip API call if no token at all — prevents 401 console errors for unauthenticated users
+  const token = getAccessToken();
+  if (!token) {
+    return { success: false, error: 'Not logged in' };
+  }
+
+  // Pre-check: skip API call if token is expired or malformed
   // to avoid unnecessary 401 errors hitting the console
   const tokenCheck = validateLocalToken();
   if (!tokenCheck.valid) {
@@ -103,7 +109,6 @@ async function request<T>(
     ...(options.headers as Record<string, string> || {}),
   };
 
-  const token = getAccessToken();
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
   try {

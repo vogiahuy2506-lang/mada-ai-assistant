@@ -34,8 +34,15 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
 
+      - name: Clear npm cache if corrupted
+        run: npm cache verify --prefer-online || npm cache clean --force
+
       - name: Install dependencies
-        run: npm ci || npm install
+        run: |
+          # Remove node_modules to avoid conflicts
+          rm -rf node_modules
+          # Try npm ci first, fallback to npm install with --legacy-peer-deps
+          npm ci --prefer-offline || npm install --legacy-peer-deps || npm install
 
       - name: Run ESLint
         run: npm run lint || true
@@ -63,8 +70,15 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
 
+      - name: Clear npm cache if corrupted
+        run: npm cache verify --prefer-online || npm cache clean --force
+
       - name: Install dependencies
-        run: npm ci || npm install
+        run: |
+          # Remove node_modules to avoid conflicts
+          rm -rf node_modules
+          # Try npm ci first, fallback to npm install with --legacy-peer-deps
+          npm ci --prefer-offline || npm install --legacy-peer-deps || npm install
 
       - name: Run unit tests
         run: |
@@ -95,8 +109,15 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
 
+      - name: Clear npm cache if corrupted
+        run: npm cache verify --prefer-online || npm cache clean --force
+
       - name: Install dependencies
-        run: npm ci || npm install
+        run: |
+          # Remove node_modules to avoid conflicts
+          rm -rf node_modules
+          # Try npm ci first, fallback to npm install with --legacy-peer-deps
+          npm ci --prefer-offline || npm install --legacy-peer-deps || npm install
 
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium || echo "Playwright install skipped"
@@ -131,8 +152,15 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
 
+      - name: Clear npm cache if corrupted
+        run: npm cache verify --prefer-online || npm cache clean --force
+
       - name: Install dependencies
-        run: npm ci || npm install
+        run: |
+          # Remove node_modules to avoid conflicts
+          rm -rf node_modules
+          # Try npm ci first, fallback to npm install with --legacy-peer-deps
+          npm ci --prefer-offline || npm install --legacy-peer-deps || npm install
 
       - name: Build server
         run: npm run build:server || true

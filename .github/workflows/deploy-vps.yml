@@ -69,16 +69,16 @@ jobs:
         run: npm ci || npm install
 
       - name: Lint
-        run: npm run lint || echo "Lint completed with warnings"
+        run: npm run lint || true
 
       - name: Type check
-        run: npx tsc --noEmit || echo "Type check complete"
+        run: npx tsc --noEmit || true
 
       - name: Build server bundle
-        run: npm run build:server || echo "Server build skipped"
+        run: npm run build:server || true
 
       - name: Build frontend
-        run: npm run build:client || npm run build || echo "Build completed"
+        run: npm run build:client || npm run build || true
 
   # ===========================================
   # Build & Push Docker image to GHCR

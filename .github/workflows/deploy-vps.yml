@@ -210,27 +210,22 @@ jobs:
             # Start with PM2
             echo "=== Starting with PM2 ==="
             
-            # Find or install PM2
-            PM2_PATH=""
-            for pm2_path in "/usr/local/bin/pm2" "/usr/bin/pm2" "$HOME/.nvm/versions/node/*/bin/pm2"; do
-              if [ -f "$pm2_path" ]; then
-                PM2_PATH="$pm2_path"
-                break
-              fi
-            done
-            
-            # Also search in node_modules
-            if [ -z "$PM2_PATH" ]; then
-              FOUND_PM2=$(find /usr -name "pm2" -type f 2>/dev/null | head -1)
-              [ -n "$FOUND_PM2" ] && PM2_PATH="$FOUND_PM2"
+            # Check if PM2 is installed locally in node_modules
+            if [ -f "$APP_DIR/node_modules/.bin/pm2" ]; then
+              PM2_PATH="$APP_DIR/node_modules/.bin/pm2"
+              echo "Found PM2 locally at: $PM2_PATH"
             fi
             
+            # If not found locally, try global installation
             if [ -z "$PM2_PATH" ] || [ ! -f "$PM2_PATH" ]; then
-              echo "Installing PM2 globally..."
-              sudo $NPM_PATH install -g pm2
-              # PM2 is usually installed in /usr/local/bin or /usr/bin after global install
-              PM2_PATH=$(find /usr -name "pm2" -type f 2>/dev/null | head -1)
-              if [ -z "$PM2_PATH" ]; then
+              # Install PM2 globally in user's home directory to avoid permission issues
+              echo "Installing PM2 in home directory..."
+              export NPM_CONFIG_PREFIX="$HOME/.npm-global"
+              export PATH="$HOME/.npm-global/bin:$PATH"
+              mkdir -p "$HOME/.npm-global"
+              $NPM_PATH install -g pm2
+              PM2_PATH="$HOME/.npm-global/bin/pm2"
+              if [ -z "$PM2_PATH" ] || [ ! -f "$PM2_PATH" ]; then
                 echo "ERROR: Could not find PM2 after install"
                 exit 1
               fi

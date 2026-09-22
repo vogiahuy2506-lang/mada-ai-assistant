@@ -4,7 +4,6 @@ import { useAuthStore } from '@/stores';
 
 // Simple text - no i18n
 const LOADING_TEXT = 'Đang tải...';
-const LOADING_TEXT_EN = 'Loading...';
 
 export function RoleLanding() {
   const user = useAuthStore((s) => s.user);

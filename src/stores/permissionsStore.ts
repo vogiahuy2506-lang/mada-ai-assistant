@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
 import { getAccessToken, validateLocalToken, clearTokens } from '@/lib/api';
 
 // Permission types

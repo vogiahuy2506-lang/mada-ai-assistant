@@ -75,7 +75,7 @@ export function RoleGuard({ children, requiredRole }: RoleGuardProps) {
           <span className="material-symbols-outlined text-7xl text-error mb-4">block</span>
           <h1 className="font-headline-md text-on-surface mb-2">{t('roleGuard.noAccess', language)}</h1>
           <p className="font-label-md text-on-surface-variant">
-            {t('roleGuard.requires', language, { requiredRole, currentRole: user.role })}
+            {t('roleGuard.requires', language).replace('{requiredRole}', requiredRole).replace('{currentRole}', user.role)}
           </p>
           <a
             href="/"

@@ -828,7 +828,7 @@ export function AdminPrompts() {
                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                 }`}
               >
-                {CATEGORY_LABELS[cat]}
+                {CATEGORY_LABELS[cat as ATCategory]}
               </button>
             ))}
           </div>
@@ -983,7 +983,7 @@ export function AdminPrompts() {
                           className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 bg-white"
                         >
                           {CATEGORIES.map((cat) => (
-                            <option key={cat} value={cat}>{CATEGORY_LABELS[cat]}</option>
+                            <option key={cat} value={cat}>{CATEGORY_LABELS[cat as ATCategory]}</option>
                           ))}
                         </select>
                       </div>
@@ -1076,7 +1076,7 @@ export function AdminPrompts() {
                             className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 bg-white"
                           >
                             {CATEGORIES.map((cat) => (
-                              <option key={cat} value={cat}>{CATEGORY_LABELS[cat]}</option>
+                              <option key={cat} value={cat}>{CATEGORY_LABELS[cat as ATCategory]}</option>
                             ))}
                           </select>
                         </div>
@@ -1132,7 +1132,7 @@ export function AdminPrompts() {
                             </span>
                           )}
                           <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${CATEGORY_CONFIG[selectedPrompt.category]?.bg || 'bg-slate-100'} ${CATEGORY_CONFIG[selectedPrompt.category]?.text || 'text-slate-600'}`}>
-                            {CATEGORY_LABELS[selectedPrompt.category]}
+                            {CATEGORY_LABELS[selectedPrompt.category as ATCategory]}
                           </span>
                           <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-600">
                             {getLanguageLabel(selectedPrompt.language, language)}

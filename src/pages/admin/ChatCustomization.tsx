@@ -6,7 +6,7 @@ import { EmotionCustomization } from './EmotionCustomization';
 import { PromptTemplates } from './PromptTemplates';
 
 // Chat Customization translations - hardcoded Vietnamese
-const tChat = (key: string): string => {
+const tChat = (key: string, params?: Record<string, string | number>): string => {
   const translations: Record<string, string> = {
     'admin.chatCustomization.error': 'Có lỗi xảy ra',
     'admin.chatCustomization.loading': 'Đang tải...',
@@ -44,7 +44,13 @@ const tChat = (key: string): string => {
     'admin.chatCustomization.promptTemplatesHint': 'Sử dụng mẫu có sẵn',
     'admin.chatCustomization.ai.disclaimer': 'Các thay đổi sẽ có hiệu lực ngay lập tức cho tất cả người dùng.',
   };
-  return translations[key] || key;
+  let text = translations[key] || key;
+  if (params) {
+    Object.entries(params).forEach(([k, v]) => {
+      text = text.replace(new RegExp(`\\{${k}\\}`, 'g'), String(v));
+    });
+  }
+  return text;
 };
 
 const LANGUAGES: { key: Language; label: string }[] = [

@@ -23,7 +23,8 @@ interface PromptsEditorProps {
 const t = (key: string, lang: Language): string => {
   // First try promptsEditor.* keys, then fall back to prompt.* keys
   const promptsEditorKey = 'promptsEditor.' + key.split('.')[1];
-  return translations[lang]?.[promptsEditorKey] || translations[lang]?.[key] || translations.vi?.[promptsEditorKey] || translations.vi?.[key] || key;
+  const typedTranslations = translations as Record<Language, Record<string, string>>;
+  return typedTranslations[lang]?.[promptsEditorKey] || typedTranslations[lang]?.[key] || typedTranslations.vi?.[promptsEditorKey] || typedTranslations.vi?.[key] || key;
 };
 
 export function PromptsEditor({ onClose }: PromptsEditorProps) {

@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { AdminLayout } from './AdminLayout';
 import { adminApi } from './adminApi';
 import { useLanguageStore } from '@/stores';
-import { translations, t } from '@/lib/translations';
+import { translations as _, t } from '@/lib/translations';
 import type { Language } from '@/types';
 import {
   Play, RefreshCw, Database, CheckCircle, AlertCircle,
@@ -97,7 +97,13 @@ export function AdminScraper() {
 
   // Translation helper function
   const tr = useCallback((key: string, params?: Record<string, string | number>): string => {
-    return t(key as any, language, params);
+    let text = t(key as any, language);
+    if (params) {
+      Object.entries(params).forEach(([k, v]) => {
+        text = text.replace(new RegExp(`\\{${k}\\}`, 'g'), String(v));
+      });
+    }
+    return text;
   }, [language]);
 
   const showMsg = (type: 'success' | 'error' | 'info', text: string) => {

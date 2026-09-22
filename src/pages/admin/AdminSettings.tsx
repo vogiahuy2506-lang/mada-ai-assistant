@@ -22,7 +22,8 @@ export function AdminSettings() {
 
   // Get current language and translations (reactive)
   const language = useLanguageStore((s) => s.language ?? 'vi') as Language;
-  const lang = translations[language] || translations.vi;
+  const typedTranslations = translations as Record<Language, Record<string, string>>;
+  const lang = typedTranslations[language] || typedTranslations.vi;
   
   // Get current user role
   const user = useAuthStore((s) => s.user);
@@ -36,9 +37,6 @@ export function AdminSettings() {
     maxFileSizeMB,
     setAnonymousLimit,
     setDefaultPlanLimit,
-    setMaxFilesPerSession,
-    setMaxFilesTotal,
-    setMaxFileSizeMB,
     loadFromBackend,
     setAllSettings,
   } = useSystemSettingsStore();
@@ -837,7 +835,7 @@ export function AdminSettings() {
               <div>
                 <h3 className="text-lg font-black text-on-surface">{lang['admin.settings.system.dbTitle']}</h3>
                 <p className="text-sm text-on-surface-variant mt-1">
-                  {lang['admin.settings.system.dbDescription'].replace('{table}', <code className="text-xs bg-surface-variant px-1.5 py-0.5 rounded">system_settings</code>)}
+                  Database settings for system configuration. Table: <code className="text-xs bg-surface-variant px-1.5 py-0.5 rounded">system_settings</code>
                 </p>
               </div>
               {!isSuperAdmin && (

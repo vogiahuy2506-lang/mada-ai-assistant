@@ -10,7 +10,6 @@ import {
   SAFETY_RULES,
   RESPONSE_FORMAT,
 } from './prompts/systemPrompts';
-import { SAMPLE_QUESTIONS } from './seedQuestions';
 
 const DATA_DIR = path.join(process.cwd(), 'data');
 if (!fs.existsSync(DATA_DIR)) {
@@ -477,51 +476,6 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_sq_language ON suggested_questions(language);
   CREATE INDEX IF NOT EXISTS idx_sq_active ON suggested_questions(is_active);
 `);
-
-// Seed default suggested questions from SAMPLE_QUESTIONS hardcoded data
-function seedSuggestedQuestions() {
-  const existing = db.prepare('SELECT COUNT(*) as count FROM suggested_questions').get() as { count: number };
-  if (existing.count > 0) {
-    console.log(`📋 suggested_questions already has ${existing.count} rows — skipping seed`);
-    return;
-  }
-
-  // SAMPLE_QUESTIONS is imported at top level
-  const now = new Date().toISOString();
-  const stmt = db.prepare(`
-    INSERT INTO suggested_questions (id, category, view_mode, language, question, sort_order, is_active, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)
-  `);
-
-  let count = 0;
-  for (const [category, viewModes] of Object.entries(SAMPLE_QUESTIONS)) {
-    for (const [viewMode, languages] of Object.entries(viewModes as Record<string, Record<string, string[]>>)) {
-      for (const [language, questions] of Object.entries(languages)) {
-        questions.forEach((q: string, idx: number) => {
-          stmt.run(
-            `sq_${category}_${viewMode}_${language}_${idx + 1}`,
-            category,
-            viewMode,
-            language,
-            q,
-            idx,
-            now,
-            now
-          );
-          count++;
-        });
-      }
-    }
-  }
-  console.log(`🌱 Seeded ${count} suggested questions from SAMPLE_QUESTIONS`);
-}
-
-// Seed disabled - only user-created questions allowed
-// try {
-//   seedSuggestedQuestions();
-// } catch (e) {
-//   console.log('📋 Seed suggested_questions skipped (SAMPLE_QUESTIONS import failed, will use empty table)');
-// }
 
 // ============== ADMIN PROMPTS SCHEMA ==============
 

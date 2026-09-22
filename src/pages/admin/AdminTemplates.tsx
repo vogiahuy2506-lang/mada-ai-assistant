@@ -279,7 +279,6 @@ const LANGUAGES = (t: (key: string) => string) => [
 ];
 
 export function AdminTemplates() {
-  const { t: tAdminTemplate } = { t: tT };
   const categories = CATEGORIES(tT);
   const languages = LANGUAGES(tT);
   const [templates, setTemplates] = useState<PromptTemplate[]>([]);

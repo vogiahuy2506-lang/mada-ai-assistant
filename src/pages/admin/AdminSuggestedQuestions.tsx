@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { AdminLayout } from './AdminLayout';
 import { adminApi } from './adminApi';
 import { useAuthStore, useLanguageStore } from '@/stores';
@@ -155,12 +155,6 @@ export default function AdminSuggestedQuestions() {
       is_active: true,
     });
     setEditingId(null);
-  };
-
-  const openCreateForm = () => {
-    if (!isSuperAdmin) return;
-    resetForm();
-    setShowForm(true);
   };
 
   const openEditForm = (q: SuggestedQuestion) => {

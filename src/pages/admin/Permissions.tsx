@@ -7,7 +7,15 @@
 import { useEffect, useState, useCallback } from 'react';
 import { AdminLayout } from './AdminLayout';
 import { getAccessToken, getRefreshToken, type UserPermissions } from '../../lib/api';
-import { useAuthStore, useLanguageStore, type Permission } from '@/stores';
+import { useAuthStore, useLanguageStore } from '@/stores';
+
+// Permission object type returned by API
+interface PermissionInfo {
+  key: string;
+  label: string;
+  group?: string;
+}
+
 import clsx from 'clsx';
 import {
   Shield, ShieldCheck, Key, Users, Package, 
@@ -86,7 +94,7 @@ export default function PermissionsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('users');
-  const [permissions, setPermissions] = useState<Permission[]>([]);
+  const [permissions, setPermissions] = useState<PermissionInfo[]>([]);
   const [groups, setGroups] = useState<{ key: string; permissions: string[] }[]>([]);
   const [rolePermissions, setRolePermissions] = useState<Record<string, string[]>>({});
   const [planPermissions, setPlanPermissions] = useState<Record<string, string[]>>({});

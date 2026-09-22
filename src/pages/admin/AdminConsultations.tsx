@@ -375,7 +375,7 @@ export function AdminConsultations() {
                   
                   <div className="flex items-center gap-3 flex-wrap">
                     <span className="px-3 py-1.5 rounded-full text-xs font-bold uppercase border-2 bg-gray-50 border-black">
-                      {new Date(request.created_at).toLocaleDateString(language === 'ar' ? 'ar-SA' : language === 'fr' ? 'fr-FR' : language === 'en' ? 'en-US' : 'vi-VN', {
+                      {new Date(request.created_at).toLocaleDateString({'ar': 'ar-SA', 'fr': 'fr-FR', 'en': 'en-US', 'vi': 'vi-VN'}[language] ?? 'vi-VN', {
                         day: '2-digit',
                         month: '2-digit',
                         year: 'numeric',
@@ -467,7 +467,7 @@ export function AdminConsultations() {
                 <div className="bg-white/60 backdrop-blur-xl rounded-2xl p-4 border border-slate-200 shadow-sm">
                   <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">{tC('admin.consult.dateSent')}</label>
                   <p className="font-bold text-on-surface">
-                    {new Date(selectedRequest.created_at).toLocaleString(language === 'ar' ? 'ar-SA' : language === 'fr' ? 'fr-FR' : language === 'en' ? 'en-US' : 'vi-VN', {
+                    {new Date(selectedRequest.created_at).toLocaleString({'ar': 'ar-SA', 'fr': 'fr-FR', 'en': 'en-US', 'vi': 'vi-VN'}[language] ?? 'vi-VN', {
                       day: '2-digit',
                       month: '2-digit',
                       year: 'numeric',

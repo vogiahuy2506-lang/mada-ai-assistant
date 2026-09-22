@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   Upload, Image, FileText, Video, Music, File,
   Save, RefreshCw, CheckCircle, XCircle, Info,
-  Loader2, Shield, Zap, Database, Users, Globe
+  Loader2, Shield, Zap, Database, Users
 } from 'lucide-react';
 import { AdminLayout } from './AdminLayout';
 import { getAccessToken } from '@/lib/api';

@@ -18,9 +18,6 @@ import { getImageUrl } from '../../lib/imageProxy';
 import { Sparkles, ExternalLink, CheckCircle2, AlertTriangle, Loader2, Save } from 'lucide-react';
 import type { Language } from '@/types';
 
-// ============== TYPES ==============
-type TranslationKey = 'vi' | 'en' | 'ar' | 'fr';
-
 // ============== TRANSLATIONS ==============
 const translations: Record<string, Record<Language, string>> = {
   // Card trigger

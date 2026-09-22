@@ -695,7 +695,7 @@ export default function AdminUsers() {
     for (let i = 0; i < 9; i++) {
       pwd += all.charAt(Math.floor(Math.random() * all.length));
     }
-    return pwd.splitU('').sort(() => Math.random() - 0.5).join('');
+    return pwd.split('').sort(() => Math.random() - 0.5).join('');
   };
 
   // ─── Create user ───
@@ -777,7 +777,7 @@ export default function AdminUsers() {
       setTimeout(() => setCopiedField(null), 2000);
     } catch {
       // Fallback
-      const ta = document.createElementU('textarea');
+      const ta = document.createElement('textarea');
       ta.value = text;
       document.body.appendChild(ta);
       ta.select();

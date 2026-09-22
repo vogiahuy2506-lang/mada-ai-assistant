@@ -349,7 +349,7 @@ export function AdminAgents() {
   const { user } = useAuthStore();
   const isSuperAdmin = user?.role === 'super_admin';
   const isReadOnly = !isSuperAdmin;
-  const language: Language = 'vi';
+  const language: Language = 'vi' as Language;
   const loadAgentsForChat = useAgentStore((s) => s.loadAgents);
   const removeAgentForChat = useAgentStore((s) => s.removeAgent);
 
@@ -1585,7 +1585,7 @@ export function AdminAgents() {
                   )}
                   {editingAgent?.last_crawl_at && (
                     <p className="text-[10px] text-gray-500">
-                      {tAgent('agent.lastCrawl', language)}: {new Date(editingAgent.last_crawl_at).toLocaleString(language === 'en' ? 'en-US' : language === 'fr' ? 'fr-FR' : language === 'ar' ? 'ar-SA' : 'vi-VN')}
+                      {tAgent('agent.lastCrawl', language)}: {new Date(editingAgent.last_crawl_at).toLocaleString({'en': 'en-US', 'fr': 'fr-FR', 'ar': 'ar-SA', 'vi': 'vi-VN'}[language] ?? 'vi-VN')}
                       {editingAgent.last_crawl_status && ` · ${editingAgent.last_crawl_status}`}
                       {editingAgent.last_crawl_count != null && ` · ${editingAgent.last_crawl_count} ${tAgent('agent.documents', language)}`}
                     </p>
@@ -1609,7 +1609,7 @@ export function AdminAgents() {
                           : 'bg-white text-on-surface hover:bg-gray-50'
                       )}
                     >
-                      {language === 'en' ? cap.labelEn : cap.label}
+                      {cap.label}
                     </button>
                   ))}
                 </div>
@@ -2070,7 +2070,7 @@ export function AdminAgents() {
                         </span>
                         {agent.last_crawl_at && (
                           <span className="text-[9px] text-gray-500">
-                            {new Date(agent.last_crawl_at).toLocaleDateString(language === 'en' ? 'en-US' : language === 'fr' ? 'fr-FR' : language === 'ar' ? 'ar-SA' : 'vi-VN')}
+                            {new Date(agent.last_crawl_at).toLocaleDateString({'en': 'en-US', 'fr': 'fr-FR', 'ar': 'ar-SA', 'vi': 'vi-VN'}[language] ?? 'vi-VN')}
                           </span>
                         )}
                       </div>

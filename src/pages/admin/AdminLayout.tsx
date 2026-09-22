@@ -241,10 +241,6 @@ export function AdminLayout({
   const { language, setLanguage } = useLanguageStore();
   const isUserSuperAdmin = isSuperAdmin();
 
-  const toggleLanguage = () => {
-    setLanguage(language === 'vi' ? 'en' : 'vi');
-  };
-
   // Get the title
   const getCurrentTitle = () => {
     if (title) return title;

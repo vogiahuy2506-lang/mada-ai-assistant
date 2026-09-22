@@ -53,7 +53,7 @@ interface EmbedWidgetProps {
 
 // Get language name translations based on current language
 const getLanguageName = (code: Language, currentLang: Language): string => {
-  const names: Record<Language, string> = {
+  const names: Record<Language, Record<Language, string>> = {
     vi: {
       vi: 'Tiếng Việt',
       en: 'English',

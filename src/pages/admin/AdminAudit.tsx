@@ -47,7 +47,8 @@ export function AdminAudit() {
   // Translation helper function
   const t = (key: string): string => {
     const lang = language as Language;
-    return translations[lang]?.[key] || translations['vi'][key] || key;
+    const typedTranslations = translations as Record<Language, Record<string, string>>;
+    return typedTranslations[lang]?.[key] || typedTranslations.vi[key] || key;
   };
 
   const user = useAuthStore((s) => s.user);

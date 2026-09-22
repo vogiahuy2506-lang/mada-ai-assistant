@@ -3,11 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { useWidgetSettingsStore, useLanguageStore, useAuthStore } from '@/stores';
 import clsx from 'clsx';
 import {
-  CheckCircle, Loader2, AlertCircle, Copy, Code, Globe, X,
-  Send, Bot as BotIcon, Eye, EyeOff, Settings, Code2, ArrowLeft,
-  Plus, Trash2, Edit3, ChevronDown, ChevronUp, HelpCircle
+  CheckCircle, Loader2, AlertCircle, Copy, Globe, X,
+  Send, Bot as BotIcon, Eye, Settings, Code2, ArrowLeft,
+  ChevronDown
 } from 'lucide-react';
-import { adminApi } from '@/pages/admin/adminApi';
 
 // Widget translations
 const tW = (key: string): string => {
@@ -309,7 +308,7 @@ function LauncherIcon({ type, className = "w-5 h-5" }: { type: string; className
     case 'sparkles':
       return (
         <svg className={className} fill="currentColor" viewBox="0 0 20 20">
-          <path fillRule="evenodd" d="M5 2a1 1 0 011 1v1h1a1 1 0 010 2H6v1a1 1 0 01-2 0V6H3a1 1 0 010-2h1V3a1 1 0 011-1zm0 10a1 1 0 011 1v1h1a1 1 0 110 2H6v1a1 1 0 11-2 0v-1H3a1 1 0 110-2h1v-1a1 1 0 011-1zM12 2a1 1 0 01.967.744L14.146 7.2 17.5 9.134a1 1 0 010 1.732l-3.354 1.935-1.18 4.455a1 1 0 01-1.933 0L9.854 12.8 6.5 10.866a1 1 0 010-1.732l3.354-1.935 1.18-4.455A1 1 0 0112 2z" fillRule="evenodd" />
+          <path fillRule="evenodd" d="M5 2a1 1 0 011 1v1h1a1 1 0 010 2H6v1a1 1 0 01-2 0V6H3a1 1 0 010-2h1V3a1 1 0 011-1zm0 10a1 1 0 011 1v1h1a1 1 0 110 2H6v1a1 1 0 11-2 0v-1H3a1 1 0 110-2h1v-1a1 1 0 011-1zM12 2a1 1 0 01.967.744L14.146 7.2 17.5 9.134a1 1 0 010 1.732l-3.354 1.935-1.18 4.455a1 1 0 01-1.933 0L9.854 12.8 6.5 10.866a1 1 0 010-1.732l3.354-1.935 1.18-4.455A1 1 0 0112 2z" />
         </svg>
       );
     case 'bot':
@@ -431,7 +430,7 @@ function LiveWidgetPreview({ config, initialChatOpen = false, onClose }: { confi
                     <div className="flex items-center gap-1.5">
                       <span className="font-bold text-sm text-white">{getBotName()}</span>
                       <svg className="w-3.5 h-3.5 text-cyan-200" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" fillRule="evenodd" />
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" />
                       </svg>
                     </div>
                     <p className="text-[11px] text-white/80">{tW('admin.widget.aiReady')}</p>
@@ -847,7 +846,7 @@ export function WidgetCustomization({ userRole: propUserRole }: Omit<WidgetCusto
                     />
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 inline-flex items-center p-1 rounded-full bg-cyan-50 text-cyan-600">
                       <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" fillRule="evenodd" />
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" />
                       </svg>
                     </span>
                   </div>
@@ -1264,7 +1263,7 @@ export function WidgetCustomization({ userRole: propUserRole }: Omit<WidgetCusto
                         <div className="flex items-center gap-1.5">
                           <span className="font-bold text-sm text-white">{config.botName || 'MADA AI'}</span>
                           <svg className="w-3.5 h-3.5 text-cyan-200" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" fillRule="evenodd" />
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" />
                           </svg>
                         </div>
                         <p className="text-[11px] text-white/80">{tW('admin.widget.aiReady')}</p>

@@ -2,7 +2,7 @@
 // Supports: Vietnamese (vi), English (en), Arabic (ar), French (fr)
 
 import { useLanguageStore } from '@/stores';
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo } from 'react';
 
 export type Language = 'vi' | 'en' | 'ar' | 'fr';
 
@@ -1854,17 +1854,18 @@ export const translations = {
 
 // Translation helper function - exported for use in components
 export function t(key: string, language?: Language): string {
-  const lang = language || useLanguageStore.getState().language || 'vi';
-  return translations[lang]?.[key] || translations.vi[key] || key;
+  const lang = (language || useLanguageStore.getState().language || 'vi') as Language;
+  return (translations as Record<Language, Record<string, string>>)[lang]?.[key] || (translations as Record<Language, Record<string, string>>).vi[key] || key;
 }
 
 // Hook for components that need reactive translations
 export function useTranslation() {
   const language = useLanguageStore((s) => s.language ?? 'vi') as Language;
+  const typedTranslations = translations as Record<Language, Record<string, string>>;
   
   const t = useMemo(() => {
     return (key: string) => {
-      return translations[language]?.[key] || translations.vi[key] || key;
+      return typedTranslations[language]?.[key] || typedTranslations.vi[key] || key;
     };
   }, [language]);
   

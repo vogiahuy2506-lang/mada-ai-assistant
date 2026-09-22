@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { User, UserRole, UserPlan, ChatMessage, Language, Notification, ViewMode } from '@/types';
+import type { User, UserRole, UserPlan, ChatMessage, Notification, ViewMode } from '@/types';
 import { authApi, setTokens, clearTokens, getAccessToken, type ApiUser } from '@/lib/api';
 import { usePermissionsStore } from './permissionsStore';
 

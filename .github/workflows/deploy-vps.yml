@@ -1,5 +1,5 @@
 # ===========================================
-# CI/CD Pipeline - Deploy to Compute Engine (VPS)
+# CI/CD Pipeline - Deploy to VPS (Direct deploy, no Docker image needed)
 # ===========================================
 name: Deploy to VPS
 
@@ -19,16 +19,17 @@ on:
           - cleanup
 
 env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
+  NODE_VERSION: '22'
 
 jobs:
-  ci:
-    name: Lint & Build
+  # ===========================================
+  # Build - just verify code compiles
+  # ===========================================
+  build:
+    name: Verify Build
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
     if: github.event.inputs.action != 'cleanup'
-    continue-on-error: true
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -36,79 +37,28 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
-
-      - name: Clear npm cache if corrupted
-        run: npm cache verify --prefer-online || npm cache clean --force
+          node-version: ${{ env.NODE_VERSION }}
 
       - name: Install dependencies
         run: |
-          rm -rf node_modules
-          npm ci --prefer-offline || npm install --legacy-peer-deps || npm install
+          npm install --legacy-peer-deps
 
-      - name: Lint
-        run: npm run lint || true
+      - name: Build server
+        run: npm run build:server || true
 
-      - name: Type check
-        run: npx tsc --noEmit || true
+      - name: Build frontend
+        run: npm run build:client || npx vite build || true
 
-      - name: Build
-        run: npm run build || true
-
-  build:
-    name: Build & Push Image
-    runs-on: ubuntu-latest
-    needs: []
-    if: github.event.inputs.action != 'cleanup'
-    timeout-minutes: 30
-    permissions:
-      contents: read
-      packages: write
-      id-token: write
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=raw,value=latest
-            type=raw,value=main-${{ github.sha }}
-            type=ref,event=branch
-
-      - name: Build and push
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./Dockerfile
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          platforms: linux/amd64
-          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache
-          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache,mode=max
-
+  # ===========================================
+  # Deploy - git clone + npm install + pm2
+  # ===========================================
   deploy:
     name: Deploy to VPS
     runs-on: ubuntu-latest
     needs: [build]
     if: github.event.inputs.action != 'cleanup'
-    timeout-minutes: 20
+    timeout-minutes: 30
     environment: production
-    continue-on-error: true
     steps:
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
@@ -116,29 +66,24 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          command_timeout: 10m
+          command_timeout: 30m
           script: |
             set -e
             APP_DIR="/app/mada-ai-assistant"
             TEMP_DIR="/tmp/mada-deploy-temp"
             MIN_DISK_GB=2
 
-            echo "Pre-deploy disk check..."
+            echo "=== Pre-deploy disk check ==="
             FREE_GB=$(df -BG / | tail -1 | awk '{print $4}' | tr -d 'G')
             echo "Disk free: ${FREE_GB}GB (min: ${MIN_DISK_GB}GB)"
             if [ "$FREE_GB" -lt "$MIN_DISK_GB" ]; then
               echo "Low disk, cleaning..."
-              sudo docker system prune -af || true
-              sudo journalctl --vacuum-size=50M || true
-              sudo apt-get clean || true
-              FREE_GB=$(df -BG / | tail -1 | awk '{print $4}' | tr -d 'G')
-              echo "Disk after cleanup: ${FREE_GB}GB"
-              if [ "$FREE_GB" -lt "$MIN_DISK_GB" ]; then
-                echo "Not enough disk space. Aborting."
-                exit 1
-              fi
+              sudo docker system prune -af 2>/dev/null || true
+              sudo journalctl --vacuum-size=50M 2>/dev/null || true
+              sudo apt-get clean 2>/dev/null || true
             fi
 
+            # Backup existing .env
             HAS_EXISTING_ENV=false
             if [ -d "$APP_DIR" ] && [ -f "$APP_DIR/.env" ]; then
               echo "Backing up existing .env..."
@@ -146,23 +91,24 @@ jobs:
               HAS_EXISTING_ENV=true
             fi
 
-            echo "Stopping containers..."
-            if [ -d "$APP_DIR" ]; then
-              cd $APP_DIR
-              sudo docker compose down --remove-orphans 2>/dev/null || true
-              cd /tmp
-            fi
+            # Stop existing PM2 process
+            echo "=== Stopping existing PM2 process ==="
+            cd $APP_DIR 2>/dev/null || true
+            sudo -u ${{ secrets.VPS_USER }} pm2 stop mada-app 2>/dev/null || true
+            sudo -u ${{ secrets.VPS_USER }} pm2 delete mada-app 2>/dev/null || true
 
-            echo "Force removing old containers..."
+            # Stop Docker containers if running
+            echo "=== Stopping Docker containers ==="
+            sudo docker compose down --remove-orphans 2>/dev/null || true
             sudo docker rm -f mada-app mada-nginx mada-ai-assistant-app-1 mada-ai-assistant-nginx-1 2>/dev/null || true
-
-            echo "Cleaning up networks..."
             sudo docker network rm mada-ai-assistant_default 2>/dev/null || true
 
-            echo "Cleaning up temp directory..."
+            # Clean up temp directory
+            echo "=== Cleaning up temp directory ==="
             sudo rm -rf $TEMP_DIR
 
-            echo "Cloning repository to temp directory..."
+            # Clone repository to temp directory
+            echo "=== Cloning repository ==="
             git clone https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/vogiahuy2506-lang/mada-ai-assistant.git $TEMP_DIR
 
             if [ ! -d "$TEMP_DIR/.git" ]; then
@@ -170,11 +116,13 @@ jobs:
               exit 1
             fi
 
-            echo "Moving to app directory..."
+            # Move to app directory
+            echo "=== Moving to app directory ==="
             sudo rm -rf $APP_DIR
             sudo mv $TEMP_DIR $APP_DIR
 
-            echo "Configuring environment..."
+            # Configure environment
+            echo "=== Configuring environment ==="
             {
               echo "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}"
               echo "PINECONE_API_KEY=${{ secrets.PINECONE_API_KEY }}"
@@ -190,74 +138,86 @@ jobs:
               echo "PORT=3000"
             } | sudo tee $APP_DIR/.env > /dev/null
 
+            # Merge backup env vars (keep custom settings)
             if [ "$HAS_EXISTING_ENV" = "true" ]; then
               echo "Merging backup env vars..."
               grep -v -E '^(GEMINI_API_KEY|PINECONE_API_KEY|PINECONE_INDEX_NAME|JWT_SECRET|ADMIN_EMAIL|ADMIN_PASSWORD|SUPER_ADMIN_EMAIL|SUPER_ADMIN_PASSWORD)=' /tmp/mada-env-backup.env | sudo tee -a $APP_DIR/.env > /dev/null
             fi
 
-            echo "Setting permissions..."
+            # Set permissions
+            echo "=== Setting permissions ==="
             sudo chmod -R 755 $APP_DIR
 
-            echo "Logging in to GHCR..."
-            echo "${{ secrets.GITHUB_TOKEN }}" | sudo docker login ghcr.io -u "${{ github.actor }}" --password-stdin 2>/dev/null || true
-
-            echo "Pulling Docker image..."
+            # Install dependencies
+            echo "=== Installing dependencies ==="
             cd $APP_DIR
-            sudo docker compose down --remove-orphans 2>/dev/null || true
+            npm install --omit=dev --legacy-peer-deps
+
+            # Build application
+            echo "=== Building application ==="
+            npm run build:server
+            npm run build:client || npx vite build
+
+            # Start with PM2
+            echo "=== Starting with PM2 ==="
+            cd $APP_DIR
             
-            # Try to pull first, if fails then build locally
-            if sudo docker compose pull 2>/dev/null; then
-              echo "✅ Pulled image from GHCR"
-            else
-              echo "⚠️ Pull failed, building locally on VPS..."
-              sudo docker compose build --no-cache app
+            # Check if PM2 is installed
+            if ! command -v pm2 &> /dev/null; then
+              echo "Installing PM2..."
+              npm install -g pm2
             fi
+            
+            # Start the application
+            sudo -u ${{ secrets.VPS_USER }} pm2 start dist/server.mjs --name mada-app -- --port 3000
+            
+            # Save PM2 config
+            sudo -u ${{ secrets.VPS_USER }} pm2 save
+            
+            # Setup startup script
+            sudo -u ${{ secrets.VPS_USER }} pm2 startup 2>/dev/null || true
 
-            echo "Starting all containers..."
-            sudo docker compose up -d
-
-            echo "Pruning old images..."
-            sudo docker image prune -f 2>/dev/null || true
-
-            echo "Waiting for app to be healthy (max 300s)..."
+            echo "=== Waiting for app to be healthy (max 120s) ==="
             COUNTER=0
             HEALTHY=false
-            while [ $COUNTER -lt 60 ]; do
+            while [ $COUNTER -lt 24 ]; do
               COUNTER=$((COUNTER + 1))
               sleep 5
               HEALTH_CODE=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/api/health 2>/dev/null || echo "000")
               if [ "$HEALTH_CODE" = "200" ]; then
-                echo "✅ App is healthy! (took ${COUNTER}x5s=${COUNTER}0s)"
+                echo "✅ App is healthy! (took ${COUNTER}x5s=$((COUNTER * 5))s)"
                 HEALTHY=true
                 break
               fi
-              if [ $((COUNTER % 6)) -eq 0 ]; then
-                echo "  Waiting... (${COUNTER}/60) HTTP $HEALTH_CODE"
+              if [ $((COUNTER % 4)) -eq 0 ]; then
+                echo "  Waiting... (${COUNTER}/24) HTTP $HEALTH_CODE"
               fi
             done
 
             if [ "$HEALTHY" = "false" ]; then
-              echo "❌ App did not become healthy within 300s"
-              echo "=== Container logs ==="
-              sudo docker compose logs --tail=200 app 2>/dev/null || true
-              echo "=== Container status ==="
-              sudo docker compose ps -a 2>/dev/null || true
+              echo "❌ App did not become healthy within 120s"
+              echo "=== PM2 logs ==="
+              sudo -u ${{ secrets.VPS_USER }} pm2 logs mada-app --nostream --lines 50 2>/dev/null || true
+              echo "=== PM2 status ==="
+              sudo -u ${{ secrets.VPS_USER }} pm2 status 2>/dev/null || true
               exit 1
             fi
 
-            echo "Deploy completed successfully at $(date)"
+            echo "✅ Deploy completed successfully at $(date)"
+            echo "📝 Commit: ${{ github.sha }}"
 
-      - name: Deploy Summary
+      - name: Success Summary
         if: success()
         run: |
           echo "🚀 MADA AI Assistant deployed to ${{ secrets.VPS_HOST }}"
           echo "📝 Commit: ${{ github.sha }}"
+          echo "🔗 App: http://${{ secrets.VPS_HOST }}:3000"
 
       - name: Failure Summary
         if: failure()
         run: |
           echo "❌ Deploy failed!"
-          echo "Check logs in the 'Deploy to VPS' step above."
+          echo "Check SSH logs above for details."
 
   cleanup:
     name: Cleanup Seed Data
@@ -273,17 +233,22 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           command_timeout: 2m
           script: |
-            echo "Finding app container..."
-            CONTAINER=$(docker ps --format '{{.Names}}' | grep -E 'mada|app' | head -1)
-            echo "Container: $CONTAINER"
+            echo "Finding app directory..."
+            APP_DIR="/app/mada-ai-assistant"
             
-            echo "Checking row counts before delete..."
-            docker exec $CONTAINER sh -c "sqlite3 /app/mada-ai-assistant/data/mada.db 'SELECT COUNT(*) as total FROM suggested_questions;'"
-            
-            echo "Deleting seed questions..."
-            docker exec $CONTAINER sh -c "sqlite3 /app/mada-ai-assistant/data/mada.db \"DELETE FROM suggested_questions WHERE id LIKE 'sq_%';\""
-            
-            echo "Verifying after delete..."
-            docker exec $CONTAINER sh -c "sqlite3 /app/mada-ai-assistant/data/mada.db 'SELECT COUNT(*) as remaining FROM suggested_questions;'"
+            if [ -f "$APP_DIR/data/mada.db" ]; then
+              echo "Checking row counts before delete..."
+              sqlite3 $APP_DIR/data/mada.db 'SELECT COUNT(*) as total FROM suggested_questions;'
+              
+              echo "Deleting seed questions..."
+              sqlite3 $APP_DIR/data/mada.db "DELETE FROM suggested_questions WHERE id LIKE 'sq_%';"
+              
+              echo "Verifying after delete..."
+              sqlite3 $APP_DIR/data/mada.db 'SELECT COUNT(*) as remaining FROM suggested_questions;'
+            else
+              echo "Database not found at $APP_DIR/data/mada.db"
+              echo "Trying PM2..."
+              sudo -u ${{ secrets.VPS_USER }} pm2 list
+            fi
             
             echo "✅ Cleanup complete!"

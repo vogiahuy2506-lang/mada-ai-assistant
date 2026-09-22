@@ -151,8 +151,8 @@ jobs:
             sudo npm install --legacy-peer-deps --include=dev
 
             echo "=== Step 12: Build application ==="
-            npm run build:server
-            npm run build:client
+            sudo npm run build:server
+            sudo npm run build:client
 
             echo "=== Step 13: Install/Update PM2 ==="
             export NPM_CONFIG_PREFIX="$HOME/.npm-global"
@@ -163,8 +163,9 @@ jobs:
             echo "PM2 version: $($PM2_PATH --version)"
 
             echo "=== Step 14: Start application with PM2 ==="
-            $PM2_PATH start dist/server.mjs --name mada-app -- --port 3000
-            $PM2_PATH save
+            cd $APP_DIR
+            sudo $PM2_PATH start dist/server.mjs --name mada-app -- --port 3000
+            sudo $PM2_PATH save
 
             echo "=== Step 15: Health check (max 180s) ==="
             COUNTER=0
@@ -184,9 +185,9 @@ jobs:
             if [ "$HEALTHY" = "false" ]; then
               echo "❌ App did not become healthy within 180s"
               echo "=== PM2 logs ==="
-              $PM2_PATH logs mada-app --nostream --lines 100
+              sudo $PM2_PATH logs mada-app --nostream --lines 100
               echo "=== PM2 status ==="
-              $PM2_PATH status
+              sudo $PM2_PATH status
               exit 1
             fi
 

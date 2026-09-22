@@ -227,7 +227,7 @@ jobs:
             
             if [ -z "$PM2_PATH" ] || [ ! -f "$PM2_PATH" ]; then
               echo "Installing PM2 globally..."
-              $NPM_PATH install -g pm2
+              sudo $NPM_PATH install -g pm2
               # PM2 is usually installed in /usr/local/bin or /usr/bin after global install
               PM2_PATH=$(find /usr -name "pm2" -type f 2>/dev/null | head -1)
               if [ -z "$PM2_PATH" ]; then

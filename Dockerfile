@@ -7,8 +7,8 @@ WORKDIR /app
 
 COPY package*.json ./
 
-# Skip native module compilation (better-sqlite3) - will be copied from builder
-RUN npm install --ignore-scripts
+# Install all dependencies (including dev) for building
+RUN npm ci --ignore-scripts || npm install --ignore-scripts
 
 COPY . .
 
@@ -33,7 +33,8 @@ COPY package*.json ./
 COPY entrypoint.sh ./
 RUN chmod +x ./entrypoint.sh
 
-# Install production deps WITHOUT scripts, then copy pre-built native modules from builder
+# Install production deps WITHOUT scripts
+# Use npm install instead of npm ci to be more robust
 RUN npm install --omit=dev --ignore-scripts && npm cache clean --force
 
 # Copy pre-built dist from builder stage

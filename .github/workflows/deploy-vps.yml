@@ -38,8 +38,13 @@ jobs:
         with:
           node-version: '22'
 
+      - name: Clear npm cache if corrupted
+        run: npm cache verify --prefer-online || npm cache clean --force
+
       - name: Install dependencies
-        run: npm ci || npm install
+        run: |
+          rm -rf node_modules
+          npm ci --prefer-offline || npm install --legacy-peer-deps || npm install
 
       - name: Lint
         run: npm run lint || true

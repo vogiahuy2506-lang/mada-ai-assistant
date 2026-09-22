@@ -132,8 +132,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          context: .
-          file: ./Dockerfile
+          context: ./mada-ai-assistant
+          file: ./mada-ai-assistant/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

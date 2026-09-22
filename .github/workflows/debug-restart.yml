@@ -1,0 +1,157 @@
+# ===========================================
+# Debug & Restart Workflow - Fix production issues
+# ===========================================
+name: Debug & Restart App
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Action to perform'
+        required: true
+        type: choice
+        options:
+          - diagnose
+          - restart
+          - full-fix
+
+jobs:
+  debug-restart:
+    name: Debug & Fix
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Debug & Fix
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          command_timeout: 10m
+          script: |
+            set -e
+            APP_DIR="/app/mada-ai-assistant"
+            
+            echo "=== System Info ==="
+            echo "Date: $(date)"
+            echo "User: $(whoami)"
+            echo "Uptime: $(uptime)"
+            
+            echo "=== Disk Space ==="
+            df -h /
+            
+            echo "=== Memory ==="
+            free -h
+            
+            echo "=== PM2 Status ==="
+            # Find PM2
+            PM2_PATH=""
+            for p in "$HOME/.npm-global/bin/pm2" "/usr/local/bin/pm2" "/usr/bin/pm2"; do
+              if [ -f "$p" ]; then PM2_PATH="$p"; break; fi
+            done
+            
+            # If not found, search
+            if [ -z "$PM2_PATH" ]; then
+              PM2_PATH=$(find /usr /home -name "pm2" -type f 2>/dev/null | head -1)
+            fi
+            
+            echo "PM2 path: $PM2_PATH"
+            
+            if [ -n "$PM2_PATH" ] && [ -f "$PM2_PATH" ]; then
+              $PM2_PATH list
+              echo "=== PM2 Logs (last 100 lines) ==="
+              $PM2_PATH logs mada-app --nostream --lines 100 2>/dev/null || true
+            else
+              echo "PM2 not found!"
+            fi
+            
+            echo "=== App Directory ==="
+            ls -la $APP_DIR 2>/dev/null || echo "App dir not found"
+            
+            echo "=== Port Check ==="
+            lsof -i :3000 2>/dev/null || netstat -tlnp | grep 3000 2>/dev/null || echo "Port 3000 not in use"
+            
+            echo "=== Nginx Status ==="
+            sudo systemctl status nginx --no-pager 2>/dev/null || sudo service nginx status 2>/dev/null || echo "nginx not running via systemctl"
+            
+            echo "=== Docker Containers ==="
+            sudo docker ps -a 2>/dev/null || echo "Docker not available"
+            
+            # Restart action
+            if [ "${{ github.event.inputs.action }}" = "restart" ] || [ "${{ github.event.inputs.action }}" = "full-fix" ]; then
+              echo "=== Restarting App ==="
+              
+              if [ -n "$PM2_PATH" ] && [ -f "$PM2_PATH" ]; then
+                $PM2_PATH stop mada-app 2>/dev/null || true
+                $PM2_PATH delete mada-app 2>/dev/null || true
+                
+                cd $APP_DIR
+                
+                if [ -f "dist/server.mjs" ]; then
+                  $PM2_PATH start dist/server.mjs --name mada-app -- --port 3000
+                  $PM2_PATH save
+                else
+                  echo "dist/server.mjs not found! Rebuilding..."
+                  $PM2_PATH run build:server 2>/dev/null || npm run build:server
+                  $PM2_PATH start dist/server.mjs --name mada-app -- --port 3000
+                fi
+                
+                echo "=== Waiting for health check ==="
+                sleep 10
+                for i in {1..12}; do
+                  if curl -sf http://localhost:3000/api/health > /dev/null 2>&1; then
+                    echo "✅ App is healthy!"
+                    break
+                  fi
+                  echo "Waiting... ($i/12)"
+                  sleep 5
+                done
+                
+                $PM2_PATH list
+              fi
+            fi
+            
+            # Full fix action
+            if [ "${{ github.event.inputs.action }}" = "full-fix" ]; then
+              echo "=== Full Fix ==="
+              
+              # Clean PM2
+              $PM2_PATH delete all 2>/dev/null || true
+              $PM2_PATH kill 2>/dev/null || true
+              
+              # Clear old logs
+              rm -rf $APP_DIR/logs 2>/dev/null || true
+              rm -rf ~/.pm2 2>/dev/null || true
+              
+              # Reinstall PM2 if needed
+              if [ ! -f "$PM2_PATH" ]; then
+                echo "Reinstalling PM2..."
+                export NPM_CONFIG_PREFIX="$HOME/.npm-global"
+                export PATH="$HOME/.npm-global/bin:$PATH"
+                mkdir -p "$HOME/.npm-global"
+                npm install -g pm2
+                PM2_PATH="$HOME/.npm-global/bin/pm2"
+              fi
+              
+              # Rebuild if needed
+              cd $APP_DIR
+              if [ ! -f "dist/server.mjs" ]; then
+                echo "Building app..."
+                npm run build:server
+              fi
+              
+              # Start fresh
+              $PM2_PATH start dist/server.mjs --name mada-app -- --port 3000
+              $PM2_PATH save
+              
+              # Wait and verify
+              echo "=== Verifying ==="
+              sleep 15
+              $PM2_PATH list
+              curl -s http://localhost:3000/api/health || echo "Health check failed"
+            fi
+            
+            echo "=== Final Health Check ==="
+            curl -sI http://localhost:3000/api/health || echo "Cannot reach health endpoint"
+            
+            echo "✅ Debug complete!"

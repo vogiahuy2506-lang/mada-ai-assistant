@@ -94,8 +94,11 @@ jobs:
             # Stop existing PM2 process
             echo "=== Stopping existing PM2 process ==="
             cd $APP_DIR 2>/dev/null || true
-            sudo -u ${{ secrets.VPS_USER }} pm2 stop mada-app 2>/dev/null || true
-            sudo -u ${{ secrets.VPS_USER }} pm2 delete mada-app 2>/dev/null || true
+            PM2_BIN=$(which pm2 2>/dev/null || echo "")
+            if [ -n "$PM2_BIN" ]; then
+              $PM2_BIN stop mada-app 2>/dev/null || true
+              $PM2_BIN delete mada-app 2>/dev/null || true
+            fi
 
             # Stop Docker containers if running
             echo "=== Stopping Docker containers ==="
@@ -169,7 +172,7 @@ jobs:
             
             # Verify node/npm is available
             if ! command -v npm &> /dev/null; then
-              echo "npm still not found, installing Node.js..."
+              echo "npm not found, installing Node.js..."
               curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
               sudo apt-get install -y nodejs
               export PATH="/usr/bin:$PATH"
@@ -177,43 +180,55 @@ jobs:
             
             echo "Node version: $(node --version)"
             echo "NPM version: $(npm --version)"
+            
+            # Get full path to npm
+            NPM_BIN=$(which npm)
+            NODE_BIN=$(which node)
+            echo "NPM path: $NPM_BIN"
+            echo "NODE path: $NODE_BIN"
 
             # Install dependencies
             echo "=== Installing dependencies ==="
             cd $APP_DIR
-            npm install --omit=dev --legacy-peer-deps
+            $NPM_BIN install --omit=dev --legacy-peer-deps
 
             # Build application
             echo "=== Building application ==="
-            npm run build:server
-            npm run build:client || npx vite build
+            $NPM_BIN run build:server
+            $NPM_BIN run build:client || $NPM_BIN exec vite build
 
             # Start with PM2
             echo "=== Starting with PM2 ==="
             cd $APP_DIR
             
             # Check if PM2 is installed
-            if ! command -v pm2 &> /dev/null; then
+            PM2_BIN=$(which pm2 2>/dev/null || echo "")
+            if [ -z "$PM2_BIN" ]; then
               echo "Installing PM2..."
-              # Ensure npm is available before installing PM2
-              export NVM_DIR="$HOME/.nvm"
-              [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
-              if command -v npm &> /dev/null; then
-                npm install -g pm2
-              else
-                echo "ERROR: npm not available to install PM2"
+              $NPM_BIN install -g pm2
+              PM2_BIN="$NODE_BIN/node_modules/pm2/bin/pm2"
+              # Try common locations
+              if [ ! -f "$PM2_BIN" ]; then
+                PM2_BIN=$(find /usr -name "pm2" -type f 2>/dev/null | head -1)
+              fi
+              if [ ! -f "$PM2_BIN" ]; then
+                PM2_BIN=$(find /home -name "pm2" -type f 2>/dev/null | head -1)
+              fi
+              if [ -z "$PM2_BIN" ] || [ ! -f "$PM2_BIN" ]; then
+                echo "ERROR: Could not find PM2 after install"
                 exit 1
               fi
+              echo "PM2 found at: $PM2_BIN"
             fi
             
             # Start the application
-            sudo -u ${{ secrets.VPS_USER }} pm2 start dist/server.mjs --name mada-app -- --port 3000
+            $PM2_BIN start dist/server.mjs --name mada-app -- --port 3000
             
             # Save PM2 config
-            sudo -u ${{ secrets.VPS_USER }} pm2 save
+            $PM2_BIN save
             
             # Setup startup script
-            sudo -u ${{ secrets.VPS_USER }} pm2 startup 2>/dev/null || true
+            $PM2_BIN startup 2>/dev/null || true
 
             echo "=== Waiting for app to be healthy (max 120s) ==="
             COUNTER=0
@@ -235,9 +250,9 @@ jobs:
             if [ "$HEALTHY" = "false" ]; then
               echo "❌ App did not become healthy within 120s"
               echo "=== PM2 logs ==="
-              sudo -u ${{ secrets.VPS_USER }} pm2 logs mada-app --nostream --lines 50 2>/dev/null || true
+              $PM2_BIN logs mada-app --nostream --lines 50 2>/dev/null || true
               echo "=== PM2 status ==="
-              sudo -u ${{ secrets.VPS_USER }} pm2 status 2>/dev/null || true
+              $PM2_BIN status 2>/dev/null || true
               exit 1
             fi
 

@@ -66,18 +66,23 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
+        working-directory: ./mada-ai-assistant
         run: npm ci || npm install
 
       - name: Lint
+        working-directory: ./mada-ai-assistant
         run: npm run lint || true
 
       - name: Type check
+        working-directory: ./mada-ai-assistant
         run: npx tsc --noEmit || true
 
       - name: Build server bundle
+        working-directory: ./mada-ai-assistant
         run: npm run build:server || true
 
       - name: Build frontend
+        working-directory: ./mada-ai-assistant
         run: npm run build:client || npm run build || true
 
   # ===========================================

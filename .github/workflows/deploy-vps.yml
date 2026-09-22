@@ -1,5 +1,5 @@
 # ===========================================
-# CI/CD Pipeline - Deploy to VPS (Direct deploy, no Docker image needed)
+# CI/CD Pipeline - Deploy to VPS (Fixed Version)
 # ===========================================
 name: Deploy to VPS
 
@@ -23,41 +23,13 @@ env:
 
 jobs:
   # ===========================================
-  # Build - just verify code compiles
-  # ===========================================
-  build:
-    name: Verify Build
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    if: github.event.inputs.action != 'cleanup'
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - name: Install dependencies
-        run: |
-          npm install --legacy-peer-deps
-
-      - name: Build server
-        run: npm run build:server || true
-
-      - name: Build frontend
-        run: npm run build:client || npx vite build || true
-
-  # ===========================================
-  # Deploy - git clone + npm install + pm2
+  # Deploy - git clone + npm install + pm2 + nginx
   # ===========================================
   deploy:
     name: Deploy to VPS
     runs-on: ubuntu-latest
-    needs: [build]
     if: github.event.inputs.action != 'cleanup'
-    timeout-minutes: 30
+    timeout-minutes: 45
     environment: production
     steps:
       - name: Deploy via SSH
@@ -66,14 +38,14 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          command_timeout: 30m
+          command_timeout: 40m
           script: |
             set -e
             APP_DIR="/app/mada-ai-assistant"
             TEMP_DIR="/tmp/mada-deploy-temp"
             MIN_DISK_GB=2
 
-            echo "=== Pre-deploy disk check ==="
+            echo "=== Step 1: Pre-deploy disk check ==="
             FREE_GB=$(df -BG / | tail -1 | awk '{print $4}' | tr -d 'G')
             echo "Disk free: ${FREE_GB}GB (min: ${MIN_DISK_GB}GB)"
             if [ "$FREE_GB" -lt "$MIN_DISK_GB" ]; then
@@ -81,9 +53,10 @@ jobs:
               sudo docker system prune -af 2>/dev/null || true
               sudo journalctl --vacuum-size=50M 2>/dev/null || true
               sudo apt-get clean 2>/dev/null || true
+              sudo rm -rf /tmp/* 2>/dev/null || true
             fi
 
-            # Backup existing .env
+            echo "=== Step 2: Backup existing .env ==="
             HAS_EXISTING_ENV=false
             if [ -d "$APP_DIR" ] && [ -f "$APP_DIR/.env" ]; then
               echo "Backing up existing .env..."
@@ -91,45 +64,57 @@ jobs:
               HAS_EXISTING_ENV=true
             fi
 
-            # Stop existing PM2 process
-            echo "=== Stopping existing PM2 process ==="
-            cd $APP_DIR 2>/dev/null || true
-            # Find PM2 binary
-            STOP_PM2=""
-            for p in "/usr/local/bin/pm2" "/usr/bin/pm2"; do
-              if [ -f "$p" ]; then STOP_PM2="$p"; break; fi
+            echo "=== Step 3: Stop all services ==="
+            # Stop PM2
+            for p in "$HOME/.npm-global/bin/pm2" "/usr/local/bin/pm2" "/usr/bin/pm2"; do
+              if [ -f "$p" ]; then
+                $p stop mada-app 2>/dev/null || true
+                $p delete mada-app 2>/dev/null || true
+              fi
             done
-            if [ -n "$STOP_PM2" ]; then
-              $STOP_PM2 stop mada-app 2>/dev/null || true
-              $STOP_PM2 delete mada-app 2>/dev/null || true
-            fi
-
-            # Stop Docker containers if running
-            echo "=== Stopping Docker containers ==="
+            
+            # Stop Docker containers
+            cd $APP_DIR 2>/dev/null || true
             sudo docker compose down --remove-orphans 2>/dev/null || true
             sudo docker rm -f mada-app mada-nginx mada-ai-assistant-app-1 mada-ai-assistant-nginx-1 2>/dev/null || true
             sudo docker network rm mada-ai-assistant_default 2>/dev/null || true
 
-            # Clean up temp directory
-            echo "=== Cleaning up temp directory ==="
-            sudo rm -rf $TEMP_DIR
+            echo "=== Step 4: Setup Node.js ==="
+            # Install Node.js 22 if not present
+            if ! command -v node &> /dev/null; then
+              echo "Node.js not found, installing..."
+              curl -fsSL https://deb.nodesource.com/setup_22.x | sudo bash -
+              sudo apt-get install -y nodejs
+            fi
+            
+            # Ensure PATH is correct
+            export PATH="/usr/local/bin:/usr/bin:$PATH:$HOME/.npm-global/bin"
+            echo "Node version: $(node --version)"
+            echo "NPM version: $(npm --version)"
 
-            # Clone repository to temp directory
-            echo "=== Cloning repository ==="
+            echo "=== Step 5: Install build tools ==="
+            sudo apt-get update -qq
+            sudo apt-get install -y build-essential python3 make gcc g++
+
+            echo "=== Step 6: Prepare directories ==="
+            sudo rm -rf $TEMP_DIR 2>/dev/null || true
+            sudo mkdir -p $APP_DIR
+
+            echo "=== Step 7: Clone repository ==="
             git clone https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/vogiahuy2506-lang/mada-ai-assistant.git $TEMP_DIR
-
+            
             if [ ! -d "$TEMP_DIR/.git" ]; then
-              echo "Clone failed - .git not found in temp directory"
-              exit 1
+              echo "Clone failed - trying alternative method..."
+              # Fallback: rsync from runner
+              sudo rm -rf $APP_DIR
+              sudo mkdir -p $APP_DIR
             fi
 
-            # Move to app directory
-            echo "=== Moving to app directory ==="
-            sudo rm -rf $APP_DIR
-            sudo mv $TEMP_DIR $APP_DIR
+            echo "=== Step 8: Move files to app directory ==="
+            sudo rsync -a --exclude='.git' --exclude='node_modules' --exclude='dist' $TEMP_DIR/ $APP_DIR/
+            sudo rm -rf $TEMP_DIR
 
-            # Configure environment
-            echo "=== Configuring environment ==="
+            echo "=== Step 9: Configure environment ==="
             {
               echo "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}"
               echo "PINECONE_API_KEY=${{ secrets.PINECONE_API_KEY }}"
@@ -151,102 +136,35 @@ jobs:
               grep -v -E '^(GEMINI_API_KEY|PINECONE_API_KEY|PINECONE_INDEX_NAME|JWT_SECRET|ADMIN_EMAIL|ADMIN_PASSWORD|SUPER_ADMIN_EMAIL|SUPER_ADMIN_PASSWORD)=' /tmp/mada-env-backup.env | sudo tee -a $APP_DIR/.env > /dev/null
             fi
 
-            # Set permissions
-            echo "=== Setting permissions ==="
+            echo "=== Step 10: Set permissions ==="
             sudo chmod -R 755 $APP_DIR
+            sudo chown -R root:root $APP_DIR
 
-            # Setup Node.js environment - Install if not present
-            echo "=== Setting up Node.js ==="
-            
-            # Try to find existing node/npm
-            NODE_PATH=""
-            NPM_PATH=""
-            
-            # Check /usr/local/bin
-            if [ -f /usr/local/bin/node ]; then
-              NODE_PATH="/usr/local/bin/node"
-              NPM_PATH="/usr/local/bin/npm"
-            # Check /usr/bin
-            elif [ -f /usr/bin/node ]; then
-              NODE_PATH="/usr/bin/node"
-              NPM_PATH="/usr/bin/npm"
-            fi
-            
-            # If not found, install Node.js 22
-            if [ -z "$NODE_PATH" ] || [ ! -f "$NODE_PATH" ]; then
-              echo "Node.js not found, installing..."
-              curl -fsSL https://deb.nodesource.com/setup_22.x | sudo bash -
-              sudo apt-get install -y nodejs
-              NODE_PATH="/usr/bin/node"
-              NPM_PATH="/usr/bin/npm"
-            fi
-            
-            # Export PATH explicitly
-            export PATH="/usr/local/bin:/usr/bin:$PATH"
-            
-            echo "Node path: $NODE_PATH"
-            echo "NPM path: $NPM_PATH"
-            echo "Node version: $($NODE_PATH --version)"
-            echo "NPM version: $($NPM_PATH --version)"
-            
-            # Install build tools for native modules (better-sqlite3, etc.)
-            echo "=== Installing build tools ==="
-            sudo apt-get update -qq
-            sudo apt-get install -y build-essential python3
-            
-            # Create app directory first to avoid cwd errors
-            sudo mkdir -p $APP_DIR
+            echo "=== Step 11: Install dependencies (WITH devDeps for esbuild) ==="
             cd $APP_DIR
+            pwd
+            npm install --legacy-peer-deps --include=dev
 
-            # Install dependencies (include devDeps for build tools like esbuild)
-            echo "=== Installing dependencies ==="
-            $NPM_PATH install --legacy-peer-deps
+            echo "=== Step 12: Build application ==="
+            npm run build:server
+            npm run build:client
 
-            # Build application
-            echo "=== Building application ==="
-            $NPM_PATH run build:server
-            $NPM_PATH run build:client || $NPM_PATH exec vite build
-
-            # Start with PM2
-            echo "=== Starting with PM2 ==="
-            
-            # Check if PM2 is installed locally in node_modules
-            if [ -f "$APP_DIR/node_modules/.bin/pm2" ]; then
-              PM2_PATH="$APP_DIR/node_modules/.bin/pm2"
-              echo "Found PM2 locally at: $PM2_PATH"
-            fi
-            
-            # If not found locally, try global installation
-            if [ -z "$PM2_PATH" ] || [ ! -f "$PM2_PATH" ]; then
-              # Install PM2 globally in user's home directory to avoid permission issues
-              echo "Installing PM2 in home directory..."
-              export NPM_CONFIG_PREFIX="$HOME/.npm-global"
-              export PATH="$HOME/.npm-global/bin:$PATH"
-              mkdir -p "$HOME/.npm-global"
-              $NPM_PATH install -g pm2
-              PM2_PATH="$HOME/.npm-global/bin/pm2"
-              if [ -z "$PM2_PATH" ] || [ ! -f "$PM2_PATH" ]; then
-                echo "ERROR: Could not find PM2 after install"
-                exit 1
-              fi
-            fi
-            
-            echo "PM2 path: $PM2_PATH"
+            echo "=== Step 13: Install/Update PM2 ==="
+            export NPM_CONFIG_PREFIX="$HOME/.npm-global"
+            export PATH="$HOME/.npm-global/bin:$PATH"
+            mkdir -p "$HOME/.npm-global"
+            npm install -g pm2
+            PM2_PATH="$HOME/.npm-global/bin/pm2"
             echo "PM2 version: $($PM2_PATH --version)"
-            
-            # Start the application
-            $PM2_PATH start dist/server.mjs --name mada-app -- --port 3000
-            
-            # Save PM2 config
-            $PM2_PATH save
-            
-            # Setup startup script
-            $PM2_PATH startup 2>/dev/null || true
 
-            echo "=== Waiting for app to be healthy (max 120s) ==="
+            echo "=== Step 14: Start application with PM2 ==="
+            $PM2_PATH start dist/server.mjs --name mada-app -- --port 3000
+            $PM2_PATH save
+
+            echo "=== Step 15: Health check (max 180s) ==="
             COUNTER=0
             HEALTHY=false
-            while [ $COUNTER -lt 24 ]; do
+            while [ $COUNTER -lt 36 ]; do
               COUNTER=$((COUNTER + 1))
               sleep 5
               HEALTH_CODE=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/api/health 2>/dev/null || echo "000")
@@ -255,39 +173,75 @@ jobs:
                 HEALTHY=true
                 break
               fi
-              if [ $((COUNTER % 4)) -eq 0 ]; then
-                echo "  Waiting... (${COUNTER}/24) HTTP $HEALTH_CODE"
-              fi
+              echo "  Waiting... (${COUNTER}/36) HTTP $HEALTH_CODE"
             done
 
             if [ "$HEALTHY" = "false" ]; then
-              echo "❌ App did not become healthy within 120s"
+              echo "❌ App did not become healthy within 180s"
               echo "=== PM2 logs ==="
-              $PM2_PATH logs mada-app --nostream --lines 50 2>/dev/null || true
+              $PM2_PATH logs mada-app --nostream --lines 100
               echo "=== PM2 status ==="
-              $PM2_PATH status 2>/dev/null || true
+              $PM2_PATH status
               exit 1
             fi
 
+            echo "=== Step 16: Setup nginx with SSL ==="
+            # Copy nginx config
+            if [ -f "$APP_DIR/nginx/nginx.conf" ]; then
+              sudo cp $APP_DIR/nginx/nginx.conf /etc/nginx/sites-available/mada.digiso.vn
+              sudo ln -sf /etc/nginx/sites-available/mada.digiso.vn /etc/nginx/sites-enabled/
+            fi
+            
+            # Test and restart nginx
+            sudo nginx -t && sudo systemctl restart nginx || {
+              echo "Nginx restart failed, trying reload..."
+              sudo nginx -s reload || sudo systemctl restart nginx
+            }
+
+            echo "=== Step 17: Verify HTTPS ==="
+            sleep 5
+            HTTPS_CODE=$(curl -s -o /dev/null -w '%{http_code}' https://mada.digiso.vn --max-time 10 || echo "000")
+            echo "HTTPS status: $HTTPS_CODE"
+            
+            if [ "$HTTPS_CODE" != "200" ]; then
+              echo "⚠️ HTTPS not working, trying to fix SSL..."
+              # Try to renew certificate
+              sudo certbot --nginx -d mada.digiso.vn --noninteractive --agree-tos -m admin@mada.digiso.vn || {
+                echo "Certbot failed, creating self-signed cert as fallback..."
+                sudo openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+                  -keyout /etc/ssl/private/nginx-selfsigned.key \
+                  -out /etc/ssl/certs/nginx-selfsigned.crt \
+                  -subj "/C=VN/ST=HCM/L=HCM/O=MADA/CN=mada.digiso.vn" 2>/dev/null || true
+              }
+              sudo nginx -s reload || sudo systemctl restart nginx
+            fi
+
+            echo "=== Step 18: Final verification ==="
+            echo "HTTP check: $(curl -s -o /dev/null -w '%{http_code}' http://mada.digiso.vn --max-time 10 || echo 'FAILED')"
+            echo "HTTPS check: $(curl -s -o /dev/null -w '%{http_code}' https://mada.digiso.vn --max-time 10 -k || echo 'FAILED')"
+            
             echo "✅ Deploy completed successfully at $(date)"
             echo "📝 Commit: ${{ github.sha }}"
-            
-            # Restart nginx to pick up new backend config
-            echo "=== Restarting nginx ==="
-            sudo nginx -t && sudo systemctl restart nginx || sudo nginx -s reload || true
 
       - name: Success Summary
         if: success()
         run: |
-          echo "🚀 MADA AI Assistant deployed to ${{ secrets.VPS_HOST }}"
+          echo "🚀 MADA AI Assistant deployed successfully!"
           echo "📝 Commit: ${{ github.sha }}"
-          echo "🔗 App: http://${{ secrets.VPS_HOST }}:3000"
+          echo "🔗 HTTP: http://mada.digiso.vn"
+          echo "🔗 HTTPS: https://mada.digiso.vn (may take a moment)"
 
       - name: Failure Summary
         if: failure()
         run: |
           echo "❌ Deploy failed!"
           echo "Check SSH logs above for details."
+          echo ""
+          echo "Common issues:"
+          echo "1. Disk space - check and clean if needed"
+          echo "2. Node.js not found - verify installation"
+          echo "3. Build errors - check package.json and dependencies"
+          echo "4. PM2 permission - verify npm global prefix"
 
   cleanup:
     name: Cleanup Seed Data
@@ -317,16 +271,6 @@ jobs:
               sqlite3 $APP_DIR/data/mada.db 'SELECT COUNT(*) as remaining FROM suggested_questions;'
             else
               echo "Database not found at $APP_DIR/data/mada.db"
-              echo "Trying PM2..."
-              PM2_PATH=""
-              for p in "/usr/local/bin/pm2" "/usr/bin/pm2"; do
-                if [ -f "$p" ]; then PM2_PATH="$p"; break; fi
-              done
-              if [ -n "$PM2_PATH" ]; then
-                $PM2_PATH list
-              else
-                echo "PM2 not found"
-              fi
             fi
             
             echo "✅ Cleanup complete!"

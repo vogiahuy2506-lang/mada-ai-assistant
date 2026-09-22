@@ -144,12 +144,11 @@ jobs:
 
             echo "=== Step 10: Set permissions ==="
             sudo chmod -R 755 $APP_DIR
-            sudo chown -R root:root $APP_DIR
 
             echo "=== Step 11: Install dependencies (WITH devDeps for esbuild) ==="
             cd $APP_DIR
             pwd
-            npm install --legacy-peer-deps --include=dev
+            sudo npm install --legacy-peer-deps --include=dev
 
             echo "=== Step 12: Build application ==="
             npm run build:server

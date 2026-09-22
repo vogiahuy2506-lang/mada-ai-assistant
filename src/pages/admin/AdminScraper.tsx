@@ -372,7 +372,7 @@ export function AdminScraper() {
               'shadow-[6px_6px_0px_0px_#000]'
             )}
           >
-            <div className={clsx('w-10 h-10 rounded-xl border-2 border-black flex items-center justify-center shadow-[3px_3px_0px_0px_#000]', s.iconBg)}>
+            <div className={clsx('w-10 h-10 rounded-xl border border-slate-300 flex items-center justify-center shadow-sm', s.iconBg)}>
               <span className={clsx('material-symbols-outlined text-lg', s.iconColor)} style={{ fontVariationSettings: "'FILL' 1" }}>{s.icon}</span>
             </div>
             <div>
@@ -386,7 +386,7 @@ export function AdminScraper() {
 
       {/* Action Bar */}
       <div className="flex items-center justify-between mb-8 flex-wrap gap-4" dir={isAr ? 'rtl' : 'ltr'}>
-        <div className="flex items-center gap-3 p-1.5 bg-white/60 backdrop-blur-xl rounded-full border-2 border-black">
+        <div className="flex items-center gap-3 p-1.5 bg-white/60 backdrop-blur-xl rounded-full border border-slate-300">
           <span className="text-on-surface-variant font-medium text-sm ml-4 mr-2">{tr('admin.scraper.actions.quickActions')}</span>
           <button
             onClick={() => handleCrawl('all')}
@@ -409,7 +409,7 @@ export function AdminScraper() {
         <button
           onClick={loadAll}
           disabled={loading}
-          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-white/60 backdrop-blur-xl border-2 border-black font-bold text-sm hover:bg-white hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[3px_3px_0px_0px_#000] shadow-[2px_2px_0px_0px_#000] transition-all disabled:opacity-50"
+          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-white/60 backdrop-blur-xl border border-slate-300 font-bold text-sm hover:bg-white hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-sm shadow-sm transition-all disabled:opacity-50"
         >
           <RefreshCw className={clsx('w-4 h-4', loading && 'animate-spin')} />
           <span>{tr('admin.scraper.actions.refresh')}</span>
@@ -419,7 +419,7 @@ export function AdminScraper() {
       {/* Message banner */}
       {message && (
         <div className={clsx(
-          'mb-6 p-4 rounded-2xl border-[3px] border-black flex items-center gap-3 text-sm font-bold shadow-[3px_3px_0px_0px_#000]',
+          'mb-6 p-4 rounded-2xl border-[3px] border-black flex items-center gap-3 text-sm font-bold shadow-sm',
           message.type === 'success' && 'bg-emerald-100 text-emerald-800',
           message.type === 'error' && 'bg-red-100 text-red-800',
           message.type === 'info' && 'bg-blue-100 text-blue-800',
@@ -431,7 +431,7 @@ export function AdminScraper() {
 
       {/* MADA Categories Card */}
       <section className="bg-white/70 backdrop-blur-xl rounded-3xl border-[3px] border-black shadow-[6px_6px_0px_0px_#000] mb-8 overflow-hidden">
-        <div className="px-6 py-4 border-b-2 border-black/10 bg-gradient-to-r from-primary/5 to-transparent flex items-center justify-between">
+        <div className="px-6 py-4 border-b border-slate-200/10 bg-gradient-to-r from-primary/5 to-transparent flex items-center justify-between">
           <div>
             <h2 className="font-black text-lg flex items-center gap-2">
               <span className="material-symbols-outlined text-primary" style={{ fontVariationSettings: "'FILL' 1" }}>category</span>
@@ -445,7 +445,7 @@ export function AdminScraper() {
             href="https://at.mada.org.qa/"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full border-2 border-black bg-white hover:bg-primary/5 font-bold text-xs shadow-[2px_2px_0px_0px_#000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[3px_3px_0px_0px_#000] transition-all"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full border border-slate-300 bg-white hover:bg-primary/5 font-bold text-xs shadow-sm hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-sm transition-all"
           >
             {tr('admin.scraper.categories.madaPortal')} <ExternalLink className="w-3 h-3" />
           </a>
@@ -456,7 +456,7 @@ export function AdminScraper() {
             <div key={cat.slug} className="px-6 py-4 flex items-center justify-between hover:bg-primary/5 transition-colors group">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 border-2 border-black flex items-center justify-center shrink-0">
+                  <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 border border-slate-300 flex items-center justify-center shrink-0">
                     <span className="material-symbols-outlined text-primary text-base" style={{ fontVariationSettings: "'FILL' 1" }}>
                       {cat.slug === 'vision' ? 'visibility' :
                        cat.slug === 'hearing' ? 'hearing' :
@@ -486,7 +486,7 @@ export function AdminScraper() {
               <button
                 onClick={() => handleCrawl(cat.slug)}
                 disabled={busy === cat.slug || busy !== null}
-                className="ml-3 inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-primary text-white border-2 border-black font-bold text-xs shadow-[2px_2px_0px_0px_#000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[3px_3px_0px_0px_#000] disabled:opacity-40 transition-all"
+                className="ml-3 inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-primary text-white border border-slate-300 font-bold text-xs shadow-sm hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-sm disabled:opacity-40 transition-all"
               >
                 {busy === cat.slug ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
                 <span>{tr('admin.scraper.categories.crawl')}</span>
@@ -498,7 +498,7 @@ export function AdminScraper() {
 
       {/* Crawl Jobs History */}
       <section className="bg-white/70 backdrop-blur-xl rounded-3xl border-[3px] border-black shadow-[6px_6px_0px_0px_#000] mb-8 overflow-hidden">
-        <div className="px-6 py-4 border-b-2 border-black/10 bg-gradient-to-r from-blue-500/5 to-transparent">
+        <div className="px-6 py-4 border-b border-slate-200/10 bg-gradient-to-r from-blue-500/5 to-transparent">
           <h2 className="font-black text-lg flex items-center gap-2">
             <span className="material-symbols-outlined text-blue-600" style={{ fontVariationSettings: "'FILL' 1" }}>history</span>
             {tr('admin.scraper.jobs.heading')}
@@ -517,7 +517,7 @@ export function AdminScraper() {
             </div>
           ) : (
             <table className="w-full text-sm">
-              <thead className="bg-blue-500/5 text-left text-xs font-bold uppercase tracking-wider text-on-surface-variant border-b-2 border-black/10">
+              <thead className="bg-blue-500/5 text-left text-xs font-bold uppercase tracking-wider text-on-surface-variant border-b border-slate-200/10">
                 <tr>
                   <th className="px-6 py-3">{tr('admin.scraper.table.jobId')}</th>
                   <th className="px-6 py-3">{tr('admin.scraper.table.category')}</th>
@@ -577,29 +577,29 @@ export function AdminScraper() {
           </h3>
           <ol className="text-xs space-y-3 text-on-surface-variant">
             <li className="flex items-center gap-3 p-2.5 rounded-xl bg-purple-50 border-2 border-purple-200">
-              <div className="w-8 h-8 rounded-full bg-purple-500 text-white border-2 border-black flex items-center justify-center font-black text-xs shadow-[2px_2px_0px_0px_#000]">1</div>
+              <div className="w-8 h-8 rounded-full bg-purple-500 text-white border border-slate-300 flex items-center justify-center font-black text-xs shadow-sm">1</div>
               <span className="material-symbols-outlined text-base text-purple-700" style={{ fontVariationSettings: "'FILL' 1" }}>cloud_download</span>
               <span className="font-medium text-on-surface">{tr('admin.scraper.pipeline.step1')}</span>
             </li>
             <li className="flex items-center gap-3 p-2.5 rounded-xl bg-purple-50 border-2 border-purple-200">
-              <div className="w-8 h-8 rounded-full bg-purple-500 text-white border-2 border-black flex items-center justify-center font-black text-xs shadow-[2px_2px_0px_0px_#000]">2</div>
+              <div className="w-8 h-8 rounded-full bg-purple-500 text-white border border-slate-300 flex items-center justify-center font-black text-xs shadow-sm">2</div>
               <span className="material-symbols-outlined text-base text-purple-700" style={{ fontVariationSettings: "'FILL' 1" }}>auto_awesome</span>
               <span className="font-medium text-on-surface">
                 {tr('admin.scraper.pipeline.step2', { p: fileStats?.productCount || 0, c: fileStats?.chunkCount || 0 })}
               </span>
             </li>
             <li className="flex items-center gap-3 p-2.5 rounded-xl bg-purple-50 border-2 border-purple-200">
-              <div className="w-8 h-8 rounded-full bg-purple-500 text-white border-2 border-black flex items-center justify-center font-black text-xs shadow-[2px_2px_0px_0px_#000]">3</div>
+              <div className="w-8 h-8 rounded-full bg-purple-500 text-white border border-slate-300 flex items-center justify-center font-black text-xs shadow-sm">3</div>
               <span className="material-symbols-outlined text-base text-purple-700" style={{ fontVariationSettings: "'FILL' 1" }}>storage</span>
               <span className="font-medium text-on-surface">{tr('admin.scraper.pipeline.step3')}</span>
             </li>
             <li className="flex items-center gap-3 p-2.5 rounded-xl bg-purple-50 border-2 border-purple-200">
-              <div className="w-8 h-8 rounded-full bg-purple-500 text-white border-2 border-black flex items-center justify-center font-black text-xs shadow-[2px_2px_0px_0px_#000]">4</div>
+              <div className="w-8 h-8 rounded-full bg-purple-500 text-white border border-slate-300 flex items-center justify-center font-black text-xs shadow-sm">4</div>
               <span className="material-symbols-outlined text-base text-purple-700" style={{ fontVariationSettings: "'FILL' 1" }}>smart_toy</span>
               <span className="font-medium text-on-surface">{tr('admin.scraper.pipeline.step4')}</span>
             </li>
           </ol>
-          <div className="mt-4 pt-3 border-t-2 border-black/10 text-xs text-amber-700 bg-amber-50 p-3 rounded-xl border-2 border-amber-300 inline-flex items-start gap-2 w-full">
+          <div className="mt-4 pt-3 border-t border-slate-200/10 text-xs text-amber-700 bg-amber-50 p-3 rounded-xl border-2 border-amber-300 inline-flex items-start gap-2 w-full">
             <span className="material-symbols-outlined text-base shrink-0" style={{ fontVariationSettings: "'FILL' 1" }}>warning</span>
             <span>{tr('admin.scraper.pipeline.warning')}</span>
           </div>
@@ -608,7 +608,7 @@ export function AdminScraper() {
 
       {/* Scheduled Sources */}
       <section className="bg-white/70 backdrop-blur-xl rounded-3xl border-[3px] border-black shadow-[6px_6px_0px_0px_#000] overflow-hidden">
-        <div className="px-6 py-4 border-b-2 border-black/10 bg-gradient-to-r from-green-500/5 to-transparent flex items-center justify-between">
+        <div className="px-6 py-4 border-b border-slate-200/10 bg-gradient-to-r from-green-500/5 to-transparent flex items-center justify-between">
           <div>
             <h2 className="font-black text-lg flex items-center gap-2">
               <span className="material-symbols-outlined text-green-600" style={{ fontVariationSettings: "'FILL' 1" }}>schedule</span>
@@ -620,7 +620,7 @@ export function AdminScraper() {
           </div>
           <button
             onClick={() => setShowAddSource(true)}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-primary text-white border-2 border-black font-bold text-xs shadow-[2px_2px_0px_0px_#000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[3px_3px_0px_0px_#000] transition-all"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-primary text-white border border-slate-300 font-bold text-xs shadow-sm hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-sm transition-all"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>{tr('admin.scraper.sources.add')}</span>
@@ -628,30 +628,30 @@ export function AdminScraper() {
         </div>
 
         {showAddSource && (
-          <div className="p-6 bg-gradient-to-br from-blue-50/60 to-purple-50/60 border-b-2 border-black/10">
+          <div className="p-6 bg-gradient-to-br from-blue-50/60 to-purple-50/60 border-b border-slate-200/10">
             <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
               <input
                 placeholder={tr('admin.scraper.sources.placeholderId')}
                 value={newSource.id}
                 onChange={(e) => setNewSource({ ...newSource, id: e.target.value })}
-                className="px-3 py-2.5 rounded-full border-2 border-black bg-white text-sm font-medium"
+                className="px-3 py-2.5 rounded-full border border-slate-300 bg-white text-sm font-medium"
               />
               <input
                 placeholder={tr('admin.scraper.sources.placeholderName')}
                 value={newSource.name}
                 onChange={(e) => setNewSource({ ...newSource, name: e.target.value })}
-                className="px-3 py-2.5 rounded-full border-2 border-black bg-white text-sm font-medium"
+                className="px-3 py-2.5 rounded-full border border-slate-300 bg-white text-sm font-medium"
               />
               <input
                 placeholder="URL"
                 value={newSource.url}
                 onChange={(e) => setNewSource({ ...newSource, url: e.target.value })}
-                className="px-3 py-2.5 rounded-full border-2 border-black bg-white text-sm font-medium col-span-2 md:col-span-1"
+                className="px-3 py-2.5 rounded-full border border-slate-300 bg-white text-sm font-medium col-span-2 md:col-span-1"
               />
               <select
                 value={newSource.frequency}
                 onChange={(e) => setNewSource({ ...newSource, frequency: e.target.value })}
-                className="px-3 py-2.5 rounded-full border-2 border-black bg-white text-sm font-bold"
+                className="px-3 py-2.5 rounded-full border border-slate-300 bg-white text-sm font-bold"
               >
                 <option value="hourly">{tr('admin.scraper.sources.frequency.hourly')}</option>
                 <option value="daily">{tr('admin.scraper.sources.frequency.daily')}</option>
@@ -663,14 +663,14 @@ export function AdminScraper() {
               <button
                 onClick={handleAddSource}
                 disabled={busy === 'add-source'}
-                className="inline-flex items-center gap-1.5 px-5 py-2 rounded-full bg-primary text-white border-2 border-black font-bold text-sm shadow-[2px_2px_0px_0px_#000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[3px_3px_0px_0px_#000] disabled:opacity-40"
+                className="inline-flex items-center gap-1.5 px-5 py-2 rounded-full bg-primary text-white border border-slate-300 font-bold text-sm shadow-sm hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-sm disabled:opacity-40"
               >
                 {busy === 'add-source' ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
                 {tr('admin.scraper.sources.save')}
               </button>
               <button
                 onClick={() => setShowAddSource(false)}
-                className="inline-flex items-center gap-1.5 px-5 py-2 rounded-full bg-white border-2 border-black font-bold text-sm shadow-[2px_2px_0px_0px_#000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[3px_3px_0px_0px_#000]"
+                className="inline-flex items-center gap-1.5 px-5 py-2 rounded-full bg-white border border-slate-300 font-bold text-sm shadow-sm hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-sm"
               >
                 {tr('admin.scraper.sources.cancel')}
               </button>
@@ -691,7 +691,7 @@ export function AdminScraper() {
               <div key={src.id} className="px-6 py-4 flex items-center justify-between hover:bg-green-500/5 transition-colors">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-green-200 to-green-100 border-2 border-black flex items-center justify-center shrink-0">
+                    <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-green-200 to-green-100 border border-slate-300 flex items-center justify-center shrink-0">
                       <span className="material-symbols-outlined text-green-700 text-base" style={{ fontVariationSettings: "'FILL' 1" }}>schedule</span>
                     </div>
                     <span className="font-bold text-sm">{src.name}</span>

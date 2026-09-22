@@ -810,7 +810,7 @@ export default function AdminUsers() {
 
   const getRoleBadge = (role: User['role']) => (
     <span className={clsx(
-      'px-2 py-0.5 rounded-full text-[10px] font-black border-2 border-black whitespace-nowrap shrink-0',
+      'px-2 py-0.5 rounded-full text-[10px] font-black border border-slate-300 whitespace-nowrap shrink-0',
       role === 'super_admin'
         ? 'bg-gradient-to-r from-yellow-400 via-orange-500 to-red-500 text-white'
         : role === 'admin'
@@ -879,7 +879,7 @@ export default function AdminUsers() {
                 setCreateError('');
                 setShowCreateModal(true);
               }}
-              className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-gradient-to-r from-violet-500 to-blue-500 text-white font-bold text-sm border-2 border-black shadow-[3px_3px_0px_0px_#000] hover:shadow-[5px_5px_0px_0px_#000] hover:-translate-x-[1px] hover:-translate-y-[1px] transition-all"
+              className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-gradient-to-r from-violet-500 to-blue-500 text-white font-bold text-sm border border-slate-200 shadow-sm hover:shadow-[5px_5px_0px_0px_#000] hover:-translate-x-[1px] hover:-translate-y-[1px] transition-all"
             >
               <UserPlus className="w-4 h-4" />
               {tU('admin.users.createUser')}
@@ -912,7 +912,7 @@ export default function AdminUsers() {
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-xl border-2 border-black p-4 mb-4 shadow-[2px_2px_0px_0px_#000]">
+      <div className="bg-white rounded-xl border border-slate-300 p-4 mb-4 shadow-sm">
         <div className="flex flex-wrap gap-3">
           <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -921,14 +921,14 @@ export default function AdminUsers() {
               placeholder={tU('admin.users.searchPlaceholder')}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 rounded-lg border-2 border-black font-medium text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-300 font-medium text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>
 
           <select
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value as FilterStatus)}
-            className="px-3 py-2 rounded-lg border-2 border-black font-medium text-sm bg-white"
+            className="px-3 py-2 rounded-lg border border-slate-300 font-medium text-sm bg-white"
           >
             <option value="all">{tU('admin.users.allStatus')}</option>
             <option value="active">{tU('admin.users.active')}</option>
@@ -939,7 +939,7 @@ export default function AdminUsers() {
           <select
             value={filterRole}
             onChange={(e) => setFilterRole(e.target.value as FilterRole)}
-            className="px-3 py-2 rounded-lg border-2 border-black font-medium text-sm bg-white"
+            className="px-3 py-2 rounded-lg border border-slate-300 font-medium text-sm bg-white"
           >
             <option value="all">{tU('admin.users.allRoles')}</option>
             <option value="admin">{tU('admin.users.admin')}</option>
@@ -954,16 +954,16 @@ export default function AdminUsers() {
           <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
         </div>
       ) : users.length === 0 ? (
-        <div className="text-center py-20 bg-white rounded-xl border-2 border-black">
+        <div className="text-center py-20 bg-white rounded-xl border border-slate-300">
           <Users className="w-16 h-16 mx-auto mb-4 text-slate-300" />
           <p className="text-slate-500 font-medium">{tU('admin.users.noUsers')}</p>
         </div>
       ) : (
         <>
-          <div className="bg-white rounded-xl border-2 border-black shadow-[2px_2px_0px_0px_#000] overflow-hidden">
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-slate-50 border-b-2 border-black">
+                <thead className="bg-slate-50 border-b border-slate-200">
                   <tr>
                     <th className="text-left px-4 py-3 font-black text-xs uppercase tracking-wider text-slate-600">{tU('admin.users.userCol')}</th>
                     <th className="text-left px-4 py-3 font-black text-xs uppercase tracking-wider text-slate-600">{tU('admin.users.statusCol')}</th>
@@ -1012,7 +1012,7 @@ export default function AdminUsers() {
                             <button
                               onClick={() => handleUpdateStatus(user.id, 'suspended')}
                               disabled={actionLoading === user.id}
-                              className="p-2 rounded-lg bg-amber-100 text-amber-700 hover:bg-amber-200 transition-all border-2 border-black disabled:opacity-50"
+                              className="p-2 rounded-lg bg-amber-100 text-amber-700 hover:bg-amber-200 transition-all border border-slate-300 disabled:opacity-50"
                               title={tU('admin.users.lockAccount')}
                             >
                               <ShieldOff className="w-4 h-4" />
@@ -1021,7 +1021,7 @@ export default function AdminUsers() {
                             <button
                               onClick={() => handleUpdateStatus(user.id, 'active')}
                               disabled={actionLoading === user.id}
-                              className="p-2 rounded-lg bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-all border-2 border-black disabled:opacity-50"
+                              className="p-2 rounded-lg bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-all border border-slate-300 disabled:opacity-50"
                               title={user.status === 'suspended' ? tU('admin.users.unlockAccount') : tU('admin.users.approveAccount')}
                             >
                               <Shield className="w-4 h-4" />
@@ -1032,7 +1032,7 @@ export default function AdminUsers() {
                             <button
                               onClick={() => handleUpdateRole(user.id, 'admin')}
                               disabled={actionLoading === user.id}
-                              className="p-2 rounded-lg bg-purple-100 text-purple-700 hover:bg-purple-200 transition-all border-2 border-black disabled:opacity-50"
+                              className="p-2 rounded-lg bg-purple-100 text-purple-700 hover:bg-purple-200 transition-all border border-slate-300 disabled:opacity-50"
                               title={tU('admin.users.promoteToAdmin')}
                             >
                               <Shield className="w-4 h-4" />
@@ -1041,7 +1041,7 @@ export default function AdminUsers() {
                             <button
                               onClick={() => handleUpdateRole(user.id, 'user')}
                               disabled={actionLoading === user.id}
-                              className="p-2 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all border-2 border-black disabled:opacity-50"
+                              className="p-2 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all border border-slate-300 disabled:opacity-50"
                               title={tU('admin.users.demoteToUser')}
                             >
                               <ShieldOff className="w-4 h-4" />
@@ -1052,7 +1052,7 @@ export default function AdminUsers() {
                           <button
                             onClick={() => handleResetPassword(user)}
                             disabled={actionLoading === user.id}
-                            className="p-2 rounded-lg bg-blue-100 text-blue-700 hover:bg-blue-200 transition-all border-2 border-black disabled:opacity-50"
+                            className="p-2 rounded-lg bg-blue-100 text-blue-700 hover:bg-blue-200 transition-all border border-slate-300 disabled:opacity-50"
                             title={tU('admin.users.resetPassword')}
                           >
                             <KeyRound className="w-4 h-4" />
@@ -1061,7 +1061,7 @@ export default function AdminUsers() {
                           <button
                             onClick={() => handleDelete(user)}
                             disabled={actionLoading === user.id}
-                            className="p-2 rounded-lg bg-red-100 text-red-700 hover:bg-red-200 transition-all border-2 border-black disabled:opacity-50"
+                            className="p-2 rounded-lg bg-red-100 text-red-700 hover:bg-red-200 transition-all border border-slate-300 disabled:opacity-50"
                             title={tU('admin.users.deleteAccount')}
                           >
                             <Trash2 className="w-4 h-4" />
@@ -1081,17 +1081,17 @@ export default function AdminUsers() {
               <button
                 onClick={() => setPage(Math.max(0, page - 1))}
                 disabled={page === 0}
-                className="px-5 py-2.5 rounded-xl border-2 border-black bg-white text-black font-bold shadow-[2px_2px_0px_0px_#000] hover:shadow-[3px_3px_0px_0px_#000] hover:-translate-x-[1px] hover:-translate-y-[1px] transition-all disabled:opacity-30 disabled:shadow-none"
+                className="px-5 py-2.5 rounded-xl border border-slate-300 bg-white text-black font-bold shadow-sm hover:shadow-sm hover:-translate-x-[1px] hover:-translate-y-[1px] transition-all disabled:opacity-30 disabled:shadow-none"
               >
                 ← {tU('admin.users.prev')}
               </button>
-              <span className="px-5 py-2.5 rounded-xl border-2 border-black bg-white text-black font-bold">
+              <span className="px-5 py-2.5 rounded-xl border border-slate-300 bg-white text-black font-bold">
                 {tU('admin.users.page')} {page + 1} / {totalPages}
               </span>
               <button
                 onClick={() => setPage(Math.min(totalPages - 1, page + 1))}
                 disabled={page >= totalPages - 1}
-                className="px-5 py-2.5 rounded-xl border-2 border-black bg-white text-black font-bold shadow-[2px_2px_0px_0px_#000] hover:shadow-[3px_3px_0px_0px_#000] hover:-translate-x-[1px] hover:-translate-y-[1px] transition-all disabled:opacity-30 disabled:shadow-none"
+                className="px-5 py-2.5 rounded-xl border border-slate-300 bg-white text-black font-bold shadow-sm hover:shadow-sm hover:-translate-x-[1px] hover:-translate-y-[1px] transition-all disabled:opacity-30 disabled:shadow-none"
               >
                 {tU('admin.users.next')} →
               </button>
@@ -1106,8 +1106,8 @@ export default function AdminUsers() {
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in"
           onClick={(e) => e.target === e.currentTarget && setShowCreateModal(false)}
         >
-          <div className="bg-white rounded-2xl border-2 border-black shadow-[6px_6px_0px_0px_#000] max-w-lg w-full max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-gradient-to-r from-violet-500 to-blue-500 text-white px-6 py-4 border-b-2 border-black flex items-center justify-between">
+          <div className="bg-white rounded-2xl border border-slate-300 shadow-[6px_6px_0px_0px_#000] max-w-lg w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-gradient-to-r from-violet-500 to-blue-500 text-white px-6 py-4 border-b border-slate-200 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <UserPlus className="w-5 h-5" />
                 <h3 className="font-black text-lg">{tU('admin.users.createAccountTitle')}</h3>
@@ -1132,7 +1132,7 @@ export default function AdminUsers() {
                   value={createForm.name}
                   onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}
                   placeholder={tU('admin.users.namePlaceholder')}
-                  className="w-full px-4 py-2.5 rounded-lg border-2 border-black font-medium text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full px-4 py-2.5 rounded-lg border border-slate-300 font-medium text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
 
@@ -1147,7 +1147,7 @@ export default function AdminUsers() {
                   value={createForm.email}
                   onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })}
                   placeholder={tU('admin.users.emailPlaceholder')}
-                  className="w-full px-4 py-2.5 rounded-lg border-2 border-black font-medium text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full px-4 py-2.5 rounded-lg border border-slate-300 font-medium text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
 
@@ -1160,7 +1160,7 @@ export default function AdminUsers() {
                   <select
                     value={createForm.role}
                     onChange={(e) => setCreateForm({ ...createForm, role: e.target.value as any })}
-                    className="w-full px-3 py-2.5 rounded-lg border-2 border-black font-medium text-sm bg-white"
+                    className="w-full px-3 py-2.5 rounded-lg border border-slate-300 font-medium text-sm bg-white"
                   >
                     <option value="user">👤 {tU('admin.users.staff')}</option>
                     {isSuperAdmin && (
@@ -1177,7 +1177,7 @@ export default function AdminUsers() {
                   <select
                     value={createForm.plan}
                     onChange={(e) => setCreateForm({ ...createForm, plan: e.target.value as any })}
-                    className="w-full px-3 py-2.5 rounded-lg border-2 border-black font-medium text-sm bg-white"
+                    className="w-full px-3 py-2.5 rounded-lg border border-slate-300 font-medium text-sm bg-white"
                   >
                     <option value="free">� {tU('admin.users.free')} ({tU('admin.users.freeQuota')})</option>
                     <option value="pro">⭐ {tU('admin.users.pro')} ({tU('admin.users.proQuota')})</option>
@@ -1224,7 +1224,7 @@ export default function AdminUsers() {
                         : tU('admin.users.enterManually')
                     }
                     disabled={autoGenPassword}
-                    className="w-full px-4 py-2.5 pr-20 rounded-lg border-2 border-black font-mono text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-slate-50 disabled:text-slate-700"
+                    className="w-full px-4 py-2.5 pr-20 rounded-lg border border-slate-300 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-slate-50 disabled:text-slate-700"
                   />
                   <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1">
                     <button
@@ -1273,14 +1273,14 @@ export default function AdminUsers() {
                 <button
                   type="button"
                   onClick={() => setShowCreateModal(false)}
-                  className="flex-1 py-2.5 rounded-lg border-2 border-black bg-white text-black font-bold text-sm hover:bg-slate-50"
+                  className="flex-1 py-2.5 rounded-lg border border-slate-300 bg-white text-black font-bold text-sm hover:bg-slate-50"
                 >
                   {tU('admin.users.cancel')}
                 </button>
                 <button
                   type="submit"
                   disabled={createLoading}
-                  className="flex-1 py-2.5 rounded-lg bg-gradient-to-r from-violet-500 to-blue-500 text-white font-bold text-sm border-2 border-black shadow-[2px_2px_0px_0px_#000] hover:shadow-[3px_3px_0px_0px_#000] hover:-translate-x-[1px] hover:-translate-y-[1px] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="flex-1 py-2.5 rounded-lg bg-gradient-to-r from-violet-500 to-blue-500 text-white font-bold text-sm border border-slate-200 shadow-sm hover:shadow-sm hover:-translate-x-[1px] hover:-translate-y-[1px] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   {createLoading ? (
                     <>
@@ -1303,8 +1303,8 @@ export default function AdminUsers() {
       {/* ═══════════════ MODAL: Sau khi tạo thành công - show password ═══════════════ */}
       {createdResult && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in">
-          <div className="bg-white rounded-2xl border-2 border-black shadow-[6px_6px_0px_0px_#000] max-w-md w-full">
-            <div className="bg-gradient-to-r from-emerald-500 to-teal-500 text-white px-6 py-4 border-b-2 border-black flex items-center justify-between">
+          <div className="bg-white rounded-2xl border border-slate-300 shadow-[6px_6px_0px_0px_#000] max-w-md w-full">
+            <div className="bg-gradient-to-r from-emerald-500 to-teal-500 text-white px-6 py-4 border-b border-slate-200 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="w-5 h-5" />
                 <h3 className="font-black text-lg">{tU('admin.users.accountCreatedSuccess')}</h3>
@@ -1330,12 +1330,12 @@ export default function AdminUsers() {
                   {tU('admin.users.loginEmail')}
                 </label>
                 <div className="flex items-center gap-2">
-                  <div className="flex-1 px-3 py-2.5 rounded-lg border-2 border-black bg-slate-50 font-mono text-sm font-bold">
+                  <div className="flex-1 px-3 py-2.5 rounded-lg border border-slate-300 bg-slate-50 font-mono text-sm font-bold">
                     {createdResult.user.email}
                   </div>
                   <button
                     onClick={() => copyToClipboard(createdResult.user.email, 'email')}
-                    className="p-2.5 rounded-lg border-2 border-black bg-white hover:bg-slate-50"
+                    className="p-2.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50"
                     title={tU('admin.users.titleCopyEmail')}
                   >
                     {copiedField === 'email' ? (
@@ -1352,12 +1352,12 @@ export default function AdminUsers() {
                   {tU('admin.users.tempPassword')}
                 </label>
                 <div className="flex items-center gap-2">
-                  <div className="flex-1 px-3 py-2.5 rounded-lg border-2 border-black bg-amber-50 font-mono text-sm font-bold text-amber-900">
+                  <div className="flex-1 px-3 py-2.5 rounded-lg border border-slate-300 bg-amber-50 font-mono text-sm font-bold text-amber-900">
                     {createdResult.tempPassword}
                   </div>
                   <button
                     onClick={() => copyToClipboard(createdResult.tempPassword, 'password')}
-                    className="p-2.5 rounded-lg border-2 border-black bg-white hover:bg-slate-50"
+                    className="p-2.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50"
                     title={tU('admin.users.titleCopyPassword')}
                   >
                     {copiedField === 'password' ? (
@@ -1381,7 +1381,7 @@ export default function AdminUsers() {
                     'all'
                   )
                 }
-                className="w-full py-2.5 rounded-lg border-2 border-black bg-violet-50 hover:bg-violet-100 text-sm font-bold flex items-center justify-center gap-2"
+                className="w-full py-2.5 rounded-lg border border-slate-300 bg-violet-50 hover:bg-violet-100 text-sm font-bold flex items-center justify-center gap-2"
               >
                 {copiedField === 'all' ? (
                   <>
@@ -1410,8 +1410,8 @@ export default function AdminUsers() {
       {/* ═══════════════ MODAL: Reset password ═══════════════ */}
       {resetTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in">
-          <div className="bg-white rounded-2xl border-2 border-black shadow-[6px_6px_0px_0px_#000] max-w-md w-full">
-            <div className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white px-6 py-4 border-b-2 border-black flex items-center justify-between">
+          <div className="bg-white rounded-2xl border border-slate-300 shadow-[6px_6px_0px_0px_#000] max-w-md w-full">
+            <div className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white px-6 py-4 border-b border-slate-200 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <KeyRound className="w-5 h-5" />
                 <h3 className="font-black text-lg">{tU('admin.users.resetPasswordTitle')}</h3>
@@ -1442,12 +1442,12 @@ export default function AdminUsers() {
                       {tU('admin.users.newPassword')}
                     </label>
                     <div className="flex items-center gap-2">
-                      <div className="flex-1 px-3 py-2.5 rounded-lg border-2 border-black bg-amber-50 font-mono text-sm font-bold text-amber-900">
+                      <div className="flex-1 px-3 py-2.5 rounded-lg border border-slate-300 bg-amber-50 font-mono text-sm font-bold text-amber-900">
                         {resetResult.tempPassword}
                       </div>
                       <button
                         onClick={() => copyToClipboard(resetResult.tempPassword, 'resetPassword')}
-                        className="p-2.5 rounded-lg border-2 border-black bg-white hover:bg-slate-50"
+                        className="p-2.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50"
                       >
                         {copiedField === 'resetPassword' ? (
                           <Check className="w-4 h-4 text-emerald-500" />
@@ -1476,7 +1476,7 @@ export default function AdminUsers() {
 
 function StatCard({ label, value, icon, color }: { label: string; value: number; icon: React.ReactNode; color: string }) {
   return (
-    <div className="bg-white rounded-xl border-2 border-black p-4 shadow-[2px_2px_0px_0px_#000]">
+    <div className="bg-white rounded-xl border border-slate-300 p-4 shadow-sm">
       <div className="flex items-center gap-3">
         <div className={`w-10 h-10 rounded-lg ${color} flex items-center justify-center text-white`}>
           {icon}

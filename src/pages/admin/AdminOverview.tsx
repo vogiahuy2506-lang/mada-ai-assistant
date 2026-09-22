@@ -337,7 +337,7 @@ export function AdminOverview() {
       {/* Metrics Row */}
       <section className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
         <div className="relative bg-gradient-to-br from-primary/10 to-primary/5 backdrop-blur-xl rounded-2xl p-4 border-3 border-black flex items-center gap-4 transform rotate-[-0.5deg] hover:rotate-0 transition-transform shadow-[6px_6px_0px_0px_#000] hover:shadow-[8px_8px_0px_0px_#000]">
-          <div className="w-10 h-10 rounded-xl bg-primary/20 border-2 border-black flex items-center justify-center shadow-[3px_3px_0px_0px_#000]">
+          <div className="w-10 h-10 rounded-xl bg-primary/20 border border-slate-300 flex items-center justify-center shadow-sm">
             <span className="material-symbols-outlined text-primary text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>group</span>
           </div>
           <div>
@@ -348,7 +348,7 @@ export function AdminOverview() {
         </div>
 
         <div className="relative bg-gradient-to-br from-secondary/10 to-secondary/5 backdrop-blur-xl rounded-2xl p-4 border-3 border-black flex items-center gap-4 transform rotate-[0.5deg] hover:rotate-0 transition-transform shadow-[6px_6px_0px_0px_#000] hover:shadow-[8px_8px_0px_0px_#000]">
-          <div className="w-10 h-10 rounded-xl bg-secondary/20 border-2 border-black flex items-center justify-center shadow-[3px_3px_0px_0px_#000]">
+          <div className="w-10 h-10 rounded-xl bg-secondary/20 border border-slate-300 flex items-center justify-center shadow-sm">
             <span className="material-symbols-outlined text-secondary text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>description</span>
           </div>
           <div>
@@ -361,7 +361,7 @@ export function AdminOverview() {
         </div>
 
         <div className="relative bg-gradient-to-br from-tertiary/10 to-tertiary/5 backdrop-blur-xl rounded-2xl p-4 border-3 border-black flex items-center gap-4 transform rotate-[-0.5deg] hover:rotate-0 transition-transform shadow-[6px_6px_0px_0px_#000] hover:shadow-[8px_8px_0px_0px_#000]">
-          <div className="w-10 h-10 rounded-xl bg-tertiary/20 border-2 border-black flex items-center justify-center shadow-[3px_3px_0px_0px_#000]">
+          <div className="w-10 h-10 rounded-xl bg-tertiary/20 border border-slate-300 flex items-center justify-center shadow-sm">
             <span className="material-symbols-outlined text-tertiary text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>workspace_premium</span>
           </div>
           <div>
@@ -372,7 +372,7 @@ export function AdminOverview() {
         </div>
 
         <div className="relative bg-gradient-to-br from-error/10 to-error/5 backdrop-blur-xl rounded-2xl p-4 border-3 border-black flex items-center gap-4 transform rotate-[0.5deg] hover:rotate-0 transition-transform shadow-[6px_6px_0px_0px_#000] hover:shadow-[8px_8px_0px_0px_#000]">
-          <div className="w-10 h-10 rounded-xl bg-error/20 border-2 border-black flex items-center justify-center shadow-[3px_3px_0px_0px_#000]">
+          <div className="w-10 h-10 rounded-xl bg-error/20 border border-slate-300 flex items-center justify-center shadow-sm">
             <span className="material-symbols-outlined text-error text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>block</span>
           </div>
           <div>
@@ -395,7 +395,7 @@ export function AdminOverview() {
             <select
               value={filterBotId}
               onChange={(e) => setFilterBotId(e.target.value)}
-              className="h-10 px-3 rounded-lg border-2 border-black font-label-md bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+              className="h-10 px-3 rounded-lg border border-slate-300 font-label-md bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
             >
               <option value="">{tO('admin.overview.allBots')}</option>
               <option value="bot-hearing">{getBotName('bot-hearing')}</option>
@@ -414,7 +414,7 @@ export function AdminOverview() {
               <button
                 key={row.botId}
                 onClick={() => setFilterBotId(filterBotId === row.botId ? '' : row.botId)}
-                className={`text-left p-3 rounded-xl border-2 border-black transition-all hover:-translate-y-0.5 hover:shadow-[3px_3px_0px_0px_#000] ${filterBotId === row.botId ? 'bg-primary text-white' : 'bg-white'}`}
+                className={`text-left p-3 rounded-xl border border-slate-300 transition-all hover:-translate-y-0.5 hover:shadow-sm ${filterBotId === row.botId ? 'bg-primary text-white' : 'bg-white'}`}
               >
                 <div className="text-[10px] font-bold uppercase opacity-70">{row.botId.replace('bot-', '')}</div>
                 <div className="text-2xl font-black mt-1">{row.count}</div>
@@ -438,14 +438,14 @@ export function AdminOverview() {
               <h3 className="text-2xl font-black text-on-surface">{tO('admin.overview.newestUsers')}</h3>
               <p className="text-sm text-on-surface-variant">{tO('admin.overview.recentAccounts')}</p>
             </div>
-            <a href="/admin/users" className="px-5 py-2.5 rounded-full bg-primary text-white text-sm font-bold border-2 border-black shadow-[3px_3px_0px_0px_#000] hover:-translate-x-1 hover:-translate-y-1 hover:shadow-[4px_4px_0px_0px_#000] transition-all">
+            <a href="/admin/users" className="px-5 py-2.5 rounded-full bg-primary text-white text-sm font-bold border border-slate-200 shadow-sm hover:-translate-x-1 hover:-translate-y-1 hover:shadow-sm transition-all">
               {tO('admin.overview.viewAll')} →
             </a>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead>
-                <tr className="border-b-2 border-black">
+                <tr className="border-b border-slate-200">
                   <th className="py-3 px-4 text-xs font-bold text-gray-500 uppercase tracking-widest">{tO('admin.overview.user')}</th>
                   <th className="py-3 px-4 text-xs font-bold text-gray-500 uppercase tracking-widest">{tO('admin.overview.role')}</th>
                   <th className="py-3 px-4 text-xs font-bold text-gray-500 uppercase tracking-widest">{tO('admin.overview.plan')}</th>
@@ -462,7 +462,7 @@ export function AdminOverview() {
                   <tr key={u.id} className="border-b border-black/10 hover:bg-gray-50/50 transition-colors">
                     <td className="py-4 px-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-tertiary flex items-center justify-center text-white font-bold text-sm border-2 border-black">
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-tertiary flex items-center justify-center text-white font-bold text-sm border border-slate-300">
                           {u.name.charAt(0).toUpperCase()}
                         </div>
                         <div>
@@ -472,12 +472,12 @@ export function AdminOverview() {
                       </div>
                     </td>
                     <td className="py-4 px-4">
-                      <span className="px-3 py-1 rounded-full text-xs font-bold border-2 border-black bg-gray-100">
+                      <span className="px-3 py-1 rounded-full text-xs font-bold border border-slate-300 bg-gray-100">
                         {u.role === 'admin' ? tO('admin.users.admin') : u.role === 'expert' ? tO('admin.overview.expert') : u.role === 'data_manager' ? tO('admin.overview.dataManager') : tO('admin.overview.user')}
                       </span>
                     </td>
                     <td className="py-4 px-4">
-                      <span className={`px-3 py-1 rounded-full text-xs font-bold border-2 border-black ${
+                      <span className={`px-3 py-1 rounded-full text-xs font-bold border border-slate-300 ${
                         u.plan === 'enterprise' ? 'bg-primary/20 text-primary' :
                         u.plan === 'pro' ? 'bg-secondary/20 text-secondary' :
                         'bg-gray-100 text-gray-600'
@@ -486,7 +486,7 @@ export function AdminOverview() {
                       </span>
                     </td>
                     <td className="py-4 px-4">
-                      <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold border-2 border-black ${
+                      <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold border border-slate-300 ${
                         u.status === 'active' ? 'bg-green-100 text-green-700' : u.status === 'suspended' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600'
                       }`}>
                         <span className={`w-2 h-2 rounded-full ${
@@ -510,22 +510,22 @@ export function AdminOverview() {
         <div className="relative z-10">
           <h3 className="text-2xl font-black text-on-surface mb-6">{tO('admin.overview.quickActions')}</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <a href="/admin/users" className="p-6 rounded-2xl bg-white/60 border-2 border-black hover:shadow-[6px_6px_0px_0px_#000] hover:-translate-x-1 hover:-translate-y-1 transition-all group">
-              <div className="w-12 h-12 rounded-xl bg-primary/20 border-2 border-black flex items-center justify-center mb-4 shadow-[3px_3px_0px_0px_#000]">
+            <a href="/admin/users" className="p-6 rounded-2xl bg-white/60 border border-slate-300 hover:shadow-[6px_6px_0px_0px_#000] hover:-translate-x-1 hover:-translate-y-1 transition-all group">
+              <div className="w-12 h-12 rounded-xl bg-primary/20 border border-slate-300 flex items-center justify-center mb-4 shadow-sm">
                 <span className="material-symbols-outlined text-primary text-xl">person_add</span>
               </div>
               <h4 className="font-bold text-on-surface mb-1">{tO('admin.overview.manageUsers')}</h4>
               <p className="text-sm text-on-surface-variant">{tO('admin.overview.manageUsersDesc')}</p>
             </a>
-            <a href="/admin/logs" className="p-6 rounded-2xl bg-white/60 border-2 border-black hover:shadow-[6px_6px_0px_0px_#000] hover:-translate-x-1 hover:-translate-y-1 transition-all group">
-              <div className="w-12 h-12 rounded-xl bg-secondary/20 border-2 border-black flex items-center justify-center mb-4 shadow-[3px_3px_0px_0px_#000]">
+            <a href="/admin/logs" className="p-6 rounded-2xl bg-white/60 border border-slate-300 hover:shadow-[6px_6px_0px_0px_#000] hover:-translate-x-1 hover:-translate-y-1 transition-all group">
+              <div className="w-12 h-12 rounded-xl bg-secondary/20 border border-slate-300 flex items-center justify-center mb-4 shadow-sm">
                 <span className="material-symbols-outlined text-secondary text-xl">receipt_long</span>
               </div>
               <h4 className="font-bold text-on-surface mb-1">{tO('admin.overview.systemLogs')}</h4>
               <p className="text-sm text-on-surface-variant">{tO('admin.overview.systemLogsDesc')}</p>
             </a>
-            <a href="/admin/settings" className="p-6 rounded-2xl bg-white/60 border-2 border-black hover:shadow-[6px_6px_0px_0px_#000] hover:-translate-x-1 hover:-translate-y-1 transition-all group">
-              <div className="w-12 h-12 rounded-xl bg-tertiary/20 border-2 border-black flex items-center justify-center mb-4 shadow-[3px_3px_0px_0px_#000]">
+            <a href="/admin/settings" className="p-6 rounded-2xl bg-white/60 border border-slate-300 hover:shadow-[6px_6px_0px_0px_#000] hover:-translate-x-1 hover:-translate-y-1 transition-all group">
+              <div className="w-12 h-12 rounded-xl bg-tertiary/20 border border-slate-300 flex items-center justify-center mb-4 shadow-sm">
                 <span className="material-symbols-outlined text-tertiary text-xl">settings_suggest</span>
               </div>
               <h4 className="font-bold text-on-surface mb-1">{tO('admin.overview.systemConfig')}</h4>

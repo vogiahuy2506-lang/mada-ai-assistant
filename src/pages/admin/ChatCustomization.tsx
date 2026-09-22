@@ -145,7 +145,7 @@ export function ChatCustomization({ userRole = 'admin', onClose: _onClose }: Omi
           <button
             onClick={handleSave}
             disabled={saving}
-            className="px-6 py-3 rounded-xl bg-primary text-white font-bold text-sm border-2 border-black shadow-[4px_4px_0px_0px_#000] hover:-translate-y-0.5 hover:shadow-[5px_5px_0px_0px_#000] transition-all disabled:opacity-50 flex items-center gap-2"
+            className="px-6 py-3 rounded-xl bg-primary text-white font-bold text-sm border border-slate-200 shadow-sm hover:-translate-y-0.5 hover:shadow-[5px_5px_0px_0px_#000] transition-all disabled:opacity-50 flex items-center gap-2"
           >
             {saving ? (
               <><Loader2 className="w-4 h-4 animate-spin" /> {tChat('admin.chatCustomization.saving')}</>
@@ -176,7 +176,7 @@ export function ChatCustomization({ userRole = 'admin', onClose: _onClose }: Omi
       )}
 
       {/* Section 1: Lời chào & Mô tả */}
-      <div className="p-6 rounded-2xl bg-white/60 border-2 border-black shadow-[4px_4px_0px_0px_#000]">
+      <div className="p-6 rounded-2xl bg-white/60 border border-slate-200 shadow-sm">
         <div className="flex items-center gap-2 mb-4">
           <span className="text-2xl">👋</span>
           <h4 className="font-bold text-on-surface">{tChat('admin.chatCustomization.greeting.title')}</h4>
@@ -192,7 +192,7 @@ export function ChatCustomization({ userRole = 'admin', onClose: _onClose }: Omi
                 type="text"
                 value={greeting[langOption.key]}
                 onChange={(e) => updateGreeting(langOption.key, e.target.value)}
-                className="w-full px-4 py-3 rounded-xl bg-white border-2 border-black text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                className="w-full px-4 py-3 rounded-xl bg-white border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
                 placeholder={`Hello! I am MADA AI.`}
               />
             </div>
@@ -201,7 +201,7 @@ export function ChatCustomization({ userRole = 'admin', onClose: _onClose }: Omi
       </div>
 
       {/* Section 2: Mô tả */}
-      <div className="p-6 rounded-2xl bg-white/60 border-2 border-black shadow-[4px_4px_0px_0px_#000]">
+      <div className="p-6 rounded-2xl bg-white/60 border border-slate-200 shadow-sm">
         <h4 className="font-bold text-on-surface mb-4">{tChat('admin.chatCustomization.greeting.descLabel')}</h4>
         
         <div className="space-y-4">
@@ -214,7 +214,7 @@ export function ChatCustomization({ userRole = 'admin', onClose: _onClose }: Omi
                 value={description[langOption.key]}
                 onChange={(e) => updateDescription(langOption.key, e.target.value)}
                 rows={3}
-                className="w-full px-4 py-3 rounded-xl bg-white border-2 border-black text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/30"
+                className="w-full px-4 py-3 rounded-xl bg-white border border-slate-300 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/30"
                 placeholder={`I can help you...`}
               />
             </div>
@@ -223,7 +223,7 @@ export function ChatCustomization({ userRole = 'admin', onClose: _onClose }: Omi
       </div>
 
       {/* Section 3: Prompts gợi ý */}
-      <div className="p-6 rounded-2xl bg-white/60 border-2 border-black shadow-[4px_4px_0px_0px_#000]">
+      <div className="p-6 rounded-2xl bg-white/60 border border-slate-200 shadow-sm">
         <div className="flex items-center gap-2 mb-2">
           <span className="text-2xl">⚡</span>
           <h4 className="font-bold text-on-surface">{tChat('admin.chatCustomization.prompts.title')}</h4>
@@ -244,7 +244,7 @@ export function ChatCustomization({ userRole = 'admin', onClose: _onClose }: Omi
                     type="text"
                     value={prompt.text}
                     onChange={(e) => updatePrompt(index, 'text', e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg bg-white border border-black/20 text-sm"
+                    className="w-full px-3 py-2 rounded-lg bg-white border border-slate-300 text-sm"
                   />
                 </div>
                 <div className="space-y-1">
@@ -253,7 +253,7 @@ export function ChatCustomization({ userRole = 'admin', onClose: _onClose }: Omi
                     type="text"
                     value={prompt.textEn}
                     onChange={(e) => updatePrompt(index, 'textEn', e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg bg-white border border-black/20 text-sm"
+                    className="w-full px-3 py-2 rounded-lg bg-white border border-slate-300 text-sm"
                   />
                 </div>
                 <div className="space-y-1">
@@ -262,7 +262,7 @@ export function ChatCustomization({ userRole = 'admin', onClose: _onClose }: Omi
                     type="text"
                     value={prompt.desc}
                     onChange={(e) => updatePrompt(index, 'desc', e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg bg-white border border-black/20 text-sm"
+                    className="w-full px-3 py-2 rounded-lg bg-white border border-slate-300 text-sm"
                   />
                 </div>
                 <div className="space-y-1">
@@ -271,7 +271,7 @@ export function ChatCustomization({ userRole = 'admin', onClose: _onClose }: Omi
                     type="text"
                     value={prompt.descEn}
                     onChange={(e) => updatePrompt(index, 'descEn', e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg bg-white border border-black/20 text-sm"
+                    className="w-full px-3 py-2 rounded-lg bg-white border border-slate-300 text-sm"
                   />
                 </div>
                 <div className="space-y-1 md:col-span-2">
@@ -300,7 +300,7 @@ export function ChatCustomization({ userRole = 'admin', onClose: _onClose }: Omi
       </div>
 
       {/* Section 4: Tính năng */}
-      <div className="p-6 rounded-2xl bg-white/60 border-2 border-black shadow-[4px_4px_0px_0px_#000]">
+      <div className="p-6 rounded-2xl bg-white/60 border border-slate-200 shadow-sm">
         <div className="flex items-center gap-2 mb-4">
           <span className="text-2xl">⚙️</span>
           <h4 className="font-bold text-on-surface">{tChat('admin.chatCustomization.feature.title')}</h4>
@@ -329,7 +329,7 @@ export function ChatCustomization({ userRole = 'admin', onClose: _onClose }: Omi
       </div>
 
       {/* Section 5: Cảm xúc AI */}
-      <div className="p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_0px_#000]">
+      <div className="p-6 rounded-2xl bg-white border border-slate-200 shadow-sm">
         <div className="flex items-center gap-2 mb-4">
           <span className="text-xl">🎯</span>
           <div>
@@ -347,7 +347,7 @@ export function ChatCustomization({ userRole = 'admin', onClose: _onClose }: Omi
       </div>
 
       {/* Section 6: AI Instructions */}
-      <div className="p-6 rounded-2xl bg-white/60 border-2 border-black shadow-[4px_4px_0px_0px_#000]">
+      <div className="p-6 rounded-2xl bg-white/60 border border-slate-200 shadow-sm">
         <div className="flex items-center gap-2 mb-4">
           <BotIcon className="w-5 h-5 text-amber-600" />
           <h4 className="font-bold text-on-surface">{tChat('admin.chatCustomization.aiInstructions')}</h4>
@@ -362,7 +362,7 @@ export function ChatCustomization({ userRole = 'admin', onClose: _onClose }: Omi
             onChange={(e) => updateSettings({ aiInstructions: { ...aiInstructions, coreIdentity: e.target.value } })}
             disabled={!isSuperAdmin}
             rows={4}
-            className="w-full px-4 py-3 rounded-xl bg-white border-2 border-black/20 font-mono text-sm resize-y focus:outline-none focus:ring-2 focus:ring-amber-400 disabled:bg-slate-100"
+            className="w-full px-4 py-3 rounded-xl bg-white border border-slate-300/20 font-mono text-sm resize-y focus:outline-none focus:ring-2 focus:ring-amber-400 disabled:bg-slate-100"
           />
         </div>
 
@@ -375,7 +375,7 @@ export function ChatCustomization({ userRole = 'admin', onClose: _onClose }: Omi
             onChange={(e) => updateSettings({ aiInstructions: { ...aiInstructions, responseFormat: e.target.value } })}
             disabled={!isSuperAdmin}
             rows={4}
-            className="w-full px-4 py-3 rounded-xl bg-white border-2 border-black/20 font-mono text-sm resize-y focus:outline-none focus:ring-2 focus:ring-amber-400 disabled:bg-slate-100"
+            className="w-full px-4 py-3 rounded-xl bg-white border border-slate-300/20 font-mono text-sm resize-y focus:outline-none focus:ring-2 focus:ring-amber-400 disabled:bg-slate-100"
           />
         </div>
 
@@ -388,7 +388,7 @@ export function ChatCustomization({ userRole = 'admin', onClose: _onClose }: Omi
             onChange={(e) => updateSettings({ aiInstructions: { ...aiInstructions, behaviorRules: e.target.value } })}
             disabled={!isSuperAdmin}
             rows={4}
-            className="w-full px-4 py-3 rounded-xl bg-white border-2 border-black/20 font-mono text-sm resize-y focus:outline-none focus:ring-2 focus:ring-amber-400 disabled:bg-slate-100"
+            className="w-full px-4 py-3 rounded-xl bg-white border border-slate-300/20 font-mono text-sm resize-y focus:outline-none focus:ring-2 focus:ring-amber-400 disabled:bg-slate-100"
           />
         </div>
 
@@ -401,13 +401,13 @@ export function ChatCustomization({ userRole = 'admin', onClose: _onClose }: Omi
             onChange={(e) => updateSettings({ aiInstructions: { ...aiInstructions, tone: e.target.value } })}
             disabled={!isSuperAdmin}
             rows={3}
-            className="w-full px-4 py-3 rounded-xl bg-white border-2 border-black/20 font-mono text-sm resize-y focus:outline-none focus:ring-2 focus:ring-amber-400 disabled:bg-slate-100"
+            className="w-full px-4 py-3 rounded-xl bg-white border border-slate-300/20 font-mono text-sm resize-y focus:outline-none focus:ring-2 focus:ring-amber-400 disabled:bg-slate-100"
           />
         </div>
       </div>
 
       {/* Section: Prompt Templates */}
-      <div className="rounded-2xl border-2 border-black overflow-hidden shadow-[4px_4px_0px_0px_#000]">
+      <div className="rounded-2xl border border-slate-300 overflow-hidden shadow-sm">
         <button
           onClick={() => setShowTemplates(!showTemplates)}
           className="w-full p-5 flex items-center justify-between bg-white hover:bg-slate-50 transition-colors"
@@ -445,7 +445,7 @@ export function ChatCustomization({ userRole = 'admin', onClose: _onClose }: Omi
         <button
           onClick={handleSave}
           disabled={saving}
-          className="px-8 py-4 rounded-xl bg-gradient-to-r from-primary to-cyan-500 text-white font-bold text-sm border-2 border-black shadow-[4px_4px_0px_0px_#000] hover:-translate-y-0.5 hover:shadow-[5px_5px_0px_0px_#000] transition-all disabled:opacity-50 flex items-center gap-2"
+          className="px-8 py-4 rounded-xl bg-gradient-to-r from-primary to-cyan-500 text-white font-bold text-sm border border-slate-200 shadow-sm hover:-translate-y-0.5 hover:shadow-[5px_5px_0px_0px_#000] transition-all disabled:opacity-50 flex items-center gap-2"
         >
           {saving ? (
             <><Loader2 className="w-4 h-4 animate-spin" /> {tChat('admin.chatCustomization.saving')}</>

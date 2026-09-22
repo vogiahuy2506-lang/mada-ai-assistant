@@ -174,7 +174,7 @@ export function AdminAudit() {
               'shadow-[6px_6px_0px_0px_#000]'
             )}
           >
-            <div className={clsx('w-10 h-10 rounded-xl border-2 border-black flex items-center justify-center shadow-[3px_3px_0px_0px_#000]', s.iconBg)}>
+            <div className={clsx('w-10 h-10 rounded-xl border border-slate-300 flex items-center justify-center shadow-sm', s.iconBg)}>
               <span className={clsx('material-symbols-outlined text-lg', s.iconColor)} style={{ fontVariationSettings: "'FILL' 1" }}>{s.icon}</span>
             </div>
             <div>
@@ -187,7 +187,7 @@ export function AdminAudit() {
 
       {/* Filter & Action Row */}
       <div className="flex items-center justify-between mb-8 flex-wrap gap-4">
-        <div className="flex items-center gap-3 p-1.5 bg-white/60 backdrop-blur-xl rounded-full border-2 border-black">
+        <div className="flex items-center gap-3 p-1.5 bg-white/60 backdrop-blur-xl rounded-full border border-slate-300">
           <span className="text-on-surface-variant font-medium text-sm ml-4 mr-2 flex items-center gap-1">
             <Filter className="w-4 h-4" />
             {t('admin.audit.filter')}
@@ -213,14 +213,14 @@ export function AdminAudit() {
               placeholder={t('admin.audit.userIdPlaceholder')}
               value={filterUser}
               onChange={(e) => setFilterUser(e.target.value)}
-              className="h-10 pl-10 pr-4 rounded-full border-2 border-black bg-white/60 backdrop-blur-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500 w-56"
+              className="h-10 pl-10 pr-4 rounded-full border border-slate-300 bg-white/60 backdrop-blur-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500 w-56"
             />
           </div>
 
           <select
             value={filterAction}
             onChange={(e) => setFilterAction(e.target.value)}
-            className="h-10 px-4 rounded-full border-2 border-black bg-white/60 backdrop-blur-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500 font-medium"
+            className="h-10 px-4 rounded-full border border-slate-300 bg-white/60 backdrop-blur-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500 font-medium"
           >
             <option value="">{t('admin.audit.allActions')}</option>
             {actions.map((a) => (
@@ -231,7 +231,7 @@ export function AdminAudit() {
           <button
             onClick={load}
             disabled={loading}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-white/60 backdrop-blur-xl border-2 border-black font-bold text-sm hover:bg-white hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[3px_3px_0px_0px_#000] shadow-[2px_2px_0px_0px_#000] transition-all disabled:opacity-50"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-white/60 backdrop-blur-xl border border-slate-300 font-bold text-sm hover:bg-white hover:translate-x-[-1px] hover:translate-y-[-1px]  shadow-sm transition-all disabled:opacity-50"
           >
             <RefreshCw className={clsx('w-4 h-4', loading && 'animate-spin')} />
             <span>{t('admin.audit.refresh')}</span>
@@ -240,7 +240,7 @@ export function AdminAudit() {
           <button
             onClick={exportCsv}
             disabled={!logs.length}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-purple-500 text-white border-2 border-black font-bold text-sm hover:bg-purple-600 hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[3px_3px_0px_0px_#000] shadow-[2px_2px_0px_0px_#000] transition-all disabled:opacity-40"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-purple-500 text-white border border-slate-300 font-bold text-sm hover:bg-purple-600 hover:translate-x-[-1px] hover:translate-y-[-1px]  shadow-sm transition-all disabled:opacity-40"
           >
             <FileDownload className="w-4 h-4" />
             <span>{t('admin.audit.exportCsv')}</span>
@@ -320,10 +320,10 @@ export function AdminAudit() {
                     <button
                       onClick={() => setExpandedLogId(isExpanded ? null : log.id)}
                       className={clsx(
-                        'shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border-2 border-black transition-all',
+                        'shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border border-slate-300 transition-all',
                         isExpanded
-                          ? 'bg-purple-500 text-white shadow-[2px_2px_0px_0px_#000]'
-                          : 'bg-white text-on-surface hover:bg-purple-500/10 shadow-[2px_2px_0px_0px_#000] hover:shadow-[3px_3px_0px_0px_#000]'
+                          ? 'bg-purple-500 text-white shadow-sm'
+                          : 'bg-white text-on-surface hover:bg-purple-500/10 shadow-sm '
                       )}
                     >
                       <span className="material-symbols-outlined text-sm">
@@ -334,7 +334,7 @@ export function AdminAudit() {
                   </div>
 
                   {isExpanded && (
-                    <div className="mt-4 ml-[1px] bg-gradient-to-br from-slate-50 to-white rounded-2xl border-2 border-black p-5 shadow-[4px_4px_0px_0px_#000]">
+                    <div className="mt-4 ml-[1px] bg-gradient-to-br from-slate-50 to-white rounded-2xl border border-slate-300 p-5 shadow-sm">
                       {/* Summary grid */}
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
                         <div className="bg-white rounded-lg border border-black/10 p-3">
@@ -390,7 +390,7 @@ export function AdminAudit() {
                             <span className="material-symbols-outlined text-sm">data_object</span>
                             {t('admin.audit.changePayload')}
                           </h5>
-                          <pre className="bg-slate-900 rounded-lg p-3 font-mono text-xs text-emerald-300 break-all whitespace-pre-wrap border-2 border-black overflow-x-auto">
+                          <pre className="bg-slate-900 rounded-lg p-3 font-mono text-xs text-emerald-300 break-all whitespace-pre-wrap border border-slate-300 overflow-x-auto">
                             {(() => {
                               try { return JSON.stringify(JSON.parse(log.details), null, 2); }
                               catch { return log.details; }

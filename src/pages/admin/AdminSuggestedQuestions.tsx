@@ -491,7 +491,7 @@ export default function AdminSuggestedQuestions() {
     >
       {/* Hero Section */}
       <section className="mb-6">
-        <div className="bg-gradient-to-br from-primary/10 via-white to-secondary/10 backdrop-blur-xl rounded-2xl border-2 border-black p-5 shadow-[6px_6px_0px_0px_#000]">
+        <div className="bg-gradient-to-br from-primary/10 via-white to-secondary/10 backdrop-blur-xl rounded-2xl border border-slate-300 p-5 shadow-[6px_6px_0px_0px_#000]">
           <div className="flex justify-between items-center flex-wrap gap-4">
             <div>
               <h2 className="text-2xl font-black text-on-surface mb-1">{t('adminSuggested.heroTitle')}</h2>
@@ -503,14 +503,14 @@ export default function AdminSuggestedQuestions() {
               <div className="flex gap-2 flex-wrap">
                 <button
                   onClick={handleImportDefaults}
-                  className="flex items-center gap-2 px-4 py-2 rounded-full bg-secondary text-white font-bold text-sm border-2 border-black shadow-[3px_3px_0px_0px_#000] hover:shadow-[4px_4px_0px_0px_#000] transition-all"
+                  className="flex items-center gap-2 px-4 py-2 rounded-full bg-secondary text-white font-bold text-sm border border-slate-200 shadow-sm hover:shadow-sm transition-all"
                 >
                   <span className="material-symbols-outlined text-sm">download</span>
                   {t('adminSuggested.importDefaults')}
                 </button>
                 <button
                   onClick={openBulkAddForm}
-                  className="flex items-center gap-2 px-4 py-2 rounded-full bg-primary text-white font-bold text-sm border-2 border-black shadow-[3px_3px_0px_0px_#000] hover:shadow-[4px_4px_0px_0px_#000] transition-all"
+                  className="flex items-center gap-2 px-4 py-2 rounded-full bg-primary text-white font-bold text-sm border border-slate-200 shadow-sm hover:shadow-sm transition-all"
                 >
                   <span className="material-symbols-outlined text-sm">add</span>
                   {t('adminSuggested.addMany')}
@@ -524,28 +524,28 @@ export default function AdminSuggestedQuestions() {
       {/* Stats Cards */}
       {stats && (
         <section className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-          <div className="bg-gradient-to-br from-blue-50 to-blue-100/50 backdrop-blur-xl rounded-xl p-4 border-2 border-black shadow-[4px_4px_0px_0px_#000]">
+          <div className="bg-gradient-to-br from-blue-50 to-blue-100/50 backdrop-blur-xl rounded-xl p-4 border border-slate-200 shadow-sm">
             <div className="flex items-center gap-2 mb-2">
               <span className="material-symbols-outlined text-blue-600">quiz</span>
               <span className="text-xs font-bold text-blue-700 uppercase">{t('adminSuggested.total')}</span>
             </div>
             <h3 className="text-2xl font-black text-blue-700">{stats.total?.count || 0}</h3>
           </div>
-          <div className="bg-gradient-to-br from-green-50 to-green-100/50 backdrop-blur-xl rounded-xl p-4 border-2 border-black shadow-[4px_4px_0px_0px_#000]">
+          <div className="bg-gradient-to-br from-green-50 to-green-100/50 backdrop-blur-xl rounded-xl p-4 border border-slate-200 shadow-sm">
             <div className="flex items-center gap-2 mb-2">
               <span className="material-symbols-outlined text-green-600">check_circle</span>
               <span className="text-xs font-bold text-green-700 uppercase">{t('adminSuggested.active')}</span>
             </div>
             <h3 className="text-2xl font-black text-green-700">{stats.active?.count || 0}</h3>
           </div>
-          <div className="bg-gradient-to-br from-purple-50 to-purple-100/50 backdrop-blur-xl rounded-xl p-4 border-2 border-black shadow-[4px_4px_0px_0px_#000]">
+          <div className="bg-gradient-to-br from-purple-50 to-purple-100/50 backdrop-blur-xl rounded-xl p-4 border border-slate-200 shadow-sm">
             <div className="flex items-center gap-2 mb-2">
               <span className="material-symbols-outlined text-purple-600">smart_toy</span>
               <span className="text-xs font-bold text-purple-700 uppercase">{t('adminSuggested.agentSpecific')}</span>
             </div>
             <h3 className="text-2xl font-black text-purple-700">{stats.agentSpecific?.count || 0}</h3>
           </div>
-          <div className="bg-gradient-to-br from-amber-50 to-amber-100/50 backdrop-blur-xl rounded-xl p-4 border-2 border-black shadow-[4px_4px_0px_0px_#000]">
+          <div className="bg-gradient-to-br from-amber-50 to-amber-100/50 backdrop-blur-xl rounded-xl p-4 border border-slate-200 shadow-sm">
             <div className="flex items-center gap-2 mb-2">
               <span className="material-symbols-outlined text-amber-600">language</span>
               <span className="text-xs font-bold text-amber-700 uppercase">{t('adminSuggested.languages')}</span>
@@ -560,7 +560,7 @@ export default function AdminSuggestedQuestions() {
       )}
 
       {/* Filters */}
-      <section className="bg-white/80 backdrop-blur-xl rounded-xl border-2 border-black p-4 mb-6 shadow-[4px_4px_0px_0px_#000]">
+      <section className="bg-white/80 backdrop-blur-xl rounded-xl border border-slate-300 p-4 mb-6 shadow-sm">
         <div className="flex items-center gap-2 mb-3">
           <span className="material-symbols-outlined text-gray-600">filter_list</span>
           <span className="text-sm font-bold text-gray-700">{t('adminSuggested.filter')}</span>
@@ -571,7 +571,7 @@ export default function AdminSuggestedQuestions() {
             <select
               value={filterCategory}
               onChange={(e) => { setFilterCategory(e.target.value as ATCategory | ''); setCurrentPage(1); }}
-              className="w-full px-3 py-2 rounded-lg bg-white border-2 border-black text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+              className="w-full px-3 py-2 rounded-lg bg-white border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
             >
               <option value="">{t('adminSuggested.all')}</option>
               {CATEGORIES.map(c => (
@@ -584,7 +584,7 @@ export default function AdminSuggestedQuestions() {
             <select
               value={filterViewMode}
               onChange={(e) => { setFilterViewMode(e.target.value as ViewMode | ''); setCurrentPage(1); }}
-              className="w-full px-3 py-2 rounded-lg bg-white border-2 border-black text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+              className="w-full px-3 py-2 rounded-lg bg-white border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
             >
               <option value="">{t('adminSuggested.all')}</option>
               {VIEW_MODES.map(v => (
@@ -597,7 +597,7 @@ export default function AdminSuggestedQuestions() {
             <select
               value={filterLanguage}
               onChange={(e) => { setFilterLanguage(e.target.value as LanguageType | ''); setCurrentPage(1); }}
-              className="w-full px-3 py-2 rounded-lg bg-white border-2 border-black text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+              className="w-full px-3 py-2 rounded-lg bg-white border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
             >
               <option value="">{t('adminSuggested.all')}</option>
               {LANGUAGES.map(l => (
@@ -612,7 +612,7 @@ export default function AdminSuggestedQuestions() {
               value={filterAgentId}
               onChange={(e) => { setFilterAgentId(e.target.value); setCurrentPage(1); }}
               placeholder={t('adminSuggested.leaveEmptyDefault')}
-              className="w-full px-3 py-2 rounded-lg bg-white border-2 border-black text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+              className="w-full px-3 py-2 rounded-lg bg-white border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
             />
           </div>
         </div>
@@ -641,9 +641,9 @@ export default function AdminSuggestedQuestions() {
       )}
 
       {/* Questions Table */}
-      <section className="bg-white/80 backdrop-blur-xl rounded-xl border-2 border-black shadow-[6px_6px_0px_0px_#000] overflow-hidden">
+      <section className="bg-white/80 backdrop-blur-xl rounded-xl border border-slate-300 shadow-[6px_6px_0px_0px_#000] overflow-hidden">
         {/* Table Header */}
-        <div className="bg-gradient-to-r from-gray-100 to-gray-50 border-b-2 border-black p-4">
+        <div className="bg-gradient-to-r from-gray-100 to-gray-50 border-b border-slate-200 p-4">
           <div className="flex items-center justify-between">
             <h3 className="font-bold text-on-surface">
               {loading ? t('adminSuggested.loading') : `${filteredQuestions.length} ${t('adminSuggested.questions')}`}
@@ -657,14 +657,14 @@ export default function AdminSuggestedQuestions() {
         {/* Table Content */}
         {loading ? (
           <div className="flex flex-col items-center justify-center py-12">
-            <div className="w-12 h-12 rounded-xl bg-gray-100 border-2 border-black flex items-center justify-center mb-4 shadow-[4px_4px_0px_0px_#000] animate-pulse">
+            <div className="w-12 h-12 rounded-xl bg-gray-100 border border-slate-300 flex items-center justify-center mb-4 shadow-sm animate-pulse">
               <span className="material-symbols-outlined text-2xl text-gray-400">hourglass_empty</span>
             </div>
             <p className="text-lg font-bold text-gray-500">{t('adminSuggested.loading')}</p>
           </div>
         ) : filteredQuestions.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12">
-            <div className="w-12 h-12 rounded-xl bg-gray-100 border-2 border-black flex items-center justify-center mb-4 shadow-[4px_4px_0px_0px_#000]">
+            <div className="w-12 h-12 rounded-xl bg-gray-100 border border-slate-300 flex items-center justify-center mb-4 shadow-sm">
               <span className="material-symbols-outlined text-2xl text-gray-400">quiz</span>
             </div>
             <h4 className="text-lg font-bold text-on-surface mb-1">{t('adminSuggested.noQuestions')}</h4>
@@ -673,13 +673,13 @@ export default function AdminSuggestedQuestions() {
               <div className="flex gap-2">
                 <button
                   onClick={handleImportDefaults}
-                  className="px-4 py-2 rounded-full bg-secondary text-white font-bold text-sm border-2 border-black shadow-[3px_3px_0px_0px_#000] hover:shadow-[4px_4px_0px_0px_#000] transition-all"
+                  className="px-4 py-2 rounded-full bg-secondary text-white font-bold text-sm border border-slate-200 shadow-sm hover:shadow-sm transition-all"
                 >
                   {t('adminSuggested.importDefaults')}
                 </button>
                 <button
                   onClick={openBulkAddForm}
-                  className="px-4 py-2 rounded-full bg-primary text-white font-bold text-sm border-2 border-black shadow-[3px_3px_0px_0px_#000] hover:shadow-[4px_4px_0px_0px_#000] transition-all"
+                  className="px-4 py-2 rounded-full bg-primary text-white font-bold text-sm border border-slate-200 shadow-sm hover:shadow-sm transition-all"
                 >
                   {t('adminSuggested.addMany')}
                 </button>
@@ -705,7 +705,7 @@ export default function AdminSuggestedQuestions() {
                 <div className="flex items-center gap-2">
                   <button
                     onClick={openBulkEditForm}
-                    className="px-3 py-1.5 rounded-full bg-primary text-white font-bold text-xs border-2 border-black shadow-[2px_2px_0px_0px_#000] hover:shadow-[3px_3px_0px_0px_#000] transition-all"
+                    className="px-3 py-1.5 rounded-full bg-primary text-white font-bold text-xs border border-slate-200 shadow-sm hover:shadow-sm transition-all"
                   >
                     <span className="flex items-center gap-1">
                       <span className="material-symbols-outlined text-xs">edit</span>
@@ -714,7 +714,7 @@ export default function AdminSuggestedQuestions() {
                   </button>
                   <button
                     onClick={handleBulkToggleActive}
-                    className="px-3 py-1.5 rounded-full bg-amber-500 text-white font-bold text-xs border-2 border-black shadow-[2px_2px_0px_0px_#000] hover:shadow-[3px_3px_0px_0px_#000] transition-all"
+                    className="px-3 py-1.5 rounded-full bg-amber-500 text-white font-bold text-xs border border-slate-200 shadow-sm hover:shadow-sm transition-all"
                   >
                     <span className="flex items-center gap-1">
                       <span className="material-symbols-outlined text-xs">toggle_on</span>
@@ -723,7 +723,7 @@ export default function AdminSuggestedQuestions() {
                   </button>
                   <button
                     onClick={handleBulkDelete}
-                    className="px-3 py-1.5 rounded-full bg-red-500 text-white font-bold text-xs border-2 border-black shadow-[2px_2px_0px_0px_#000] hover:shadow-[3px_3px_0px_0px_#000] transition-all"
+                    className="px-3 py-1.5 rounded-full bg-red-500 text-white font-bold text-xs border border-slate-200 shadow-sm hover:shadow-sm transition-all"
                   >
                     <span className="flex items-center gap-1">
                       <span className="material-symbols-outlined text-xs">delete</span>
@@ -862,14 +862,14 @@ export default function AdminSuggestedQuestions() {
                   <button
                     onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                     disabled={currentPage === 1}
-                    className="px-3 py-1.5 rounded-lg bg-white border-2 border-black text-sm font-bold disabled:opacity-50 hover:bg-gray-50 transition-colors shadow-[2px_2px_0px_0px_#000]"
+                    className="px-3 py-1.5 rounded-lg bg-white border border-slate-300 text-sm font-bold disabled:opacity-50 hover:bg-gray-50 transition-colors shadow-sm"
                   >
                     ← {t('admin.common.previous')}
                   </button>
                   <button
                     onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
                     disabled={currentPage === totalPages}
-                    className="px-3 py-1.5 rounded-lg bg-white border-2 border-black text-sm font-bold disabled:opacity-50 hover:bg-gray-50 transition-colors shadow-[2px_2px_0px_0px_#000]"
+                    className="px-3 py-1.5 rounded-lg bg-white border border-slate-300 text-sm font-bold disabled:opacity-50 hover:bg-gray-50 transition-colors shadow-sm"
                   >
                     {t('admin.common.next')} →
                   </button>
@@ -883,9 +883,9 @@ export default function AdminSuggestedQuestions() {
       {/* ============== FORM MODAL ============== */}
       {showForm && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(15, 23, 42, 0.7)', backdropFilter: 'blur(8px)' }}>
-          <div className="relative bg-white rounded-2xl border-2 border-black w-full max-w-lg max-h-[85vh] overflow-y-auto shadow-[8px_8px_0px_0px_#000]">
+          <div className="relative bg-white rounded-2xl border border-slate-300 w-full max-w-lg max-h-[85vh] overflow-y-auto shadow-[8px_8px_0px_0px_#000]">
             {/* Modal Header */}
-            <div className="sticky top-0 bg-white/80 backdrop-blur-xl border-b-2 border-black p-4 z-10">
+            <div className="sticky top-0 bg-white/80 backdrop-blur-xl border-b border-slate-200 p-4 z-10">
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-lg font-black text-on-surface">
@@ -897,7 +897,7 @@ export default function AdminSuggestedQuestions() {
                 </div>
                 <button
                   onClick={() => { setShowForm(false); resetForm(); }}
-                  className="w-8 h-8 rounded-full bg-white border-2 border-black flex items-center justify-center hover:bg-gray-100 transition-colors shadow-[2px_2px_0px_0px_#000]"
+                  className="w-8 h-8 rounded-full bg-white border border-slate-300 flex items-center justify-center hover:bg-gray-100 transition-colors shadow-sm"
                 >
                   <span className="material-symbols-outlined text-sm">close</span>
                 </button>
@@ -917,7 +917,7 @@ export default function AdminSuggestedQuestions() {
                 <select
                   value={formData.category}
                   onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value as ATCategory }))}
-                  className="w-full px-3 py-2 rounded-lg bg-white border-2 border-black text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  className="w-full px-3 py-2 rounded-lg bg-white border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
                 >
                   {CATEGORIES.map(c => (
                     <option key={c.value} value={c.value}>{c.icon} {getCategoryLabelByLang(c.value)}</option>
@@ -933,7 +933,7 @@ export default function AdminSuggestedQuestions() {
                 <select
                   value={formData.view_mode}
                   onChange={(e) => setFormData(prev => ({ ...prev, view_mode: e.target.value as ViewMode }))}
-                  className="w-full px-3 py-2 rounded-lg bg-white border-2 border-black text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  className="w-full px-3 py-2 rounded-lg bg-white border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
                 >
                   {VIEW_MODES.map(v => (
                     <option key={v.value} value={v.value}>{getViewModeLabelByLang(v.value)}</option>
@@ -949,7 +949,7 @@ export default function AdminSuggestedQuestions() {
                 <select
                   value={formData.language}
                   onChange={(e) => setFormData(prev => ({ ...prev, language: e.target.value as LanguageType }))}
-                  className="w-full px-3 py-2 rounded-lg bg-white border-2 border-black text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  className="w-full px-3 py-2 rounded-lg bg-white border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
                 >
                   {LANGUAGES.map(l => (
                     <option key={l.value} value={l.value}>{l.flag} {getLanguageLabelByLang(l.value)}</option>
@@ -967,7 +967,7 @@ export default function AdminSuggestedQuestions() {
                   onChange={(e) => setFormData(prev => ({ ...prev, question: e.target.value }))}
                   placeholder={t('adminSuggested.example')}
                   rows={3}
-                  className="w-full px-3 py-2 rounded-lg bg-white border-2 border-black text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  className="w-full px-3 py-2 rounded-lg bg-white border border-slate-300 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/30"
                 />
               </div>
 
@@ -981,7 +981,7 @@ export default function AdminSuggestedQuestions() {
                   value={formData.sort_order}
                   onChange={(e) => setFormData(prev => ({ ...prev, sort_order: parseInt(e.target.value) || 0 }))}
                   min={0}
-                  className="w-full px-3 py-2 rounded-lg bg-white border-2 border-black text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  className="w-full px-3 py-2 rounded-lg bg-white border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
                 />
                 <p className="text-[10px] text-gray-500 mt-1">{t('adminSuggested.orderHint')}</p>
               </div>
@@ -1023,18 +1023,18 @@ export default function AdminSuggestedQuestions() {
             </form>
 
             {/* Modal Footer */}
-            <div className="p-4 border-t-2 border-black bg-white/80 backdrop-blur-xl flex items-center gap-2">
+            <div className="p-4 border-t border-slate-200 bg-white/80 backdrop-blur-xl flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => { setShowForm(false); resetForm(); }}
-                className="flex-1 px-3 py-2 rounded-lg bg-white border-2 border-black font-bold text-xs hover:bg-gray-100 transition-colors shadow-[2px_2px_0px_0px_#000]"
+                className="flex-1 px-3 py-2 rounded-lg bg-white border border-slate-300 font-bold text-xs hover:bg-gray-100 transition-colors shadow-sm"
               >
                 {t('adminSuggested.cancel')}
               </button>
               <button
                 type="button"
                 onClick={handleSubmit}
-                className="flex-1 px-3 py-2 rounded-lg bg-primary text-white font-bold text-xs border-2 border-black shadow-[2px_2px_0px_0px_#000] hover:-translate-y-0.5 hover:shadow-[3px_3px_0px_0px_#000] transition-all"
+                className="flex-1 px-3 py-2 rounded-lg bg-primary text-white font-bold text-xs border border-slate-200 shadow-sm hover:-translate-y-0.5 hover:shadow-sm transition-all"
               >
                 {editingId ? t('adminSuggested.update') : t('adminSuggested.create')}
               </button>
@@ -1046,9 +1046,9 @@ export default function AdminSuggestedQuestions() {
       {/* ============== BULK FORM MODAL ============== */}
       {showBulkForm && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(15, 23, 42, 0.7)', backdropFilter: 'blur(8px)' }}>
-          <div className="relative bg-white rounded-2xl border-2 border-black w-full max-w-4xl max-h-[90vh] overflow-hidden shadow-[8px_8px_0px_0px_#000] flex flex-col">
+          <div className="relative bg-white rounded-2xl border border-slate-300 w-full max-w-4xl max-h-[90vh] overflow-hidden shadow-[8px_8px_0px_0px_#000] flex flex-col">
             {/* Modal Header */}
-            <div className="sticky top-0 bg-white/80 backdrop-blur-xl border-b-2 border-black p-4 z-10">
+            <div className="sticky top-0 bg-white/80 backdrop-blur-xl border-b border-slate-200 p-4 z-10">
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-lg font-black text-on-surface">
@@ -1062,7 +1062,7 @@ export default function AdminSuggestedQuestions() {
                 </div>
                 <button
                   onClick={() => { setShowBulkForm(false); setBulkMode(null); setBulkQuestions([]); }}
-                  className="w-8 h-8 rounded-full bg-white border-2 border-black flex items-center justify-center hover:bg-gray-100 transition-colors shadow-[2px_2px_0px_0px_#000]"
+                  className="w-8 h-8 rounded-full bg-white border border-slate-300 flex items-center justify-center hover:bg-gray-100 transition-colors shadow-sm"
                 >
                   <span className="material-symbols-outlined text-sm">close</span>
                 </button>
@@ -1199,18 +1199,18 @@ export default function AdminSuggestedQuestions() {
             </div>
 
             {/* Modal Footer */}
-            <div className="p-4 border-t-2 border-black bg-white/80 backdrop-blur-xl flex items-center gap-2">
+            <div className="p-4 border-t border-slate-200 bg-white/80 backdrop-blur-xl flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => { setShowBulkForm(false); setBulkMode(null); setBulkQuestions([]); }}
-                className="flex-1 px-3 py-2 rounded-lg bg-white border-2 border-black font-bold text-xs hover:bg-gray-100 transition-colors shadow-[2px_2px_0px_0px_#000]"
+                className="flex-1 px-3 py-2 rounded-lg bg-white border border-slate-300 font-bold text-xs hover:bg-gray-100 transition-colors shadow-sm"
               >
                 {t('adminSuggested.cancel')}
               </button>
               <button
                 type="button"
                 onClick={handleBulkSubmit}
-                className="flex-1 px-3 py-2 rounded-lg bg-primary text-white font-bold text-xs border-2 border-black shadow-[2px_2px_0px_0px_#000] hover:-translate-y-0.5 hover:shadow-[3px_3px_0px_0px_#000] transition-all"
+                className="flex-1 px-3 py-2 rounded-lg bg-primary text-white font-bold text-xs border border-slate-200 shadow-sm hover:-translate-y-0.5 hover:shadow-sm transition-all"
               >
                 {bulkMode === 'add' ? `${t('adminSuggested.commonAdd')} ${bulkQuestions.length} ${t('adminSuggested.questions')}` : `${t('adminSuggested.update')} ${bulkQuestions.filter(q => q.id).length} ${t('adminSuggested.questions')}`}
               </button>

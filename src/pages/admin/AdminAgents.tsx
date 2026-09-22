@@ -332,13 +332,13 @@ function AgentAvatar({
 
   if (isImage) {
     return (
-      <div className={clsx(sizeClass, 'rounded-lg bg-white border-2 border-black overflow-hidden flex items-center justify-center shadow-[2px_2px_0px_0px_#000]', className)}>
+      <div className={clsx(sizeClass, 'rounded-lg bg-white border border-slate-300 overflow-hidden flex items-center justify-center shadow-sm', className)}>
         <img src={agent.avatar_url!} alt="avatar" className="w-full h-full object-cover" />
       </div>
     );
   }
   return (
-    <div className={clsx(sizeClass, 'rounded-lg bg-white border-2 border-black flex items-center justify-center shadow-[2px_2px_0px_0px_#000]', className)}>
+    <div className={clsx(sizeClass, 'rounded-lg bg-white border border-slate-300 flex items-center justify-center shadow-sm', className)}>
       {agent.avatar || '🤖'}
     </div>
   );
@@ -1159,8 +1159,8 @@ export function AdminAgents() {
 
       {/* Metrics Row */}
       <section className="grid grid-cols-3 gap-3 mb-6">
-        <div className="relative bg-gradient-to-br from-primary/10 to-primary/5 backdrop-blur-xl rounded-xl p-3 border-2 border-black flex items-center gap-2 shadow-[4px_4px_0px_0px_#000]">
-          <div className="w-8 h-8 rounded-lg bg-primary/20 border-2 border-black flex items-center justify-center shadow-[2px_2px_0px_0px_#000]">
+        <div className="relative bg-gradient-to-br from-primary/10 to-primary/5 backdrop-blur-xl rounded-xl p-3 border border-slate-300 flex items-center gap-2 shadow-sm">
+          <div className="w-8 h-8 rounded-lg bg-primary/20 border border-slate-300 flex items-center justify-center shadow-sm">
             <span className="material-symbols-outlined text-primary text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>smart_toy</span>
           </div>
           <div>
@@ -1169,8 +1169,8 @@ export function AdminAgents() {
           </div>
         </div>
 
-        <div className="relative bg-gradient-to-br from-green-50 to-green-100/40 backdrop-blur-xl rounded-xl p-3 border-2 border-black flex items-center gap-2 shadow-[4px_4px_0px_0px_#000]">
-          <div className="w-8 h-8 rounded-lg bg-green-200 border-2 border-black flex items-center justify-center shadow-[2px_2px_0px_0px_#000]">
+        <div className="relative bg-gradient-to-br from-green-50 to-green-100/40 backdrop-blur-xl rounded-xl p-3 border border-slate-300 flex items-center gap-2 shadow-sm">
+          <div className="w-8 h-8 rounded-lg bg-green-200 border border-slate-300 flex items-center justify-center shadow-sm">
             <span className="material-symbols-outlined text-green-600 text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>toggle_on</span>
           </div>
           <div>
@@ -1179,8 +1179,8 @@ export function AdminAgents() {
           </div>
         </div>
 
-        <div className="relative bg-gradient-to-br from-gray-50 to-gray-100/40 backdrop-blur-xl rounded-xl p-3 border-2 border-black flex items-center gap-2 shadow-[4px_4px_0px_0px_#000]">
-          <div className="w-8 h-8 rounded-lg bg-gray-200 border-2 border-black flex items-center justify-center shadow-[2px_2px_0px_0px_#000]">
+        <div className="relative bg-gradient-to-br from-gray-50 to-gray-100/40 backdrop-blur-xl rounded-xl p-3 border border-slate-300 flex items-center gap-2 shadow-sm">
+          <div className="w-8 h-8 rounded-lg bg-gray-200 border border-slate-300 flex items-center justify-center shadow-sm">
             <span className="material-symbols-outlined text-gray-600 text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>pause_circle</span>
           </div>
           <div>
@@ -1199,7 +1199,7 @@ export function AdminAgents() {
           <button
             onClick={() => { loadAgents(); loadPrompts(); }}
             title={tAgent('admin.common.refresh', language)}
-            className="flex items-center gap-1 bg-white text-on-surface px-3 py-2 rounded-full font-bold text-xs border-2 border-black shadow-[2px_2px_0px_0px_#000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[3px_3px_0px_0px_#000] transition-all"
+            className="flex items-center gap-1 bg-white text-on-surface px-3 py-2 rounded-full font-bold text-xs border border-slate-200 shadow-sm hover:shadow-md transition-all"
           >
             <span className="material-symbols-outlined text-sm">refresh</span>
             {tAgent('admin.common.refresh', language)}
@@ -1208,7 +1208,7 @@ export function AdminAgents() {
             <>
               <button
                 onClick={openImportModal}
-                className="flex items-center gap-2 bg-secondary text-white px-4 py-2 rounded-full font-bold text-xs border-2 border-black shadow-[3px_3px_0px_0px_#000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[4px_4px_0px_0px_#000] transition-all"
+                className="flex items-center gap-2 bg-secondary text-white px-4 py-2 rounded-full font-bold text-xs border border-slate-200 shadow-sm hover:shadow-sm transition-all"
                 title={tAgent('agent.selectBotImport', language)}
               >
                 <span className="material-symbols-outlined text-sm">download</span>
@@ -1216,7 +1216,7 @@ export function AdminAgents() {
               </button>
               <button
                 onClick={openCreateForm}
-                className="flex items-center gap-2 bg-primary text-white px-4 py-2 rounded-full font-bold text-xs border-2 border-black shadow-[3px_3px_0px_0px_#000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[4px_4px_0px_0px_#000] transition-all"
+                className="flex items-center gap-2 bg-primary text-white px-4 py-2 rounded-full font-bold text-xs border border-slate-200 shadow-sm hover:shadow-sm transition-all"
               >
                 <span className="material-symbols-outlined text-sm">add</span>
                 {tAgent('agent.create', language)}
@@ -1237,9 +1237,9 @@ export function AdminAgents() {
       {/* ============== AGENT FORM MODAL ============== */}
       {showForm && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(15, 23, 42, 0.7)', backdropFilter: 'blur(8px)' }}>
-          <div className="relative bg-gradient-to-br from-white/95 to-white/80 backdrop-blur-xl rounded-2xl border-2 border-black w-full max-w-lg max-h-[85vh] overflow-y-auto shadow-[8px_8px_0px_0px_#000]">
+          <div className="relative bg-gradient-to-br from-white/95 to-white/80 backdrop-blur-xl rounded-2xl border border-slate-200 w-full max-w-lg max-h-[85vh] overflow-y-auto shadow-lg">
             {/* Modal Header */}
-            <div className="sticky top-0 bg-white/80 backdrop-blur-xl border-b-2 border-black p-4 z-10">
+            <div className="sticky top-0 bg-white/80 backdrop-blur-xl border-b border-slate-200 p-4 z-10">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <AgentAvatar agent={formData} size="md" />
@@ -1250,7 +1250,7 @@ export function AdminAgents() {
                 </div>
                 <button
                   onClick={() => { setShowForm(false); setEditingId(null); resetForm(); }}
-                  className="w-8 h-8 rounded-full bg-white border-2 border-black flex items-center justify-center hover:bg-gray-100 transition-colors shadow-[2px_2px_0px_0px_#000]"
+                  className="w-8 h-8 rounded-full bg-white border border-slate-300 flex items-center justify-center hover:bg-gray-100 transition-colors shadow-sm"
                 >
                   <span className="material-symbols-outlined text-sm">close</span>
                 </button>
@@ -1278,7 +1278,7 @@ export function AdminAgents() {
                           type="button"
                           onClick={() => setFormData(prev => ({ ...prev, avatar: emoji, avatar_url: '' }))}
                           className={clsx(
-                            'w-9 h-9 rounded-lg text-lg flex items-center justify-center transition-all border-2 border-black shadow-[2px_2px_0px_0px_#000]',
+                            'w-9 h-9 rounded-lg text-lg flex items-center justify-center transition-all border border-slate-200 shadow-sm',
                             !formData.avatar_url && formData.avatar === emoji
                               ? 'bg-primary text-white translate-y-[-1px]'
                               : 'bg-white hover:bg-gray-50'
@@ -1304,7 +1304,7 @@ export function AdminAgents() {
                         type="button"
                         onClick={() => fileInputRef.current?.click()}
                         disabled={uploadingAvatar}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-100 text-cyan-700 font-bold text-xs border-2 border-black shadow-[2px_2px_0px_0px_#000] hover:shadow-[3px_3px_0px_0px_#000] disabled:opacity-50"
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-100 text-cyan-700 font-bold text-xs border border-slate-200 shadow-sm  disabled:opacity-50"
                       >
                         <span className="material-symbols-outlined text-sm">
                           {uploadingAvatar ? 'progress_activity' : 'upload'}
@@ -1334,7 +1334,7 @@ export function AdminAgents() {
                   value={formData.name}
                   onChange={e => setFormData(prev => ({ ...prev, name: e.target.value }))}
                   placeholder={tAgent('agent.form.namePlaceholder', language)}
-                  className="w-full px-3 py-2 rounded-lg bg-white/60 border-2 border-black text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  className="w-full px-3 py-2 rounded-lg bg-white/60 border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
                 />
               </div>
 
@@ -1346,7 +1346,7 @@ export function AdminAgents() {
                   onChange={e => setFormData(prev => ({ ...prev, description: e.target.value }))}
                   placeholder={tAgent('agent.form.descriptionPlaceholder', language)}
                   rows={2}
-                  className="w-full px-3 py-2 rounded-lg bg-white/60 border-2 border-black text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  className="w-full px-3 py-2 rounded-lg bg-white/60 border border-slate-300 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/30"
                 />
               </div>
 
@@ -1359,7 +1359,7 @@ export function AdminAgents() {
                   <select
                     value={formData.prompt_id}
                     onChange={e => setFormData(prev => ({ ...prev, prompt_id: e.target.value }))}
-                    className="w-full px-3 py-2 rounded-lg bg-white/60 border-2 border-black text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    className="w-full px-3 py-2 rounded-lg bg-white/60 border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
                   >
                     <option value="">{tAgent('agent.form.noReference', language)}</option>
                     {availablePrompts.map(p => (
@@ -1382,7 +1382,7 @@ export function AdminAgents() {
                   onChange={e => setFormData(prev => ({ ...prev, system_prompt: e.target.value }))}
                   placeholder={tAgent('agent.form.systemPromptPlaceholder', language)}
                   rows={3}
-                  className="w-full px-3 py-2 rounded-lg bg-white/60 border-2 border-black text-sm resize-none font-mono focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  className="w-full px-3 py-2 rounded-lg bg-white/60 border border-slate-300 text-sm resize-none font-mono focus:outline-none focus:ring-2 focus:ring-primary/30"
                 />
               </div>
 
@@ -1397,7 +1397,7 @@ export function AdminAgents() {
                   value={formData.knowledge_url}
                   onChange={e => setFormData(prev => ({ ...prev, knowledge_url: e.target.value }))}
                   placeholder={tAgent('agent.form.knowledgeUrlPlaceholder', language)}
-                  className="w-full px-3 py-2 rounded-lg bg-white border-2 border-black text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+                  className="w-full px-3 py-2 rounded-lg bg-white border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
                 />
                 <p className="text-[10px] text-blue-700/80">
                   {tAgent('agent.form.knowledgeUrlHint', language)}
@@ -1460,7 +1460,7 @@ export function AdminAgents() {
                       }
                     }}
                     placeholder={tAgent('agent.form.productUrlPlaceholder', language)}
-                    className="flex-1 px-3 py-2 rounded-lg bg-white border-2 border-black text-sm focus:outline-none focus:ring-2 focus:ring-emerald-300"
+                    className="flex-1 px-3 py-2 rounded-lg bg-white border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-300"
                   />
                   <button
                     type="button"
@@ -1481,7 +1481,7 @@ export function AdminAgents() {
                       setNewProductUrl('');
                       setProductUrlError('');
                     }}
-                    className="px-3 py-2 rounded-lg bg-emerald-500 text-white font-bold text-sm border-2 border-black hover:bg-emerald-600"
+                    className="px-3 py-2 rounded-lg bg-emerald-500 text-white font-bold text-sm border border-slate-300 hover:bg-emerald-600"
                     title={tAgent('agent.form.addUrl', language)}
                   >
                     +
@@ -1565,7 +1565,7 @@ export function AdminAgents() {
                         knowledge_url: formData.knowledge_url.trim(),
                         product_urls: formData.product_urls,
                       }, false)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500 text-white font-bold text-xs border-2 border-black shadow-[2px_2px_0px_0px_#000] hover:shadow-[3px_3px_0px_0px_#000] disabled:opacity-50"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500 text-white font-bold text-xs border border-slate-200 shadow-sm  disabled:opacity-50"
                     >
                       <span className="material-symbols-outlined text-sm">{crawling ? 'progress_activity' : 'play_arrow'}</span>
                       {crawling ? tAgent('agent.form.crawling', language) : tAgent('agent.form.crawlTest', language)}
@@ -1603,7 +1603,7 @@ export function AdminAgents() {
                       type="button"
                       onClick={() => toggleCapability(cap.value)}
                       className={clsx(
-                        'px-3 py-1.5 rounded-full text-xs font-bold border-2 border-black transition-all shadow-[2px_2px_0px_0px_#000]',
+                        'px-3 py-1.5 rounded-full text-xs font-bold border border-slate-300 transition-all shadow-sm',
                         formData.capabilities.includes(cap.value)
                           ? 'bg-primary text-white translate-y-[-1px]'
                           : 'bg-white text-on-surface hover:bg-gray-50'
@@ -1936,11 +1936,11 @@ export function AdminAgents() {
             </form>
 
             {/* Modal Footer */}
-            <div className="p-4 border-t-2 border-black bg-white/80 backdrop-blur-xl flex items-center gap-2">
+            <div className="p-4 border-t border-slate-200 bg-white/80 backdrop-blur-xl flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => { setShowForm(false); setEditingId(null); resetForm(); }}
-                className="flex-1 px-3 py-2 rounded-lg bg-white border-2 border-black font-bold text-xs hover:bg-gray-100 transition-colors shadow-[2px_2px_0px_0px_#000]"
+                className="flex-1 px-3 py-2 rounded-lg bg-white border border-slate-300 font-bold text-xs hover:bg-gray-100 transition-colors shadow-sm"
               >
                 {tAgent('agent.form.cancel', language)}
               </button>
@@ -1948,7 +1948,7 @@ export function AdminAgents() {
                 type="button"
                 onClick={handleSubmit}
                 disabled={!formData.name.trim() || !formData.system_prompt.trim() || crawling}
-                className="flex-1 px-3 py-2 rounded-lg bg-primary text-white font-bold text-xs border-2 border-black shadow-[2px_2px_0px_0px_#000] hover:-translate-y-0.5 hover:shadow-[3px_3px_0px_0px_#000] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 px-3 py-2 rounded-lg bg-primary text-white font-bold text-xs border border-slate-200 shadow-sm hover:-translate-y-0.5  transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {crawling ? tAgent('agent.form.crawlSave', language) : editingId ? tAgent('agent.form.save', language) : (formHasValidUrl ? tAgent('agent.form.saveAndCrawl', language) : tAgent('agent.form.create', language))}
               </button>
@@ -1958,19 +1958,19 @@ export function AdminAgents() {
       )}
 
       {/* ============== AGENTS GRID ============== */}
-      <div className="relative bg-gradient-to-br from-white/80 to-white/40 backdrop-blur-xl rounded-2xl border-2 border-black p-5 shadow-[6px_6px_0px_0px_#000]">
+      <div className="relative bg-gradient-to-br from-white/80 to-white/40 backdrop-blur-xl rounded-2xl border border-slate-300 p-5 shadow-[6px_6px_0px_0px_#000]">
         <div className="absolute inset-0 bg-gradient-to-b from-white/40 to-transparent rounded-2xl"></div>
 
         {loading ? (
           <div className="relative z-10 flex flex-col items-center justify-center py-12">
-            <div className="w-16 h-16 rounded-xl bg-gray-100 border-2 border-black flex items-center justify-center mb-4 text-gray-400 shadow-[4px_4px_0px_0px_#000] animate-pulse">
+            <div className="w-16 h-16 rounded-xl bg-gray-100 border border-slate-300 flex items-center justify-center mb-4 text-gray-400 shadow-sm animate-pulse">
               <span className="material-symbols-outlined text-3xl">hourglass_empty</span>
             </div>
             <p className="text-lg font-bold text-gray-500">{tAgent('agent.loading', language)}</p>
           </div>
         ) : agents.length === 0 ? (
           <div className="relative z-10 flex flex-col items-center justify-center py-12">
-            <div className="w-16 h-16 rounded-xl bg-gray-100 border-2 border-black flex items-center justify-center mb-4 text-gray-400 shadow-[4px_4px_0px_0px_#000]">
+            <div className="w-16 h-16 rounded-xl bg-gray-100 border border-slate-300 flex items-center justify-center mb-4 text-gray-400 shadow-sm">
               <span className="material-symbols-outlined text-3xl">smart_toy</span>
             </div>
             <h4 className="text-lg font-black text-on-surface mb-1">{tAgent('agent.empty', language)}</h4>
@@ -1980,7 +1980,7 @@ export function AdminAgents() {
             {isSuperAdmin && (
               <button
                 onClick={() => setShowImportModal(true)}
-                className="px-4 py-2 rounded-full bg-secondary text-white font-bold text-xs border-2 border-black shadow-[3px_3px_0px_0px_#000] hover:-translate-y-0.5 hover:shadow-[4px_4px_0px_0px_#000] transition-all"
+                className="px-4 py-2 rounded-full bg-secondary text-white font-bold text-xs border border-slate-200 shadow-sm hover:-translate-y-0.5 hover:shadow-sm transition-all"
               >
                 <span className="material-symbols-outlined text-xs mr-1">download</span>
                 {t('admin.agents.importMada')}
@@ -1993,7 +1993,7 @@ export function AdminAgents() {
               <div
                 key={agent.id}
                 className={clsx(
-                  'p-4 rounded-xl border-2 border-black transition-all shadow-[4px_4px_0px_0px_#000] hover:shadow-[5px_5px_0px_0px_#000]',
+                  'p-4 rounded-xl border border-slate-300 transition-all shadow-sm hover:shadow-md',
                   (agent.is_active || agent.isActive)
                     ? 'bg-gradient-to-br from-primary/10 to-primary/5'
                     : 'bg-gray-50'
@@ -2005,18 +2005,18 @@ export function AdminAgents() {
                     <div className="flex items-center gap-2 flex-wrap">
                       <h4 className="font-bold text-on-surface truncate text-sm">{agent.name}</h4>
                       <span className={clsx(
-                        'px-2 py-0.5 rounded-full text-[9px] font-bold border border-black',
+                        'px-2 py-0.5 rounded-full text-[9px] font-bold border border-slate-300',
                         (agent.is_active || agent.isActive) ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
                       )}>
                         {(agent.is_active || agent.isActive) ? 'ON' : 'OFF'}
                       </span>
                       {agent.mada_category && (
-                        <span className="px-2 py-0.5 rounded-full text-[9px] font-bold border border-black bg-blue-100 text-blue-700">
+                        <span className="px-2 py-0.5 rounded-full text-[9px] font-bold border border-slate-300 bg-blue-100 text-blue-700">
                           🏷️ {agent.mada_category}
                         </span>
                       )}
                       {agent.created_by && agent.created_by !== 'system' && (
-                        <span className="px-2 py-0.5 rounded-full text-[9px] font-bold border border-black bg-purple-100 text-purple-700">
+                        <span className="px-2 py-0.5 rounded-full text-[9px] font-bold border border-slate-300 bg-purple-100 text-purple-700">
                           ✨ {tAgent('agent.custom', language)}
                         </span>
                       )}
@@ -2032,7 +2032,7 @@ export function AdminAgents() {
                   {agent.capabilities.slice(0, 3).map((cap, i) => (
                     <span
                       key={i}
-                      className="px-1.5 py-0.5 rounded bg-white border border-black/20 text-[9px] text-on-surface-variant"
+                      className="px-1.5 py-0.5 rounded bg-white border border-slate-300 text-[9px] text-on-surface-variant"
                     >
                       {language === 'en' ? (capabilityOptions.find(c => c.value === cap)?.labelEn || cap) : (capabilityOptions.find(c => c.value === cap)?.label || cap)}
                     </span>
@@ -2058,7 +2058,7 @@ export function AdminAgents() {
                     {agent.last_crawl_count != null && (
                       <div className="flex items-center gap-1.5 mt-1">
                         <span className={clsx(
-                          'px-1.5 py-0.5 rounded-md text-[9px] font-bold border border-black flex items-center gap-1',
+                          'px-1.5 py-0.5 rounded-md text-[9px] font-bold border border-slate-300 flex items-center gap-1',
                           agent.last_crawl_status === 'completed' ? 'bg-emerald-100 text-emerald-700' :
                           agent.last_crawl_status === 'partial' ? 'bg-amber-100 text-amber-700' :
                           agent.last_crawl_status === 'running' ? 'bg-blue-100 text-blue-700' :
@@ -2079,15 +2079,15 @@ export function AdminAgents() {
                 )}
 
                 {/* Actions */}
-                <div className="flex items-center gap-1.5 pt-2 border-t border-black/10">
+                <div className="flex items-center gap-1.5 pt-2 border-t border-slate-200">
                   <button
                     onClick={() => toggleAgentActive(agent.id)}
                     disabled={!isSuperAdmin}
                     className={clsx(
-                      'flex-none min-w-[60px] py-1.5 px-2 rounded-lg font-bold text-xs border border-black transition-all shadow-[2px_2px_0px_0px_#000]',
+                      'flex-none min-w-[60px] py-1.5 px-2 rounded-lg font-bold text-xs border border-slate-300 transition-all shadow-sm',
                       (agent.is_active || agent.isActive)
-                        ? 'bg-yellow-100 text-yellow-700 hover:shadow-[3px_3px_0px_0px_#000] disabled:opacity-50'
-                        : 'bg-green-100 text-green-700 hover:shadow-[3px_3px_0px_0px_#000] disabled:opacity-50'
+                        ? 'bg-yellow-100 text-yellow-700  disabled:opacity-50'
+                        : 'bg-green-100 text-green-700  disabled:opacity-50'
                     )}
                     title={isSuperAdmin ? '' : t('admin.common.noPermission')}
                   >
@@ -2096,7 +2096,7 @@ export function AdminAgents() {
                   <button
                     onClick={() => handleEdit(agent)}
                     disabled={!isSuperAdmin}
-                    className="flex-none min-w-[60px] py-1.5 px-2 rounded-lg bg-primary text-white font-bold text-xs border border-black shadow-[2px_2px_0px_0px_#000] hover:shadow-[3px_3px_0px_0px_#000] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex-none min-w-[60px] py-1.5 px-2 rounded-lg bg-primary text-white font-bold text-xs border border-slate-300 shadow-sm  transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     title={isSuperAdmin ? t('admin.common.edit') : t('admin.common.noPermission')}
                   >
                     {isSuperAdmin ? t('admin.common.edit') : (
@@ -2113,14 +2113,14 @@ export function AdminAgents() {
                       setTestMessages([]);
                     }}
                     title="Test agent này"
-                    className="w-8 h-8 rounded-lg bg-cyan-100 text-cyan-700 flex items-center justify-center border border-black shadow-[2px_2px_0px_0px_#000] hover:shadow-[3px_3px_0px_0px_#000]"
+                    className="w-8 h-8 rounded-lg bg-cyan-100 text-cyan-700 flex items-center justify-center border border-slate-300 shadow-sm "
                   >
                     <span className="material-symbols-outlined text-xs">play_arrow</span>
                   </button>
                   <button
                     onClick={() => openKbModal({ id: agent.id, name: agent.name })}
                     title={t('admin.agents.viewKb')}
-                    className="w-8 h-8 rounded-lg bg-violet-100 text-violet-700 flex items-center justify-center border border-black shadow-[2px_2px_0px_0px_#000] hover:shadow-[3px_3px_0px_0px_#000]"
+                    className="w-8 h-8 rounded-lg bg-violet-100 text-violet-700 flex items-center justify-center border border-slate-300 shadow-sm "
                   >
                     <span className="material-symbols-outlined text-xs">database</span>
                   </button>
@@ -2128,7 +2128,7 @@ export function AdminAgents() {
                     <button
                       onClick={() => handleDelete(agent.id)}
                       title={t('admin.common.delete')}
-                      className="w-8 h-8 rounded-lg bg-red-100 text-red-600 flex items-center justify-center border border-black shadow-[2px_2px_0px_0px_#000] hover:shadow-[3px_3px_0px_0px_#000]"
+                      className="w-8 h-8 rounded-lg bg-red-100 text-red-600 flex items-center justify-center border border-slate-300 shadow-sm "
                     >
                       <span className="material-symbols-outlined text-xs">delete</span>
                     </button>
@@ -2221,7 +2221,7 @@ export function AdminAgents() {
       {/* ============== KB VIEWER MODAL ============== */}
       {kbModalAgent && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
-          <div className="bg-white rounded-2xl w-full max-w-4xl max-h-[85vh] flex flex-col shadow-2xl border-2 border-black">
+          <div className="bg-white rounded-2xl w-full max-w-4xl max-h-[85vh] flex flex-col shadow-2xl border border-slate-300">
             <div className="px-5 py-3 border-b border-outline-variant flex items-center justify-between bg-gradient-to-r from-violet-50 to-fuchsia-50">
               <div className="flex-1 min-w-0">
                 <h2 className="text-lg font-bold flex items-center gap-2">
@@ -2266,7 +2266,7 @@ export function AdminAgents() {
                     return (
                       <div
                         key={doc.id}
-                        className="border-2 border-black/10 rounded-xl bg-white hover:border-violet-300 transition-all"
+                        className="border border-slate-300/10 rounded-xl bg-white hover:border-violet-300 transition-all"
                       >
                         <div className="w-full px-4 py-3 flex items-start gap-3">
                           <button
@@ -2381,15 +2381,15 @@ export function AdminAgents() {
       {/* ============== IMPORT MODAL ============== */}
       {showImportModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl border-2 border-black max-h-[90vh] flex flex-col overflow-hidden">
+          <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl max-h-[90vh] flex flex-col overflow-hidden border border-slate-200">
             {/* Header */}
-            <div className="px-5 py-4 border-b-2 border-black bg-gradient-to-r from-primary/10 via-primary/5 to-secondary/10 flex items-center justify-between flex-shrink-0">
+            <div className="px-5 py-4 border-b border-slate-200 bg-gradient-to-r from-primary/10 via-primary/5 to-secondary/10 flex items-center justify-between flex-shrink-0">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-primary text-white flex items-center justify-center border-2 border-black shadow-[2px_2px_0px_0px_#000]">
+                <div className="w-10 h-10 rounded-xl bg-primary text-white flex items-center justify-center">
                   <span className="material-symbols-outlined text-xl">download_for_offline</span>
                 </div>
                 <div>
-                  <h2 className="text-lg font-black text-on-surface flex items-center gap-2">
+                  <h2 className="text-lg font-bold text-on-surface flex items-center gap-2">
                     {tAgent('agent.importModalTitle', language)}
                     <span className="ml-2 text-xs font-normal text-slate-500">(MADA bots)</span>
                   </h2>
@@ -2401,7 +2401,7 @@ export function AdminAgents() {
               </div>
               <button
                 onClick={() => setShowImportModal(false)}
-                className="w-8 h-8 rounded-lg bg-white border-2 border-black text-on-surface hover:bg-slate-100 flex items-center justify-center shadow-[2px_2px_0px_0px_#000] transition-all hover:-translate-y-0.5 hover:shadow-[3px_3px_0px_0px_#000]"
+                className="w-8 h-8 rounded-lg bg-white border border-slate-300 text-on-surface hover:bg-slate-100 flex items-center justify-center transition-colors"
               >
                 <span className="material-symbols-outlined text-base">close</span>
               </button>
@@ -2412,7 +2412,7 @@ export function AdminAgents() {
               <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
                   <div className="flex items-center gap-1.5">
-                    <div className="w-6 h-6 rounded bg-indigo-100 border border-black flex items-center justify-center">
+                    <div className="w-6 h-6 rounded bg-indigo-100 flex items-center justify-center">
                       <span className="text-xs">🤖</span>
                     </div>
                     <div className="flex items-center gap-1">
@@ -2424,7 +2424,7 @@ export function AdminAgents() {
                   </div>
                   <div className="w-px h-4 bg-slate-300"></div>
                   <div className="flex items-center gap-1.5">
-                    <div className="w-6 h-6 rounded bg-green-100 border border-black flex items-center justify-center">
+                    <div className="w-6 h-6 rounded bg-green-100 flex items-center justify-center">
                       <span className="material-symbols-outlined text-green-600 text-xs" style={{ fontVariationSettings: "'FILL' 1" }}>auto_awesome</span>
                     </div>
                     <div className="flex items-center gap-1">
@@ -2434,7 +2434,7 @@ export function AdminAgents() {
                   </div>
                   <div className="w-px h-4 bg-slate-300"></div>
                   <div className="flex items-center gap-1.5">
-                    <div className="w-6 h-6 rounded bg-green-100 border border-black flex items-center justify-center">
+                    <div className="w-6 h-6 rounded bg-green-100 flex items-center justify-center">
                       <span className="material-symbols-outlined text-green-600 text-xs">check_circle</span>
                     </div>
                     <div className="flex items-center gap-1">
@@ -2452,14 +2452,14 @@ export function AdminAgents() {
                         .map(item => item.id);
                       setImportSelected(new Set(allMadaAvailable));
                     }}
-                    className="px-2.5 py-1.5 rounded bg-primary text-white font-bold text-[10px] border-2 border-black shadow-[2px_2px_0px_0px_#000] hover:bg-primary/90 hover:-translate-y-0.5 hover:shadow-[3px_3px_0px_0px_#000] active:shadow-none active:translate-y-0 transition-all flex items-center gap-1"
+                    className="px-2.5 py-1.5 rounded-md bg-primary text-white font-bold text-[10px] hover:bg-primary/90 transition-colors flex items-center gap-1"
                   >
                     <span className="material-symbols-outlined text-xs">select_all</span>
                     MADA
                   </button>
                   <button
                     onClick={() => setImportSelected(new Set())}
-                    className="px-2.5 py-1.5 rounded bg-white text-on-surface font-bold text-[10px] border-2 border-black hover:bg-slate-100 transition-all flex items-center gap-1"
+                    className="px-2.5 py-1.5 rounded-md bg-white text-on-surface font-bold text-[10px] hover:bg-slate-100 transition-colors flex items-center gap-1"
                   >
                     <span className="material-symbols-outlined text-xs">close</span>
                     Bỏ
@@ -2473,7 +2473,7 @@ export function AdminAgents() {
               {/* MADA BOTS Section */}
               <div>
                 <div className="flex items-center gap-2 mb-2">
-                  <div className="w-6 h-6 rounded bg-primary text-white flex items-center justify-center border border-black">
+                  <div className="w-6 h-6 rounded bg-primary text-white flex items-center justify-center">
                     <span className="text-xs">🤖</span>
                   </div>
                   <h3 className="font-bold text-xs text-on-surface uppercase tracking-wide">{tAgent('agent.importMadaBots', language)}</h3>
@@ -2495,7 +2495,7 @@ export function AdminAgents() {
                           exists 
                             ? 'border-slate-200 bg-slate-50 opacity-60 cursor-not-allowed' 
                             : checked 
-                              ? 'border-primary bg-primary/5 shadow-[2px_2px_0px_0px_#000]' 
+                              ? 'border-primary bg-primary/5' 
                               : 'border-slate-200 bg-white hover:border-primary/50'
                         )}
                       >
@@ -2511,7 +2511,7 @@ export function AdminAgents() {
                           <div className="font-bold text-[11px] text-on-surface truncate">{bot.name}</div>
                         </div>
                         {exists && (
-                          <span className="absolute -top-1 -right-1 text-[8px] font-bold bg-slate-200 text-slate-500 px-1 py-0.5 rounded border border-black">
+                          <span className="absolute -top-1 -right-1 text-[8px] font-bold bg-slate-200 text-slate-500 px-1 py-0.5 rounded">
                             ✓
                           </span>
                         )}
@@ -2525,7 +2525,7 @@ export function AdminAgents() {
               {getImportableAgents().filter(item => item.source === 'custom').length > 0 && (
                 <div>
                   <div className="flex items-center gap-2 mb-2">
-                    <div className="w-6 h-6 rounded bg-green-500 text-white flex items-center justify-center border border-black">
+                    <div className="w-6 h-6 rounded bg-green-500 text-white flex items-center justify-center">
                       <span className="material-symbols-outlined text-xs" style={{ fontVariationSettings: "'FILL' 1" }}>auto_awesome</span>
                     </div>
                     <h3 className="font-bold text-xs text-on-surface uppercase tracking-wide">{tAgent('agent.importCustomBots', language)}</h3>
@@ -2540,7 +2540,7 @@ export function AdminAgents() {
                       return (
                         <label
                           key={bot.id}
-                          className="relative flex flex-col gap-1 p-2 rounded-lg border-2 border-green-300 bg-green-50 cursor-default transition-all hover:border-green-400 shadow-[2px_2px_0px_0px_#000]"
+                          className="relative flex flex-col gap-1 p-2 rounded-lg border border-green-300 bg-green-50 cursor-default transition-all hover:border-green-400"
                         >
                           <div className="flex items-center gap-2">
                             <span className="text-lg">{bot.avatar}</span>
@@ -2560,7 +2560,7 @@ export function AdminAgents() {
                                   setShowImportModal(false);
                                 }
                               }}
-                              className="flex-1 flex items-center justify-center gap-1 py-1 rounded bg-blue-500 text-white text-[10px] font-bold hover:bg-blue-600 transition-colors border border-black"
+                              className="flex-1 flex items-center justify-center gap-1 py-1 rounded-md bg-blue-500 text-white text-[11px] font-bold hover:bg-blue-600 transition-colors"
                               title={tAgent('admin.common.edit', language)}
                             >
                               <span className="material-symbols-outlined text-xs">edit</span>
@@ -2573,7 +2573,7 @@ export function AdminAgents() {
                                 setShowImportModal(false);
                                 await handleDelete(bot.id);
                               }}
-                              className="flex-1 flex items-center justify-center gap-1 py-1 rounded bg-red-500 text-white text-[10px] font-bold hover:bg-red-600 transition-colors border border-black"
+                              className="flex-1 flex items-center justify-center gap-1 py-1 rounded-md bg-red-500 text-white text-[11px] font-bold hover:bg-red-600 transition-colors"
                               title={tAgent('admin.common.delete', language)}
                             >
                               <span className="material-symbols-outlined text-xs">delete</span>
@@ -2590,7 +2590,7 @@ export function AdminAgents() {
               {/* Empty State */}
               {getImportableAgents().filter(item => !agents.some(a => a.id === item.id)).length === 0 && (
                 <div className="text-center py-8">
-                  <div className="w-12 h-12 rounded-lg bg-green-100 border-2 border-black flex items-center justify-center mx-auto mb-3 shadow-[2px_2px_0px_0px_#000]">
+                  <div className="w-12 h-12 rounded-lg bg-green-100 flex items-center justify-center mx-auto mb-3">
                     <span className="material-symbols-outlined text-2xl text-green-600">verified</span>
                   </div>
                   <h3 className="font-black text-sm text-on-surface mb-1">{tAgent('agent.importAllBotsImported', language)}</h3>
@@ -2600,12 +2600,12 @@ export function AdminAgents() {
             </div>
 
             {/* Footer */}
-            <div className="px-5 py-3 border-t-2 border-black bg-slate-50 flex items-center justify-between flex-shrink-0">
+            <div className="px-5 py-3 border-t border-slate-200 bg-slate-50 flex items-center justify-between flex-shrink-0">
               <div className="flex items-center gap-2">
                 <div className={clsx(
-                  "w-8 h-8 rounded-lg flex items-center justify-center border-2 border-black transition-all",
+                  "w-8 h-8 rounded-lg flex items-center justify-center transition-all",
                   importSelected.size > 0 
-                    ? "bg-primary text-white shadow-[2px_2px_0px_0px_#000]" 
+                    ? "bg-primary text-white" 
                     : "bg-slate-200"
                 )}>
                   {importSelected.size > 0 ? (
@@ -2627,7 +2627,7 @@ export function AdminAgents() {
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setShowImportModal(false)}
-                  className="px-3 py-1.5 rounded-lg border-2 border-black text-on-surface font-bold text-xs bg-white hover:bg-slate-100 transition-all"
+                  className="px-3 py-1.5 rounded-lg border border-slate-300 text-on-surface font-bold text-xs bg-white hover:bg-slate-100 transition-colors"
                 >
                   {tAgent('admin.common.cancel', language)}
                 </button>
@@ -2635,10 +2635,10 @@ export function AdminAgents() {
                   onClick={handleImportSelected}
                   disabled={importing || importSelected.size === 0}
                   className={clsx(
-                    "px-4 py-1.5 rounded-lg font-bold text-xs border-2 border-black transition-all flex items-center gap-1.5",
+                    "px-4 py-1.5 rounded-lg font-bold text-xs transition-colors flex items-center gap-1.5",
                     importing || importSelected.size === 0
                       ? "bg-slate-200 text-slate-400 cursor-not-allowed"
-                      : "bg-primary text-white shadow-[3px_3px_0px_0px_#000] hover:-translate-x-[-1px] hover:-translate-y-[-1px] hover:shadow-[4px_4px_0px_0px_#000]"
+                      : "bg-primary text-white hover:bg-primary/90"
                   )}
                 >
                   {importing ? (
@@ -2664,14 +2664,14 @@ export function AdminAgents() {
         <div className="fixed bottom-6 right-6 z-50">
           <button
             onClick={openCreateForm}
-            className="w-12 h-12 bg-primary text-white rounded-xl flex items-center justify-center border-2 border-black shadow-[4px_4px_0px_0px_#000] hover:-translate-y-0.5 hover:shadow-[5px_5px_0px_0px_#000] transition-all"
+            className="w-12 h-12 bg-primary text-white rounded-xl flex items-center justify-center border border-slate-200 shadow-sm hover:-translate-y-0.5 hover:shadow-md transition-all"
           >
             <span className="material-symbols-outlined text-xl font-bold">add</span>
           </button>
         </div>
       )}
       {savedAt && (
-        <div className="fixed bottom-6 left-6 px-3 py-2 rounded-lg bg-primary text-white font-bold text-xs border-2 border-black shadow-[4px_4px_0px_0px_#000] animate-pulse">
+        <div className="fixed bottom-6 left-6 px-3 py-2 rounded-lg bg-primary text-white font-bold text-xs border border-slate-200 shadow-sm animate-pulse">
           ✓ {tAgent('agent.saved', language)} {savedAt}
         </div>
       )}

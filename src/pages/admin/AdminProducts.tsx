@@ -563,13 +563,13 @@ function CategoryModal({ category, onSave, onClose }: {
  return (
   <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
    <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-   <div className="relative w-full max-w-xl rounded-2xl overflow-hidden bg-white border-[4px] border-black shadow-[1px_1px_0px_0px_#000]">
-    <div className="flex items-center justify-between p-5 border-b-[3px] border-black bg-yellow-200">
+   <div className="relative w-full max-w-xl rounded-2xl overflow-hidden bg-white border border-slate-200 shadow-sm">
+    <div className="flex items-center justify-between p-5 border-b border-slate-300 bg-yellow-200">
      <div>
       <h2 className="text-lg font-black text-black">{category ? t('products.categoryEdit') : t('products.categoryNew')}</h2>
       <p className="text-xs text-black/70 mt-0.5">{category ? t('products.categoryUpdateHint') : t('products.categoryAddHint')}</p>
      </div>
-     <button onClick={onClose} className="w-9 h-9 rounded-xl bg-white border-2 border-black flex items-center justify-center text-black hover:bg-red-200 transition-all">
+     <button onClick={onClose} className="w-9 h-9 rounded-xl bg-white border border-slate-300 flex items-center justify-center text-black hover:bg-red-200 transition-all">
       <span className="material-symbols-outlined">close</span>
      </button>
     </div>
@@ -586,7 +586,7 @@ function CategoryModal({ category, onSave, onClose }: {
      <div>
        <label className="block text-xs font-black text-black uppercase tracking-wider mb-1.5 ml-1">{t('products.categoryIcon')}</label>
       <div className="flex items-center gap-3">
-       <div className="w-11 h-11 rounded-xl bg-yellow-300 border-2 border-black shadow-[1px_1px_0px_0px_#000] flex items-center justify-center text-black font-black">
+       <div className="w-11 h-11 rounded-xl bg-yellow-300 border border-slate-300 shadow-sm flex items-center justify-center text-black font-black">
         M
        </div>
        <p className="text-xs font-bold text-slate-700">Logo MADA AI</p>
@@ -640,9 +640,9 @@ function CategoryModal({ category, onSave, onClose }: {
      )}
     </div>
 
-    <div className="flex justify-end gap-3 p-4 border-t-2 border-black bg-slate-100">
-     <button onClick={onClose} className="px-5 py-2.5 rounded-xl border-2 border-black font-bold text-black bg-white shadow-[1px_1px_0px_0px_#000] transition-all">{t('admin.common.cancel')}</button>
-     <button onClick={handleSave} disabled={saving} className="px-5 py-2.5 rounded-xl bg-black text-white border-2 border-black font-bold shadow-[1px_1px_0px_0px_#000] flex items-center gap-2 transition-all disabled:opacity-50">
+    <div className="flex justify-end gap-3 p-4 border-t border-slate-300 bg-slate-100">
+     <button onClick={onClose} className="px-5 py-2.5 rounded-xl border border-slate-300 font-bold text-black bg-white shadow-sm transition-all">{t('admin.common.cancel')}</button>
+     <button onClick={handleSave} disabled={saving} className="px-5 py-2.5 rounded-xl bg-black text-white border border-slate-300 font-bold shadow-sm flex items-center gap-2 transition-all disabled:opacity-50">
       {saving && <Loader2 className="w-4 h-4 animate-spin" />}
       {saving ? t('products.saving') : t('admin.common.save')}
      </button>
@@ -992,12 +992,12 @@ function ProductCard({ product, categoryName, onEdit, onDelete, onTogglePublish,
 
     <div className="absolute top-2 left-2 flex gap-1">
      {product.featured && (
-      <span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-amber-400 text-black border border-black/20">
+      <span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-amber-400 text-black border border-slate-300">
        {t('product.hot')}
       </span>
      )}
      {!isPublished && (
-      <span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-slate-500 text-white border border-black/20">
+      <span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-slate-500 text-white border border-slate-300">
        {t('products.draft')}
       </span>
      )}
@@ -1291,8 +1291,8 @@ export function AdminProducts() {
    </section>
 
    <section className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
-    <div className="relative bg-gradient-to-br from-primary/10 to-primary/5 backdrop-blur-xl rounded-2xl p-4 border-[3px] border-black shadow-[4px_4px_0px_0px_#000] transform rotate-[-0.3deg] hover:rotate-0 transition-all flex items-center gap-3">
-     <div className="w-10 h-10 rounded-xl border-2 border-black flex items-center justify-center shadow-[2px_2px_0px_0px_#000] bg-primary/20">
+    <div className="relative bg-gradient-to-br from-primary/10 to-primary/5 backdrop-blur-xl rounded-2xl p-4 border border-slate-200 shadow-sm transform rotate-[-0.3deg] hover:rotate-0 transition-all flex items-center gap-3">
+     <div className="w-10 h-10 rounded-xl border border-slate-300 flex items-center justify-center shadow-sm bg-primary/20">
       <span className="material-symbols-outlined text-lg text-primary" style={{ fontVariationSettings: "'FILL' 1" }}>inventory_2</span>
      </div>
      <div>
@@ -1305,8 +1305,8 @@ export function AdminProducts() {
       <p className="text-[10px] text-on-surface-variant mt-0.5">{t('product.inSystem')}</p>
      </div>
     </div>
-    <div className="relative bg-gradient-to-br from-amber-50/80 to-amber-100/40 backdrop-blur-xl rounded-2xl p-4 border-[3px] border-black shadow-[4px_4px_0px_0px_#000] transform rotate-[0.3deg] hover:rotate-0 transition-all flex items-center gap-3">
-     <div className="w-10 h-10 rounded-xl border-2 border-black flex items-center justify-center shadow-[2px_2px_0px_0px_#000] bg-amber-200">
+    <div className="relative bg-gradient-to-br from-amber-50/80 to-amber-100/40 backdrop-blur-xl rounded-2xl p-4 border border-slate-200 shadow-sm transform rotate-[0.3deg] hover:rotate-0 transition-all flex items-center gap-3">
+     <div className="w-10 h-10 rounded-xl border border-slate-300 flex items-center justify-center shadow-sm bg-amber-200">
       <span className="material-symbols-outlined text-lg text-amber-600" style={{ fontVariationSettings: "'FILL' 1" }}>category</span>
      </div>
      <div>
@@ -1319,8 +1319,8 @@ export function AdminProducts() {
       <p className="text-[10px] text-on-surface-variant mt-0.5">{t('product.active')}</p>
      </div>
     </div>
-    <div className="relative bg-gradient-to-br from-emerald-50/80 to-emerald-100/40 backdrop-blur-xl rounded-2xl p-4 border-[3px] border-black shadow-[4px_4px_0px_0px_#000] transform rotate-[-0.3deg] hover:rotate-0 transition-all flex items-center gap-3">
-     <div className="w-10 h-10 rounded-xl border-2 border-black flex items-center justify-center shadow-[2px_2px_0px_0px_#000] bg-emerald-200">
+    <div className="relative bg-gradient-to-br from-emerald-50/80 to-emerald-100/40 backdrop-blur-xl rounded-2xl p-4 border border-slate-200 shadow-sm transform rotate-[-0.3deg] hover:rotate-0 transition-all flex items-center gap-3">
+     <div className="w-10 h-10 rounded-xl border border-slate-300 flex items-center justify-center shadow-sm bg-emerald-200">
       <span className="material-symbols-outlined text-lg text-emerald-600" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
      </div>
      <div>
@@ -1359,7 +1359,7 @@ export function AdminProducts() {
      <div className="flex items-center gap-2">
       {products.some(p => p.status !== 'published') && (
        <button onClick={handlePublishAll}
-        className="px-4 py-2 rounded-lg bg-emerald-500 text-white font-bold text-sm border-2 border-black hover:bg-emerald-600 transition-all flex items-center gap-2 shadow-[2px_2px_0px_0px_#000]">
+        className="px-4 py-2 rounded-lg bg-emerald-500 text-white font-bold text-sm border border-slate-300 hover:bg-emerald-600 transition-all flex items-center gap-2 shadow-sm">
         <CheckCircle2 className="w-4 h-4" /> {t('products.publishAll')}
        </button>
       )}
@@ -1376,25 +1376,25 @@ export function AdminProducts() {
           alert(t('product.syncError') + ' ' + (e as Error)?.message);
         }
       }}
-       className="px-4 py-2 rounded-lg bg-violet-500 text-white font-bold text-sm border-2 border-black hover:bg-violet-600 transition-all flex items-center gap-2 shadow-[2px_2px_0px_0px_#000]">
+       className="px-4 py-2 rounded-lg bg-violet-500 text-white font-bold text-sm border border-slate-300 hover:bg-violet-600 transition-all flex items-center gap-2 shadow-sm">
        <RefreshCw className="w-4 h-4" /> Sync & Index
       </button>
       <button onClick={() => setViewMode('products')} 
-       className={clsx('px-4 py-2 rounded-lg font-bold text-sm transition-all border-2 border-black',
+       className={clsx('px-4 py-2 rounded-lg font-bold text-sm transition-all border border-slate-300',
         viewMode === 'products' 
          ? 'bg-black text-white' 
          : 'bg-white text-black hover:bg-slate-50')}>
        {t('products.tabProducts')}
       </button>
       <button onClick={() => setViewMode('categories')} 
-       className={clsx('px-4 py-2 rounded-lg font-bold text-sm transition-all border-2 border-black',
+       className={clsx('px-4 py-2 rounded-lg font-bold text-sm transition-all border border-slate-300',
         viewMode === 'categories' 
          ? 'bg-black text-white' 
          : 'bg-white text-black hover:bg-slate-50')}>
        {t('products.tabCategories')}
       </button>
       <button onClick={() => handleOpenAddProduct()}
-       className="px-4 py-2 rounded-lg bg-primary text-white font-bold text-sm border-2 border-black hover:bg-primary/90 transition-all flex items-center gap-2">
+       className="px-4 py-2 rounded-lg bg-primary text-white font-bold text-sm border border-slate-300 hover:bg-primary/90 transition-all flex items-center gap-2">
        <Plus className="w-4 h-4" /> {t('admin.common.add')}
       </button>
      </div>
@@ -1475,21 +1475,21 @@ export function AdminProducts() {
        <div className="w-12 h-12 rounded-full border-2 border-primary/20 border-t-primary animate-spin"></div>
       </div>
      ) : products.length === 0 ? (
-      <div className="min-h-[200px] flex flex-col items-center justify-center p-8 bg-white rounded-2xl border-[3px] border-black shadow-[1px_1px_0px_0px_#000]">
-       <div className="w-16 h-16 rounded-xl border-[3px] border-black shadow-[1px_1px_0px_0px_#000] bg-white flex items-center justify-center mb-4">
+      <div className="min-h-[200px] flex flex-col items-center justify-center p-8 bg-white rounded-2xl border border-slate-300 shadow-sm">
+       <div className="w-16 h-16 rounded-xl border border-slate-300 shadow-sm bg-white flex items-center justify-center mb-4">
         <span className="material-symbols-outlined text-3xl text-black">inventory_2</span>
        </div>
        <h3 className="text-title-md font-black text-black mb-1">{t('products.emptyTitle')}</h3>
        <p className="text-body-md text-slate-600 mb-4">{t('products.emptyHint')}</p>
        <button onClick={() => handleOpenAddProduct()}
-        className="px-6 py-3 bg-black text-white rounded-xl font-bold border-[3px] border-black shadow-[1px_1px_0px_0px_#000] transition-all flex items-center gap-2">
+        className="px-6 py-3 bg-black text-white rounded-xl font-bold border border-slate-300 shadow-sm transition-all flex items-center gap-2">
         <Plus className="w-5 h-5" /> {t('products.addProduct')}
        </button>
       </div>
      ) : (
       <>
        {products.length > 0 && (
-        <div className="mb-4 flex items-center gap-3 p-3 bg-slate-50 rounded-xl border-2 border-black">
+        <div className="mb-4 flex items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-300">
          <input
           type="checkbox"
           id="select-all"
@@ -1498,22 +1498,22 @@ export function AdminProducts() {
            if (e.target.checked) setSelectedProducts(new Set(products.map(p => p.id)));
            else setSelectedProducts(new Set());
           }}
-          className="w-5 h-5 rounded border-2 border-black text-indigo-600 focus:ring-indigo-500"
+          className="w-5 h-5 rounded border border-slate-300 text-indigo-600 focus:ring-indigo-500"
          />
          <label htmlFor="select-all" className="font-bold text-sm text-black cursor-pointer">{t('admin.common.selectAll')} ({products.length})</label>
          {selectedProducts.size > 0 && (
           <div className="flex items-center gap-2 ml-auto">
            <span className="text-sm font-bold text-slate-600">{selectedProducts.size} {t('admin.common.selected')}</span>
            <button onClick={handleBulkPublish}
-            className="px-3 py-1.5 rounded-lg bg-emerald-500 text-white font-bold text-xs border-2 border-black hover:bg-emerald-600 transition-all">
+            className="px-3 py-1.5 rounded-lg bg-emerald-500 text-white font-bold text-xs border border-slate-300 hover:bg-emerald-600 transition-all">
             ✓ {t('products.publishSelected')}
            </button>
            <button onClick={handleBulkUnpublish}
-            className="px-3 py-1.5 rounded-lg bg-amber-500 text-white font-bold text-xs border-2 border-black hover:bg-amber-600 transition-all">
+            className="px-3 py-1.5 rounded-lg bg-amber-500 text-white font-bold text-xs border border-slate-300 hover:bg-amber-600 transition-all">
             ✗ {t('products.unpublishSelected')}
            </button>
            <button onClick={() => setSelectedProducts(new Set())}
-            className="px-3 py-1.5 rounded-lg bg-slate-200 text-black font-bold text-xs border-2 border-black hover:bg-slate-300 transition-all">
+            className="px-3 py-1.5 rounded-lg bg-slate-200 text-black font-bold text-xs border border-slate-300 hover:bg-slate-300 transition-all">
             {t('admin.common.deselect')}
            </button>
           </div>
@@ -1533,7 +1533,7 @@ export function AdminProducts() {
              else newSet.add(prod.id);
              setSelectedProducts(newSet);
             }}
-            className="absolute top-2 left-2 z-10 w-5 h-5 rounded border-2 border-black text-indigo-600 focus:ring-indigo-500 bg-white cursor-pointer"
+            className="absolute top-2 left-2 z-10 w-5 h-5 rounded border border-slate-300 text-indigo-600 focus:ring-indigo-500 bg-white cursor-pointer"
            />
           )}
           <ProductCard product={prod} categoryName={getCategoryName(prod.category)}
@@ -1545,12 +1545,12 @@ export function AdminProducts() {
        {totalPages > 1 && (
         <div className="flex items-center justify-center gap-3 mt-8">
 <button onClick={() => setPage(Math.max(0, page - 1))} disabled={page === 0}
-         className="px-5 py-2.5 rounded-xl border-2 border-black bg-white text-black font-bold shadow-[1px_1px_0px_0px_#000] transition-all disabled:opacity-30 disabled:shadow-none disabled:translate-x-0 disabled:translate-y-0">
+         className="px-5 py-2.5 rounded-xl border border-slate-300 bg-white text-black font-bold shadow-sm transition-all disabled:opacity-30 disabled:opacity-50">
          ← {t('admin.common.previous')}
         </button>
-        <span className="px-5 py-2.5 rounded-xl border-2 border-black bg-white text-black font-bold shadow-[1px_1px_0px_0px_#000]">{t('admin.common.page')} {page + 1} / {totalPages}</span>
+        <span className="px-5 py-2.5 rounded-xl border border-slate-300 bg-white text-black font-bold shadow-sm">{t('admin.common.page')} {page + 1} / {totalPages}</span>
         <button onClick={() => setPage(Math.min(totalPages - 1, page + 1))} disabled={page >= totalPages - 1}
-         className="px-5 py-2.5 rounded-xl border-2 border-black bg-white text-black font-bold shadow-[1px_1px_0px_0px_#000] transition-all disabled:opacity-30 disabled:shadow-none disabled:translate-x-0 disabled:translate-y-0">
+         className="px-5 py-2.5 rounded-xl border border-slate-300 bg-white text-black font-bold shadow-sm transition-all disabled:opacity-30 disabled:opacity-50">
          {t('admin.common.next')} →
         </button>
         </div>

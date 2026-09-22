@@ -215,7 +215,7 @@ export function EmotionCustomization({ userRole = 'admin' }: EmotionCustomizatio
       {/* Row 1: Phong cách + Cường độ */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Phong cách */}
-        <div className="p-4 rounded-xl bg-white border-2 border-black shadow-[3px_3px_0px_0px_#000]">
+        <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-sm">
           <h4 className="font-bold text-sm text-slate-800 mb-1">{tE('emotionCustomization.presets.title')}</h4>
           <p className="text-xs text-slate-500 mb-3">{tE('emotionCustomization.presets.subtitle')}</p>
           
@@ -226,7 +226,7 @@ export function EmotionCustomization({ userRole = 'admin' }: EmotionCustomizatio
                 onClick={() => updateEmotionSettings({ preset: preset.id })}
                 className={`p-3 rounded-lg border-2 text-left transition-all ${
                   emotionSettings.preset === preset.id
-                    ? 'bg-teal-50 border-teal-500 shadow-[2px_2px_0px_0px_#000]'
+                    ? 'bg-teal-50 border-teal-500 shadow-sm'
                     : 'bg-white border-slate-200 hover:border-slate-400'
                 }`}
               >
@@ -244,7 +244,7 @@ export function EmotionCustomization({ userRole = 'admin' }: EmotionCustomizatio
         </div>
 
         {/* Cường độ */}
-        <div className="p-4 rounded-xl bg-white border-2 border-black shadow-[3px_3px_0px_0px_#000]">
+        <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-sm">
           <h4 className="font-bold text-sm text-slate-800 mb-1">{tE('emotionCustomization.intensity.title')}</h4>
           <p className="text-xs text-slate-500 mb-3">{tE('emotionCustomization.intensity.subtitle')}</p>
           
@@ -255,7 +255,7 @@ export function EmotionCustomization({ userRole = 'admin' }: EmotionCustomizatio
                 onClick={() => updateEmotionSettings({ intensity: option.id })}
                 className={`flex-1 p-3 rounded-lg border-2 text-center transition-all ${
                   emotionSettings.intensity === option.id
-                    ? 'bg-cyan-500 text-white border-cyan-700 shadow-[2px_2px_0px_0px_#000]'
+                    ? 'bg-cyan-500 text-white border-cyan-700 shadow-sm'
                     : 'bg-white border-slate-200 hover:border-slate-400'
                 }`}
               >
@@ -269,7 +269,7 @@ export function EmotionCustomization({ userRole = 'admin' }: EmotionCustomizatio
       </div>
 
       {/* Row 2: Sliders */}
-      <div className="p-4 rounded-xl bg-white border-2 border-black shadow-[3px_3px_0px_0px_#000]">
+      <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-sm">
         <h4 className="font-bold text-sm text-slate-800 mb-1">{tE('emotionCustomization.sliders.title')}</h4>
         <p className="text-xs text-slate-500 mb-4">{tE('emotionCustomization.sliders.subtitle')}</p>
         
@@ -353,7 +353,7 @@ export function EmotionCustomization({ userRole = 'admin' }: EmotionCustomizatio
       </div>
 
       {/* Row 3: Response Style */}
-      <div className="p-4 rounded-xl bg-white border-2 border-black shadow-[3px_3px_0px_0px_#000]">
+      <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-sm">
         <h4 className="font-bold text-sm text-slate-800 mb-1">{tE('emotionCustomization.style.title')}</h4>
         <p className="text-xs text-slate-500 mb-3">{tE('emotionCustomization.style.subtitle')}</p>
         
@@ -409,7 +409,7 @@ export function EmotionCustomization({ userRole = 'admin' }: EmotionCustomizatio
                 onClick={() => updateEmotionSettings({ maxResponseLength: option.id as 'short' | 'medium' | 'long' })}
                 className={`px-4 py-2 rounded-lg border-2 text-xs font-bold transition-all ${
                   emotionSettings.maxResponseLength === option.id
-                    ? 'bg-teal-500 text-white border-teal-700 shadow-[2px_2px_0px_0px_#000]'
+                    ? 'bg-teal-500 text-white border-teal-700 shadow-sm'
                     : 'bg-white border-slate-200 text-slate-600 hover:border-teal-300'
                 }`}
               >
@@ -421,7 +421,7 @@ export function EmotionCustomization({ userRole = 'admin' }: EmotionCustomizatio
       </div>
 
       {/* Row 4: Custom Instructions */}
-      <div className="p-4 rounded-xl bg-white border-2 border-black shadow-[3px_3px_0px_0px_#000]">
+      <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-sm">
         <h4 className="font-bold text-sm text-slate-800 mb-1">{tE('emotionCustomization.custom.title')}</h4>
         <p className="text-xs text-slate-500 mb-3">{tE('emotionCustomization.custom.subtitle')}</p>
         
@@ -429,7 +429,7 @@ export function EmotionCustomization({ userRole = 'admin' }: EmotionCustomizatio
           value={emotionSettings.customInstructions}
           onChange={(e) => updateEmotionSettings({ customInstructions: e.target.value })}
           rows={3}
-          className="w-full px-3 py-2 rounded-lg bg-slate-50 border-2 border-black/20 text-sm resize-none focus:outline-none focus:border-teal-500"
+          className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-300/20 text-sm resize-none focus:outline-none focus:border-teal-500"
           placeholder={tE('emotionCustomization.custom.placeholderVi')}
         />
       </div>

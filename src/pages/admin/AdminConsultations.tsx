@@ -224,7 +224,7 @@ export function AdminConsultations() {
       <section className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         {/* Metric 1 - Total */}
         <div className="relative bg-gradient-to-br from-white/80 to-white/40 backdrop-blur-xl rounded-2xl p-4 border-3 border-black flex items-center gap-3 transform rotate-[-0.5deg] hover:rotate-0 transition-transform shadow-[6px_6px_0px_0px_#000] hover:shadow-[8px_8px_0px_0px_#000]">
-          <div className="w-10 h-10 rounded-xl bg-gray-100 border-2 border-black flex items-center justify-center shadow-[3px_3px_0px_0px_#000]">
+          <div className="w-10 h-10 rounded-xl bg-gray-100 border border-slate-300 flex items-center justify-center shadow-sm">
             <span className="material-symbols-outlined text-on-surface text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>inbox</span>
           </div>
           <div>
@@ -235,7 +235,7 @@ export function AdminConsultations() {
 
         {/* Metric 2 - Pending */}
         <div className="relative bg-gradient-to-br from-yellow-50/80 to-yellow-100/40 backdrop-blur-xl rounded-2xl p-4 border-3 border-black flex items-center gap-3 transform rotate-[0.5deg] hover:rotate-0 transition-transform shadow-[6px_6px_0px_0px_#000] hover:shadow-[8px_8px_0px_0px_#000]">
-          <div className="w-10 h-10 rounded-xl bg-yellow-200 border-2 border-black flex items-center justify-center shadow-[3px_3px_0px_0px_#000]">
+          <div className="w-10 h-10 rounded-xl bg-yellow-200 border border-slate-300 flex items-center justify-center shadow-sm">
             <span className="material-symbols-outlined text-yellow-600 text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>pending_actions</span>
           </div>
           <div>
@@ -246,7 +246,7 @@ export function AdminConsultations() {
 
         {/* Metric 3 - Reviewed */}
         <div className="relative bg-gradient-to-br from-blue-50/80 to-blue-100/40 backdrop-blur-xl rounded-2xl p-4 border-3 border-black flex items-center gap-3 transform rotate-[-0.5deg] hover:rotate-0 transition-transform shadow-[6px_6px_0px_0px_#000] hover:shadow-[8px_8px_0px_0px_#000]">
-          <div className="w-10 h-10 rounded-xl bg-blue-100 border-2 border-black flex items-center justify-center shadow-[3px_3px_0px_0px_#000]">
+          <div className="w-10 h-10 rounded-xl bg-blue-100 border border-slate-300 flex items-center justify-center shadow-sm">
             <span className="material-symbols-outlined text-blue-600 text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>visibility</span>
           </div>
           <div>
@@ -257,7 +257,7 @@ export function AdminConsultations() {
 
         {/* Metric 4 - Contacted */}
         <div className="relative bg-gradient-to-br from-green-50/80 to-green-100/40 backdrop-blur-xl rounded-2xl p-4 border-3 border-black flex items-center gap-3 transform rotate-[0.5deg] hover:rotate-0 transition-transform shadow-[6px_6px_0px_0px_#000] hover:shadow-[8px_8px_0px_0px_#000]">
-          <div className="w-10 h-10 rounded-xl bg-green-100 border-2 border-black flex items-center justify-center shadow-[3px_3px_0px_0px_#000]">
+          <div className="w-10 h-10 rounded-xl bg-green-100 border border-slate-300 flex items-center justify-center shadow-sm">
             <span className="material-symbols-outlined text-green-600 text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
           </div>
           <div>
@@ -269,7 +269,7 @@ export function AdminConsultations() {
 
       {/* Filter & Action Row */}
       <div className="flex items-center justify-between mb-8 flex-wrap gap-4">
-        <div className="flex items-center gap-3 p-1.5 bg-white/60 backdrop-blur-xl rounded-full border-2 border-black">
+        <div className="flex items-center gap-3 p-1.5 bg-white/60 backdrop-blur-xl rounded-full border border-slate-300">
           <span className="text-on-surface-variant font-medium text-sm ml-4 mr-2">{tC('admin.consult.filter')}</span>
           <button
             onClick={() => setStatusFilter('all')}
@@ -317,7 +317,7 @@ export function AdminConsultations() {
           </button>
         </div>
         <div>
-          <button className="flex items-center gap-2 bg-white text-primary px-6 py-2.5 rounded-full font-bold text-sm border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] transition-all group">
+          <button className="flex items-center gap-2 bg-white text-primary px-6 py-2.5 rounded-full font-bold text-sm border border-slate-300 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] transition-all group">
             <span className="material-symbols-outlined text-sm transition-transform group-hover:-translate-y-1">cloud_download</span>
             {tC('admin.consult.exportReport')}
           </button>
@@ -330,14 +330,14 @@ export function AdminConsultations() {
         
         {loading ? (
           <div className="relative z-10 flex flex-col items-center justify-center min-h-[300px]">
-            <div className="w-16 h-16 rounded-2xl bg-gray-100 border-2 border-black flex items-center justify-center mb-4 shadow-[4px_4px_0px_0px_#000] animate-pulse">
+            <div className="w-16 h-16 rounded-2xl bg-gray-100 border border-slate-300 flex items-center justify-center mb-4 shadow-sm animate-pulse">
               <span className="material-symbols-outlined text-gray-400 text-3xl">hourglass_empty</span>
             </div>
             <p className="text-lg font-bold text-gray-500">{tC('admin.consult.loading')}</p>
           </div>
         ) : filteredRequests.length === 0 ? (
           <div className="relative z-10 flex flex-col items-center justify-center min-h-[400px]">
-            <div className="w-24 h-24 rounded-2xl bg-gray-100 border-2 border-black flex items-center justify-center mb-6 text-gray-400 transform rotate-[-3deg] hover:rotate-0 transition-all duration-300 shadow-[8px_8px_0px_0px_#000]">
+            <div className="w-24 h-24 rounded-2xl bg-gray-100 border border-slate-300 flex items-center justify-center mb-6 text-gray-400 transform rotate-[-3deg] hover:rotate-0 transition-all duration-300 shadow-[8px_8px_0px_0px_#000]">
               <span className="material-symbols-outlined text-5xl">inbox</span>
             </div>
             <h4 className="text-2xl font-black text-on-surface mb-2">{tC('admin.consult.noRequests')}</h4>
@@ -350,7 +350,7 @@ export function AdminConsultations() {
             {filteredRequests.map((request, index) => (
               <div
                 key={request.id}
-                className="bg-white/60 backdrop-blur-xl rounded-2xl border-2 border-black p-6 hover:shadow-[6px_6px_0px_0px_#000] hover:-translate-x-1 hover:-translate-y-1 transition-all cursor-pointer"
+                className="bg-white/60 backdrop-blur-xl rounded-2xl border border-slate-300 p-6 hover:shadow-[6px_6px_0px_0px_#000] hover:-translate-x-1 hover:-translate-y-1 transition-all cursor-pointer"
                 style={{
                   boxShadow: `${4 + (index % 3) * 2}px ${4 + (index % 3) * 2}px 0px 0px #000`,
                 }}
@@ -358,7 +358,7 @@ export function AdminConsultations() {
               >
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <div className="flex items-start gap-4">
-                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/20 to-secondary/20 border-2 border-black flex items-center justify-center shadow-[2px_2px_0px_0px_#000]">
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/20 to-secondary/20 border border-slate-300 flex items-center justify-center shadow-sm">
                       <span className="material-symbols-outlined text-primary text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>person</span>
                     </div>
                     <div>
@@ -382,18 +382,18 @@ export function AdminConsultations() {
                       })}
                     </span>
                     <span className={clsx(
-                      'px-4 py-2 rounded-full text-sm font-bold border-2 border-black',
+                      'px-4 py-2 rounded-full text-sm font-bold border border-slate-300',
                       statusColors[request.status]
                     )}>
                       {statusLabels[request.status]}
                     </span>
-                    <button className="px-4 py-2 rounded-full bg-primary text-white text-sm font-bold border-2 border-black shadow-[2px_2px_0px_0px_#000] hover:translate-x-[-1px] hover:-translate-y-[1px] hover:shadow-[3px_3px_0px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all">
+                    <button className="px-4 py-2 rounded-full bg-primary text-white text-sm font-bold border border-slate-200 shadow-sm hover:translate-x-[-1px] hover:-translate-y-[1px] hover:shadow-sm active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all">
                       {tC('admin.consult.viewDetails')}
                     </button>
                   </div>
                 </div>
                 
-                <div className="mt-4 p-4 bg-gray-50/60 rounded-xl border border-black/20">
+                <div className="mt-4 p-4 bg-gray-50/60 rounded-xl border border-slate-300">
                   <p className="text-sm text-on-surface-variant line-clamp-2">{request.message}</p>
                 </div>
               </div>
@@ -421,10 +421,10 @@ export function AdminConsultations() {
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
-            <div className="sticky top-0 bg-white/80 backdrop-blur-xl border-b-2 border-black p-6 z-10">
+            <div className="sticky top-0 bg-white/80 backdrop-blur-xl border-b border-slate-200 p-6 z-10">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-secondary border-2 border-black flex items-center justify-center shadow-[3px_3px_0px_0px_#000]">
+                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-secondary border border-slate-300 flex items-center justify-center shadow-sm">
                     <span className="material-symbols-outlined text-white text-2xl" style={{ fontVariationSettings: "'FILL' 1" }}>clinical_notes</span>
                   </div>
                   <div>
@@ -434,7 +434,7 @@ export function AdminConsultations() {
                 </div>
                 <button
                   onClick={() => setSelectedRequest(null)}
-                  className="w-10 h-10 rounded-full bg-white border-2 border-black flex items-center justify-center hover:bg-gray-100 transition-colors shadow-[2px_2px_0px_0px_#000]"
+                  className="w-10 h-10 rounded-full bg-white border border-slate-300 flex items-center justify-center hover:bg-gray-100 transition-colors shadow-sm"
                 >
                   <span className="material-symbols-outlined">close</span>
                 </button>
@@ -445,18 +445,18 @@ export function AdminConsultations() {
             <div className="p-6 space-y-6">
               {/* Info Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="bg-white/60 backdrop-blur-xl rounded-2xl p-4 border-2 border-black shadow-[3px_3px_0px_0px_#000]">
+                <div className="bg-white/60 backdrop-blur-xl rounded-2xl p-4 border border-slate-200 shadow-sm">
                   <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">{tC('admin.consult.fullName')}</label>
                   <p className="font-bold text-on-surface text-lg">{selectedRequest.name}</p>
                 </div>
-                <div className="bg-white/60 backdrop-blur-xl rounded-2xl p-4 border-2 border-black shadow-[3px_3px_0px_0px_#000]">
+                <div className="bg-white/60 backdrop-blur-xl rounded-2xl p-4 border border-slate-200 shadow-sm">
                   <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">{tC('admin.common.email')}</label>
                   <a href={`mailto:${selectedRequest.email}`} className="font-bold text-primary hover:underline">
                     {selectedRequest.email}
                   </a>
                 </div>
                 {selectedRequest.phone && (
-                  <div className="bg-white/60 backdrop-blur-xl rounded-2xl p-4 border-2 border-black shadow-[3px_3px_0px_0px_#000]">
+                  <div className="bg-white/60 backdrop-blur-xl rounded-2xl p-4 border border-slate-200 shadow-sm">
                     <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">{tC('admin.consult.phone')}</label>
                     <a href={`tel:${selectedRequest.phone}`} className="font-bold text-primary hover:underline flex items-center gap-2">
                       <span className="material-symbols-outlined text-sm">phone</span>
@@ -464,7 +464,7 @@ export function AdminConsultations() {
                     </a>
                   </div>
                 )}
-                <div className="bg-white/60 backdrop-blur-xl rounded-2xl p-4 border-2 border-black shadow-[3px_3px_0px_0px_#000]">
+                <div className="bg-white/60 backdrop-blur-xl rounded-2xl p-4 border border-slate-200 shadow-sm">
                   <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">{tC('admin.consult.dateSent')}</label>
                   <p className="font-bold text-on-surface">
                     {new Date(selectedRequest.created_at).toLocaleString(language === 'ar' ? 'ar-SA' : language === 'fr' ? 'fr-FR' : language === 'en' ? 'en-US' : 'vi-VN', {
@@ -479,15 +479,15 @@ export function AdminConsultations() {
               </div>
 
               {/* Message Content */}
-              <div className="bg-white/60 backdrop-blur-xl rounded-2xl p-6 border-2 border-black shadow-[3px_3px_0px_0px_#000]">
+              <div className="bg-white/60 backdrop-blur-xl rounded-2xl p-6 border border-slate-200 shadow-sm">
                 <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">{tC('admin.consult.requestContent')}</label>
-                <div className="p-4 bg-gray-50/60 rounded-xl border border-black/20">
+                <div className="p-4 bg-gray-50/60 rounded-xl border border-slate-300">
                   <p className="whitespace-pre-wrap text-on-surface leading-relaxed">{selectedRequest.message}</p>
                 </div>
               </div>
 
               {/* Status Update */}
-              <div className="bg-white/60 backdrop-blur-xl rounded-2xl p-6 border-2 border-black shadow-[3px_3px_0px_0px_#000]">
+              <div className="bg-white/60 backdrop-blur-xl rounded-2xl p-6 border border-slate-200 shadow-sm">
                 <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-4">{tC('admin.consult.updateStatus')}</label>
                 <div className="flex flex-wrap gap-3">
                   {(['pending', 'reviewed', 'contacted'] as const).map((status) => (
@@ -495,12 +495,12 @@ export function AdminConsultations() {
                       key={status}
                       onClick={() => updateStatus(selectedRequest.id, status)}
                       className={clsx(
-                        'px-5 py-3 rounded-xl text-sm font-bold transition-all border-2 border-black',
+                        'px-5 py-3 rounded-xl text-sm font-bold transition-all border border-slate-300',
                         selectedRequest.status === status
-                          ? status === 'pending' ? 'bg-yellow-400 shadow-[2px_2px_0px_0px_#000]'
-                            : status === 'reviewed' ? 'bg-blue-500 text-white shadow-[2px_2px_0px_0px_#000]'
-                            : 'bg-green-500 text-white shadow-[2px_2px_0px_0px_#000]'
-                          : 'bg-white shadow-[2px_2px_0px_0px_#000] hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-[3px_3px_0px_0px_#000]'
+                          ? status === 'pending' ? 'bg-yellow-400 shadow-sm'
+                            : status === 'reviewed' ? 'bg-blue-500 text-white shadow-sm'
+                            : 'bg-green-500 text-white shadow-sm'
+                          : 'bg-white shadow-sm hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-sm'
                       )}
                     >
                       {status === 'pending' && <span className="material-symbols-outlined text-sm mr-2">pending_actions</span>}
@@ -514,17 +514,17 @@ export function AdminConsultations() {
             </div>
 
             {/* Modal Footer */}
-            <div className="p-6 border-t-2 border-black bg-white/80 backdrop-blur-xl flex flex-col sm:flex-row justify-end gap-3">
+            <div className="p-6 border-t border-slate-200 bg-white/80 backdrop-blur-xl flex flex-col sm:flex-row justify-end gap-3">
               <a
                 href={`mailto:${selectedRequest.email}?subject=Re: ${tC('admin.topBar.consultations')}&body=${tC('consult.title')}, ${selectedRequest.name},`}
-                className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-primary text-white font-bold text-sm border-2 border-black shadow-[4px_4px_0px_0px_#000] hover:-translate-x-1 hover:-translate-y-1 hover:shadow-[5px_5px_0px_0px_#000] active:translate-x-0 active:translate-y-0 active:shadow-none transition-all"
+                className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-primary text-white font-bold text-sm border border-slate-200 shadow-sm hover:-translate-x-1 hover:-translate-y-1 hover:shadow-[5px_5px_0px_0px_#000] active:translate-x-0 active:translate-y-0 active:shadow-none transition-all"
               >
                 <span className="material-symbols-outlined">email</span>
                 {tC('admin.consult.replyEmail')}
               </a>
               <button
                 onClick={() => setSelectedRequest(null)}
-                className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-white text-on-surface font-bold text-sm border-2 border-black shadow-[4px_4px_0px_0px_#000] hover:-translate-x-1 hover:-translate-y-1 hover:shadow-[5px_5px_0px_0px_#000] active:translate-x-0 active:translate-y-0 active:shadow-none transition-all"
+                className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-white text-on-surface font-bold text-sm border border-slate-200 shadow-sm hover:-translate-x-1 hover:-translate-y-1 hover:shadow-[5px_5px_0px_0px_#000] active:translate-x-0 active:translate-y-0 active:shadow-none transition-all"
               >
                 <span className="material-symbols-outlined">close</span>
                 {tC('admin.consult.close')}

@@ -952,13 +952,13 @@ export function AdminLogs() {
         <button
           onClick={() => setLevelFilter('all')}
           className={clsx(
-            'relative backdrop-blur-xl rounded-xl p-3 border-3 transition-all shadow-[4px_4px_0px_0px_#000] hover:shadow-[6px_6px_0px_0px_#000]',
+            'relative backdrop-blur-xl rounded-xl p-3 border-3 transition-all shadow-sm hover:shadow-[6px_6px_0px_0px_#000]',
             levelFilter === 'all' 
               ? 'bg-primary text-white border-black transform rotate-0' 
               : 'bg-white/80 to-white/40 border-black transform rotate-[-0.3deg] hover:rotate-0'
           )}
         >
-          <div className={clsx('w-8 h-8 rounded-lg border-2 border-black flex items-center justify-center shadow-[2px_2px_0px_0px_#000] mb-2 mx-auto',
+          <div className={clsx('w-8 h-8 rounded-lg border border-slate-300 flex items-center justify-center shadow-sm mb-2 mx-auto',
             levelFilter === 'all' ? 'bg-white/30' : 'bg-gray-100'
           )}>
             <span className={clsx('material-symbols-outlined text-base', levelFilter === 'all' ? 'text-white' : 'text-gray-600')} style={{ fontVariationSettings: "'FILL' 1" }}>all_inbox</span>
@@ -975,13 +975,13 @@ export function AdminLogs() {
               key={level}
               onClick={() => setLevelFilter(isActive ? 'all' : level)}
               className={clsx(
-                'relative backdrop-blur-xl rounded-xl p-3 border-3 transition-all shadow-[4px_4px_0px_0px_#000] hover:shadow-[6px_6px_0px_0px_#000]',
+                'relative backdrop-blur-xl rounded-xl p-3 border-3 transition-all shadow-sm hover:shadow-[6px_6px_0px_0px_#000]',
                 isActive 
                   ? `bg-${level === 'critical' || level === 'error' ? 'red' : level}-500 text-white border-black transform rotate-0` 
                   : 'bg-white/80 to-white/40 border-black transform rotate-[0.3deg] hover:rotate-0'
               )}
             >
-              <div className={clsx('w-8 h-8 rounded-lg border-2 border-black flex items-center justify-center shadow-[2px_2px_0px_0px_#000] mb-2 mx-auto',
+              <div className={clsx('w-8 h-8 rounded-lg border border-slate-300 flex items-center justify-center shadow-sm mb-2 mx-auto',
                 isActive ? 'bg-white/30' : badge.bg
               )}>
                 <span className={clsx('material-symbols-outlined text-base', isActive ? 'text-white' : badge.text)} style={{ fontVariationSettings: "'FILL' 1" }}>{badge.icon}</span>
@@ -995,7 +995,7 @@ export function AdminLogs() {
 
       {/* Filter & Action Row */}
       <div className="flex items-center justify-between mb-8 flex-wrap gap-4">
-        <div className="flex items-center gap-3 p-1.5 bg-white/60 backdrop-blur-xl rounded-full border-2 border-black">
+        <div className="flex items-center gap-3 p-1.5 bg-white/60 backdrop-blur-xl rounded-full border border-slate-300">
           <span className="text-on-surface-variant font-medium text-sm ml-4 mr-2">{lang.source}</span>
           <select
             value={sourceFilter}
@@ -1012,9 +1012,9 @@ export function AdminLogs() {
           <button
             onClick={() => setAutoRefresh(!autoRefresh)}
             className={clsx(
-              'flex items-center gap-2 px-5 py-2.5 rounded-full font-bold text-sm border-2 border-black transition-all shadow-[3px_3px_0px_0px_#000]',
+              'flex items-center gap-2 px-5 py-2.5 rounded-full font-bold text-sm border border-slate-300 transition-all shadow-sm',
               autoRefresh
-                ? 'bg-secondary text-white hover:shadow-[4px_4px_0px_0px_#000]'
+                ? 'bg-secondary text-white hover:shadow-sm'
                 : 'bg-white text-on-surface hover:bg-gray-50'
             )}
           >
@@ -1023,7 +1023,7 @@ export function AdminLogs() {
           </button>
           <button
             onClick={handleClear}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-red-100 text-red-600 font-bold text-sm border-2 border-black shadow-[3px_3px_0px_0px_#000] hover:-translate-x-1 hover:-translate-y-1 hover:shadow-[4px_4px_0px_0px_#000] transition-all"
+            className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-red-100 text-red-600 font-bold text-sm border border-slate-200 shadow-sm hover:-translate-x-1 hover:-translate-y-1 hover:shadow-sm transition-all"
           >
             <span className="material-symbols-outlined text-sm">delete_sweep</span>
             {lang.clearLogs}
@@ -1040,7 +1040,7 @@ export function AdminLogs() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={lang.searchPlaceholder}
-            className="w-full pl-12 pr-4 py-3 rounded-2xl bg-white/60 backdrop-blur-xl border-2 border-black text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+            className="w-full pl-12 pr-4 py-3 rounded-2xl bg-white/60 backdrop-blur-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
           />
         </div>
       </div>
@@ -1051,14 +1051,14 @@ export function AdminLogs() {
         
         {loading && filtered.length === 0 ? (
           <div className="relative z-10 flex flex-col items-center justify-center min-h-[300px]">
-            <div className="w-16 h-16 rounded-2xl bg-gray-100 border-2 border-black flex items-center justify-center mb-4 animate-pulse shadow-[4px_4px_0px_0px_#000]">
+            <div className="w-16 h-16 rounded-2xl bg-gray-100 border border-slate-300 flex items-center justify-center mb-4 animate-pulse shadow-sm">
               <span className="material-symbols-outlined text-gray-400 text-3xl">progress_activity</span>
             </div>
             <p className="text-lg font-bold text-gray-500">{lang.loading}</p>
           </div>
         ) : filtered.length === 0 ? (
           <div className="relative z-10 flex flex-col items-center justify-center min-h-[400px]">
-            <div className="w-24 h-24 rounded-2xl bg-gray-100 border-2 border-black flex items-center justify-center mb-6 text-gray-400 transform rotate-[-3deg] hover:rotate-0 transition-all duration-300 shadow-[8px_8px_0px_0px_#000]">
+            <div className="w-24 h-24 rounded-2xl bg-gray-100 border border-slate-300 flex items-center justify-center mb-6 text-gray-400 transform rotate-[-3deg] hover:rotate-0 transition-all duration-300 shadow-[8px_8px_0px_0px_#000]">
               <span className="material-symbols-outlined text-5xl">search_off</span>
             </div>
             <h4 className="text-2xl font-black text-on-surface mb-2">{lang.noLogs}</h4>
@@ -1076,7 +1076,7 @@ export function AdminLogs() {
                   <div className="flex items-start gap-4">
                     <div className="flex flex-col items-center min-w-[80px]">
                       <span className={clsx(
-                        'px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider border-2 border-black',
+                        'px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider border border-slate-300',
                         badge.bg, badge.text
                       )}>
                         {LEVEL_LABELS[log.level]}
@@ -1096,7 +1096,7 @@ export function AdminLogs() {
                         </span>
                         <span className="font-bold font-mono text-primary bg-primary/10 px-2 py-0.5 rounded border border-primary/30">{log.source}</span>
                         {log.user && (
-                          <span className="px-2 py-0.5 rounded bg-gray-100 text-xs font-mono text-on-surface-variant border border-black/20">
+                          <span className="px-2 py-0.5 rounded bg-gray-100 text-xs font-mono text-on-surface-variant border border-slate-300">
                             {log.user}
                           </span>
                         )}
@@ -1107,10 +1107,10 @@ export function AdminLogs() {
                     <button
                       onClick={() => setExpandedLogId(isExpanded ? null : log.id)}
                       className={clsx(
-                        'shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border-2 border-black transition-all',
+                        'shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border border-slate-300 transition-all',
                         isExpanded
-                          ? 'bg-primary text-white shadow-[2px_2px_0px_0px_#000]'
-                          : 'bg-white text-on-surface hover:bg-primary/10 shadow-[2px_2px_0px_0px_000] hover:shadow-[3px_3px_0px_0px_#000]'
+                          ? 'bg-primary text-white shadow-sm'
+                          : 'bg-white text-on-surface hover:bg-primary/10 shadow-[2px_2px_0px_0px_000] '
                       )}
                     >
                       <span className="material-symbols-outlined text-sm">
@@ -1121,7 +1121,7 @@ export function AdminLogs() {
                   </div>
 
                   {isExpanded && (
-                    <div className="mt-4 ml-[96px] bg-gradient-to-br from-slate-50 to-white rounded-2xl border-2 border-black p-5 shadow-[4px_4px_0px_0px_#000]">
+                    <div className="mt-4 ml-[96px] bg-gradient-to-br from-slate-50 to-white rounded-2xl border border-slate-300 p-5 shadow-sm">
                       {/* Summary row */}
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
                         <div className="bg-white rounded-lg border border-black/10 p-3">
@@ -1153,7 +1153,7 @@ export function AdminLogs() {
                           {buildUserTimeline(log, language).map((step, idx) => (
                             <div key={idx} className="relative pb-4 last:pb-0">
                               <div className={clsx(
-                                'absolute -left-[14px] top-0.5 w-4 h-4 rounded-full border-2 border-black',
+                                'absolute -left-[14px] top-0.5 w-4 h-4 rounded-full border border-slate-300',
                                 idx === 4 ? 'bg-primary' : idx < 4 ? 'bg-slate-300' : 'bg-emerald-400'
                               )}></div>
                               <div className="flex items-start gap-2 flex-wrap">
@@ -1179,7 +1179,7 @@ export function AdminLogs() {
                             <span className="material-symbols-outlined text-sm">data_object</span>
                             {lang.changeData}
                           </h5>
-                          <div className="bg-slate-900 rounded-lg p-3 font-mono text-xs text-emerald-300 break-all whitespace-pre-wrap border-2 border-black">
+                          <div className="bg-slate-900 rounded-lg p-3 font-mono text-xs text-emerald-300 break-all whitespace-pre-wrap border border-slate-300">
                             {formatLogDetails(log.details, language)}
                           </div>
                         </div>

@@ -193,7 +193,7 @@ export function AdminAnalytics() {
       </section>
 
       {/* Time Range Tabs */}
-      <div className="flex items-center gap-3 p-1.5 bg-white/60 backdrop-blur-xl rounded-full border-2 border-black mb-8 w-fit">
+      <div className="flex items-center gap-3 p-1.5 bg-white/60 backdrop-blur-xl rounded-full border border-slate-300 mb-8 w-fit">
         {(['24h', '7d', '30d', '90d'] as TimeRange[]).map((r) => (
           <button
             key={r}
@@ -258,7 +258,7 @@ export function AdminAnalytics() {
       {/* ====== CHARTS ROW ====== */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         {/* Hourly Activity Chart */}
-        <div className="bg-white rounded-2xl border-2 border-black p-6 shadow-[4px_4px_0px_0px_#000]">
+        <div className="bg-white rounded-2xl border border-slate-300 p-6 shadow-sm">
           <h3 className="text-lg font-bold mb-4">{t('analytics.hourlyActivity')}</h3>
           <BarChart
             data={(chatMetrics?.chatsByHour ?? []).map(h => ({
@@ -270,7 +270,7 @@ export function AdminAnalytics() {
         </div>
 
         {/* Category Distribution */}
-        <div className="bg-white rounded-2xl border-2 border-black p-6 shadow-[4px_4px_0px_0px_#000]">
+        <div className="bg-white rounded-2xl border border-slate-300 p-6 shadow-sm">
           <h3 className="text-lg font-bold mb-4">{t('analytics.categoryDistribution')}</h3>
           <PieChart
             data={(chatMetrics?.categoryUsage ?? []).map((c, i) => ({
@@ -285,7 +285,7 @@ export function AdminAnalytics() {
       {/* ====== TOP QUERIES & LANGUAGE ====== */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
         {/* Top Queries */}
-        <div className="lg:col-span-2 bg-white rounded-2xl border-2 border-black p-6 shadow-[4px_4px_0px_0px_#000]">
+        <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-300 p-6 shadow-sm">
           <h3 className="text-lg font-bold mb-4">{t('analytics.topQueries')}</h3>
           <div className="space-y-2">
             {(chatMetrics?.topQueries ?? []).map((q, i) => (
@@ -304,7 +304,7 @@ export function AdminAnalytics() {
         </div>
 
         {/* Language Distribution */}
-        <div className="bg-white rounded-2xl border-2 border-black p-6 shadow-[4px_4px_0px_0px_#000]">
+        <div className="bg-white rounded-2xl border border-slate-300 p-6 shadow-sm">
           <h3 className="text-lg font-bold mb-4">{t('analytics.languageDistribution')}</h3>
           <div className="space-y-3">
             {(chatMetrics?.languageDistribution ?? []).map((l, i) => (
@@ -331,7 +331,7 @@ export function AdminAnalytics() {
       {/* ====== LEGACY METRICS ROW ====== */}
       <section className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
         <div className="relative bg-gradient-to-br from-primary/10 to-primary/5 backdrop-blur-xl rounded-2xl p-4 border-3 border-black flex items-center gap-3 transform rotate-[-0.5deg] hover:rotate-0 transition-transform shadow-[6px_6px_0px_0px_#000] hover:shadow-[8px_8px_0px_0px_#000]">
-          <div className="w-10 h-10 rounded-xl bg-primary/20 border-2 border-black flex items-center justify-center shadow-[3px_3px_0px_0px_#000]">
+          <div className="w-10 h-10 rounded-xl bg-primary/20 border border-slate-300 flex items-center justify-center shadow-sm">
             <span className="material-symbols-outlined text-primary text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>group</span>
           </div>
           <div>
@@ -342,7 +342,7 @@ export function AdminAnalytics() {
         </div>
 
         <div className="relative bg-gradient-to-br from-secondary/10 to-secondary/5 backdrop-blur-xl rounded-2xl p-4 border-3 border-black flex items-center gap-3 transform rotate-[0.5deg] hover:rotate-0 transition-transform shadow-[6px_6px_0px_0px_#000] hover:shadow-[8px_8px_0px_0px_#000]">
-          <div className="w-10 h-10 rounded-xl bg-secondary/20 border-2 border-black flex items-center justify-center shadow-[3px_3px_0px_0px_#000]">
+          <div className="w-10 h-10 rounded-xl bg-secondary/20 border border-slate-300 flex items-center justify-center shadow-sm">
             <span className="material-symbols-outlined text-secondary text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>description</span>
           </div>
           <div>
@@ -353,7 +353,7 @@ export function AdminAnalytics() {
         </div>
 
         <div className="relative bg-gradient-to-br from-tertiary/10 to-tertiary/5 backdrop-blur-xl rounded-2xl p-4 border-3 border-black flex items-center gap-3 transform rotate-[-0.5deg] hover:rotate-0 transition-transform shadow-[6px_6px_0px_0px_#000] hover:shadow-[8px_8px_0px_0px_#000]">
-          <div className="w-10 h-10 rounded-xl bg-tertiary/20 border-2 border-black flex items-center justify-center shadow-[3px_3px_0px_0px_#000]">
+          <div className="w-10 h-10 rounded-xl bg-tertiary/20 border border-slate-300 flex items-center justify-center shadow-sm">
             <span className="material-symbols-outlined text-tertiary text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>list_alt</span>
           </div>
           <div>
@@ -364,7 +364,7 @@ export function AdminAnalytics() {
         </div>
 
         <div className="relative bg-gradient-to-br from-green-50/80 to-green-100/40 backdrop-blur-xl rounded-2xl p-4 border-3 border-black flex items-center gap-3 transform rotate-[0.5deg] hover:rotate-0 transition-transform shadow-[6px_6px_0px_0px_#000] hover:shadow-[8px_8px_0px_0px_#000]">
-          <div className="w-10 h-10 rounded-xl bg-green-200 border-2 border-black flex items-center justify-center shadow-[3px_3px_0px_0px_#000]">
+          <div className="w-10 h-10 rounded-xl bg-green-200 border border-slate-300 flex items-center justify-center shadow-sm">
             <span className="material-symbols-outlined text-green-600 text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>bolt</span>
           </div>
           <div>
@@ -392,7 +392,7 @@ export function AdminAnalytics() {
                       <span className="text-sm font-bold capitalize">{b.level}</span>
                       <span className="text-sm font-black">{b.count}</span>
                     </div>
-                    <div className="h-3 w-full bg-gray-100 rounded-full overflow-hidden border border-black/20">
+                    <div className="h-3 w-full bg-gray-100 rounded-full overflow-hidden border border-slate-300">
                       <div
                         className={`h-full ${b.color} transition-all`}
                         style={{ width: `${(b.count / maxLog) * 100}%` }}
@@ -486,7 +486,7 @@ export function AdminAnalytics() {
                     <span className="text-lg font-black text-tertiary">{(kb.totalSize / 1024).toFixed(2)} KB</span>
                   </div>
                 )}
-                <a href="/data" className="block mt-4 text-center py-3 bg-primary text-white rounded-xl font-bold text-sm border-2 border-black shadow-[3px_3px_0px_0px_#000] hover:-translate-x-1 hover:-translate-y-1 hover:shadow-[4px_4px_0px_0px_#000] transition-all">
+                <a href="/data" className="block mt-4 text-center py-3 bg-primary text-white rounded-xl font-bold text-sm border border-slate-200 shadow-sm hover:-translate-x-1 hover:-translate-y-1 hover:shadow-sm transition-all">
                   {t('analytics.openKbPage')} →
                 </a>
               </div>

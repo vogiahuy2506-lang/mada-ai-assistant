@@ -198,9 +198,9 @@ jobs:
             sudo mkdir -p $APP_DIR
             cd $APP_DIR
 
-            # Install dependencies
+            # Install dependencies (include devDeps for build tools like esbuild)
             echo "=== Installing dependencies ==="
-            $NPM_PATH install --omit=dev --legacy-peer-deps
+            $NPM_PATH install --legacy-peer-deps
 
             # Build application
             echo "=== Building application ==="

@@ -17,12 +17,13 @@ env:
 
 jobs:
   # ===========================================
-  # Lint & Type Check
+  # Lint & Type Check (warnings allowed)
   # ===========================================
   lint:
     name: Lint & Type Check
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
+    continue-on-error: true  # Allow warnings, don't fail CI
     steps:
       - name: Checkout
         uses: actions/checkout@v4

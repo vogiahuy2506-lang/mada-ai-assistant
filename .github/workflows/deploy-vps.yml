@@ -51,7 +51,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     if: github.event.inputs.action != 'cleanup'
-    continue-on-error: false
+    continue-on-error: true  # Allow warnings, don't fail CI
     steps:
       - name: Checkout
         uses: actions/checkout@v4

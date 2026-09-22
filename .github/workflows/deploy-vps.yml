@@ -188,10 +188,18 @@ jobs:
             echo "NPM path: $NPM_PATH"
             echo "Node version: $($NODE_PATH --version)"
             echo "NPM version: $($NPM_PATH --version)"
+            
+            # Install build tools for native modules (better-sqlite3, etc.)
+            echo "=== Installing build tools ==="
+            sudo apt-get update -qq
+            sudo apt-get install -y build-essential python3
+            
+            # Create app directory first to avoid cwd errors
+            sudo mkdir -p $APP_DIR
+            cd $APP_DIR
 
             # Install dependencies
             echo "=== Installing dependencies ==="
-            cd $APP_DIR
             $NPM_PATH install --omit=dev --legacy-peer-deps
 
             # Build application
@@ -201,7 +209,6 @@ jobs:
 
             # Start with PM2
             echo "=== Starting with PM2 ==="
-            cd $APP_DIR
             
             # Find or install PM2
             PM2_PATH=""

@@ -271,6 +271,10 @@ jobs:
 
             echo "✅ Deploy completed successfully at $(date)"
             echo "📝 Commit: ${{ github.sha }}"
+            
+            # Restart nginx to pick up new backend config
+            echo "=== Restarting nginx ==="
+            sudo nginx -t && sudo systemctl restart nginx || sudo nginx -s reload || true
 
       - name: Success Summary
         if: success()

@@ -64,6 +64,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+      id-token: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -198,7 +199,7 @@ jobs:
             sudo chmod -R 755 $APP_DIR
 
             echo "Logging in to GHCR..."
-            echo "${{ secrets.GHCR_TOKEN }}" | sudo docker login ghcr.io -u "${{ github.actor }}" --password-stdin 2>/dev/null || true
+            echo "${{ secrets.GITHUB_TOKEN }}" | sudo docker login ghcr.io -u "${{ github.actor }}" --password-stdin
 
             echo "Pulling Docker image..."
             cd $APP_DIR

@@ -651,3 +651,6 @@ MIT License - xem [LICENSE](LICENSE) để biết thêm chi tiết.
 ---
 
 **Made with ❤️ by MADA AI Team**
+
+## CI/CD Status
+[![CI](https://github.com/vogiahuy2506-lang/mada-ai-assistant/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/vogiahuy2506-lang/mada-ai-assistant/actions)

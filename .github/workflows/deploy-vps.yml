@@ -94,10 +94,14 @@ jobs:
             # Stop existing PM2 process
             echo "=== Stopping existing PM2 process ==="
             cd $APP_DIR 2>/dev/null || true
-            PM2_BIN=$(which pm2 2>/dev/null || echo "")
-            if [ -n "$PM2_BIN" ]; then
-              $PM2_BIN stop mada-app 2>/dev/null || true
-              $PM2_BIN delete mada-app 2>/dev/null || true
+            # Find PM2 binary
+            STOP_PM2=""
+            for p in "/usr/local/bin/pm2" "/usr/bin/pm2"; do
+              if [ -f "$p" ]; then STOP_PM2="$p"; break; fi
+            done
+            if [ -n "$STOP_PM2" ]; then
+              $STOP_PM2 stop mada-app 2>/dev/null || true
+              $STOP_PM2 delete mada-app 2>/dev/null || true
             fi
 
             # Stop Docker containers if running
@@ -151,84 +155,91 @@ jobs:
             echo "=== Setting permissions ==="
             sudo chmod -R 755 $APP_DIR
 
-            # Setup Node.js environment (handle nvm or direct install)
+            # Setup Node.js environment - Install if not present
             echo "=== Setting up Node.js ==="
-            export NVM_DIR="$HOME/.nvm"
-            if [ -s "$NVM_DIR/nvm.sh" ]; then
-              echo "Sourcing nvm..."
-              [ -s "$NVM_DIR/bash_completion" ] && . "$NVM_DIR/bash_completion"
-              . "$NVM_DIR/nvm.sh"
+            
+            # Try to find existing node/npm
+            NODE_PATH=""
+            NPM_PATH=""
+            
+            # Check /usr/local/bin
+            if [ -f /usr/local/bin/node ]; then
+              NODE_PATH="/usr/local/bin/node"
+              NPM_PATH="/usr/local/bin/npm"
+            # Check /usr/bin
+            elif [ -f /usr/bin/node ]; then
+              NODE_PATH="/usr/bin/node"
+              NPM_PATH="/usr/bin/npm"
             fi
             
-            # Also check common node locations
-            if ! command -v node &> /dev/null; then
-              echo "Node not found in PATH, checking common locations..."
-              if [ -f /usr/local/bin/node ]; then
-                export PATH="/usr/local/bin:$PATH"
-              elif [ -f /usr/bin/node ]; then
-                export PATH="/usr/bin:$PATH"
-              fi
-            fi
-            
-            # Verify node/npm is available
-            if ! command -v npm &> /dev/null; then
-              echo "npm not found, installing Node.js..."
-              curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+            # If not found, install Node.js 22
+            if [ -z "$NODE_PATH" ] || [ ! -f "$NODE_PATH" ]; then
+              echo "Node.js not found, installing..."
+              curl -fsSL https://deb.nodesource.com/setup_22.x | sudo bash -
               sudo apt-get install -y nodejs
-              export PATH="/usr/bin:$PATH"
+              NODE_PATH="/usr/bin/node"
+              NPM_PATH="/usr/bin/npm"
             fi
             
-            echo "Node version: $(node --version)"
-            echo "NPM version: $(npm --version)"
+            # Export PATH explicitly
+            export PATH="/usr/local/bin:/usr/bin:$PATH"
             
-            # Get full path to npm
-            NPM_BIN=$(which npm)
-            NODE_BIN=$(which node)
-            echo "NPM path: $NPM_BIN"
-            echo "NODE path: $NODE_BIN"
+            echo "Node path: $NODE_PATH"
+            echo "NPM path: $NPM_PATH"
+            echo "Node version: $($NODE_PATH --version)"
+            echo "NPM version: $($NPM_PATH --version)"
 
             # Install dependencies
             echo "=== Installing dependencies ==="
             cd $APP_DIR
-            $NPM_BIN install --omit=dev --legacy-peer-deps
+            $NPM_PATH install --omit=dev --legacy-peer-deps
 
             # Build application
             echo "=== Building application ==="
-            $NPM_BIN run build:server
-            $NPM_BIN run build:client || $NPM_BIN exec vite build
+            $NPM_PATH run build:server
+            $NPM_PATH run build:client || $NPM_PATH exec vite build
 
             # Start with PM2
             echo "=== Starting with PM2 ==="
             cd $APP_DIR
             
-            # Check if PM2 is installed
-            PM2_BIN=$(which pm2 2>/dev/null || echo "")
-            if [ -z "$PM2_BIN" ]; then
-              echo "Installing PM2..."
-              $NPM_BIN install -g pm2
-              PM2_BIN="$NODE_BIN/node_modules/pm2/bin/pm2"
-              # Try common locations
-              if [ ! -f "$PM2_BIN" ]; then
-                PM2_BIN=$(find /usr -name "pm2" -type f 2>/dev/null | head -1)
+            # Find or install PM2
+            PM2_PATH=""
+            for pm2_path in "/usr/local/bin/pm2" "/usr/bin/pm2" "$HOME/.nvm/versions/node/*/bin/pm2"; do
+              if [ -f "$pm2_path" ]; then
+                PM2_PATH="$pm2_path"
+                break
               fi
-              if [ ! -f "$PM2_BIN" ]; then
-                PM2_BIN=$(find /home -name "pm2" -type f 2>/dev/null | head -1)
-              fi
-              if [ -z "$PM2_BIN" ] || [ ! -f "$PM2_BIN" ]; then
+            done
+            
+            # Also search in node_modules
+            if [ -z "$PM2_PATH" ]; then
+              FOUND_PM2=$(find /usr -name "pm2" -type f 2>/dev/null | head -1)
+              [ -n "$FOUND_PM2" ] && PM2_PATH="$FOUND_PM2"
+            fi
+            
+            if [ -z "$PM2_PATH" ] || [ ! -f "$PM2_PATH" ]; then
+              echo "Installing PM2 globally..."
+              $NPM_PATH install -g pm2
+              # PM2 is usually installed in /usr/local/bin or /usr/bin after global install
+              PM2_PATH=$(find /usr -name "pm2" -type f 2>/dev/null | head -1)
+              if [ -z "$PM2_PATH" ]; then
                 echo "ERROR: Could not find PM2 after install"
                 exit 1
               fi
-              echo "PM2 found at: $PM2_BIN"
             fi
             
+            echo "PM2 path: $PM2_PATH"
+            echo "PM2 version: $($PM2_PATH --version)"
+            
             # Start the application
-            $PM2_BIN start dist/server.mjs --name mada-app -- --port 3000
+            $PM2_PATH start dist/server.mjs --name mada-app -- --port 3000
             
             # Save PM2 config
-            $PM2_BIN save
+            $PM2_PATH save
             
             # Setup startup script
-            $PM2_BIN startup 2>/dev/null || true
+            $PM2_PATH startup 2>/dev/null || true
 
             echo "=== Waiting for app to be healthy (max 120s) ==="
             COUNTER=0
@@ -250,9 +261,9 @@ jobs:
             if [ "$HEALTHY" = "false" ]; then
               echo "❌ App did not become healthy within 120s"
               echo "=== PM2 logs ==="
-              $PM2_BIN logs mada-app --nostream --lines 50 2>/dev/null || true
+              $PM2_PATH logs mada-app --nostream --lines 50 2>/dev/null || true
               echo "=== PM2 status ==="
-              $PM2_BIN status 2>/dev/null || true
+              $PM2_PATH status 2>/dev/null || true
               exit 1
             fi
 
@@ -301,7 +312,15 @@ jobs:
             else
               echo "Database not found at $APP_DIR/data/mada.db"
               echo "Trying PM2..."
-              sudo -u ${{ secrets.VPS_USER }} pm2 list
+              PM2_PATH=""
+              for p in "/usr/local/bin/pm2" "/usr/bin/pm2"; do
+                if [ -f "$p" ]; then PM2_PATH="$p"; break; fi
+              done
+              if [ -n "$PM2_PATH" ]; then
+                $PM2_PATH list
+              else
+                echo "PM2 not found"
+              fi
             fi
             
             echo "✅ Cleanup complete!"

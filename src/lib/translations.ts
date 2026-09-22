@@ -150,11 +150,6 @@ export const translations = {
     'products.daily': 'Sinh hoạt hàng ngày',
     'products.education': 'Hỗ trợ giáo dục',
     'products.at': 'Thiết bị AT',
-    'products.vision': 'Vision',
-    'products.hearing': 'Hearing',
-    'products.mobility': 'Mobility',
-    'products.cognition': 'Cognition',
-    'products.communication': 'Communication',
     'products.selfCare': 'Self-care',
     
     // Product Card
@@ -616,11 +611,6 @@ export const translations = {
     'products.daily': 'Daily living',
     'products.education': 'Education support',
     'products.at': 'AT Devices',
-    'products.vision': 'Vision',
-    'products.hearing': 'Hearing',
-    'products.mobility': 'Mobility',
-    'products.cognition': 'Cognition',
-    'products.communication': 'Communication',
     'products.selfCare': 'Self-care',
     
     // Product Card
@@ -1082,11 +1072,6 @@ export const translations = {
     'products.daily': 'الحياة اليومية',
     'products.education': 'دعم التعليم',
     'products.at': 'أجهزة AT',
-    'products.vision': 'البصر',
-    'products.hearing': 'السمع',
-    'products.mobility': 'الحركة',
-    'products.cognition': 'الإدراك',
-    'products.communication': 'التواصل',
     'products.selfCare': 'الرعاية الذاتية',
     
     // Product Card
@@ -1548,11 +1533,6 @@ export const translations = {
     'products.daily': 'Vie quotidienne',
     'products.education': "Support éducatif",
     'products.at': 'Appareils AT',
-    'products.vision': 'Vision',
-    'products.hearing': 'Audition',
-    'products.mobility': 'Mobilité',
-    'products.cognition': 'Cognition',
-    'products.communication': 'Communication',
     'products.selfCare': 'Soins personnels',
     
     // Product Card

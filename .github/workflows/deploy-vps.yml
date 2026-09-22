@@ -164,6 +164,7 @@ jobs:
 
             echo "=== Step 14: Start application with PM2 ==="
             cd $APP_DIR
+            sudo $PM2_PATH delete mada-app 2>/dev/null || true
             sudo $PM2_PATH start dist/server.mjs --name mada-app -- --port 3000
             sudo $PM2_PATH save
 

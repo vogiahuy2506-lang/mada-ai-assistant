@@ -37,7 +37,7 @@ const CategoryPage = lazy(() => import('@/pages/CategoryPage'));
 
 // Translation helper hook for App component
 function useAppTranslations() {
-  const language = useLanguageStore((s) => s.language) as 'vi' | 'en' | 'ar' | 'fr';
+  const language = useLanguageStore((s) => s.language ?? 'vi') as 'vi' | 'en' | 'ar' | 'fr';
   const t = (key: string) => {
     return translations[language]?.[key] || translations.vi[key] || key;
   };

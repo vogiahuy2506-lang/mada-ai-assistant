@@ -8,7 +8,7 @@ import clsx from 'clsx';
 
 // ============== GLOBAL TRANSLATION HELPER ==============
 const t = (key: string): string => {
-  const lang = useLanguageStore.getState().language;
+  const lang = useLanguageStore.getState().language ?? 'vi';
   const translations: Record<string, Record<string, string>> = {
     vi: {
       'admin.overview.totalUsers': 'Tổng người dùng',
@@ -1027,16 +1027,17 @@ export function AdminAgents() {
     setImporting(true);
     let imported = 0;
     let skipped = 0;
+    let autoAvailable = 0; // ⭐ Custom agents đã tự động có sẵn
     let crawledDocs = 0;
     // ⭐ Track các agent đã import để broadcast
     const importedAgentIds: string[] = [];
 
-    // Xử lý từng agent được chọn
+    // Xử lý từng agent được chọn (chỉ MADA bots)
     for (const botId of importSelected) {
       const exists = agents.some(a => a.id === botId);
       if (exists) { skipped++; continue; }
 
-      // Tìm trong MADA_BOTS trước
+      // ⭐ Chỉ tìm trong MADA_BOTS - Custom agents đã có sẵn trong DB
       const madaBot = MADA_BOTS.find(b => b.id === botId);
       if (madaBot) {
         // Agent từ MADA - tạo với dữ liệu predefined
@@ -1064,32 +1065,13 @@ export function AdminAgents() {
             } catch {}
           }
         } catch { skipped++; }
-      } else {
-        // Custom agent - lấy dữ liệu từ agents array trong state
-        const customAgent = agents.find(a => a.id === botId);
-        if (customAgent) {
-          try {
-            const res = await adminApi.createAgent({
-              id: customAgent.id,
-              name: customAgent.name,
-              description: customAgent.description,
-              avatar: customAgent.avatar,
-              avatar_url: customAgent.avatar_url,
-              system_prompt: customAgent.system_prompt || customAgent.systemPrompt || '',
-              capabilities: customAgent.capabilities || [],
-              is_active: true,
-              mada_category: customAgent.mada_category,
-              knowledge_url: customAgent.knowledge_url,
-            });
-            if (!res.success) { skipped++; continue; }
-            imported++;
-            importedAgentIds.push(customAgent.id); // ⭐ Track ID đã import
-          } catch { skipped++; }
-        } else {
-          skipped++;
-        }
       }
+      // ⭐ Custom agents KHÔNG cần xử lý ở đây - đã có sẵn trong DB
     }
+
+    // ⭐ Đếm custom agents để thông báo
+    const customAgentCount = agents.filter(a => !MADA_BOTS.some(m => m.id === a.id)).length;
+    if (customAgentCount > 0) autoAvailable = customAgentCount;
 
     await loadAgents();
     // ⭐ Broadcast để ChatPage ở tab khác cập nhật tức thì
@@ -1102,7 +1084,8 @@ export function AdminAgents() {
     setImporting(false);
     alert(
       `✅ ${tAgent('agent.importDone', language)}\n` +
-      `• ${tAgent('agent.importCreated', language)}: ${imported} bot\n` +
+      `• ${tAgent('agent.importCreated', language)}: ${imported} MADA bot\n` +
+      (autoAvailable > 0 ? `• ✨ Custom bots: ${autoAvailable} bot tự động có sẵn!\n` : '') +
       `• ${tAgent('agent.importSkipped', language)}: ${skipped} bot (${tAgent('agent.importAlreadyExists', language)})\n` +
       `• ${tAgent('agent.importDocsCrawled', language)}: ${crawledDocs}`
     );
@@ -1118,8 +1101,8 @@ export function AdminAgents() {
   };
 
   const openImportModal = () => {
-    // ⭐ Pre-select MADA bots chưa có trong agents
-    // Custom agents cũng có thể được chọn nếu cần
+    // ⭐ Chỉ pre-select MADA bots CHƯA import
+    // Custom agents (Super Admin tạo) đã tự động có sẵn trong DB → không cần import
     const madaAvailable = new Set(
       MADA_BOTS.filter(b => !agents.some(a => a.id === b.id)).map(b => b.id)
     );
@@ -2397,83 +2380,110 @@ export function AdminAgents() {
 
       {/* ============== IMPORT MODAL ============== */}
       {showImportModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
-          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl border-2 border-black max-h-[85vh] flex flex-col">
-            <div className="px-5 py-4 border-b-2 border-black flex items-center justify-between bg-gradient-to-r from-indigo-50 to-purple-50 flex-shrink-0">
-              <div>
-                <h2 className="text-lg font-black flex items-center gap-2">
-                  <span className="material-symbols-outlined text-indigo-600">download</span>
-                  {tAgent('agent.importModalTitle', language)}
-                </h2>
-                <p className="text-xs text-on-surface-variant mt-0.5">
-                  ⭐ {tAgent('agent.importAutoReceive', language)}
-                </p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl border-2 border-black max-h-[90vh] flex flex-col overflow-hidden">
+            {/* Header */}
+            <div className="px-5 py-4 border-b-2 border-black bg-gradient-to-r from-primary/10 via-primary/5 to-secondary/10 flex items-center justify-between flex-shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-primary text-white flex items-center justify-center border-2 border-black shadow-[2px_2px_0px_0px_#000]">
+                  <span className="material-symbols-outlined text-xl">download_for_offline</span>
+                </div>
+                <div>
+                  <h2 className="text-lg font-black text-on-surface flex items-center gap-2">
+                    {tAgent('agent.importModalTitle', language)}
+                    <span className="ml-2 text-xs font-normal text-slate-500">(MADA bots)</span>
+                  </h2>
+                  <p className="text-xs text-on-surface-variant flex items-center gap-1">
+                    <span className="material-symbols-outlined text-xs text-green-500">auto_awesome</span>
+                    Custom bots tự động có sẵn — không cần import
+                  </p>
+                </div>
               </div>
               <button
                 onClick={() => setShowImportModal(false)}
-                className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center"
+                className="w-8 h-8 rounded-lg bg-white border-2 border-black text-on-surface hover:bg-slate-100 flex items-center justify-center shadow-[2px_2px_0px_0px_#000] transition-all hover:-translate-y-0.5 hover:shadow-[3px_3px_0px_0px_#000]"
               >
-                <span className="material-symbols-outlined">close</span>
+                <span className="material-symbols-outlined text-base">close</span>
               </button>
             </div>
 
-            {/* Nguồn bot info */}
-            <div className="px-4 pt-3 flex gap-2 flex-shrink-0">
-              <span className="text-[10px] font-bold bg-indigo-100 text-indigo-700 px-2 py-1 rounded-full">
-                🤖 MADA: {MADA_BOTS.length} bots
-              </span>
-              <span className="text-[10px] font-bold bg-purple-100 text-purple-700 px-2 py-1 rounded-full">
-                ✨ Custom: {agents.filter(a => !MADA_BOTS.some(m => m.id === a.id)).length} bots
-              </span>
+            {/* Stats Bar */}
+            <div className="px-5 py-3 bg-slate-50 border-b border-slate-200 flex-shrink-0">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-6 h-6 rounded bg-indigo-100 border border-black flex items-center justify-center">
+                      <span className="text-xs">🤖</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <p className="text-[10px] font-bold text-indigo-600 uppercase">MADA</p>
+                      <span className="text-[10px] font-black text-indigo-700">
+                        {MADA_BOTS.length - getImportableAgents().filter(item => item.source === 'mada' && !agents.some(a => a.id === item.id)).length}/{MADA_BOTS.length}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="w-px h-4 bg-slate-300"></div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-6 h-6 rounded bg-green-100 border border-black flex items-center justify-center">
+                      <span className="material-symbols-outlined text-green-600 text-xs" style={{ fontVariationSettings: "'FILL' 1" }}>auto_awesome</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <p className="text-[10px] font-bold text-green-600 uppercase">Custom</p>
+                      <span className="text-[10px] font-black text-green-700">{agents.filter(a => !MADA_BOTS.some(m => m.id === a.id)).length}</span>
+                    </div>
+                  </div>
+                  <div className="w-px h-4 bg-slate-300"></div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-6 h-6 rounded bg-green-100 border border-black flex items-center justify-center">
+                      <span className="material-symbols-outlined text-green-600 text-xs">check_circle</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <p className="text-[10px] font-bold text-green-600 uppercase">Total</p>
+                      <span className="text-[10px] font-black text-green-700">{agents.length}</span>
+                    </div>
+                  </div>
+                </div>
+                {/* Quick Actions */}
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => {
+                      const allMadaAvailable = getImportableAgents()
+                        .filter(item => item.source === 'mada' && !agents.some(a => a.id === item.id))
+                        .map(item => item.id);
+                      setImportSelected(new Set(allMadaAvailable));
+                    }}
+                    className="px-2.5 py-1.5 rounded bg-primary text-white font-bold text-[10px] border-2 border-black shadow-[2px_2px_0px_0px_#000] hover:bg-primary/90 hover:-translate-y-0.5 hover:shadow-[3px_3px_0px_0px_#000] active:shadow-none active:translate-y-0 transition-all flex items-center gap-1"
+                  >
+                    <span className="material-symbols-outlined text-xs">select_all</span>
+                    MADA
+                  </button>
+                  <button
+                    onClick={() => setImportSelected(new Set())}
+                    className="px-2.5 py-1.5 rounded bg-white text-on-surface font-bold text-[10px] border-2 border-black hover:bg-slate-100 transition-all flex items-center gap-1"
+                  >
+                    <span className="material-symbols-outlined text-xs">close</span>
+                    Bỏ
+                  </button>
+                </div>
+              </div>
             </div>
 
-            <div className="p-4 max-h-[400px] overflow-y-auto space-y-1 flex-1">
-              {/* ⭐ Hiển thị MADA BOTS trước */}
-              <div className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2 px-1">
-                🤖 {tAgent('agent.importMadaBots', language)}
-              </div>
-              {getImportableAgents()
-                .filter(item => item.source === 'mada')
-                .map((bot) => {
-                const exists = agents.some(a => a.id === bot.id);
-                const checked = importSelected.has(bot.id);
-                return (
-                  <label
-                    key={bot.id}
-                    className={clsx(
-                      'flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all',
-                      exists ? 'border-gray-200 bg-gray-50 opacity-50' : checked ? 'border-indigo-400 bg-indigo-50' : 'border-gray-200 bg-white hover:border-indigo-300'
-                    )}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={() => !exists && toggleImportBot(bot.id)}
-                      disabled={exists}
-                      className="w-4 h-4 accent-indigo-600"
-                    />
-                    <span className="text-2xl">{bot.avatar}</span>
-                    <div className="flex-1 min-w-0">
-                      <div className="font-bold text-sm text-on-surface">{bot.name}</div>
-                      <div className="text-xs text-on-surface-variant truncate">{bot.description}</div>
-                    </div>
-                    {exists ? (
-                      <span className="text-[10px] font-bold bg-gray-200 text-gray-500 px-2 py-0.5 rounded-full">{tAgent('agent.importAlready', language)}</span>
-                    ) : (
-                      <span className="text-[10px] font-bold bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded-full">MADA</span>
-                    )}
-                  </label>
-                );
-              })}
-
-              {/* ⭐ Hiển thị CUSTOM BOTS (nếu có) */}
-              {getImportableAgents().filter(item => item.source === 'custom').length > 0 && (
-                <>
-                  <div className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2 mt-4 px-1 pt-3 border-t border-gray-200">
-                    ✨ {tAgent('agent.importCustomBots', language)}
+            {/* Bot List */}
+            <div className="p-3 overflow-y-auto space-y-3 flex-1">
+              {/* MADA BOTS Section */}
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-6 h-6 rounded bg-primary text-white flex items-center justify-center border border-black">
+                    <span className="text-xs">🤖</span>
                   </div>
+                  <h3 className="font-bold text-xs text-on-surface uppercase tracking-wide">{tAgent('agent.importMadaBots', language)}</h3>
+                  <span className="text-[10px] font-bold bg-primary/10 text-primary px-1.5 py-0.5 rounded">
+                    {getImportableAgents().filter(item => item.source === 'mada' && !agents.some(a => a.id === item.id)).length} available
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {getImportableAgents()
-                    .filter(item => item.source === 'custom')
+                    .filter(item => item.source === 'mada')
                     .map((bot) => {
                     const exists = agents.some(a => a.id === bot.id);
                     const checked = importSelected.has(bot.id);
@@ -2481,8 +2491,12 @@ export function AdminAgents() {
                       <label
                         key={bot.id}
                         className={clsx(
-                          'flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all',
-                          exists ? 'border-gray-200 bg-gray-50 opacity-50' : checked ? 'border-purple-400 bg-purple-50' : 'border-gray-200 bg-white hover:border-purple-300'
+                          'relative flex items-center gap-2 p-2 rounded-lg border-2 cursor-pointer transition-all',
+                          exists 
+                            ? 'border-slate-200 bg-slate-50 opacity-60 cursor-not-allowed' 
+                            : checked 
+                              ? 'border-primary bg-primary/5 shadow-[2px_2px_0px_0px_#000]' 
+                              : 'border-slate-200 bg-white hover:border-primary/50'
                         )}
                       >
                         <input
@@ -2490,59 +2504,153 @@ export function AdminAgents() {
                           checked={checked}
                           onChange={() => !exists && toggleImportBot(bot.id)}
                           disabled={exists}
-                          className="w-4 h-4 accent-purple-600"
+                          className="w-4 h-4 accent-primary cursor-pointer"
                         />
-                        <span className="text-2xl">{bot.avatar}</span>
+                        <span className="text-lg">{bot.avatar}</span>
                         <div className="flex-1 min-w-0">
-                          <div className="font-bold text-sm text-on-surface">{bot.name}</div>
-                          <div className="text-xs text-on-surface-variant truncate">{bot.description || tAgent('agent.form.noDescription', language)}</div>
+                          <div className="font-bold text-[11px] text-on-surface truncate">{bot.name}</div>
                         </div>
-                        {exists ? (
-                          <span className="text-[10px] font-bold bg-gray-200 text-gray-500 px-2 py-0.5 rounded-full">{tAgent('agent.importAlready', language)}</span>
-                        ) : (
-                          <span className="text-[10px] font-bold bg-purple-100 text-purple-600 px-2 py-0.5 rounded-full">Custom</span>
+                        {exists && (
+                          <span className="absolute -top-1 -right-1 text-[8px] font-bold bg-slate-200 text-slate-500 px-1 py-0.5 rounded border border-black">
+                            ✓
+                          </span>
                         )}
                       </label>
                     );
                   })}
-                </>
+                </div>
+              </div>
+
+              {/* CUSTOM BOTS Section - Tự động có sẵn, không cần import */}
+              {getImportableAgents().filter(item => item.source === 'custom').length > 0 && (
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-6 h-6 rounded bg-green-500 text-white flex items-center justify-center border border-black">
+                      <span className="material-symbols-outlined text-xs" style={{ fontVariationSettings: "'FILL' 1" }}>auto_awesome</span>
+                    </div>
+                    <h3 className="font-bold text-xs text-on-surface uppercase tracking-wide">{tAgent('agent.importCustomBots', language)}</h3>
+                    <span className="text-[10px] font-bold bg-green-100 text-green-700 px-1.5 py-0.5 rounded border border-green-300">
+                      Tự động có sẵn
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {getImportableAgents()
+                      .filter(item => item.source === 'custom')
+                      .map((bot) => {
+                      return (
+                        <label
+                          key={bot.id}
+                          className="relative flex flex-col gap-1 p-2 rounded-lg border-2 border-green-300 bg-green-50 cursor-default transition-all hover:border-green-400 shadow-[2px_2px_0px_0px_#000]"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="text-lg">{bot.avatar}</span>
+                            <div className="flex-1 min-w-0">
+                              <div className="font-bold text-[11px] text-on-surface truncate">{bot.name}</div>
+                            </div>
+                            <span className="material-symbols-outlined text-green-500 text-sm flex-shrink-0" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
+                          </div>
+                          {/* Action buttons for Super Admin */}
+                          <div className="flex items-center gap-1 mt-1 pt-1 border-t border-green-200">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const agent = agents.find(a => a.id === bot.id);
+                                if (agent) {
+                                  handleEdit(agent);
+                                  setShowImportModal(false);
+                                }
+                              }}
+                              className="flex-1 flex items-center justify-center gap-1 py-1 rounded bg-blue-500 text-white text-[10px] font-bold hover:bg-blue-600 transition-colors border border-black"
+                              title={tAgent('admin.common.edit', language)}
+                            >
+                              <span className="material-symbols-outlined text-xs">edit</span>
+                              Sửa
+                            </button>
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                if (!confirm(tAgent('agent.confirmDeleteQuestion', language))) return;
+                                setShowImportModal(false);
+                                await handleDelete(bot.id);
+                              }}
+                              className="flex-1 flex items-center justify-center gap-1 py-1 rounded bg-red-500 text-white text-[10px] font-bold hover:bg-red-600 transition-colors border border-black"
+                              title={tAgent('admin.common.delete', language)}
+                            >
+                              <span className="material-symbols-outlined text-xs">delete</span>
+                              Xóa
+                            </button>
+                          </div>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
               )}
 
-              {/* Empty state */}
+              {/* Empty State */}
               {getImportableAgents().filter(item => !agents.some(a => a.id === item.id)).length === 0 && (
-                <div className="text-center py-8 text-on-surface-variant">
-                  <span className="material-symbols-outlined text-2xl text-gray-300 mb-2">check_circle</span>
-                  <p className="text-sm font-medium">{tAgent('agent.importAllBotsImported', language)}</p>
+                <div className="text-center py-8">
+                  <div className="w-12 h-12 rounded-lg bg-green-100 border-2 border-black flex items-center justify-center mx-auto mb-3 shadow-[2px_2px_0px_0px_#000]">
+                    <span className="material-symbols-outlined text-2xl text-green-600">verified</span>
+                  </div>
+                  <h3 className="font-black text-sm text-on-surface mb-1">{tAgent('agent.importAllBotsImported', language)}</h3>
+                  <p className="text-xs text-on-surface-variant">Tất cả MADA bots đã import. Custom bots tự động có sẵn!</p>
                 </div>
               )}
             </div>
 
-            <div className="px-5 py-4 border-t-2 border-black bg-slate-50 flex items-center justify-between flex-shrink-0">
-              <span className="text-xs text-on-surface-variant">
-                {importSelected.size} {tAgent('agent.importBotsSelected', language)}
-              </span>
-              <div className="flex gap-2">
+            {/* Footer */}
+            <div className="px-5 py-3 border-t-2 border-black bg-slate-50 flex items-center justify-between flex-shrink-0">
+              <div className="flex items-center gap-2">
+                <div className={clsx(
+                  "w-8 h-8 rounded-lg flex items-center justify-center border-2 border-black transition-all",
+                  importSelected.size > 0 
+                    ? "bg-primary text-white shadow-[2px_2px_0px_0px_#000]" 
+                    : "bg-slate-200"
+                )}>
+                  {importSelected.size > 0 ? (
+                    <span className="material-symbols-outlined text-white text-sm">check</span>
+                  ) : (
+                    <span className="material-symbols-outlined text-slate-400 text-sm">download</span>
+                  )}
+                </div>
+                <div>
+                  <p className="text-[10px] text-slate-500">Selected</p>
+                  <p className={clsx(
+                    "font-bold text-sm",
+                    importSelected.size > 0 ? "text-primary" : "text-slate-400"
+                  )}>
+                    {importSelected.size} bot{importSelected.size !== 1 ? 's' : ''}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
                 <button
                   onClick={() => setShowImportModal(false)}
-                  className="px-4 py-2 rounded-lg border-2 border-black font-bold text-sm hover:bg-slate-100 transition-colors"
+                  className="px-3 py-1.5 rounded-lg border-2 border-black text-on-surface font-bold text-xs bg-white hover:bg-slate-100 transition-all"
                 >
                   {tAgent('admin.common.cancel', language)}
                 </button>
                 <button
                   onClick={handleImportSelected}
                   disabled={importing || importSelected.size === 0}
-                  className="px-4 py-2 rounded-lg bg-indigo-600 text-white font-bold text-sm border-2 border-black shadow-[3px_3px_0px_0px_#000] hover:-translate-x-[-1px] hover:-translate-y-[-1px] hover:shadow-[4px_4px_0px_0px_#000] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  className={clsx(
+                    "px-4 py-1.5 rounded-lg font-bold text-xs border-2 border-black transition-all flex items-center gap-1.5",
+                    importing || importSelected.size === 0
+                      ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                      : "bg-primary text-white shadow-[3px_3px_0px_0px_#000] hover:-translate-x-[-1px] hover:-translate-y-[-1px] hover:shadow-[4px_4px_0px_0px_#000]"
+                  )}
                 >
                   {importing ? (
-                    <span className="flex items-center gap-2">
-                      <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span>
+                    <>
+                      <span className="material-symbols-outlined text-xs animate-spin">progress_activity</span>
                       {tAgent('agent.form.importing', language)}
-                    </span>
+                    </>
                   ) : (
-                    <span className="flex items-center gap-2">
-                      <span className="material-symbols-outlined text-sm">download</span>
+                    <>
+                      <span className="material-symbols-outlined text-xs">download</span>
                       {tAgent('agent.importImportCount', language).replace('{count}', String(importSelected.size))}
-                    </span>
+                    </>
                   )}
                 </button>
               </div>

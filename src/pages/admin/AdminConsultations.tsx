@@ -6,7 +6,7 @@ import { useLanguageStore } from '@/stores';
 
 // Admin Consultations translations - supports all languages via useLanguageStore
 const tC = (key: string): string => {
-  const lang = useLanguageStore.getState().language;
+  const lang = useLanguageStore.getState().language ?? 'vi';
   const translations: Record<string, Record<string, string>> = {
     vi: {
       // Top bar

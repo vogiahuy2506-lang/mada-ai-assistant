@@ -79,7 +79,7 @@ router.get('/config', (_req, res) => {
       allowLanguageSwitch: true,
       widgetType: 'popup',
       chatBubbleEnabled: true,
-      chatBubbleIcon: '💬',
+      chatBubbleIcon: 'chat', // Use ID instead of emoji for consistency
       showLabel: true,
       labelPosition: 'bottom',
       labelName: 'Chat với MADA',

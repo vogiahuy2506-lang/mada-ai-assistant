@@ -6,7 +6,7 @@ import { useLanguageStore } from '@/stores';
 
 // Emotion translations - supports all languages via useLanguageStore
 const tE = (key: string): string => {
-  const lang = useLanguageStore.getState().language;
+  const lang = useLanguageStore.getState().language ?? 'vi';
   const translations: Record<string, Record<string, string>> = {
     vi: {
       'emotionCustomization.notSuperAdmin': 'Chỉ Super Admin mới có quyền truy cập trang này.',

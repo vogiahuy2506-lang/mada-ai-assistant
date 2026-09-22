@@ -74,7 +74,7 @@ const DEFAULT_WIDGET_CONFIG: WidgetConfig = {
   
   // Chat Bubble Button
   chatBubbleEnabled: true,
-  chatBubbleIcon: 'chat',
+  chatBubbleIcon: 'chat', // Use ID: chat, sparkles, bot, plus
   
   // Label Settings
   showLabel: true,
@@ -211,7 +211,7 @@ export const useWidgetSettingsStore = create<WidgetSettingsState>()(
         
         if (type === 'iframe') {
           return `<iframe
-  src="${baseUrl}/embed?botName=${encodeURIComponent(config.botName)}&primaryColor=${encodeURIComponent(config.primaryColor)}&position=${config.position}&lang=${config.defaultLanguage}&widgetType=${config.widgetType}&chatBubbleEnabled=${config.chatBubbleEnabled}&chatBubbleIcon=${encodeURIComponent(config.chatBubbleIcon)}&showLabel=${config.showLabel}&labelPosition=${config.labelPosition}&labelName=${encodeURIComponent(config.labelName)}&labelColor=${encodeURIComponent(config.labelColor)}"
+  src="${baseUrl}/embed?botName=${encodeURIComponent(config.botName)}&primaryColor=${encodeURIComponent(config.primaryColor)}&position=${config.position}&lang=${config.defaultLanguage}&widgetType=${config.widgetType}&chatBubbleEnabled=${config.chatBubbleEnabled}&chatBubbleIcon=${encodeURIComponent(config.chatBubbleIcon)}&showLabel=${config.showLabel}&labelPosition=${config.labelPosition}&labelName=${encodeURIComponent(config.labelName)}&labelColor=${encodeURIComponent(config.labelColor)}&allowFaq=${config.allowFaq}"
   width="400"
   height="600"
   style="border: none; border-radius: 12px; box-shadow: 0 4px 24px rgba(0,0,0,0.15);"
@@ -243,6 +243,7 @@ export const useWidgetSettingsStore = create<WidgetSettingsState>()(
     defaultLanguage: '${config.defaultLanguage}',
     allowFileUpload: ${config.allowFileUpload},
     allowLanguageSwitch: ${config.allowLanguageSwitch},
+    allowFaq: ${config.allowFaq},
     widgetType: '${config.widgetType}',
     chatBubbleEnabled: ${config.chatBubbleEnabled},
     chatBubbleIcon: '${config.chatBubbleIcon}',

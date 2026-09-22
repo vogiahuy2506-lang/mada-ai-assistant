@@ -6,7 +6,7 @@ import { translations, type Language } from '@/lib/translations';
 
 // Translation helper hook
 function usePromptHistoryTranslation() {
-  const language = useLanguageStore((state) => state.language) as Language;
+  const language = useLanguageStore((state) => state.language ?? 'vi') as Language;
   const t = (key: string, params?: Record<string, string | number>) => {
     let text = (translations[language]?.[key as keyof typeof translations[typeof language]] || translations.vi[key as keyof typeof translations.vi]) as string || key;
     if (params) {

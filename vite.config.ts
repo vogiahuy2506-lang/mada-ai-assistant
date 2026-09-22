@@ -5,8 +5,8 @@ import path from 'path'
 export default defineConfig({
   plugins: [react()],
   optimizeDeps: {
-    include: ['react', 'react-dom', 'react-router-dom', 'zustand'],
-    // Exclude libraries that bundle their own React - causes "Cannot read properties of null" errors
+    include: ['react', 'react-dom'],
+    // Exclude libraries that bundle their own React
     exclude: ['mammoth', 'pdfjs-dist'],
   },
   resolve: {
@@ -19,11 +19,11 @@ export default defineConfig({
     strictPort: false,
     proxy: {
       '/api': {
-        target: 'http://localhost:3008',
+        target: 'http://localhost:3007',
         changeOrigin: true,
       },
       '/ws': {
-        target: 'ws://localhost:3008',
+        target: 'ws://localhost:3007',
         ws: true,
       },
     },
@@ -33,10 +33,20 @@ export default defineConfig({
     emptyOutDir: true,
     rollupOptions: {
       output: {
-        manualChunks: {
-          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
-          'vendor-lucide': ['lucide-react'],
-          'vendor-utils': ['clsx', 'date-fns'],
+        manualChunks: (id) => {
+          // Put all React-related modules in the same chunk
+          if (id.includes('node_modules/react') || id.includes('node_modules/react-dom') || id.includes('node_modules/react-router-dom')) {
+            return 'vendor-react';
+          }
+          if (id.includes('node_modules/zustand')) {
+            return 'vendor-zustand';
+          }
+          if (id.includes('node_modules/lucide-react')) {
+            return 'vendor-lucide';
+          }
+          if (id.includes('node_modules/clsx') || id.includes('node_modules/date-fns')) {
+            return 'vendor-utils';
+          }
         },
       },
     },

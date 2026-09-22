@@ -11,7 +11,7 @@ import { adminApi } from '@/pages/admin/adminApi';
 
 // Widget translations
 const tW = (key: string): string => {
-  const lang = useLanguageStore.getState().language;
+  const lang = useLanguageStore.getState().language ?? 'vi';
   const translations: Record<string, Record<string, string>> = {
     vi: {
       'admin.widget.saveFailed': 'Lưu thất bại',
@@ -350,21 +350,21 @@ interface WidgetCustomizationProps {
   userRole?: 'admin' | 'superadmin' | 'super_admin' | 'user';
 }
 
-// Toggle component - uses actual checkbox for proper CSS peer styling
+// Toggle component - matching the exact HTML sample provided
 function Toggle({ enabled, onChange, disabled }: { enabled: boolean; onChange: () => void; disabled?: boolean }) {
   return (
-    <label className={clsx(
-      'relative inline-flex items-center cursor-pointer',
-      disabled && 'opacity-50 cursor-not-allowed'
-    )}>
+    <label className={`relative inline-flex items-center cursor-pointer select-none ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}>
       <input 
-        type="checkbox" 
         checked={enabled} 
         onChange={onChange} 
         disabled={disabled}
         className="sr-only peer" 
+        type="checkbox"
       />
-      <div className="w-12 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500 transition-all" />
+      <div 
+        onClick={() => !disabled && onChange()}
+        className="w-14 h-8 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-6 peer-checked:after:border-white after:content-[''] after:absolute after:top-[4px] after:left-[4px] after:bg-white after:rounded-full after:h-6 after:w-6 after:transition-all after:shadow-sm peer-checked:bg-emerald-500"
+      />
     </label>
   );
 }
@@ -477,10 +477,10 @@ function LiveWidgetPreview({ config, initialChatOpen = false, onClose }: { confi
               {config.allowFaq && (
                 <div className="pl-9 space-y-1.5">
                   <button className="block w-full text-left text-xs bg-white hover:bg-cyan-50/70 text-cyan-800 font-medium px-3 py-1.5 rounded-lg border border-cyan-100 shadow-2xs transition-colors">
-                    💡 Hướng dẫn tích hợp API
+                    💡 {config.defaultLanguage === 'en' ? 'API Integration Guide' : config.defaultLanguage === 'ar' ? 'دليل تكامل API' : config.defaultLanguage === 'fr' ? "Guide d'intégration API" : 'Hướng dẫn tích hợp API'}
                   </button>
                   <button className="block w-full text-left text-xs bg-white hover:bg-cyan-50/70 text-cyan-800 font-medium px-3 py-1.5 rounded-lg border border-cyan-100 shadow-2xs transition-colors">
-                    📊 Bảng giá và chính sách dịch vụ
+                    📊 {config.defaultLanguage === 'en' ? 'Pricing & Service Policy' : config.defaultLanguage === 'ar' ? 'التسعير وسياسة الخدمة' : config.defaultLanguage === 'fr' ? 'Tarification et politique' : 'Bảng giá và chính sách dịch vụ'}
                   </button>
                 </div>
               )}
@@ -574,7 +574,7 @@ function adjustColor(hex: string, percent: number): string {
 export function WidgetCustomization({ userRole: propUserRole }: Omit<WidgetCustomizationProps, 'language'>) {
   const navigate = useNavigate();
   const { user } = useAuthStore();
-  const { config, isLoading, loadConfig, updateConfig, saveConfig } = useWidgetSettingsStore();
+  const { config, isLoading, loadConfig, updateConfig, saveConfig, resetConfig } = useWidgetSettingsStore();
   
   // Get role from auth store, fallback to prop for backwards compatibility
   const userRole = user?.role || propUserRole || 'admin';
@@ -587,10 +587,22 @@ export function WidgetCustomization({ userRole: propUserRole }: Omit<WidgetCusto
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [showLivePreview, setShowLivePreview] = useState(false);
   const [previewChatOpen, setPreviewChatOpen] = useState(false);
+  const [initialConfig, setInitialConfig] = useState<typeof config | null>(null);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   useEffect(() => { 
     loadConfig(); 
   }, [loadConfig]);
+
+  // Track initial config for dirty state
+  useEffect(() => {
+    if (!isLoading && config && !initialConfig) {
+      setInitialConfig({ ...config });
+    }
+  }, [isLoading, config, initialConfig]);
+
+  // Check if there are unsaved changes
+  const hasUnsavedChanges = initialConfig && JSON.stringify(config) !== JSON.stringify(initialConfig);
 
   // Normalize launcher icon on mount and when config changes
   useEffect(() => {
@@ -601,10 +613,10 @@ export function WidgetCustomization({ userRole: propUserRole }: Omit<WidgetCusto
 
   useEffect(() => {
     const baseUrl = window.location.origin;
-    const embedParams = `botName=${encodeURIComponent(config.botName)}&primaryColor=${encodeURIComponent(config.primaryColor)}&position=${config.position}&lang=${config.defaultLanguage}&widgetType=${config.widgetType}&chatBubbleEnabled=${config.chatBubbleEnabled}&chatBubbleIcon=${encodeURIComponent(config.chatBubbleIcon)}&showLabel=${config.showLabel}&labelPosition=${config.labelPosition}&labelName=${encodeURIComponent(config.labelName)}&labelColor=${encodeURIComponent(config.labelColor)}`;
+    const embedParams = `botName=${encodeURIComponent(config.botName)}&primaryColor=${encodeURIComponent(config.primaryColor)}&position=${config.position}&lang=${config.defaultLanguage}&widgetType=${config.widgetType}&chatBubbleEnabled=${config.chatBubbleEnabled}&chatBubbleIcon=${encodeURIComponent(config.chatBubbleIcon)}&showLabel=${config.showLabel}&labelPosition=${config.labelPosition}&labelName=${encodeURIComponent(config.labelName)}&labelColor=${encodeURIComponent(config.labelColor)}&allowFaq=${config.allowFaq}`;
 
     setIframeCode(`<iframe src="${baseUrl}/embed?${embedParams}" width="380" height="600" style="border:none;border-radius:16px;box-shadow:0 4px 24px rgba(0,0,0,0.15);" title="${config.botName}"></iframe>`);
-    setScriptCode(`<script src="${baseUrl}/embed/widget.js"></script>\n<script>\n  MadaWidget.init({\n    botName: '${config.botName}',\n    primaryColor: '${config.primaryColor}',\n    position: '${config.position}',\n    defaultLanguage: '${config.defaultLanguage}',\n    widgetType: '${config.widgetType}',\n    chatBubbleEnabled: ${config.chatBubbleEnabled},\n    chatBubbleIcon: '${config.chatBubbleIcon}',\n    showLabel: ${config.showLabel},\n    labelPosition: '${config.labelPosition}',\n    labelName: '${config.labelName}',\n    labelColor: '${config.labelColor}'\n  });\n</script>`);
+    setScriptCode(`<script src="${baseUrl}/embed/widget.js"></script>\n<script>\n  MadaWidget.init({\n    botName: '${config.botName}',\n    primaryColor: '${config.primaryColor}',\n    position: '${config.position}',\n    defaultLanguage: '${config.defaultLanguage}',\n    widgetType: '${config.widgetType}',\n    chatBubbleEnabled: ${config.chatBubbleEnabled},\n    chatBubbleIcon: '${config.chatBubbleIcon}',\n    showLabel: ${config.showLabel},\n    labelPosition: '${config.labelPosition}',\n    labelName: '${config.labelName}',\n    labelColor: '${config.labelColor}',\n    allowFaq: ${config.allowFaq}\n  });\n</script>`);
   }, [config]);
 
   const handleSave = async () => {
@@ -613,12 +625,20 @@ export function WidgetCustomization({ userRole: propUserRole }: Omit<WidgetCusto
     try {
       await saveConfig();
       setSaveSuccess(true);
+      setInitialConfig({ ...config }); // Update initial config after save
       setTimeout(() => setSaveSuccess(false), 3000);
     } catch (e: any) {
       setSaveError(e.message || tW('admin.widget.saveFailed'));
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleReset = () => {
+    resetConfig();
+    setInitialConfig(null); // Reset tracking
+    loadConfig(); // Reload from backend
+    setShowResetConfirm(false);
   };
 
   const handleCopy = (code: string, type: string) => {
@@ -678,6 +698,14 @@ export function WidgetCustomization({ userRole: propUserRole }: Omit<WidgetCusto
 
             {/* Right: Action Buttons */}
             <div className="flex items-center space-x-3">
+              {/* Unsaved changes indicator */}
+              {hasUnsavedChanges && (
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 text-xs font-medium">
+                  <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                  <span>Chưa lưu</span>
+                </div>
+              )}
+              
               <button 
                 onClick={() => { setShowLivePreview(true); setPreviewChatOpen(true); }} 
                 className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 bg-white/90 text-sm font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-300 shadow-sm transition-all"
@@ -685,6 +713,51 @@ export function WidgetCustomization({ userRole: propUserRole }: Omit<WidgetCusto
                 <Eye className="w-4 h-4 text-slate-500" />
                 <span>Xem preview</span>
               </button>
+              
+              {/* Reset button */}
+              {!isReadOnly && (
+                <button 
+                  onClick={() => setShowResetConfirm(true)}
+                  disabled={saving || !hasUnsavedChanges}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 bg-white/90 text-sm font-medium text-slate-600 hover:bg-slate-50 hover:border-slate-300 shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Khôi phục cấu hình mặc định"
+                >
+                  <Settings className="w-4 h-4" />
+                  <span>Đặt lại</span>
+                </button>
+              )}
+              
+              {/* Reset confirmation modal */}
+              {showResetConfirm && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+                  <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-sm mx-4">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="p-3 rounded-full bg-amber-100 text-amber-600">
+                        <AlertCircle className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-slate-800">Xác nhận đặt lại?</h3>
+                        <p className="text-sm text-slate-500">Tất cả thay đổi sẽ bị mất.</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-3">
+                      <button 
+                        onClick={() => setShowResetConfirm(false)}
+                        className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                      >
+                        Hủy
+                      </button>
+                      <button 
+                        onClick={handleReset}
+                        className="flex-1 px-4 py-2.5 rounded-xl bg-amber-500 text-white text-sm font-semibold hover:bg-amber-600 transition-colors"
+                      >
+                        Đặt lại
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
               {!isReadOnly && (
                 <button 
                   onClick={handleSave} 

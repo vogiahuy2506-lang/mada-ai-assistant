@@ -848,7 +848,7 @@ function buildUserTimeline(log: AdminLog, language: Language): Array<{ time: str
 }
 
 export function AdminLogs() {
-  const language = useLanguageStore((s) => s.language) as Language;
+  const language = useLanguageStore((s) => s.language ?? 'vi') as Language;
   const lang = t[language];
   
   const LEVEL_LABELS: Record<LogLevel, string> = {

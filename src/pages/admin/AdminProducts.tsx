@@ -13,7 +13,7 @@ import clsx from 'clsx';
 
 // Products translations - supports all languages via useLanguageStore
 const t = (key: string): string => {
-  const lang = useLanguageStore.getState().language;
+  const lang = useLanguageStore.getState().language ?? 'vi';
   const translations: Record<string, Record<string, string>> = {
     vi: {
       // Admin common
@@ -1574,3 +1574,5 @@ export function AdminProducts() {
    </AdminLayout>
   );
 }
+
+export default AdminProducts;

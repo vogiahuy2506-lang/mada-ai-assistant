@@ -140,7 +140,7 @@ interface AIImportCardProps {
 
 export function AIImportCard({ categories, onImportSuccess }: AIImportCardProps) {
   const { user } = useAuthStore();
-  const language = useLanguageStore((state) => state.language) as Language;
+  const language = useLanguageStore((state) => state.language ?? 'vi') as Language;
 
   // Translation helper
   const t = (key: string, params?: Record<string, string | number>): string => {

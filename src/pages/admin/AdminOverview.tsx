@@ -5,7 +5,7 @@ import { useLanguageStore } from '@/stores';
 
 // Admin Overview translations - supports all languages via useLanguageStore
 const tO = (key: string): string => {
-  const lang = useLanguageStore.getState().language;
+  const lang = useLanguageStore.getState().language ?? 'vi';
   const translations: Record<string, Record<string, string>> = {
     vi: {
       // Bot names

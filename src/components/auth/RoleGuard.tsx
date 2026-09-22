@@ -13,7 +13,7 @@ export function RoleGuard({ children, requiredRole }: RoleGuardProps) {
   const user = useAuthStore((s) => s.user);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const refreshUser = useAuthStore((s) => s.refreshUser);
-  const language = useLanguageStore((s) => s.language);
+  const language = useLanguageStore((s) => s.language ?? 'vi');
 
   const [state, setState] = useState<'loading' | 'ready'>('loading');
 

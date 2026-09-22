@@ -6,7 +6,7 @@ import { usePromptStore, useLanguageStore } from '@/stores';
 
 // Admin Templates translations - supports all languages via useLanguageStore
 const tT = (key: string): string => {
-  const lang = useLanguageStore.getState().language;
+  const lang = useLanguageStore.getState().language ?? 'vi';
   const translations: Record<string, Record<string, string>> = {
     vi: {
       // Categories

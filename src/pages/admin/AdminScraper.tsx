@@ -49,7 +49,7 @@ interface Source {
 
 // ============== COMPONENT ==============
 export function AdminScraper() {
-  const language = useLanguageStore((s) => s.language) as Language;
+  const language = useLanguageStore((s) => s.language ?? 'vi') as Language;
   const isVi = language === 'vi';
   const isAr = language === 'ar';
   const isFr = language === 'fr';

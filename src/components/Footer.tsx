@@ -3,7 +3,7 @@ import { t } from '@/lib/translations';
 import { useLanguageStore } from '@/stores';
 
 export function Footer() {
-  const language = useLanguageStore((s) => s.language);
+  const language = useLanguageStore((s) => s.language ?? 'vi');
 
   return (
     <footer className="w-full flex flex-col md:flex-row justify-between items-start md:items-end p-6 md:p-8 gap-6 bg-zinc-900 text-zinc-100">

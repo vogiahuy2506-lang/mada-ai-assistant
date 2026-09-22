@@ -96,7 +96,7 @@ function applyPrefs(prefs: A11yPrefs) {
 export function AccessibilityToolbar() {
   const [open, setOpen] = useState(false);
   const [prefs, setPrefs] = useState<A11yPrefs>(DEFAULTS);
-  const language = useLanguageStore((s) => s.language);
+  const language = useLanguageStore((s) => s.language ?? 'vi');
 
   useEffect(() => {
     const loaded = loadPrefs();

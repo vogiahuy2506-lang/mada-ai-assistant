@@ -49,7 +49,7 @@ const LANGUAGES: { value: LanguageType; label: string; labelEn: string; labelAr:
 
 // ============== TRANSLATION HELPER ==============
 function useSuggestedQuestionsTranslation() {
-  const language = useLanguageStore((state) => state.language) as Language;
+  const language = useLanguageStore((state) => state.language ?? 'vi') as Language;
   const t = (key: string, params?: Record<string, string | number>) => {
     let text = (translations[language]?.[key as keyof typeof translations[typeof language]] || translations.vi[key as keyof typeof translations.vi]) as string || key;
     if (params) {
@@ -782,13 +782,13 @@ export default function AdminSuggestedQuestions() {
                         </p>
                       </td>
                       <td className="px-4 py-3">
-                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-bold border border-blue-300">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 text-[10px] font-bold border border-blue-300 whitespace-nowrap shrink-0">
                           {getCategoryIcon(q.category)} {getCategoryLabelByLang(q.category)}
                         </span>
                       </td>
                       <td className="px-4 py-3">
                         <span className={clsx(
-                          'px-2 py-1 rounded-full text-xs font-bold border',
+                          'px-2 py-0.5 rounded-full text-[10px] font-bold border whitespace-nowrap shrink-0',
                           q.view_mode === 'at_specialist' 
                             ? 'bg-purple-100 text-purple-700 border-purple-300'
                             : 'bg-green-100 text-green-700 border-green-300'
@@ -797,7 +797,7 @@ export default function AdminSuggestedQuestions() {
                         </span>
                       </td>
                       <td className="px-4 py-3">
-                        <span className="px-2 py-1 rounded bg-gray-100 text-gray-700 text-xs font-medium border border-gray-300">
+                        <span className="px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 text-[10px] font-medium border border-gray-300 whitespace-nowrap shrink-0">
                           {getLanguageLabelByLang(q.language)}
                         </span>
                       </td>
@@ -807,46 +807,21 @@ export default function AdminSuggestedQuestions() {
                           <button
                             onClick={() => handleToggleActive(q)}
                             className={clsx(
-                              'group relative inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border transition-all duration-200',
+                              'px-2 py-0.5 rounded-full text-[10px] font-bold border transition-all duration-200 whitespace-nowrap shrink-0',
                               q.is_active === 1
-                                ? 'bg-gradient-to-r from-green-50 to-emerald-50 text-emerald-700 border-emerald-200 hover:from-green-100 hover:to-emerald-100 hover:border-emerald-300 hover:shadow-[0_0_0_2px_rgba(16,185,129,0.15)] active:scale-95'
-                                : 'bg-gradient-to-r from-gray-50 to-slate-50 text-gray-500 border-gray-200 hover:from-gray-100 hover:to-slate-100 hover:border-gray-300 hover:shadow-[0_0_0_2px_rgba(107,114,128,0.15)] active:scale-95',
+                                ? 'bg-emerald-100 text-emerald-700 border-emerald-300 hover:bg-emerald-200'
+                                : 'bg-gray-100 text-gray-500 border-gray-300 hover:bg-gray-200'
                             )}
                           >
-                            {/* Animated dot indicator */}
-                            <span className={clsx(
-                              'relative flex h-1.5 w-1.5',
-                            )}>
-                              <span className={clsx(
-                                'animate-ping absolute inline-flex h-full w-full rounded-full opacity-75',
-                                q.is_active === 1 ? 'bg-emerald-400' : 'bg-gray-400'
-                              )} />
-                              <span className={clsx(
-                                'relative inline-flex rounded-full h-1.5 w-1.5',
-                                q.is_active === 1 ? 'bg-emerald-500' : 'bg-gray-400'
-                              )} />
-                            </span>
                             {q.is_active === 1 ? t('adminSuggested.activeStatus') : t('adminSuggested.disabledStatus')}
                           </button>
                         ) : (
                           <span className={clsx(
-                            'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border',
+                            'px-2 py-0.5 rounded-full text-[10px] font-bold border whitespace-nowrap shrink-0',
                             q.is_active === 1
-                              ? 'bg-gradient-to-r from-green-50 to-emerald-50 text-emerald-700 border-emerald-200'
-                              : 'bg-gradient-to-r from-gray-50 to-slate-50 text-gray-500 border-gray-200',
+                              ? 'bg-emerald-100 text-emerald-700 border-emerald-300'
+                              : 'bg-gray-100 text-gray-500 border-gray-300'
                           )}>
-                            <span className={clsx(
-                              'relative flex h-1.5 w-1.5',
-                            )}>
-                              <span className={clsx(
-                                'absolute inline-flex h-full w-full rounded-full',
-                                q.is_active === 1 ? 'bg-emerald-400' : 'bg-gray-400'
-                              )} />
-                              <span className={clsx(
-                                'relative inline-flex rounded-full h-1.5 w-1.5',
-                                q.is_active === 1 ? 'bg-emerald-500' : 'bg-gray-400'
-                              )} />
-                            </span>
                             {q.is_active === 1 ? t('adminSuggested.activeStatus') : t('adminSuggested.disabledStatus')}
                           </span>
                         )}

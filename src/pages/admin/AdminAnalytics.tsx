@@ -8,7 +8,7 @@ import clsx from 'clsx';
 
 // Translation helper function using useLanguageStore
 function useAnalyticsTranslation() {
-  const language = useLanguageStore((state) => state.language) as Language;
+  const language = useLanguageStore((state) => state.language ?? 'vi') as Language;
   const t = (key: string, params?: Record<string, string>) => {
     // Fallback to Vietnamese if language not found
     let text = (translations[language]?.[key as keyof typeof translations[typeof language]] || translations.vi[key as keyof typeof translations.vi]) as string || key;

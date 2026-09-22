@@ -6,7 +6,7 @@ import madaLogo from '@/assets/mada-logo.png';
 
 // Admin Layout translations - Vietnamese, English, Arabic, French
 const tL = (key: string): string => {
-  const lang = useLanguageStore.getState().language;
+  const lang = useLanguageStore.getState().language ?? 'vi';
   const translations: Record<string, Record<string, string>> = {
     vi: {
       // Navigation
@@ -49,6 +49,9 @@ const tL = (key: string): string => {
       'admin.topBar.consultationsSub': 'Xem và quản lý các yêu cầu tư vấn',
       'admin.topBar.templates': 'Templates',
       'admin.topBar.templatesSub': 'Quản lý mẫu prompts',
+      // File Management translations
+      'admin.topBar.fileManagement': 'Quản Lý Upload File',
+      'admin.topBar.fileManagementSub': 'Cấu hình tính năng upload file và giới hạn cho người dùng',
     },
     en: {
       // Navigation
@@ -91,6 +94,9 @@ const tL = (key: string): string => {
       'admin.topBar.consultationsSub': 'View and manage consultation requests',
       'admin.topBar.templates': 'Templates',
       'admin.topBar.templatesSub': 'Manage prompt templates',
+      // File Management translations
+      'admin.topBar.fileManagement': 'Upload File Management',
+      'admin.topBar.fileManagementSub': 'Configure file upload features and limits for users',
     },
     ar: {
       // Navigation
@@ -133,6 +139,9 @@ const tL = (key: string): string => {
       'admin.topBar.consultationsSub': 'عرض وإدارة طلبات الاستشارة',
       'admin.topBar.templates': 'القوالب',
       'admin.topBar.templatesSub': 'إدارة قوالب الطلبات',
+      // File Management translations
+      'admin.topBar.fileManagement': 'إدارة تحميل الملفات',
+      'admin.topBar.fileManagementSub': 'تكوين ميزات تحميل الملفات وحدودها للمستخدمين',
     },
     fr: {
       // Navigation
@@ -175,6 +184,9 @@ const tL = (key: string): string => {
       'admin.topBar.consultationsSub': 'Voir et gérer les demandes de consultation',
       'admin.topBar.templates': 'Modèles',
       'admin.topBar.templatesSub': 'Gérer les modèles de prompts',
+      // File Management translations
+      'admin.topBar.fileManagement': 'Gestion des fichiers',
+      'admin.topBar.fileManagementSub': 'Configurer les fonctionnalités de téléchargement et les limites pour les utilisateurs',
     },
   };
   return translations[lang]?.[key] || translations['vi'][key] || key;
@@ -256,7 +268,7 @@ export function AdminLayout({
 
   return (
     <div
-      className="font-body-md antialiased bg-background text-on-background min-h-screen"
+      className="font-body-md antialiased bg-background text-on-background min-h-screen flex"
       style={{ overflowX: 'hidden' }}
     >
       {/* Material Symbols font */}
@@ -357,9 +369,9 @@ export function AdminLayout({
       </aside>
 
       {/* MAIN CONTENT */}
-      <main className="ml-64 min-h-screen">
+      <main className="ml-64 min-h-screen overflow-y-auto flex-1 flex flex-col">
         {/* TOP BAR */}
-        <div className="sticky top-0 z-40 backdrop-blur-xl bg-white/70 border-b border-outline-variant/30 px-8 py-3 flex items-center gap-4">
+        <div className="sticky top-0 z-40 backdrop-blur-xl bg-white/70 border-b border-outline-variant/30 px-8 py-3 flex items-center gap-4 shrink-0">
           <div className="flex-1 min-w-0">
             {showLayoutTitle && (
               <div>
@@ -535,8 +547,10 @@ export function AdminLayout({
         </div>
 
         {/* PAGE BODY */}
-        <div className="p-8 max-w-[1600px] mx-auto space-y-8">
-          {children}
+        <div className="flex-1 overflow-y-auto">
+          <div className="p-8 pb-36 max-w-[1600px] mx-auto space-y-8">
+            {children}
+          </div>
         </div>
       </main>
     </div>

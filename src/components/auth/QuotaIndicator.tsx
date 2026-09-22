@@ -6,7 +6,7 @@ export function QuotaIndicator() {
   const anon = useAnonQuotaStore();
   const authModal = useAuthModalStore();
   const paywall = usePaywallModalStore();
-  const language = useLanguageStore((s) => s.language);
+  const language = useLanguageStore((s) => s.language ?? 'vi');
   const systemSettings = useSystemSettingsStore();
 
   const labels = {

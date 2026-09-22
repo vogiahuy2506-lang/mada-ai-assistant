@@ -47,6 +47,8 @@ interface EmbedWidgetProps {
   labelPosition?: 'bottom' | 'top';
   labelName?: string;
   labelColor?: string;
+  allowFaq?: boolean;
+  onFaqClick?: (question: string) => void;
 }
 
 // Get language name translations based on current language
@@ -88,6 +90,21 @@ const LANGUAGES_FLAGS: { code: Language; flag: string }[] = [
   { code: 'fr', flag: '🇫🇷' },
 ];
 
+// Icon mapping: admin IDs -> emoji
+const ICON_MAP: Record<string, string> = {
+  'chat': '💬',
+  'sparkles': '✨',
+  'bot': '🤖',
+  'plus': '➕',
+};
+
+// Default FAQ prompts
+const DEFAULT_FAQ_PROMPTS = [
+  { id: 'faq1', vi: '💡 Hướng dẫn tích hợp API', en: '💡 API Integration Guide', ar: '💡 دليل تكامل API', fr: '💡 Guide d\'intégration API' },
+  { id: 'faq2', vi: '📊 Bảng giá và chính sách dịch vụ', en: '📊 Pricing & Service Policy', ar: '📊 التسعير وسياسة الخدمة', fr: '📊 Tarification et politique de service' },
+  { id: 'faq3', vi: '🔧 Hỗ trợ kỹ thuật', en: '🔧 Technical Support', ar: '🔧 الدعم الفني', fr: '🔧 Support technique' },
+];
+
 export function EmbedWidget({
   botName: botNameProp,
   primaryColor: primaryColorProp,
@@ -102,12 +119,20 @@ export function EmbedWidget({
   // New settings
   widgetType: widgetTypeProp = 'popup',
   chatBubbleEnabled: chatBubbleEnabledProp = true,
-  chatBubbleIcon: chatBubbleIconProp = '💬',
+  chatBubbleIcon: chatBubbleIconProp = 'chat',
   showLabel: showLabelProp = true,
   labelPosition: labelPositionProp = 'bottom',
   labelName: labelNameProp = 'Chat with MADA',
   labelColor: labelColorProp,
+  allowFaq: allowFaqProp = true,
 }: EmbedWidgetProps) {
+  // Map icon ID to emoji
+  const iconEmoji = ICON_MAP[chatBubbleIconProp] || '💬';
+  
+  // Get FAQ prompt based on language
+  const getFaqPrompt = (faq: typeof DEFAULT_FAQ_PROMPTS[0]) => {
+    return faq[language] || faq.vi;
+  };
   const [internalIsOpen, setInternalIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
 
@@ -428,6 +453,85 @@ export function EmbedWidget({
     }
   };
 
+  const handleFaqSend = async (question: string) => {
+    try {
+      const chatBody: any = {
+        message: question,
+        language,
+        userMode: 'endUser',
+      };
+      
+      if (apiKeyProp) {
+        chatBody.apiKey = apiKeyProp;
+      }
+
+      const token = getAccessToken();
+      const response = await fetch('/api/chat/stream', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(chatBody),
+      });
+
+      if (!response.ok) throw new Error('Failed to get response');
+
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error('No response body');
+
+      const decoder = new TextDecoder();
+      let fullContent = '';
+      let confidence = 0.5;
+
+      const assistantMsgId = `assistant-${Date.now()}`;
+      setMessages(prev => [...prev, {
+        id: assistantMsgId,
+        role: 'assistant',
+        content: '',
+        isStreaming: true,
+      }]);
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value);
+        const lines = chunk.split('\n');
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              if (data.type === 'chunk') {
+                fullContent += data.chunk;
+                setMessages(prev => prev.map(m => 
+                  m.id === assistantMsgId ? { ...m, content: fullContent } : m
+                ));
+              } else if (data.type === 'done') {
+                confidence = data.confidence || 0.5;
+              }
+            } catch {}
+          }
+        }
+      }
+
+      setMessages(prev => prev.map(m => 
+        m.id === assistantMsgId ? { ...m, content: fullContent, confidence, isStreaming: false } : m
+      ));
+    } catch (error) {
+      console.error('FAQ error:', error);
+      const assistantMsgId = `assistant-${Date.now()}`;
+      setMessages(prev => [...prev, {
+        id: assistantMsgId,
+        role: 'assistant',
+        content: t('widget.sorry', language),
+      }]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleCopy = (content: string, id: string) => {
     navigator.clipboard.writeText(content);
     setCopiedId(id);
@@ -474,7 +578,7 @@ export function EmbedWidget({
               [isLeftPosition ? 'left' : 'right']: '24px'
             }}
           >
-            {chatBubbleIconProp}
+            <span className="text-2xl">{iconEmoji}</span>
           </button>
         </div>
       )}
@@ -486,7 +590,7 @@ export function EmbedWidget({
           className="w-full h-full min-h-[400px] rounded-2xl border-2 border-dashed border-gray-300 flex flex-col items-center justify-center gap-3 text-gray-500 hover:border-cyan-400 hover:text-cyan-600 transition-colors"
           style={{ backgroundColor: `${configPrimaryColor}10` }}
         >
-          <span className="text-5xl">{chatBubbleIconProp}</span>
+          <span className="text-5xl">{iconEmoji}</span>
           <span className="text-sm font-medium">{labelNameProp || translations.chatWithMada}</span>
         </button>
       )}
@@ -594,7 +698,7 @@ export function EmbedWidget({
               className="w-full h-full flex items-center justify-center"
               style={{ backgroundColor: configPrimaryColor }}
             >
-              <span className="text-white text-2xl">{chatBubbleIconProp}</span>
+              <span className="text-white text-2xl">{iconEmoji}</span>
             </button>
           )}
 
@@ -682,6 +786,39 @@ export function EmbedWidget({
                 )}
                 
                 <div ref={messagesEndRef} />
+
+                {/* FAQ Quick Prompts */}
+                {allowFaqProp && messages.length <= 1 && !isLoading && (
+                  <div className="pt-2 space-y-2">
+                    <p className="text-xs text-gray-400 font-medium px-1">Câu hỏi phổ biến:</p>
+                    {DEFAULT_FAQ_PROMPTS.map((faq) => (
+                      <button
+                        key={faq.id}
+                        onClick={() => {
+                          const question = getFaqPrompt(faq);
+                          setInputValue(question.replace(/^[^\s]+\s/, '')); // Remove emoji
+                          // Auto send
+                          setTimeout(() => {
+                            if (inputValue) {
+                              const userMsg: Message = {
+                                id: `user-${Date.now()}`,
+                                role: 'user',
+                                content: question.replace(/^[^\s]+\s/, ''),
+                              };
+                              setMessages(prev => [...prev, userMsg]);
+                              setIsLoading(true);
+                              // Send to API
+                              handleFaqSend(question.replace(/^[^\s]+\s/, ''));
+                            }
+                          }, 100);
+                        }}
+                        className="block w-full text-left text-xs bg-white hover:bg-cyan-50/70 text-gray-700 font-medium px-3 py-2 rounded-lg border border-gray-200 shadow-xs transition-colors"
+                      >
+                        {getFaqPrompt(faq)}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Selected Files Preview */}

@@ -114,7 +114,7 @@ interface Props {
 }
 
 export function PromptTemplates({ onSelectTemplate, onClose, isInline = false }: Props) {
-  const language = useLanguageStore((s) => s.language) as Language;
+  const language = useLanguageStore((s) => s.language ?? 'vi') as Language;
   const t = (key: string, params?: Record<string, string>) => {
     const text = promptTemplateTranslations[key]?.[language] || promptTemplateTranslations[key]?.['vi'] || key;
     if (params) {

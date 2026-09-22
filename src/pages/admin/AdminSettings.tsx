@@ -5,7 +5,7 @@ import { useSystemSettingsStore, useAuthStore, useLanguageStore } from '@/stores
 import { translations, Language } from '@/lib/translations';
 import clsx from 'clsx';
 import { systemApi } from '@/lib/api';
-import { CheckCircle, Loader2, AlertCircle, Shield, Settings, Lock, Cloud, CreditCard, Mail, Bug, Sparkles, FileText, Zap, ArrowRight } from 'lucide-react';
+import { CheckCircle, Loader2, AlertCircle, Shield, Settings, Lock, Cloud, CreditCard, Mail, Bug, Sparkles, FileText, Zap, ArrowRight, Image, Video, Music, File } from 'lucide-react';
 import { PromptTemplates } from './PromptTemplates';
 
 type Tab = 'general' | 'plans' | 'security' | 'ai' | 'integrations' | 'live' | 'system' | 'templates';
@@ -21,7 +21,7 @@ export function AdminSettings() {
   const [saveError, setSaveError] = useState<string | null>(null);
 
   // Get current language and translations (reactive)
-  const language = useLanguageStore((s) => s.language) as Language;
+  const language = useLanguageStore((s) => s.language ?? 'vi') as Language;
   const lang = translations[language] || translations.vi;
   
   // Get current user role
@@ -220,7 +220,7 @@ export function AdminSettings() {
               <div className="space-y-2">
                 <label className="text-label-sm font-semibold text-on-surface">{lang['admin.settings.general.defaultLanguage']}</label>
                 <select className="w-full px-4 py-3 rounded-xl bg-surface-variant/30 border border-outline-variant text-on-surface text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30 transition-colors">
-                  {(lang['admin.settings.languages'] || ['Tiếng Việt', 'English', 'Français', 'العربية']).map((langName: string, idx: number) => (
+                  {['Tiếng Việt', 'English', 'Français', 'العربية'].map((langName: string, idx: number) => (
                     <option key={idx}>{langName}</option>
                   ))}
                 </select>
@@ -304,69 +304,108 @@ export function AdminSettings() {
             </div>
           </div>
 
-          {/* File Upload Limits */}
+          {/* File Upload Limits - Upload Types */}
           <div className="bg-white rounded-2xl border border-outline-variant overflow-hidden">
             <div className="px-8 py-6 border-b border-outline-variant">
-              <h3 className="text-lg font-black text-on-surface">{lang['admin.settings.plans.fileUploadLimits']}</h3>
+              <h3 className="text-lg font-black text-on-surface">{lang['admin.settings.plans.uploadTypes']}</h3>
+              <p className="text-sm text-on-surface-variant mt-1">{lang['admin.settings.plans.uploadTypesDesc']}</p>
             </div>
-            <div className="p-8 space-y-5">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="space-y-2">
-                  <label className="text-label-sm font-semibold text-on-surface">{lang['admin.settings.plans.maxPerSession']}</label>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-on-surface-variant whitespace-nowrap">{lang['admin.settings.plans.filePerSession']}</span>
-                    <input
-                      type="number"
-                      min="1"
-                      max="50"
-                      value={maxFilesPerSession}
-                      onChange={(e) => setMaxFilesPerSession(parseInt(e.target.value) || 10)}
-                      className="w-20 px-3 py-2.5 rounded-xl bg-surface-variant/30 border border-outline-variant text-on-surface text-sm font-mono text-center focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30"
-                    />
+            <div className="p-8">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
+                {/* Image Card */}
+                <div className="flex flex-col items-center gap-3 p-4 rounded-2xl bg-gradient-to-br from-pink-400 to-purple-500">
+                  <div className="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur flex items-center justify-center">
+                    <Image className="w-7 h-7 text-white" />
                   </div>
+                  <span className="text-sm font-bold text-white">Hình ảnh</span>
                 </div>
-                <div className="space-y-2">
-                  <label className="text-label-sm font-semibold text-on-surface">{lang['admin.settings.plans.maxTotalFiles']}</label>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-on-surface-variant whitespace-nowrap">{lang['admin.settings.plans.totalFiles']}</span>
-                    <input
-                      type="number"
-                      min="10"
-                      max="1000"
-                      value={maxFilesTotal}
-                      onChange={(e) => setMaxFilesTotal(parseInt(e.target.value) || 100)}
-                      className="w-20 px-3 py-2.5 rounded-xl bg-surface-variant/30 border border-outline-variant text-on-surface text-sm font-mono text-center focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30"
-                    />
+
+                {/* PDF Card */}
+                <div className="flex flex-col items-center gap-3 p-4 rounded-2xl bg-gradient-to-br from-blue-400 to-cyan-500">
+                  <div className="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur flex items-center justify-center">
+                    <FileText className="w-7 h-7 text-white" />
                   </div>
+                  <span className="text-sm font-bold text-white">PDF</span>
                 </div>
-                <div className="space-y-2">
-                  <label className="text-label-sm font-semibold text-on-surface">{lang['admin.settings.plans.maxFileSize']}</label>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-on-surface-variant whitespace-nowrap">{lang['admin.settings.plans.fileSize']}</span>
-                    <input
-                      type="number"
-                      min="1"
-                      max="100"
-                      value={maxFileSizeMB}
-                      onChange={(e) => setMaxFileSizeMB(parseInt(e.target.value) || 50)}
-                      className="w-20 px-3 py-2.5 rounded-xl bg-surface-variant/30 border border-outline-variant text-on-surface text-sm font-mono text-center focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30"
-                    />
-                    <span className="text-sm font-semibold text-on-surface-variant">MB</span>
+
+                {/* Video Card */}
+                <div className="flex flex-col items-center gap-3 p-4 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600">
+                  <div className="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur flex items-center justify-center">
+                    <Video className="w-7 h-7 text-white" />
                   </div>
+                  <span className="text-sm font-bold text-white">Video</span>
+                </div>
+
+                {/* Music Card */}
+                <div className="flex flex-col items-center gap-3 p-4 rounded-2xl bg-gradient-to-br from-orange-400 to-amber-500">
+                  <div className="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur flex items-center justify-center">
+                    <Music className="w-7 h-7 text-white" />
+                  </div>
+                  <span className="text-sm font-bold text-white">Nhạc</span>
+                </div>
+
+                {/* File Card */}
+                <div className="flex flex-col items-center gap-3 p-4 rounded-2xl bg-gradient-to-br from-gray-500 to-gray-600">
+                  <div className="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur flex items-center justify-center">
+                    <File className="w-7 h-7 text-white" />
+                  </div>
+                  <span className="text-sm font-bold text-white">File</span>
                 </div>
               </div>
-              <div className="pt-2">
-                <p className="text-label-sm font-semibold text-on-surface mb-2">{lang['admin.settings.plans.supportedFormats']}</p>
-                <div className="flex flex-wrap gap-2">
-                  {['PDF', 'DOCX', 'TXT', 'PNG', 'JPEG', 'JPG', 'PPTX'].map((fmt) => (
-                    <span
-                      key={fmt}
-                      className="px-3 py-1.5 bg-primary/5 text-primary text-xs font-label-sm font-semibold rounded-lg border border-primary/20"
-                    >
-                      {fmt}
-                    </span>
-                  ))}
-                </div>
+            </div>
+          </div>
+
+          {/* File Upload Limits - Size Limits */}
+          <div className="bg-white rounded-2xl border border-outline-variant overflow-hidden">
+            <div className="px-8 py-6 border-b border-outline-variant">
+              <h3 className="text-lg font-black text-on-surface">{lang['admin.settings.plans.sizeLimits']}</h3>
+            </div>
+            <div className="p-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {/* Image Limit - green border */}
+                <LimitCard
+                  icon={<Image className="w-5 h-5 text-green-600" />}
+                  label="Tối đa 10 MB/tệp"
+                  value={true}
+                  borderColor="green"
+                  onToggle={() => {}}
+                />
+
+                {/* PDF Limit - red border */}
+                <LimitCard
+                  icon={<FileText className="w-5 h-5 text-red-600" />}
+                  label="Tối đa 50 MB/tệp"
+                  value={true}
+                  borderColor="red"
+                  onToggle={() => {}}
+                />
+
+                {/* Video Limit - purple border */}
+                <LimitCard
+                  icon={<Video className="w-5 h-5 text-purple-600" />}
+                  label="Tối đa 100 MB/tệp"
+                  value={true}
+                  borderColor="purple"
+                  onToggle={() => {}}
+                />
+
+                {/* Music Limit - teal border */}
+                <LimitCard
+                  icon={<Music className="w-5 h-5 text-teal-600" />}
+                  label="Tối đa 50 MB/tệp"
+                  value={false}
+                  borderColor="teal"
+                  onToggle={() => {}}
+                />
+
+                {/* File Limit - amber border */}
+                <LimitCard
+                  icon={<File className="w-5 h-5 text-amber-600" />}
+                  label="Tối đa 25 MB/tệp"
+                  value={true}
+                  borderColor="amber"
+                  onToggle={() => {}}
+                />
               </div>
             </div>
           </div>
@@ -904,6 +943,58 @@ function ToggleRow({ label, desc, value }: { label: string; desc: string; value:
           className={clsx(
             'absolute top-1 w-5 h-5 rounded-full bg-white shadow-sm transition-transform',
             enabled ? 'left-[28px]' : 'left-1'
+          )}
+        />
+      </button>
+    </div>
+  );
+}
+
+type BorderColor = 'green' | 'red' | 'purple' | 'teal' | 'amber';
+
+const borderColorClasses: Record<BorderColor, string> = {
+  green: 'border-green-500',
+  red: 'border-red-500',
+  purple: 'border-purple-500',
+  teal: 'border-teal-500',
+  amber: 'border-amber-500',
+};
+
+function LimitCard({
+  icon,
+  label,
+  value,
+  borderColor,
+  onToggle,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: boolean;
+  borderColor: BorderColor;
+  onToggle: () => void;
+}) {
+  return (
+    <div className={clsx(
+      'flex items-center justify-between gap-3 p-4 rounded-2xl border-2 bg-white',
+      borderColorClasses[borderColor]
+    )}>
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-xl bg-surface-variant flex items-center justify-center">
+          {icon}
+        </div>
+        <span className="text-sm font-semibold text-on-surface">{label}</span>
+      </div>
+      <button
+        onClick={onToggle}
+        className={clsx(
+          'relative w-12 h-7 rounded-full transition-colors flex-shrink-0',
+          value ? 'bg-green-500' : 'bg-surface-variant'
+        )}
+      >
+        <span
+          className={clsx(
+            'absolute top-1 w-5 h-5 rounded-full bg-white shadow-sm transition-transform',
+            value ? 'left-[28px]' : 'left-1'
           )}
         />
       </button>

@@ -327,7 +327,7 @@ const CATEGORY_CONFIG: Record<string, { bg: string; text: string; border: string
 
 export function AdminPrompts() {
   // Use proper reactive hook instead of getState()
-  const language = useLanguageStore((state) => state.language);
+  const language = useLanguageStore((state) => state.language ?? 'vi');
   const upsertPromptStore = usePromptStore((s) => s.upsertPrompt);
   const removePromptStore = usePromptStore((s) => s.removePrompt);
   const setStorePrompts = usePromptStore((s) => s.setPrompts);

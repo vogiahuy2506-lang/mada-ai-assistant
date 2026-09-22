@@ -12,7 +12,7 @@ import {
 
 // Admin Users translations - supports all languages via useLanguageStore
 const tU = (key: string, params?: Record<string, string>): string => {
-  const lang = useLanguageStore.getState().language;
+  const lang = useLanguageStore.getState().language ?? 'vi';
   const translations: Record<string, Record<string, string>> = {
     vi: {
       // Common

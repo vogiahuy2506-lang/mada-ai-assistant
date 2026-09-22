@@ -19,7 +19,7 @@ export function AuthModal() {
   const registerWithEmail = useAuthStore((s) => s.registerWithEmail);
   const navigate = useNavigate();
   const resetAnon = useAnonQuotaStore((s) => s.reset);
-  const language = useLanguageStore((s) => s.language);
+  const language = useLanguageStore((s) => s.language ?? 'vi');
 
   // Translation helper function
   const tr = (key: string) => t(key, language);

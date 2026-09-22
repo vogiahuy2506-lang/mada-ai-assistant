@@ -14,7 +14,7 @@ interface ErrorBoundaryState {
 
 export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
   // Use static store access since hooks can't be used in class components
-  private static language = useLanguageStore.getState().language;
+  private static language = useLanguageStore.getState().language ?? 'vi';
 
   constructor(props: ErrorBoundaryProps) {
     super(props);

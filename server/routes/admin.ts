@@ -552,12 +552,13 @@ router.post('/agents', requireAdmin, (req: Request, res: Response) => {
     db.prepare(`
       INSERT INTO admin_agents (
         id, name, description, avatar, system_prompt, capabilities, is_active,
-        created_by, mada_category, bot_id, prompt_id,
+        created_by, mada_category, bot_id,
+        created_at, updated_at,
         avatar_url, knowledge_url, product_url,
         last_crawl_at, last_crawl_status, last_crawl_count,
-        created_at, updated_at
+        prompt_id, crawl_follow_links, crawl_max_depth, crawl_max_pages
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       agentId,
       name,
@@ -569,15 +570,18 @@ router.post('/agents', requireAdmin, (req: Request, res: Response) => {
       (req as any).user?.id || null,
       mada_category || null,
       bot_id || null,
-      prompt_id || null,
+      now,   // created_at
+      now,   // updated_at
       avatar_url || null,
       knowledge_url || null,
       firstProductUrl,
-      null, // last_crawl_at
-      null, // last_crawl_status
-      0,    // last_crawl_count
-      now,
-      now
+      null,  // last_crawl_at
+      null,  // last_crawl_status
+      0,     // last_crawl_count
+      prompt_id || null,
+      0,     // crawl_follow_links
+      1,     // crawl_max_depth
+      5,     // crawl_max_pages
     );
 
     const agent = db.prepare('SELECT * FROM admin_agents WHERE id = ?').get(agentId) as any;

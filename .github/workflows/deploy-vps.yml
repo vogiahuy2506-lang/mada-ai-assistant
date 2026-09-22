@@ -148,6 +148,36 @@ jobs:
             echo "=== Setting permissions ==="
             sudo chmod -R 755 $APP_DIR
 
+            # Setup Node.js environment (handle nvm or direct install)
+            echo "=== Setting up Node.js ==="
+            export NVM_DIR="$HOME/.nvm"
+            if [ -s "$NVM_DIR/nvm.sh" ]; then
+              echo "Sourcing nvm..."
+              [ -s "$NVM_DIR/bash_completion" ] && . "$NVM_DIR/bash_completion"
+              . "$NVM_DIR/nvm.sh"
+            fi
+            
+            # Also check common node locations
+            if ! command -v node &> /dev/null; then
+              echo "Node not found in PATH, checking common locations..."
+              if [ -f /usr/local/bin/node ]; then
+                export PATH="/usr/local/bin:$PATH"
+              elif [ -f /usr/bin/node ]; then
+                export PATH="/usr/bin:$PATH"
+              fi
+            fi
+            
+            # Verify node/npm is available
+            if ! command -v npm &> /dev/null; then
+              echo "npm still not found, installing Node.js..."
+              curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+              sudo apt-get install -y nodejs
+              export PATH="/usr/bin:$PATH"
+            fi
+            
+            echo "Node version: $(node --version)"
+            echo "NPM version: $(npm --version)"
+
             # Install dependencies
             echo "=== Installing dependencies ==="
             cd $APP_DIR
@@ -165,7 +195,15 @@ jobs:
             # Check if PM2 is installed
             if ! command -v pm2 &> /dev/null; then
               echo "Installing PM2..."
-              npm install -g pm2
+              # Ensure npm is available before installing PM2
+              export NVM_DIR="$HOME/.nvm"
+              [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+              if command -v npm &> /dev/null; then
+                npm install -g pm2
+              else
+                echo "ERROR: npm not available to install PM2"
+                exit 1
+              fi
             fi
             
             # Start the application

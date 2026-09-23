@@ -416,4 +416,59 @@ router.get('/agents', (_req, res) => {
   }
 });
 
+// ============== PRICING PLANS (Public - for PaywallModal) ==============
+// GET /api/public/pricing-plans - Get active pricing plans (no auth required)
+
+function parsePublicPlanRow(row: any, lang: SupportedLang) {
+  return {
+    id: row.id,
+    planKey: row.plan_key,
+    name: row[`name_${lang}`] || row.name_vi,
+    priceAmount: row.price_amount,
+    priceCurrency: row.price_currency,
+    priceNote: row[`price_note_${lang}`] || row.price_note_vi,
+    description: row[`description_${lang}`] || row.description_vi,
+    features: (() => {
+      try {
+        return JSON.parse(row[`features_${lang}`] || row.features_vi || '[]');
+      } catch {
+        return [];
+      }
+    })(),
+    isHighlighted: row.is_highlighted === 1,
+    ctaText: row[`cta_text_${lang}`] || row.cta_text_vi,
+  };
+}
+
+router.get('/pricing-plans', (req, res) => {
+  try {
+    const lang: SupportedLang = ['vi', 'en', 'ar', 'fr'].includes(String(req.query.lang))
+      ? String(req.query.lang) as SupportedLang
+      : 'vi';
+
+    // Check if table exists
+    const tableCheck = db
+      .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='pricing_plans'")
+      .get();
+    if (!tableCheck) {
+      return res.json({
+        success: true,
+        data: [],
+        message: 'Pricing plans table not found',
+      });
+    }
+
+    const rows = db
+      .prepare('SELECT * FROM pricing_plans WHERE is_active = 1 ORDER BY sort_order ASC')
+      .all();
+
+    res.json({
+      success: true,
+      data: rows.map((row: any) => parsePublicPlanRow(row, lang)),
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 export default router;

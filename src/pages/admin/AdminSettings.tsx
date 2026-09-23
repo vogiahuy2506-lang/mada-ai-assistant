@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
 import { AdminLayout } from './AdminLayout';
 import { adminApi, UserStats, KnowledgeStats } from './adminApi';
-import { useSystemSettingsStore, useAuthStore, useLanguageStore } from '@/stores';
+import { useSystemSettingsStore, useAuthStore, useLanguageStore, usePricingPlansStore } from '@/stores';
 import { translations, Language } from '@/lib/translations';
 import clsx from 'clsx';
 import { systemApi } from '@/lib/api';
-import { CheckCircle, Loader2, AlertCircle, Shield, Settings, Lock, Cloud, CreditCard, Mail, Bug, Sparkles, FileText, Zap, ArrowRight, Image, Video, Music, File } from 'lucide-react';
+import { CheckCircle, Loader2, AlertCircle, Shield, Settings, Lock, Cloud, CreditCard, Mail, Bug, Sparkles, FileText, Zap, ArrowRight, Image, Video, Music, File, Pencil, Save, X } from 'lucide-react';
 import { PromptTemplates } from './PromptTemplates';
 
 type Tab = 'general' | 'plans' | 'security' | 'ai' | 'integrations' | 'live' | 'system' | 'templates';
@@ -302,167 +302,36 @@ export function AdminSettings() {
             </div>
           </div>
 
-          {/* File Upload Limits - Upload Types */}
+          {/* File Upload Limits */}
           <div className="bg-white rounded-2xl border border-outline-variant overflow-hidden">
             <div className="px-8 py-6 border-b border-outline-variant">
-              <h3 className="text-lg font-black text-on-surface">{lang['admin.settings.plans.uploadTypes']}</h3>
-              <p className="text-sm text-on-surface-variant mt-1">{lang['admin.settings.plans.uploadTypesDesc']}</p>
+              <h3 className="text-lg font-black text-on-surface">Loại file hỗ trợ</h3>
+              <p className="text-sm text-on-surface-variant mt-1">Các loại file được phép tải lên</p>
             </div>
             <div className="p-8">
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
-                {/* Image Card */}
-                <div className="flex flex-col items-center gap-3 p-4 rounded-2xl bg-gradient-to-br from-pink-400 to-purple-500">
-                  <div className="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur flex items-center justify-center">
-                    <Image className="w-7 h-7 text-white" />
-                  </div>
-                  <span className="text-sm font-bold text-white">Hình ảnh</span>
-                </div>
-
-                {/* PDF Card */}
-                <div className="flex flex-col items-center gap-3 p-4 rounded-2xl bg-gradient-to-br from-blue-400 to-cyan-500">
-                  <div className="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur flex items-center justify-center">
-                    <FileText className="w-7 h-7 text-white" />
-                  </div>
-                  <span className="text-sm font-bold text-white">PDF</span>
-                </div>
-
-                {/* Video Card */}
-                <div className="flex flex-col items-center gap-3 p-4 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600">
-                  <div className="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur flex items-center justify-center">
-                    <Video className="w-7 h-7 text-white" />
-                  </div>
-                  <span className="text-sm font-bold text-white">Video</span>
-                </div>
-
-                {/* Music Card */}
-                <div className="flex flex-col items-center gap-3 p-4 rounded-2xl bg-gradient-to-br from-orange-400 to-amber-500">
-                  <div className="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur flex items-center justify-center">
-                    <Music className="w-7 h-7 text-white" />
-                  </div>
-                  <span className="text-sm font-bold text-white">Nhạc</span>
-                </div>
-
-                {/* File Card */}
-                <div className="flex flex-col items-center gap-3 p-4 rounded-2xl bg-gradient-to-br from-gray-500 to-gray-600">
-                  <div className="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur flex items-center justify-center">
-                    <File className="w-7 h-7 text-white" />
-                  </div>
-                  <span className="text-sm font-bold text-white">File</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* File Upload Limits - Size Limits */}
-          <div className="bg-white rounded-2xl border border-outline-variant overflow-hidden">
-            <div className="px-8 py-6 border-b border-outline-variant">
-              <h3 className="text-lg font-black text-on-surface">{lang['admin.settings.plans.sizeLimits']}</h3>
-            </div>
-            <div className="p-8">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {/* Image Limit - green border */}
-                <LimitCard
-                  icon={<Image className="w-5 h-5 text-green-600" />}
-                  label="Tối đa 10 MB/tệp"
-                  value={true}
-                  borderColor="green"
-                  onToggle={() => {}}
-                />
-
-                {/* PDF Limit - red border */}
-                <LimitCard
-                  icon={<FileText className="w-5 h-5 text-red-600" />}
-                  label="Tối đa 50 MB/tệp"
-                  value={true}
-                  borderColor="red"
-                  onToggle={() => {}}
-                />
-
-                {/* Video Limit - purple border */}
-                <LimitCard
-                  icon={<Video className="w-5 h-5 text-purple-600" />}
-                  label="Tối đa 100 MB/tệp"
-                  value={true}
-                  borderColor="purple"
-                  onToggle={() => {}}
-                />
-
-                {/* Music Limit - teal border */}
-                <LimitCard
-                  icon={<Music className="w-5 h-5 text-teal-600" />}
-                  label="Tối đa 50 MB/tệp"
-                  value={false}
-                  borderColor="teal"
-                  onToggle={() => {}}
-                />
-
-                {/* File Limit - amber border */}
-                <LimitCard
-                  icon={<File className="w-5 h-5 text-amber-600" />}
-                  label="Tối đa 25 MB/tệp"
-                  value={true}
-                  borderColor="amber"
-                  onToggle={() => {}}
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Plan Quotas */}
-          <div className="bg-white rounded-2xl border border-outline-variant overflow-hidden">
-            <div className="px-8 py-6 border-b border-outline-variant">
-              <h3 className="text-lg font-black text-on-surface">{lang['admin.settings.plans.planQuotas']}</h3>
-            </div>
-            <div className="p-8">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {[
-                  { name: 'Free', color: 'gray', price: '0', current: false, planKey: 'free' },
-                  { name: 'Pro', color: 'primary', price: '199,000', current: true, planKey: 'pro' },
-                  { name: 'Enterprise', color: 'tertiary', price: 'Liên hệ', current: false, planKey: 'enterprise' },
-                ].map((p) => (
-                  <div
-                    key={p.name}
-                    className={clsx(
-                      'p-5 rounded-xl border',
-                      p.current ? 'border-primary bg-primary/5' : 'border-outline-variant'
-                    )}
-                  >
-                    <div className="flex items-center justify-between mb-4">
-                      <span className="text-lg font-black text-on-surface">{p.name}</span>
-                      {p.current && (
-                        <span className="px-2.5 py-1 rounded-full bg-primary text-on-primary text-xs font-bold">
-                          {lang['admin.settings.plans.current']}
-                        </span>
-                      )}
+                  { icon: Image, label: 'Hình ảnh', color: 'from-pink-400 to-purple-500' },
+                  { icon: FileText, label: 'PDF', color: 'from-blue-400 to-cyan-500' },
+                  { icon: Video, label: 'Video', color: 'from-violet-500 to-purple-600' },
+                  { icon: Music, label: 'Nhạc', color: 'from-orange-400 to-amber-500' },
+                  { icon: File, label: 'File', color: 'from-gray-500 to-gray-600' },
+                ].map((item) => (
+                  <div key={item.label} className={`flex flex-col items-center gap-3 p-4 rounded-2xl bg-gradient-to-br ${item.color}`}>
+                    <div className="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur flex items-center justify-center">
+                      <item.icon className="w-7 h-7 text-white" />
                     </div>
-                    <div className="space-y-3">
-                      <div className="space-y-1.5">
-                        <label className="text-label-sm font-semibold text-on-surface-variant">{lang['admin.settings.plans.pricePerMonth']}</label>
-                        <input
-                          defaultValue={p.price}
-                          className="w-full px-3 py-2.5 rounded-xl bg-surface-variant/30 border border-outline-variant text-on-surface text-sm font-mono focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30"
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-label-sm font-semibold text-on-surface-variant">{lang['admin.settings.plans.quotaPerMonth']}</label>
-                        <label className="flex items-center gap-2 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={defaultPlanLimit === -1}
-                            onChange={(e) => setDefaultPlanLimit(e.target.checked ? -1 : 50)}
-                            className="w-4 h-4 rounded border-outline text-primary focus:ring-primary"
-                          />
-                          <span className="text-xs text-on-surface-variant">{lang['admin.settings.plans.unlimited']}</span>
-                        </label>
-                      </div>
-                    </div>
+                    <span className="text-sm font-bold text-white">{item.label}</span>
                   </div>
                 ))}
               </div>
             </div>
           </div>
 
-          {/* Save Button */}
+          {/* Pricing Plans Editor */}
+          <PricingPlansEditor language={language} />
+
+          {/* Save Button for Quota Settings */}
           <div className="flex items-center gap-3">
             <button
               onClick={save}
@@ -996,6 +865,472 @@ function LimitCard({
           )}
         />
       </button>
+    </div>
+  );
+}
+
+// ============== PRICING PLANS EDITOR COMPONENT ==============
+
+interface PricingPlanData {
+  id: string;
+  planKey: string;
+  name_vi: string;
+  name_en: string;
+  price_amount: number;
+  price_currency: string;
+  price_note_vi: string;
+  price_note_en: string;
+  description_vi: string;
+  description_en: string;
+  features_vi: string[];
+  features_en: string[];
+  is_active: boolean;
+  is_highlighted: boolean;
+  cta_text_vi: string;
+  cta_text_en: string;
+  isEditing: boolean;
+}
+
+interface PricingPlansEditorProps {
+  language: 'vi' | 'en' | 'ar' | 'fr';
+}
+
+function PricingPlansEditor({ language }: PricingPlansEditorProps) {
+  const [plans, setPlans] = useState<PricingPlanData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [savedId, setSavedId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  // Load plans from API
+  useEffect(() => {
+    loadPlans();
+  }, [language]);
+
+  const loadPlans = async () => {
+    setLoading(true);
+    setError(null);
+    const res = await adminApi.getPricingPlans({ language });
+    if (res.success && res.data) {
+      // Transform API data to editable format
+      const editablePlans: PricingPlanData[] = res.data.map((p: any) => ({
+        id: p.id,
+        planKey: p.planKey,
+        name_vi: p.name || '',
+        name_en: p.name || '',
+        price_amount: p.priceAmount || 0,
+        price_currency: p.priceCurrency || 'VND',
+        price_note_vi: p.priceNote || '',
+        price_note_en: p.priceNote || '',
+        description_vi: p.description || '',
+        description_en: p.description || '',
+        features_vi: Array.isArray(p.features) ? p.features : [],
+        features_en: Array.isArray(p.features) ? p.features : [],
+        is_active: p.isActive !== false,
+        is_highlighted: p.isHighlighted || false,
+        cta_text_vi: p.ctaText || '',
+        cta_text_en: p.ctaText || '',
+        isEditing: false,
+      }));
+      setPlans(editablePlans);
+    } else {
+      setError(res.error || 'Failed to load pricing plans');
+    }
+    setLoading(false);
+  };
+
+  const updatePlan = (id: string, updates: Partial<PricingPlanData>) => {
+    setPlans(plans.map(p => p.id === id ? { ...p, ...updates } : p));
+  };
+
+  const toggleEdit = (id: string) => {
+    setPlans(plans.map(p => p.id === id ? { ...p, isEditing: !p.isEditing } : p));
+  };
+
+  const savePlan = async (plan: PricingPlanData) => {
+    setSaving(true);
+    setError(null);
+    
+    const res = await adminApi.updatePricingPlan(
+      plan.id,
+      {
+        name_vi: plan.name_vi,
+        name_en: plan.name_en,
+        price_amount: plan.price_amount,
+        price_currency: plan.price_currency,
+        price_note_vi: plan.price_note_vi,
+        price_note_en: plan.price_note_en,
+        description_vi: plan.description_vi,
+        description_en: plan.description_en,
+        features_vi: plan.features_vi,
+        features_en: plan.features_en,
+        is_active: plan.is_active,
+        is_highlighted: plan.is_highlighted,
+        cta_text_vi: plan.cta_text_vi,
+        cta_text_en: plan.cta_text_en,
+      },
+      { language }
+    );
+    
+    if (res.success) {
+      setPlans(plans.map(p => p.id === plan.id ? { ...p, isEditing: false } : p));
+      setSavedId(plan.id);
+      setTimeout(() => setSavedId(null), 3000);
+    } else {
+      setError(res.error || 'Failed to save pricing plan');
+    }
+    setSaving(false);
+  };
+
+  const addFeature = (planId: string, lang: 'vi' | 'en') => {
+    const plan = plans.find(p => p.id === planId);
+    if (!plan) return;
+    
+    if (lang === 'vi') {
+      updatePlan(planId, { features_vi: [...plan.features_vi, ''] });
+    } else {
+      updatePlan(planId, { features_en: [...plan.features_en, ''] });
+    }
+  };
+
+  const updateFeature = (planId: string, lang: 'vi' | 'en', index: number, value: string) => {
+    const plan = plans.find(p => p.id === planId);
+    if (!plan) return;
+    
+    if (lang === 'vi') {
+      const newFeatures = [...plan.features_vi];
+      newFeatures[index] = value;
+      updatePlan(planId, { features_vi: newFeatures });
+    } else {
+      const newFeatures = [...plan.features_en];
+      newFeatures[index] = value;
+      updatePlan(planId, { features_en: newFeatures });
+    }
+  };
+
+  const removeFeature = (planId: string, lang: 'vi' | 'en', index: number) => {
+    const plan = plans.find(p => p.id === planId);
+    if (!plan) return;
+    
+    if (lang === 'vi') {
+      updatePlan(planId, { features_vi: plan.features_vi.filter((_, i) => i !== index) });
+    } else {
+      updatePlan(planId, { features_en: plan.features_en.filter((_, i) => i !== index) });
+    }
+  };
+
+  const getPlanColor = (planKey: string) => {
+    switch (planKey) {
+      case 'free': return 'gray';
+      case 'pro': return 'primary';
+      case 'enterprise': return 'tertiary';
+      default: return 'gray';
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (error && plans.length === 0) {
+    return (
+      <div className="bg-white rounded-2xl border border-error/30 p-6 text-center">
+        <AlertCircle className="w-12 h-12 mx-auto text-error mb-4" />
+        <p className="text-error font-semibold">{error}</p>
+        <button onClick={loadPlans} className="mt-4 px-4 py-2 bg-primary text-white rounded-lg">
+          Thử lại
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="bg-white rounded-2xl border border-outline-variant p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-black text-on-surface">Gói dịch vụ</h3>
+            <p className="text-sm text-on-surface-variant mt-1">
+              Chỉnh sửa thông tin các gói dịch vụ. Thay đổi sẽ áp dụng ngay cho toàn bộ website.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={loadPlans}
+              className="px-4 py-2 rounded-lg border border-outline-variant text-sm font-semibold hover:bg-surface-variant/50 transition-colors"
+            >
+              Làm mới
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Error banner */}
+      {error && (
+        <div className="bg-error/10 border border-error/30 rounded-xl p-4 flex items-center gap-3">
+          <AlertCircle className="w-5 h-5 text-error flex-shrink-0" />
+          <span className="text-sm text-error font-semibold">{error}</span>
+        </div>
+      )}
+
+      {/* Plans Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {plans.map((plan) => (
+          <div
+            key={plan.id}
+            className={clsx(
+              'bg-white rounded-2xl border overflow-hidden transition-all',
+              plan.is_highlighted ? 'border-primary shadow-lg shadow-primary/20' : 'border-outline-variant',
+              plan.isEditing && 'ring-2 ring-primary ring-offset-2'
+            )}
+          >
+            {/* Plan Header */}
+            <div className={clsx(
+              'px-6 py-4 border-b border-outline-variant',
+              plan.planKey === 'free' && 'bg-gray-50',
+              plan.planKey === 'pro' && 'bg-primary/5',
+              plan.planKey === 'enterprise' && 'bg-tertiary/5'
+            )}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className={clsx(
+                    'w-10 h-10 rounded-xl flex items-center justify-center font-black text-white',
+                    plan.planKey === 'free' && 'bg-gray-500',
+                    plan.planKey === 'pro' && 'bg-primary',
+                    plan.planKey === 'enterprise' && 'bg-tertiary'
+                  )}>
+                    {plan.planKey === 'free' ? 'F' : plan.planKey === 'pro' ? 'P' : 'E'}
+                  </div>
+                  <div>
+                    <h4 className="font-black text-on-surface">
+                      {language === 'vi' ? plan.name_vi : plan.name_en || plan.name_vi}
+                    </h4>
+                    <p className="text-xs text-on-surface-variant">
+                      {plan.planKey === 'free' ? 'Miễn phí' : plan.planKey === 'pro' ? 'Pro' : 'Enterprise'}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  {savedId === plan.id && (
+                    <span className="text-xs text-green-600 font-semibold flex items-center gap-1">
+                      <CheckCircle className="w-4 h-4" /> Đã lưu
+                    </span>
+                  )}
+                  <button
+                    onClick={() => toggleEdit(plan.id)}
+                    className={clsx(
+                      'p-2 rounded-lg transition-colors',
+                      plan.isEditing ? 'bg-error/10 text-error hover:bg-error/20' : 'bg-surface-variant text-on-surface-variant hover:bg-surface-variant/80'
+                    )}
+                  >
+                    {plan.isEditing ? <X className="w-4 h-4" /> : <Pencil className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Plan Content */}
+            <div className="p-6 space-y-4">
+              {plan.isEditing ? (
+                // Edit Mode
+                <div className="space-y-4">
+                  {/* Name (VI) */}
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-on-surface-variant">Tên (Tiếng Việt)</label>
+                    <input
+                      value={plan.name_vi}
+                      onChange={(e) => updatePlan(plan.id, { name_vi: e.target.value })}
+                      className="w-full px-3 py-2 rounded-lg border border-outline-variant text-sm focus:outline-none focus:border-primary"
+                    />
+                  </div>
+
+                  {/* Name (EN) */}
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-on-surface-variant">Name (English)</label>
+                    <input
+                      value={plan.name_en}
+                      onChange={(e) => updatePlan(plan.id, { name_en: e.target.value })}
+                      className="w-full px-3 py-2 rounded-lg border border-outline-variant text-sm focus:outline-none focus:border-primary"
+                    />
+                  </div>
+
+                  {/* Price */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-on-surface-variant">Giá (VNĐ)</label>
+                      <input
+                        type="number"
+                        value={plan.price_amount}
+                        onChange={(e) => updatePlan(plan.id, { price_amount: parseInt(e.target.value) || 0 })}
+                        className="w-full px-3 py-2 rounded-lg border border-outline-variant text-sm font-mono focus:outline-none focus:border-primary"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-on-surface-variant">Tiền tệ</label>
+                      <select
+                        value={plan.price_currency}
+                        onChange={(e) => updatePlan(plan.id, { price_currency: e.target.value })}
+                        className="w-full px-3 py-2 rounded-lg border border-outline-variant text-sm focus:outline-none focus:border-primary"
+                      >
+                        <option value="VND">VND</option>
+                        <option value="USD">USD</option>
+                        <option value="EUR">EUR</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Price Note */}
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-on-surface-variant">Ghi chú giá (VI)</label>
+                    <input
+                      value={plan.price_note_vi}
+                      onChange={(e) => updatePlan(plan.id, { price_note_vi: e.target.value })}
+                      placeholder="VD: /tháng, Liên hệ báo giá"
+                      className="w-full px-3 py-2 rounded-lg border border-outline-variant text-sm focus:outline-none focus:border-primary"
+                    />
+                  </div>
+
+                  {/* Description */}
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-on-surface-variant">Mô tả (Tiếng Việt)</label>
+                    <textarea
+                      value={plan.description_vi}
+                      onChange={(e) => updatePlan(plan.id, { description_vi: e.target.value })}
+                      rows={2}
+                      className="w-full px-3 py-2 rounded-lg border border-outline-variant text-sm resize-none focus:outline-none focus:border-primary"
+                    />
+                  </div>
+
+                  {/* Features (VI) */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-semibold text-on-surface-variant">Tính năng (Tiếng Việt)</label>
+                    {plan.features_vi.map((feat, idx) => (
+                      <div key={`vi-${idx}`} className="flex gap-2">
+                        <input
+                          value={feat}
+                          onChange={(e) => updateFeature(plan.id, 'vi', idx, e.target.value)}
+                          placeholder={`Tính năng ${idx + 1}`}
+                          className="flex-1 px-3 py-2 rounded-lg border border-outline-variant text-sm focus:outline-none focus:border-primary"
+                        />
+                        <button
+                          onClick={() => removeFeature(plan.id, 'vi', idx)}
+                          className="p-2 text-error hover:bg-error/10 rounded-lg"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                      onClick={() => addFeature(plan.id, 'vi')}
+                      className="w-full py-2 border border-dashed border-outline rounded-lg text-sm text-on-surface-variant hover:bg-surface-variant/50 transition-colors"
+                    >
+                      + Thêm tính năng
+                    </button>
+                  </div>
+
+                  {/* CTA Text */}
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-on-surface-variant">Nút bấm (VI)</label>
+                    <input
+                      value={plan.cta_text_vi}
+                      onChange={(e) => updatePlan(plan.id, { cta_text_vi: e.target.value })}
+                      placeholder="VD: Nâng cấp Pro"
+                      className="w-full px-3 py-2 rounded-lg border border-outline-variant text-sm focus:outline-none focus:border-primary"
+                    />
+                  </div>
+
+                  {/* Highlight Toggle */}
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={plan.is_highlighted}
+                      onChange={(e) => updatePlan(plan.id, { is_highlighted: e.target.checked })}
+                      className="w-4 h-4 rounded text-primary focus:ring-primary"
+                    />
+                    <span className="text-sm font-semibold">Hiển thị nổi bật (Popular badge)</span>
+                  </label>
+
+                  {/* Active Toggle */}
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={plan.is_active}
+                      onChange={(e) => updatePlan(plan.id, { is_active: e.target.checked })}
+                      className="w-4 h-4 rounded text-primary focus:ring-primary"
+                    />
+                    <span className="text-sm font-semibold">Đang hoạt động</span>
+                  </label>
+
+                  {/* Save Button */}
+                  <button
+                    onClick={() => savePlan(plan)}
+                    disabled={saving}
+                    className="w-full py-2.5 rounded-xl bg-primary text-white font-semibold text-sm flex items-center justify-center gap-2 hover:bg-primary/90 transition-colors disabled:opacity-50"
+                  >
+                    {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                    Lưu thay đổi
+                  </button>
+                </div>
+              ) : (
+                // View Mode
+                <div className="space-y-3">
+                  {/* Price Display */}
+                  <div className="text-center py-3 bg-surface-variant/30 rounded-xl">
+                    <div className="text-2xl font-black text-on-surface">
+                      {plan.price_amount === 0 ? 'Miễn phí' : (
+                        plan.price_currency === 'VND' 
+                          ? new Intl.NumberFormat('vi-VN').format(plan.price_amount) + 'đ'
+                          : new Intl.NumberFormat('en-US', { style: 'currency', currency: plan.price_currency }).format(plan.price_amount)
+                      )}
+                    </div>
+                    <div className="text-xs text-on-surface-variant">{plan.price_note_vi}</div>
+                  </div>
+
+                  {/* Description */}
+                  <p className="text-sm text-on-surface-variant text-center">
+                    {language === 'vi' ? plan.description_vi : plan.description_en || plan.description_vi}
+                  </p>
+
+                  {/* Features */}
+                  <ul className="space-y-2">
+                    {(language === 'vi' ? plan.features_vi : plan.features_en || plan.features_vi).slice(0, 5).map((feat, idx) => (
+                      <li key={idx} className="flex items-start gap-2 text-sm">
+                        <Check className="w-4 h-4 text-green-500 flex-shrink-0 mt-0.5" />
+                        <span className="text-on-surface">{feat}</span>
+                      </li>
+                    ))}
+                  </ul>
+
+                  {/* CTA */}
+                  <div className="pt-2">
+                    <button
+                      className={clsx(
+                        'w-full py-2.5 rounded-xl font-semibold text-sm transition-colors',
+                        plan.is_highlighted
+                          ? 'bg-primary text-white hover:bg-primary/90'
+                          : 'bg-surface-variant text-on-surface hover:bg-surface-variant/80'
+                      )}
+                    >
+                      {plan.cta_text_vi || 'Chọn gói này'}
+                    </button>
+                  </div>
+
+                  {plan.is_highlighted && (
+                    <div className="absolute -top-2 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-gradient-to-r from-primary to-secondary text-white text-xs font-bold flex items-center gap-1">
+                      <Sparkles className="w-3 h-3" /> Phổ biến
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

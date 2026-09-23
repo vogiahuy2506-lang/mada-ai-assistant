@@ -513,3 +513,32 @@ export const userFavoritesApi = {
     return request<{ success: boolean }>(`/user/favorites/by-item?item_type=${encodeURIComponent(item_type)}&item_id=${encodeURIComponent(item_id)}`, { method: 'DELETE' });
   },
 };
+
+// ============== PRICING PLANS (Public) ==============
+
+export interface PricingPlan {
+  id: string;
+  planKey: string;
+  name: string;
+  priceAmount: number;
+  priceCurrency: string;
+  priceNote: string;
+  description: string;
+  features: string[];
+  isHighlighted: boolean;
+  ctaText: string;
+}
+
+export const publicApi = {
+  /** Lấy danh sách pricing plans (public - không cần auth). */
+  async getPricingPlans(language: 'vi' | 'en' | 'ar' | 'fr' = 'vi') {
+    try {
+      const res = await fetch(`/api/public/pricing-plans?lang=${language}`);
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error('Failed to fetch pricing plans');
+      return { success: true as const, data: json.data as PricingPlan[] };
+    } catch (err) {
+      return { success: false as const, error: (err as Error).message };
+    }
+  },
+};

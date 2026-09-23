@@ -899,4 +899,92 @@ export const adminApi = {
       agentSpecific: { count: number };
     }>('/admin/suggested-questions/stats/all');
   },
+
+  // ============== PRICING PLANS ==============
+  async getPricingPlans(params?: { language?: string }) {
+    const p = new URLSearchParams();
+    if (params?.language) p.set('lang', params.language);
+    const qs = p.toString();
+    return request<Array<{
+      id: string;
+      planKey: string;
+      name: string;
+      priceAmount: number;
+      priceCurrency: string;
+      priceNote: string;
+      description: string;
+      features: string[];
+      isActive: boolean;
+      isHighlighted: boolean;
+      sortOrder: number;
+      ctaText: string;
+      createdAt: string;
+      updatedAt: string;
+    }>>(`/admin/pricing-plans${qs ? `?${qs}` : ''}`);
+  },
+
+  async getPricingPlan(id: string, params?: { language?: string }) {
+    const p = new URLSearchParams();
+    if (params?.language) p.set('lang', params.language);
+    const qs = p.toString();
+    return request<{
+      id: string;
+      planKey: string;
+      name: string;
+      priceAmount: number;
+      priceCurrency: string;
+      priceNote: string;
+      description: string;
+      features: string[];
+      isActive: boolean;
+      isHighlighted: boolean;
+      sortOrder: number;
+      ctaText: string;
+    }>(`/admin/pricing-plans/${id}${qs ? `?${qs}` : ''}`);
+  },
+
+  async updatePricingPlan(id: string, data: {
+    name_vi?: string;
+    name_en?: string;
+    name_ar?: string;
+    name_fr?: string;
+    price_amount?: number;
+    price_currency?: string;
+    price_note_vi?: string;
+    price_note_en?: string;
+    description_vi?: string;
+    description_en?: string;
+    description_ar?: string;
+    description_fr?: string;
+    features_vi?: string[];
+    features_en?: string[];
+    features_ar?: string[];
+    features_fr?: string[];
+    is_active?: boolean;
+    is_highlighted?: boolean;
+    sort_order?: number;
+    cta_text_vi?: string;
+    cta_text_en?: string;
+  }, params?: { language?: string }) {
+    const p = new URLSearchParams();
+    if (params?.language) p.set('lang', params.language);
+    const qs = p.toString();
+    return request<{
+      id: string;
+      planKey: string;
+      name: string;
+      priceAmount: number;
+      priceCurrency: string;
+      priceNote: string;
+      description: string;
+      features: string[];
+      isActive: boolean;
+      isHighlighted: boolean;
+      sortOrder: number;
+      ctaText: string;
+    }>(`/admin/pricing-plans/${id}${qs ? `?${qs}` : ''}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  },
 };

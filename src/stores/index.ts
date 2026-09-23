@@ -678,3 +678,63 @@ export type { WidgetConfig } from './widgetStore';
 // Re-export permissions store from separate file
 export { usePermissionsStore, useHasPermission, useHasFeature } from './permissionsStore';
 export type { Permission, Feature } from './permissionsStore';
+
+// ============== PRICING PLANS STORE ==============
+// Lưu trữ pricing plans từ database để admin có thể chỉnh sửa và áp dụng cho toàn bộ website
+
+import type { PricingPlan } from '@/lib/api';
+
+interface PricingPlansState {
+  plans: PricingPlan[];
+  isLoading: boolean;
+  error: string | null;
+  lastFetched: number | null;
+  
+  // Actions
+  fetchPlans: (language?: 'vi' | 'en' | 'ar' | 'fr') => Promise<void>;
+  getPlan: (planKey: string) => PricingPlan | undefined;
+}
+
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes cache
+
+export const usePricingPlansStore = create<PricingPlansState>((set, get) => ({
+  plans: [],
+  isLoading: false,
+  error: null,
+  lastFetched: null,
+
+  fetchPlans: async (language = 'vi') => {
+    const { lastFetched, isLoading } = get();
+    
+    // Skip if recently fetched and not loading
+    if (lastFetched && Date.now() - lastFetched < CACHE_DURATION && !isLoading) {
+      return;
+    }
+
+    set({ isLoading: true, error: null });
+
+    try {
+      const res = await fetch(`/api/public/pricing-plans?lang=${language}`);
+      const json = await res.json();
+      
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || 'Failed to fetch pricing plans');
+      }
+
+      set({
+        plans: json.data || [],
+        isLoading: false,
+        lastFetched: Date.now(),
+      });
+    } catch (err) {
+      set({
+        isLoading: false,
+        error: (err as Error).message,
+      });
+    }
+  },
+
+  getPlan: (planKey: string) => {
+    return get().plans.find(p => p.planKey === planKey);
+  },
+}));

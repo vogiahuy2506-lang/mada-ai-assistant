@@ -2321,4 +2321,133 @@ router.get('/file-settings/public', (_req: Request, res: Response) => {
   }
 });
 
+// ============== PRICING PLANS (Admin CRUD) ==============
+
+type SupportedLang = 'vi' | 'en' | 'ar' | 'fr';
+
+function parsePlanRow(row: any, lang: SupportedLang) {
+  return {
+    id: row.id,
+    planKey: row.plan_key,
+    name: row[`name_${lang}`] || row.name_vi,
+    priceAmount: row.price_amount,
+    priceCurrency: row.price_currency,
+    priceNote: row[`price_note_${lang}`] || row.price_note_vi,
+    description: row[`description_${lang}`] || row.description_vi,
+    features: (() => {
+      try {
+        return JSON.parse(row[`features_${lang}`] || row.features_vi || '[]');
+      } catch {
+        return [];
+      }
+    })(),
+    isActive: row.is_active === 1,
+    isHighlighted: row.is_highlighted === 1,
+    sortOrder: row.sort_order,
+    ctaText: row[`cta_text_${lang}`] || row.cta_text_vi,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+// GET /api/admin/pricing-plans - Get all pricing plans
+router.get('/pricing-plans', requireAdmin, (req: Request, res: Response) => {
+  try {
+    const lang = (req.query.lang as SupportedLang) || 'vi';
+    const rows = db.prepare('SELECT * FROM pricing_plans ORDER BY sort_order ASC').all();
+    res.json({
+      success: true,
+      data: rows.map((row: any) => parsePlanRow(row, lang)),
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// GET /api/admin/pricing-plans/:id - Get single pricing plan
+router.get('/pricing-plans/:id', requireAdmin, (req: Request, res: Response) => {
+  try {
+    const lang = (req.query.lang as SupportedLang) || 'vi';
+    const row = db.prepare('SELECT * FROM pricing_plans WHERE id = ?').get(req.params.id);
+    if (!row) {
+      return res.status(404).json({ success: false, error: 'Plan not found' });
+    }
+    res.json({ success: true, data: parsePlanRow(row as any, lang) });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// PATCH /api/admin/pricing-plans/:id - Update pricing plan
+router.patch('/pricing-plans/:id', requireAdmin, (req: Request, res: Response) => {
+  try {
+    const row = db.prepare('SELECT * FROM pricing_plans WHERE id = ?').get(req.params.id);
+    if (!row) {
+      return res.status(404).json({ success: false, error: 'Plan not found' });
+    }
+
+    const {
+      name_vi, name_en, name_ar, name_fr,
+      price_amount, price_currency,
+      price_note_vi, price_note_en,
+      description_vi, description_en, description_ar, description_fr,
+      features_vi, features_en, features_ar, features_fr,
+      is_active, is_highlighted, sort_order,
+      cta_text_vi, cta_text_en,
+    } = req.body;
+
+    const updates: string[] = [];
+    const params: any[] = [];
+
+    const fields = [
+      'name_vi', 'name_en', 'name_ar', 'name_fr',
+      'price_amount', 'price_currency',
+      'price_note_vi', 'price_note_en',
+      'description_vi', 'description_en', 'description_ar', 'description_fr',
+      'features_vi', 'features_en', 'features_ar', 'features_fr',
+      'is_active', 'is_highlighted', 'sort_order',
+      'cta_text_vi', 'cta_text_en',
+    ];
+
+    for (const field of fields) {
+      if (req.body[field] !== undefined) {
+        updates.push(`${field} = ?`);
+        let value = req.body[field];
+        if (['is_active', 'is_highlighted'].includes(field)) {
+          value = value ? 1 : 0;
+        }
+        if (Array.isArray(value)) {
+          value = JSON.stringify(value);
+        }
+        params.push(value);
+      }
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json({ success: false, error: 'No updates provided' });
+    }
+
+    updates.push('updated_at = ?');
+    params.push(new Date().toISOString());
+    params.push(req.params.id);
+
+    db.prepare(`UPDATE pricing_plans SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+
+    const updated = db.prepare('SELECT * FROM pricing_plans WHERE id = ?').get(req.params.id);
+    const lang = (req.query.lang as SupportedLang) || 'vi';
+    res.json({ success: true, data: parsePlanRow(updated as any, lang) });
+
+    // Log the update
+    logSystemEvent(
+      'info', 'pricing', 'Cập nhật gói dịch vụ',
+      { id: req.params.id, planKey: (row as any).plan_key, updatedFields: Object.keys(req.body) },
+      (req as any).user?.id,
+      req.ip,
+      req.headers['user-agent']
+    );
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 export default router;

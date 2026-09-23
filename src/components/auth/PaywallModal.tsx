@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { X, Lock, Sparkles, Check, Building2, ArrowRight, Loader2 } from 'lucide-react';
-import { usePaywallModalStore, useAuthModalStore, useAuthStore, useLanguageStore } from '@/stores';
+import { usePaywallModalStore, useAuthModalStore, useAuthStore, useLanguageStore, usePricingPlansStore } from '@/stores';
 import { t } from '@/lib/translations';
 import type { UserPlan } from '@/types';
 
@@ -22,11 +22,19 @@ export function PaywallModal() {
   const setPlan = useAuthStore((s) => s.setPlan);
   const resetQuota = useAuthStore((s) => s.resetQuota);
   const language = useLanguageStore((s) => s.language ?? 'vi') as 'vi' | 'en' | 'ar' | 'fr';
+  const { plans, fetchPlans, isLoading } = usePricingPlansStore();
 
   const [loadingPlan, setLoadingPlan] = useState<UserPlan | null>(null);
 
   // Translation helper
   const tr = (key: string) => t(key as any, language);
+
+  // Fetch pricing plans from API
+  useEffect(() => {
+    if (isOpen) {
+      fetchPlans(language);
+    }
+  }, [isOpen, language]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -74,56 +82,83 @@ export function PaywallModal() {
     authModal.open('login');
   };
 
-  // Plan data with translations
-  const plans: PlanCard[] = [
-    {
-      id: 'free',
-      name: 'Free',
-      price: '0đ',
-      priceNote: tr('paywall.freeForever'),
-      desc: tr('paywall.personalUse'),
-      features: [
-        tr('paywall.freeFeature1'),
-        tr('paywall.freeFeature2'),
-        tr('paywall.freeFeature3'),
-        tr('paywall.freeFeature4'),
-      ],
-      cta: tr('paywall.continueFree'),
-    },
-    {
-      id: 'pro',
-      name: 'Pro',
-      price: '299.000đ',
-      priceNote: tr('paywall.perMonth'),
-      desc: tr('paywall.proForPros'),
-      features: [
-        tr('paywall.proFeature1'),
-        tr('paywall.proFeature2'),
-        tr('paywall.proFeature3'),
-        tr('paywall.proFeature4'),
-        tr('paywall.proFeature5'),
-        tr('paywall.proFeature6'),
-      ],
-      highlight: true,
-      cta: tr('paywall.upgradePro'),
-    },
-    {
-      id: 'enterprise',
-      name: 'Enterprise',
-      price: tr('paywall.contactSales'),
-      priceNote: tr('paywall.customQuote'),
-      desc: tr('paywall.forOrgs'),
-      features: [
-        tr('paywall.entFeature1'),
-        tr('paywall.entFeature2'),
-        tr('paywall.entFeature3'),
-        tr('paywall.entFeature4'),
-        tr('paywall.entFeature5'),
-        tr('paywall.entFeature6'),
-      ],
-      cta: tr('paywall.contactSalesCta'),
-    },
-  ];
+  // Format price for display
+  const formatPriceDisplay = (amount: number, currency: string) => {
+    if (amount === 0) return '0đ';
+    if (currency === 'VND') {
+      return new Intl.NumberFormat('vi-VN').format(amount) + 'đ';
+    }
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount);
+  };
+
+  // Convert API plans to UI format
+  const getPlans = (): PlanCard[] => {
+    if (plans.length > 0) {
+      return plans.map(p => ({
+        id: p.planKey as UserPlan,
+        name: p.name,
+        price: p.priceAmount === 0 ? (p.priceNote || '0đ') : formatPriceDisplay(p.priceAmount, p.priceCurrency),
+        priceNote: p.priceNote,
+        desc: p.description,
+        features: p.features,
+        highlight: p.isHighlighted,
+        cta: p.ctaText || tr('paywall.upgradePro'),
+      }));
+    }
+    
+    // Fallback to hardcoded defaults if API fails
+    return [
+      {
+        id: 'free',
+        name: 'Free',
+        price: '0đ',
+        priceNote: tr('paywall.freeForever'),
+        desc: tr('paywall.personalUse'),
+        features: [
+          tr('paywall.freeFeature1'),
+          tr('paywall.freeFeature2'),
+          tr('paywall.freeFeature3'),
+          tr('paywall.freeFeature4'),
+        ],
+        cta: tr('paywall.continueFree'),
+      },
+      {
+        id: 'pro',
+        name: 'Pro',
+        price: '299.000đ',
+        priceNote: tr('paywall.perMonth'),
+        desc: tr('paywall.proForPros'),
+        features: [
+          tr('paywall.proFeature1'),
+          tr('paywall.proFeature2'),
+          tr('paywall.proFeature3'),
+          tr('paywall.proFeature4'),
+          tr('paywall.proFeature5'),
+          tr('paywall.proFeature6'),
+        ],
+        highlight: true,
+        cta: tr('paywall.upgradePro'),
+      },
+      {
+        id: 'enterprise',
+        name: 'Enterprise',
+        price: tr('paywall.contactSales'),
+        priceNote: tr('paywall.customQuote'),
+        desc: tr('paywall.forOrgs'),
+        features: [
+          tr('paywall.entFeature1'),
+          tr('paywall.entFeature2'),
+          tr('paywall.entFeature3'),
+          tr('paywall.entFeature4'),
+          tr('paywall.entFeature5'),
+          tr('paywall.entFeature6'),
+        ],
+        cta: tr('paywall.contactSalesCta'),
+      },
+    ];
+  };
+
+  const plans = getPlans();
 
   // Reason-based title and description
   const getTitle = () => {

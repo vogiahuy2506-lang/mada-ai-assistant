@@ -498,6 +498,102 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_prompts_language ON admin_prompts(language);
 `);
 
+// ============== PRICING PLANS SCHEMA ==============
+// Lưu cấu hình các gói dịch vụ (Free, Pro, Enterprise) để admin có thể chỉnh sửa
+// và áp dụng cho toàn bộ website
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS pricing_plans (
+    id TEXT PRIMARY KEY,
+    plan_key TEXT NOT NULL UNIQUE CHECK (plan_key IN ('free', 'pro', 'enterprise')),
+    name_vi TEXT NOT NULL,
+    name_en TEXT NOT NULL,
+    name_ar TEXT NOT NULL DEFAULT '',
+    name_fr TEXT NOT NULL DEFAULT '',
+    price_amount INTEGER NOT NULL DEFAULT 0,
+    price_currency TEXT NOT NULL DEFAULT 'VND',
+    price_note_vi TEXT,
+    price_note_en TEXT,
+    description_vi TEXT,
+    description_en TEXT,
+    description_ar TEXT DEFAULT '',
+    description_fr TEXT DEFAULT '',
+    features_vi TEXT,
+    features_en TEXT,
+    features_ar TEXT DEFAULT '[]',
+    features_fr TEXT DEFAULT '[]',
+    is_active INTEGER NOT NULL DEFAULT 1,
+    is_highlighted INTEGER NOT NULL DEFAULT 0,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    cta_text_vi TEXT,
+    cta_text_en TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_pricing_plans_key ON pricing_plans(plan_key);
+  CREATE INDEX IF NOT EXISTS idx_pricing_plans_active ON pricing_plans(is_active);
+  CREATE INDEX IF NOT EXISTS idx_pricing_plans_order ON pricing_plans(sort_order);
+`);
+
+// Seed default pricing plans if not exist
+const existingPlans = db.prepare('SELECT COUNT(*) as count FROM pricing_plans').get() as { count: number };
+if (existingPlans.count === 0) {
+  const now = new Date().toISOString();
+  const insertPlan = db.prepare(`
+    INSERT INTO pricing_plans (
+      id, plan_key, name_vi, name_en, name_ar, name_fr,
+      price_amount, price_currency, price_note_vi, price_note_en,
+      description_vi, description_en, description_ar, description_fr,
+      features_vi, features_en, features_ar, features_fr,
+      is_active, is_highlighted, sort_order, cta_text_vi, cta_text_en,
+      created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  // Free Plan
+  insertPlan.run(
+    'plan-free', 'free',
+    'Miễn phí', 'Free', 'مجاني', 'Gratuit',
+    0, 'VND', '/tháng', '/month',
+    'Dành cho cá nhân sử dụng cơ bản', 'For personal basic use', 'للاستخدام الشخصي الأساسي', 'Pour usage personnel de base',
+    JSON.stringify(['10 tin nhắn/phiên', '3 file tải lên/phiên', 'Trả lời tiêu chuẩn', 'Hỗ trợ 4 ngôn ngữ']),
+    JSON.stringify(['10 messages/session', '3 file uploads/session', 'Standard responses', 'Support 4 languages']),
+    JSON.stringify([]), JSON.stringify([]),
+    1, 0, 1,
+    'Tiếp tục miễn phí', 'Continue Free',
+    now, now
+  );
+
+  // Pro Plan
+  insertPlan.run(
+    'plan-pro', 'pro',
+    'Pro', 'Pro', 'احترافي', 'Pro',
+    299000, 'VND', '/tháng', '/month',
+    'Dành cho người dùng chuyên nghiệp', 'For professional users', 'للمستخدمين المحترفين', 'Pour les utilisateurs professionnels',
+    JSON.stringify(['Tin nhắn không giới hạn', '20 file tải lên/phiên', 'Trả lời ưu tiên', 'Hỗ trợ 4 ngôn ngữ', 'Phân tích nâng cao', 'Không quảng cáo']),
+    JSON.stringify(['Unlimited messages', '20 file uploads/session', 'Priority responses', 'Support 4 languages', 'Advanced analytics', 'No ads']),
+    JSON.stringify([]), JSON.stringify([]),
+    1, 1, 2,
+    'Nâng cấp Pro', 'Upgrade to Pro',
+    now, now
+  );
+
+  // Enterprise Plan
+  insertPlan.run(
+    'plan-enterprise', 'enterprise',
+    'Doanh nghiệp', 'Enterprise', 'المؤسسي', 'Entreprise',
+    0, 'VND', 'Liên hệ báo giá', 'Contact for quote',
+    'Dành cho tổ chức và doanh nghiệp', 'For organizations and businesses', 'للمنظمات والشركات', 'Pour les organisations et entreprises',
+    JSON.stringify(['Tất cả tính năng Pro', 'File không giới hạn', 'Hỗ trợ 24/7', 'API truy cập', 'Tích hợp tùy chỉnh', 'SLA đảm bảo']),
+    JSON.stringify(['All Pro features', 'Unlimited files', '24/7 support', 'API access', 'Custom integrations', 'Guaranteed SLA']),
+    JSON.stringify([]), JSON.stringify([]),
+    1, 0, 3,
+    'Liên hệ bán hàng', 'Contact Sales',
+    now, now
+  );
+}
+
 // ============== PROMPT VERSIONS SCHEMA (Version Control) ==============
 
 db.exec(`

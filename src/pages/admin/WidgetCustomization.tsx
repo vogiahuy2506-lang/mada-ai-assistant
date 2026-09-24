@@ -625,6 +625,8 @@ export function WidgetCustomization({ userRole: propUserRole }: Omit<WidgetCusto
       await saveConfig();
       setSaveSuccess(true);
       setInitialConfig({ ...config }); // Update initial config after save
+      // Reload config from API to ensure consistency
+      await loadConfig();
       setTimeout(() => setSaveSuccess(false), 3000);
     } catch (e: any) {
       setSaveError(e.message || tW('admin.widget.saveFailed'));

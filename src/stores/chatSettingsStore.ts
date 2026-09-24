@@ -48,6 +48,8 @@ interface ChatSettingsState {
   description: Record<Language, string>;
   // Features
   fileAttachmentEnabled: boolean;
+  // Show suggested questions section
+  showSuggestedQuestions: boolean;
   // Suggested prompts
   suggestedPrompts: SuggestedPrompt[];
   // AI System Instructions (Super Admin only)
@@ -64,6 +66,7 @@ interface ChatSettingsState {
     greeting: Record<Language, string>;
     description: Record<Language, string>;
     fileAttachmentEnabled: boolean;
+    showSuggestedQuestions: boolean;
     suggestedPrompts: SuggestedPrompt[];
     aiInstructions: AIInstructions;
     emotionSettings: EmotionSettings;
@@ -197,7 +200,10 @@ export const useChatSettingsStore = create<ChatSettingsState>()(
     (set, get) => ({
       greeting: { ...DEFAULT_GREETING },
       description: { ...DEFAULT_DESCRIPTION },
-      fileAttachmentEnabled: true,
+      // ⭐ Default = FALSE — feature chỉ bật khi backend xác nhận.
+      // Ngăn việc user thấy nút đính kèm trước khi API trả về.
+      fileAttachmentEnabled: false,
+      showSuggestedQuestions: true,
       suggestedPrompts: [...DEFAULT_SUGGESTED_PROMPTS],
       aiInstructions: {
         coreIdentity: DEFAULT_AI_CORE_IDENTITY,
@@ -233,13 +239,30 @@ export const useChatSettingsStore = create<ChatSettingsState>()(
                     ar: d.chat_description_ar ?? DEFAULT_DESCRIPTION.ar,
                     fr: d.chat_description_fr ?? DEFAULT_DESCRIPTION.fr,
                   },
-                  fileAttachmentEnabled: d.feature_file_attachment_enabled ?? true,
+                  showSuggestedQuestions: d.feature_show_suggested_questions ?? true,
                   suggestedPrompts: d.suggested_prompts ?? DEFAULT_SUGGESTED_PROMPTS,
                 });
               }
             }
           } catch (e) {
             console.warn('Failed to load public chat settings:', e);
+          }
+
+          // ⭐ ALSO load file settings from file-settings/public — this is the source of truth
+          // for feature_file_attachment_enabled from FileManagement admin page
+          try {
+            const fileRes = await fetch('/api/admin/file-settings/public');
+            if (fileRes.ok) {
+              const fileData = await fileRes.json();
+              if (fileData.success && fileData.data) {
+                // Use file-settings as source of truth for fileAttachmentEnabled
+                set({
+                  fileAttachmentEnabled: fileData.data.feature_file_attachment_enabled ?? true,
+                });
+              }
+            }
+          } catch (e) {
+            console.warn('Failed to load file settings:', e);
           }
 
           // Load AI instructions from public endpoint
@@ -314,8 +337,10 @@ export const useChatSettingsStore = create<ChatSettingsState>()(
       },
 
       saveToBackend: async () => {
-        const { greeting, description, fileAttachmentEnabled, suggestedPrompts } = get();
-        
+        const { greeting, description, showSuggestedQuestions, suggestedPrompts } = get();
+        // NOTE: fileAttachmentEnabled is managed by FileManagement page — NOT saved here
+        // to avoid conflicts between two admin pages writing to the same DB key.
+
         try {
           const token = localStorage.getItem('mada-access-token');
           if (!token) {
@@ -331,7 +356,8 @@ export const useChatSettingsStore = create<ChatSettingsState>()(
             chat_description_en: description.en,
             chat_description_ar: description.ar,
             chat_description_fr: description.fr,
-            feature_file_attachment_enabled: fileAttachmentEnabled,
+            // feature_file_attachment_enabled is saved ONLY by FileManagement page
+            feature_show_suggested_questions: showSuggestedQuestions,
             suggested_prompts: JSON.stringify(suggestedPrompts),
           };
 
@@ -434,10 +460,13 @@ export const useChatSettingsStore = create<ChatSettingsState>()(
     }),
     {
       name: 'mada-chat-settings',
+      // ⭐ DON'T persist fileAttachmentEnabled — always load fresh from backend
+      // to ensure the admin toggle in FileManagement is always respected
       partialize: (state) => ({
         greeting: state.greeting,
         description: state.description,
-        fileAttachmentEnabled: state.fileAttachmentEnabled,
+        // fileAttachmentEnabled intentionally excluded — fetched fresh every time
+        showSuggestedQuestions: state.showSuggestedQuestions,
         suggestedPrompts: state.suggestedPrompts,
         aiInstructions: state.aiInstructions,
         emotionSettings: state.emotionSettings,

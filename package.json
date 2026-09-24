@@ -65,6 +65,7 @@
     "zustand": "^4.5.4"
   },
   "devDependencies": {
+    "@babel/code-frame": "^8.0.6",
     "@eslint/js": "^9.9.0",
     "@playwright/test": "^1.62.1",
     "@types/bcryptjs": "^2.4.6",

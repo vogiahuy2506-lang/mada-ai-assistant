@@ -158,7 +158,7 @@ export function PaywallModal() {
     ];
   };
 
-  const plans = getPlans();
+  const planCards = getPlans();
 
   // Reason-based title and description
   const getTitle = () => {
@@ -228,7 +228,7 @@ export function PaywallModal() {
 
           <div className="px-6 md:px-8 pb-10">
             <div className="grid md:grid-cols-3 gap-4">
-              {plans.map((plan) => (
+              {planCards.map((plan) => (
                 <div
                   key={plan.id}
                   className={`relative rounded-2xl p-6 transition-all ${

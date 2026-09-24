@@ -519,9 +519,12 @@ app.use('/api/scraper', scraperRoutes);
 app.use('/api/scraper', scraperScheduleRoutes);
 app.use('/api/scraper', urlImportRoutes);
 app.use('/api/mada-scraper', madaScraperRoutes);
+// ⭐ adminRoutes PHẢI mount TRƯỚC approvalRoutes
+// vì approvalRoutes có global auth middleware chặn TẤT CẢ /api/admin/*
+// Nếu adminRoutes sau → public endpoints như /file-settings/public bị chặn 401
+app.use('/api/admin', adminRoutes);
 app.use('/api/admin', approvalRoutes);
 app.use('/api/consultation', consultationRoutes);
-app.use('/api/admin', adminRoutes);
 app.use('/api/admin/scraper', adminScraperRoutes);
 app.use('/api/admin/prompts', promptsRoutes);
 app.use('/api/admin/prompt-templates', promptTemplatesRoutes);

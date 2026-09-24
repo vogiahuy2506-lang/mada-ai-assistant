@@ -4,6 +4,7 @@ import type { Language, UserRole } from '@/types';
 import { CheckCircle, Loader2, AlertCircle, Shield, Bot as BotIcon, ChevronDown, ChevronUp, Zap } from 'lucide-react';
 import { EmotionCustomization } from './EmotionCustomization';
 import { PromptTemplates } from './PromptTemplates';
+import { broadcastSettingsChange } from '@/lib/settingsBroadcast';
 
 // Chat Customization translations - hardcoded Vietnamese
 const tChat = (key: string, params?: Record<string, string | number>): string => {
@@ -29,6 +30,9 @@ const tChat = (key: string, params?: Record<string, string | number>): string =>
     'admin.chatCustomization.feature.fileAttachment': 'Cho phép đính kèm file',
     'admin.chatCustomization.fileEnabled': 'Đã bật - Người dùng có thể gửi file',
     'admin.chatCustomization.fileDisabled': 'Đã tắt - Người dùng không thể gửi file',
+    'admin.chatCustomization.feature.showSuggestedQuestions': 'Hiển thị câu hỏi gợi ý',
+    'admin.chatCustomization.suggestedQuestionsEnabled': 'Đã bật - Hiển thị phần câu hỏi gợi ý',
+    'admin.chatCustomization.suggestedQuestionsDisabled': 'Đã tắt - Ẩn phần câu hỏi gợi ý',
     'admin.chatCustomization.ai.emotion': 'Cảm xúc AI',
     'admin.chatCustomization.ai.emotionDesc': 'Tùy chỉnh phong cách giao tiếp của AI',
     'admin.chatCustomization.aiInstructions': 'Hướng dẫn AI',
@@ -86,6 +90,7 @@ export function ChatCustomization({ userRole = 'admin', onClose: _onClose }: Omi
     greeting,
     description,
     fileAttachmentEnabled,
+    showSuggestedQuestions,
     suggestedPrompts,
     aiInstructions,
     isLoading,
@@ -108,6 +113,8 @@ export function ChatCustomization({ userRole = 'admin', onClose: _onClose }: Omi
     try {
       await saveToBackend();
       setSaveSuccess(true);
+      // ⭐ Broadcast settings change to all ChatPage instances - immediate sync!
+      broadcastSettingsChange(['feature_file_attachment_enabled', 'feature_show_suggested_questions']);
       setTimeout(() => setSaveSuccess(false), 3000);
     } catch (e: any) {
       setSaveError(e.message || tChat('admin.chatCustomization.error'));
@@ -311,23 +318,43 @@ export function ChatCustomization({ userRole = 'admin', onClose: _onClose }: Omi
           <span className="text-2xl">⚙️</span>
           <h4 className="font-bold text-on-surface">{tChat('admin.chatCustomization.feature.title')}</h4>
         </div>
-        
-        <div className="flex items-center justify-between p-4 rounded-xl bg-slate-50 border border-slate-200">
+
+        {/* fileAttachmentEnabled is controlled by FileManagement page — not shown here */}
+        {/* The value is still available via store for read-only display */}
+        <div className="flex items-center justify-between p-4 rounded-xl bg-slate-50 border border-slate-200 opacity-60 cursor-not-allowed">
           <div className="pr-4">
             <p className="font-bold text-on-surface">{tChat('admin.chatCustomization.feature.fileAttachment')}</p>
             <p className="text-sm text-on-surface-variant">
               {fileAttachmentEnabled ? tChat('admin.chatCustomization.fileEnabled') : tChat('admin.chatCustomization.fileDisabled')}
+              <span className="ml-2 text-xs text-slate-400">(Quản lý tại File Management)</span>
+            </p>
+          </div>
+          <div className="relative w-14 h-7 rounded-full bg-gray-300 shrink-0">
+            <span
+              className={`absolute top-1.5 w-4 h-4 rounded-full bg-white shadow-md transition-transform ${
+                fileAttachmentEnabled ? 'left-[38px]' : 'left-0.5'
+              }`}
+            />
+          </div>
+        </div>
+
+        {/* Show Suggested Questions Toggle */}
+        <div className="flex items-center justify-between p-4 rounded-xl bg-slate-50 border border-slate-200 mt-4">
+          <div className="pr-4">
+            <p className="font-bold text-on-surface">{tChat('admin.chatCustomization.feature.showSuggestedQuestions')}</p>
+            <p className="text-sm text-on-surface-variant">
+              {showSuggestedQuestions ? tChat('admin.chatCustomization.suggestedQuestionsEnabled') : tChat('admin.chatCustomization.suggestedQuestionsDisabled')}
             </p>
           </div>
           <button
-            onClick={() => updateSettings({ fileAttachmentEnabled: !fileAttachmentEnabled })}
+            onClick={() => updateSettings({ showSuggestedQuestions: !showSuggestedQuestions })}
             className={`relative w-14 h-7 rounded-full transition-colors shrink-0 ${
-              fileAttachmentEnabled ? 'bg-primary' : 'bg-gray-300'
+              showSuggestedQuestions ? 'bg-primary' : 'bg-gray-300'
             }`}
           >
             <span
               className={`absolute top-1.5 w-4 h-4 rounded-full bg-white shadow-md transition-transform ${
-                fileAttachmentEnabled ? 'left-[38px]' : 'left-0.5'
+                showSuggestedQuestions ? 'left-[38px]' : 'left-0.5'
               }`}
             />
           </button>

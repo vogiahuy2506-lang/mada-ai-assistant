@@ -103,9 +103,9 @@ router.put('/config', authenticate as any, requireRole('admin', 'super_admin') a
     const now = new Date().toISOString();
     
     const stmt = db.prepare(`
-      INSERT INTO system_settings (\`key\`, value, type, updated_at)
-      VALUES (?, ?, ?)
-      ON CONFLICT(\`key\`) DO UPDATE SET value = ?, updated_at = ?
+      INSERT INTO system_settings (\`key\`, value, type, description, updated_at)
+      VALUES (?, ?, ?, ?, ?)
+      ON CONFLICT(\`key\`) DO UPDATE SET value = ?, type = ?, description = ?, updated_at = ?
     `);
     
     for (const [key, value] of Object.entries(updates)) {
@@ -124,7 +124,7 @@ router.put('/config', authenticate as any, requireRole('admin', 'super_admin') a
         strValue = JSON.stringify(value);
       }
       
-      stmt.run(dbKey, strValue, type, strValue, now);
+      stmt.run(dbKey, strValue, type, '', now, strValue, type, '', now);
     }
     
     res.json({ success: true, message: 'Widget configuration updated successfully' });

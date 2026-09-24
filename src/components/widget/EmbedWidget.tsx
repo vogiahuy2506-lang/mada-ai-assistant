@@ -9,6 +9,7 @@ import remarkGfm from 'remark-gfm';
 import type { Language } from '@/types';
 import { t } from '@/lib/translations';
 import { getAccessToken } from '@/lib/api';
+import { onSettingsChange } from '@/lib/settingsBroadcast';
 
 // Translation helper for EmbedWidget
 const useWidgetTranslation = (lang: Language) => ({
@@ -208,6 +209,15 @@ export function EmbedWidget({
       loadChatSettings();
     }
   }, [isOpen, loadChatSettings]);
+
+  // ⭐ Listen for settings broadcast from admin - immediate sync when admin changes settings
+  useEffect(() => {
+    const cleanup = onSettingsChange((event) => {
+      console.log('[EmbedWidget] 📡 Received settings change broadcast:', event.type);
+      loadChatSettings();
+    });
+    return cleanup;
+  }, [loadChatSettings]);
 
   // Add welcome message when widget opens and greeting is loaded
   useEffect(() => {

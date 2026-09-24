@@ -8,6 +8,7 @@ import { AdminLayout } from './AdminLayout';
 import { getAccessToken } from '@/lib/api';
 import { useLanguageStore } from '@/stores';
 import clsx from 'clsx';
+import { broadcastSettingsChange } from '@/lib/settingsBroadcast';
 
 // ============== TYPES ==============
 type Language = 'vi' | 'en' | 'ar' | 'fr';
@@ -227,6 +228,8 @@ const FileManagement: React.FC = () => {
       const data = await res.json();
       if (data.success) {
         setMessage({ type: 'success', text: tFile('file.saveSuccess', language) });
+        // ⭐ Broadcast settings change to all ChatPage instances - immediate sync!
+        broadcastSettingsChange(['feature_file_attachment_enabled']);
       } else {
         setMessage({ type: 'error', text: data.error || tFile('file.error', language) });
       }

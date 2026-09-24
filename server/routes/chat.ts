@@ -21,6 +21,7 @@ import { verifyAccessToken } from '../lib/auth';
 import { getFileUploadQuota, trackFileUpload } from '../lib/db';
 import { chatHistory, waitForRagReady } from '../lib/chat-context';
 import { logActivity } from '../index';
+import { parseAttachment } from '../lib/fileProcessor';
 
 const router = express.Router();
 
@@ -430,21 +431,68 @@ router.post('/with-file', async (req, res) => {
       }
     }
     
-    // Parse attachments
+    // Parse attachments — trích xuất nội dung từ PDF, DOCX, Ảnh, Audio, Video, etc.
     let fileContext = '';
+    const attachmentResults: { name: string; type: string; success: boolean; preview?: string; error?: string; fileType?: string }[] = [];
     if (attachments && Array.isArray(attachments) && attachments.length > 0) {
       for (const att of attachments) {
-        try {
-          if (att.type?.startsWith('image/') && att.base64) {
-            // OCR for images - simplified
-            fileContext += `\n[Image attached: ${att.name || 'image'}]`;
-          } else if (att.type === 'application/pdf' && att.base64) {
-            fileContext += `\n[PDF attached: ${att.name || 'document'}]`;
-          } else if ((att.type === 'text/plain' || att.type === 'text/markdown') && att.content) {
-            fileContext += `\n[File content: ${att.name}]\n${att.content}`;
+        if (!att) continue;
+        
+        const name = att.name || 'unknown';
+        const mimeType = att.type || 'application/octet-stream';
+        
+        // Nếu có content đã parse sẵn (từ frontend), dùng trực tiếp
+        if (att.content && !att.content.includes('waiting to parse')) {
+          const previewText = att.content.slice(0, 500);
+          const displayName = name.length > 40 ? name.slice(0, 37) + '...' : name;
+          fileContext += `\n\n📄 **${displayName}** (${mimeType})\n${previewText}${att.content.length > 500 ? '\n... (nội dung đã rút gọn)' : ''}`;
+          attachmentResults.push({ name, type: mimeType, success: true, preview: previewText, fileType: mimeType });
+          continue;
+        }
+        
+        // Nếu có base64, parse để trích xuất nội dung
+        if (att.base64) {
+          try {
+            const result = await parseAttachment(name, mimeType, att.base64);
+            
+            if (result.success && result.text) {
+              // Limit context to avoid token overflow
+              const maxChars = 8000;
+              const truncatedText = result.text.length > maxChars 
+                ? result.text.slice(0, maxChars) + '\n... (nội dung đã rút gọn để tránh quá tải)'
+                : result.text;
+              
+              const displayName = name.length > 40 ? name.slice(0, 37) + '...' : name;
+              const typeLabel = {
+                pdf: 'PDF', docx: 'Word', xlsx: 'Excel', csv: 'CSV',
+                txt: 'Text', image: 'Ảnh (OCR)', audio: 'Audio (transcription)', video: 'Video (transcription)', other: 'File'
+              }[result.type] || 'File';
+              
+              fileContext += `\n\n📄 **${typeLabel}: ${displayName}**\n${truncatedText}`;
+              attachmentResults.push({ 
+                name, 
+                type: mimeType, 
+                success: true, 
+                preview: truncatedText.slice(0, 200),
+                fileType: result.type 
+              });
+              console.log(`✅ Parsed ${result.type}: ${name} → ${result.text.length} chars`);
+            } else {
+              // Parse failed — include error info
+              const displayName = name.length > 40 ? name.slice(0, 37) + '...' : name;
+              fileContext += `\n\n⚠️ Không thể đọc file "${displayName}": ${result.error || 'Lỗi không xác định'}`;
+              attachmentResults.push({ name, type: mimeType, success: false, error: result.error, fileType: result.type });
+              console.log(`⚠️ Failed to parse ${name}: ${result.error}`);
+            }
+          } catch (attErr) {
+            console.log('⚠️ Attachment processing error:', attErr);
+            fileContext += `\n\n⚠️ Lỗi xử lý file "${name}": ${attErr instanceof Error ? attErr.message : 'Unknown'}`;
+            attachmentResults.push({ name, type: mimeType, success: false, error: String(attErr) });
           }
-        } catch (attErr) {
-          console.log('⚠️ Attachment processing error:', attErr);
+        } else {
+          // No base64 or content — just show file reference
+          fileContext += `\n\n📎 File: ${name} (${mimeType})`;
+          attachmentResults.push({ name, type: mimeType, success: false, error: 'No content provided' });
         }
       }
       
@@ -516,6 +564,7 @@ router.post('/with-file', async (req, res) => {
         detectedLanguage: effectiveLanguage,
         suggestedProducts,
         attachmentsProcessed: attachments?.length || 0,
+        attachmentResults: attachmentResults.length > 0 ? attachmentResults : undefined,
       },
     });
   } catch (error) {

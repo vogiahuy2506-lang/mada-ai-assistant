@@ -1348,6 +1348,7 @@ function seedSystemSettings() {
     { key: 'chat_description_ar', value: 'يمكنني مساعدتك في تحليل المستندات ومعالجة البيانات من الملفات أو الإجابة على الأسئلة التفصيلية. ماذا تريد أن تبدأ اليوم؟', type: 'string', description: 'Chat description in Arabic' },
     { key: 'chat_description_fr', value: 'Je peux vous aider à analyser des documents, traiter des données de fichiers ou répondre à des questions détaillées. Par quoi souhaitez-vous commencer aujourd\'hui?', type: 'string', description: 'Chat description in French' },
     { key: 'feature_file_attachment_enabled', value: 'true', type: 'boolean', description: 'Enable file attachment feature' },
+    { key: 'feature_show_suggested_questions', value: 'true', type: 'boolean', description: 'Show suggested questions section in chat' },
     { key: 'feature_image_upload_enabled', value: 'true', type: 'boolean', description: 'Enable image upload feature' },
     { key: 'feature_document_upload_enabled', value: 'true', type: 'boolean', description: 'Enable document (PDF, DOCX) upload feature' },
     { key: 'feature_video_upload_enabled', value: 'true', type: 'boolean', description: 'Enable video upload feature' },

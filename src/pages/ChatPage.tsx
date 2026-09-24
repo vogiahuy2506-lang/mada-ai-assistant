@@ -24,6 +24,7 @@ import { CATEGORY_INFO, SAMPLE_QUESTIONS, AT_SPECIALIST_KEYWORDS, type ATCategor
 import { t } from '@/lib/translations';
 import { userHistoryApi, fileQuotaApi, getAccessToken, type FileUploadQuota } from '@/lib/api';
 import { onAgentChange } from '@/lib/agentBroadcast';
+import { onSettingsChange } from '@/lib/settingsBroadcast';
 
 // Attachment options - use getAttachmentOptions(language) inside component
 function getAttachmentOptions(lang: Language) {
@@ -37,7 +38,7 @@ function getAttachmentOptions(lang: Language) {
   
   return [
     { id: 'image', icon: ImageIcon, label: l.image, accept: 'image/*', description: l.imageDesc },
-    { id: 'document', icon: FileText, label: l.document, accept: '.pdf,.doc,.docx,.txt', description: 'PDF, Word, Text' },
+    { id: 'document', icon: FileText, label: l.document, accept: '.pdf,.doc,.docx,.txt,.xlsx,.xls,.csv,.md', description: 'PDF, Word, Excel, Text' },
     { id: 'video', icon: Video, label: l.video, accept: 'video/*', description: l.videoDesc },
     { id: 'audio', icon: Mic2, label: l.audio, accept: 'audio/*', description: l.audioDesc },
     { id: 'file', icon: File, label: l.file, accept: '*/*', description: l.fileDesc },
@@ -820,7 +821,7 @@ export function ChatPage() {
   const authModal = useAuthModalStore();
 
   // Chat settings from admin
-  const { greeting, description, suggestedPrompts, fileAttachmentEnabled, loadFromBackend: loadChatSettings } = useChatSettingsStore();
+  const { greeting, description, suggestedPrompts, fileAttachmentEnabled, showSuggestedQuestions, loadFromBackend: loadChatSettings } = useChatSettingsStore();
 
   const [inputValue, setInputValue] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -879,6 +880,16 @@ export function ChatPage() {
   // Load chat settings from backend on mount
   useEffect(() => {
     loadChatSettings();
+  }, [loadChatSettings]);
+
+  // ⭐ Lắng nghe broadcast từ Admin - cập nhật settings ngay khi admin thay đổi
+  useEffect(() => {
+    const cleanup = onSettingsChange((event) => {
+      console.log('[ChatPage] 📡 Received settings change broadcast:', event.type, event);
+      // Reload settings ngay lập tức khi có thay đổi từ Admin
+      loadChatSettings();
+    });
+    return cleanup;
   }, [loadChatSettings]);
 
   const fileQuotaExhausted = !!fileQuota && fileQuota.limit !== -1 && fileQuota.remaining <= 0;
@@ -1262,9 +1273,44 @@ export function ChatPage() {
           reader.readAsDataURL(file);
         } else if (file.type === 'application/pdf' || 
                    file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
-                   file.type === 'application/msword') {
-          // PDF/DOCX - keep as originalFile (will be sent as base64)
+                   file.type === 'application/msword' ||
+                   /\.(pdf|docx?|xlsx?|xls|csv)$/i.test(file.name)) {
+          // PDF/DOCX/Excel/CSV - keep as originalFile (will be sent as base64)
           // Small delay to simulate processing
+          await new Promise(resolve => setTimeout(resolve, 100));
+          setCancellingFiles(prev => {
+            if (prev.has(fileId)) {
+              setSelectedFiles(prev => prev.filter(f => f.fileId !== fileId));
+              const next = new Set(prev);
+              next.delete(fileId);
+              return next;
+            }
+            setSelectedFiles(prev => prev.map((f) => 
+              f.fileId === fileId 
+                ? { ...f, isLoading: false }
+                : f
+            ));
+            return prev;
+          });
+        } else if (file.type.startsWith('audio/') || /\.(mp3|wav|ogg|webm|aac|m4a|flac)$/i.test(file.name)) {
+          // Audio files - keep as originalFile for transcription
+          await new Promise(resolve => setTimeout(resolve, 100));
+          setCancellingFiles(prev => {
+            if (prev.has(fileId)) {
+              setSelectedFiles(prev => prev.filter(f => f.fileId !== fileId));
+              const next = new Set(prev);
+              next.delete(fileId);
+              return next;
+            }
+            setSelectedFiles(prev => prev.map((f) => 
+              f.fileId === fileId 
+                ? { ...f, isLoading: false }
+                : f
+            ));
+            return prev;
+          });
+        } else if (file.type.startsWith('video/') || /\.(mp4|webm|mov|avi|mkv)$/i.test(file.name)) {
+          // Video files - keep as originalFile for transcription
           await new Promise(resolve => setTimeout(resolve, 100));
           setCancellingFiles(prev => {
             if (prev.has(fileId)) {
@@ -2137,12 +2183,24 @@ export function ChatPage() {
                 // Lưu file để gửi kèm request
                 fileData.content = t('chat.pdfFilePending').replace('{{name}}', file.name).replace('{{size}}', (file.size / 1024).toFixed(1));
                 fileData.originalFile = file; // Lưu file gốc để gửi lên server
-              } else if (file.type.includes('word') || file.name.endsWith('.docx')) {
+              } else if (file.type.includes('word') || file.name.endsWith('.docx') || file.name.endsWith('.doc')) {
                 // DOCX - đọc bằng mammoth
                 const arrayBuffer = await file.arrayBuffer();
                 const mammoth = await import('mammoth');
                 const result = await mammoth.extractRawText({ arrayBuffer });
                 fileData.content = result.value.slice(0, 10000);
+              } else if (file.type.includes('excel') || file.type.includes('spreadsheet') || file.name.endsWith('.xlsx') || file.name.endsWith('.xls') || file.name.endsWith('.csv')) {
+                // Excel/CSV - server sẽ parse bằng xlsx library
+                fileData.content = t('chat.pdfFilePending').replace('{{name}}', file.name).replace('{{size}}', (file.size / 1024).toFixed(1));
+                fileData.originalFile = file;
+              } else if (file.type.startsWith('audio/') || /\.(mp3|wav|ogg|webm|aac|m4a|flac)$/i.test(file.name)) {
+                // Audio - server sẽ transcribe bằng Whisper API
+                fileData.content = t('chat.pdfFilePending').replace('{{name}}', file.name).replace('{{size}}', (file.size / 1024).toFixed(1));
+                fileData.originalFile = file;
+              } else if (file.type.startsWith('video/') || /\.(mp4|webm|mov|avi|mkv)$/i.test(file.name)) {
+                // Video - server sẽ trích xuất audio + transcribe
+                fileData.content = t('chat.pdfFilePending').replace('{{name}}', file.name).replace('{{size}}', (file.size / 1024).toFixed(1));
+                fileData.originalFile = file;
               } else {
                 // Các loại file khác - thử đọc như text
                 try {
@@ -2816,6 +2874,7 @@ export function ChatPage() {
                 </div>
 
                 {/* Section Header: Câu hỏi gợi ý */}
+                {showSuggestedQuestions && (
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-1.5">
                     <span className="material-symbols-outlined text-blue-500 text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>forum</span>
@@ -2823,19 +2882,11 @@ export function ChatPage() {
                       {language === 'vi' ? 'Câu hỏi gợi ý' : language === 'en' ? 'Suggested Questions' : language === 'ar' ? 'الأسئلة المقترحة' : 'Questions suggérées'}
                     </h3>
                   </div>
-                  {/* Quản lý - Chỉ hiện cho admin */}
-                  {(user?.role === 'admin' || user?.role === 'super_admin') && (
-                    <button
-                      onClick={() => navigate('/admin/suggested-questions')}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg transition-all duration-150 active:scale-95 shadow-xs"
-                    >
-                      <Settings className="w-3.5 h-3.5" />
-                      <span>{language === 'vi' ? 'Quản lý' : language === 'en' ? 'Manage' : language === 'ar' ? 'إدارة' : 'Gérer'}</span>
-                    </button>
-                  )}
                 </div>
+                )}
 
                 {/* Prompt Cards Grid - Material Design 3 Style */}
+                {showSuggestedQuestions && (
                 <div className="w-full max-w-3xl">
                   <div className="grid grid-cols-2 gap-3">
                     {(activeCategory ? currentQuestions : suggestedPrompts.map(prompt => ({
@@ -2869,6 +2920,7 @@ export function ChatPage() {
                     ))}
                   </div>
                 </div>
+                )}
               </div>
             </div>
           ) : (
@@ -2980,7 +3032,7 @@ export function ChatPage() {
           <div className="max-w-3xl mx-auto relative flex flex-col gap-3">
 
             {/* File upload status with limits */}
-            {selectedFiles.length > 0 && (
+            {fileAttachmentEnabled && selectedFiles.length > 0 && (
               <div className="bg-[#eff6ff] border border-[#bfdbfe] rounded-full px-4 py-2 flex flex-col gap-1 w-full relative overflow-hidden">
                 <div className="flex justify-between items-center w-full z-10 text-[11px] text-[#3b82f6] font-medium">
                   <div className="flex items-center gap-1">
@@ -2999,7 +3051,7 @@ export function ChatPage() {
             )}
 
             {/* File attachments display - Grid 2 cột, full width bên ngoài pill input */}
-            {selectedFiles.length > 0 && (
+            {fileAttachmentEnabled && selectedFiles.length > 0 && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3 w-full" role="list" aria-label={language === 'vi' ? 'Danh sách tệp đính kèm' : 'Attached files list'}>
                 {selectedFiles.map((file, index) => {
                   const isError = file.size > 50 * 1024 * 1024; // 50MB limit
@@ -3012,12 +3064,36 @@ export function ChatPage() {
                     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
                   };
 
+                  // Determine file type category for styling
+                  const isDocument = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/msword', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/vnd.ms-excel'].includes(file.type) || /\.(pdf|docx?|xlsx?|xls|csv)$/i.test(file.name);
+                  const isImage = file.type.startsWith('image/');
+                  const isAudio = file.type.startsWith('audio/') || /\.(mp3|wav|ogg|webm|aac|m4a|flac)$/i.test(file.name);
+                  const isVideo = file.type.startsWith('video/') || /\.(mp4|webm|mov|avi|mkv)$/i.test(file.name);
+                  const isText = file.type.startsWith('text/') || /\.(txt|md|json|xml|html|css|js|ts)$/i.test(file.name);
+
+                  // Get preview text for non-image files
+                  const getPreviewText = () => {
+                    if (!file.content || isImage) return null;
+                    const text = file.content.slice(0, 120);
+                    return text.length < file.content.length ? `${text}...` : text;
+                  };
+                  const previewText = getPreviewText();
+
+                  // Get file type label
+                  const getTypeLabel = () => {
+                    if (isDocument) return language === 'vi' ? 'Tài liệu' : 'Document';
+                    if (isAudio) return language === 'vi' ? 'Âm thanh' : 'Audio';
+                    if (isVideo) return language === 'vi' ? 'Video' : 'Video';
+                    if (isText) return language === 'vi' ? 'Văn bản' : 'Text';
+                    return '';
+                  };
+
                   return (
                     <div
                       key={index}
                       role="listitem"
                       className={clsx(
-                        'group/file relative flex items-center gap-2.5 rounded-xl border px-3 py-2 transition-all min-w-0',
+                        'group/file relative flex items-start gap-2.5 rounded-xl border px-3 py-2 transition-all min-w-0',
                         status === 'ready' && 'bg-white border-emerald-300 hover:border-emerald-500 hover:shadow-md',
                         status === 'loading' && 'bg-blue-50 border-blue-300',
                         status === 'error' && 'bg-red-50 border-red-300'
@@ -3027,17 +3103,23 @@ export function ChatPage() {
                       {/* File type icon */}
                       <div className={clsx(
                         'flex-shrink-0 w-9 h-9 rounded-lg flex items-center justify-center',
-                        file.type === 'application/pdf' && 'bg-red-100 text-red-600',
-                        file.type.includes('word') && 'bg-blue-100 text-blue-600',
-                        file.type.startsWith('image/') && 'bg-pink-100 text-pink-600',
-                        !['application/pdf'].includes(file.type) && !file.type.includes('word') && !file.type.startsWith('image/') && 'bg-slate-100 text-slate-600'
+                        isDocument && 'bg-purple-100 text-purple-600',
+                        isImage && 'bg-pink-100 text-pink-600',
+                        isAudio && 'bg-amber-100 text-amber-600',
+                        isVideo && 'bg-indigo-100 text-indigo-600',
+                        isText && 'bg-teal-100 text-teal-600',
+                        !isDocument && !isImage && !isAudio && !isVideo && !isText && 'bg-slate-100 text-slate-600'
                       )}>
-                        {file.type === 'application/pdf' ? (
-                          <span className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>picture_as_pdf</span>
-                        ) : file.type.includes('word') ? (
+                        {isDocument ? (
                           <span className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>description</span>
-                        ) : file.type.startsWith('image/') ? (
+                        ) : isImage ? (
                           <span className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>image</span>
+                        ) : isAudio ? (
+                          <span className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>mic</span>
+                        ) : isVideo ? (
+                          <span className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>videocam</span>
+                        ) : isText ? (
+                          <span className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>article</span>
                         ) : (
                           <span className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>attach_file</span>
                         )}
@@ -3045,9 +3127,22 @@ export function ChatPage() {
 
                       {/* File info - flex-1 min-w-0 để truncate đúng */}
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs font-semibold text-slate-900 truncate">
-                          {file.name}
-                        </p>
+                        <div className="flex items-center gap-1">
+                          <p className="text-xs font-semibold text-slate-900 truncate">
+                            {file.name}
+                          </p>
+                          {getTypeLabel() && (
+                            <span className={clsx(
+                              'flex-shrink-0 text-[9px] font-bold px-1 py-0.5 rounded uppercase tracking-wide',
+                              isDocument && 'bg-purple-100 text-purple-700',
+                              isAudio && 'bg-amber-100 text-amber-700',
+                              isVideo && 'bg-indigo-100 text-indigo-700',
+                              isText && 'bg-teal-100 text-teal-700',
+                            )}>
+                              {getTypeLabel()}
+                            </span>
+                          )}
+                        </div>
                         <div className="flex items-center gap-1 mt-0.5 min-w-0">
                           {status === 'ready' && (
                             <>
@@ -3078,6 +3173,12 @@ export function ChatPage() {
                             </>
                           )}
                         </div>
+                        {/* Show preview text for non-image files */}
+                        {previewText && (
+                          <p className="text-[10px] text-slate-500 mt-0.5 truncate italic">
+                            📝 {previewText}
+                          </p>
+                        )}
                       </div>
 
                       {/* Remove button */}

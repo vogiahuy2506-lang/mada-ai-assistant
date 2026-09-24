@@ -1896,6 +1896,7 @@ router.get('/chat-settings', requireAdmin, (_req: Request, res: Response) => {
       'chat_greeting_vi', 'chat_greeting_en', 'chat_greeting_ar', 'chat_greeting_fr',
       'chat_description_vi', 'chat_description_en', 'chat_description_ar', 'chat_description_fr',
       'feature_file_attachment_enabled',
+      'feature_show_suggested_questions',
       'suggested_prompts'
     ];
     
@@ -1909,10 +1910,21 @@ router.get('/chat-settings', requireAdmin, (_req: Request, res: Response) => {
       } else if (s.type === 'json') {
         result[s.key] = JSON.parse(s.value);
       } else {
+        // Auto-parse JSON strings (e.g. suggested_prompts stored with type='string')
+        const trimmed = (s.value || '').trim();
+        if ((trimmed.startsWith('[') || trimmed.startsWith('{')) &&
+            (trimmed.endsWith(']') || trimmed.endsWith('}'))) {
+          try {
+            result[s.key] = JSON.parse(trimmed);
+            continue;
+          } catch {
+            // Fall through
+          }
+        }
         result[s.key] = s.value;
       }
     }
-    
+
     res.json({ success: true, data: result });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
@@ -1963,6 +1975,7 @@ router.get('/chat-settings/public', (_req: Request, res: Response) => {
       'chat_greeting_vi', 'chat_greeting_en', 'chat_greeting_ar', 'chat_greeting_fr',
       'chat_description_vi', 'chat_description_en', 'chat_description_ar', 'chat_description_fr',
       'feature_file_attachment_enabled',
+      'feature_show_suggested_questions',
       'suggested_prompts',
       'ai_system_instruction',
     ];
@@ -1977,10 +1990,21 @@ router.get('/chat-settings/public', (_req: Request, res: Response) => {
       } else if (s.type === 'json') {
         result[s.key] = JSON.parse(s.value);
       } else {
+        // Auto-parse JSON strings (e.g. suggested_prompts stored with type='string')
+        const trimmed = (s.value || '').trim();
+        if ((trimmed.startsWith('[') || trimmed.startsWith('{')) &&
+            (trimmed.endsWith(']') || trimmed.endsWith('}'))) {
+          try {
+            result[s.key] = JSON.parse(trimmed);
+            continue;
+          } catch {
+            // Fall through
+          }
+        }
         result[s.key] = s.value;
       }
     }
-    
+
     res.json({ success: true, data: result });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
@@ -2209,14 +2233,50 @@ router.get('/file-settings', requireAdmin, (_req: Request, res: Response) => {
 
     const result: Record<string, any> = {};
     for (const s of settings) {
+      // Map database key → frontend key for fileAttachmentEnabled
+      const frontendKey = s.key === 'feature_file_attachment_enabled'
+        ? 'fileAttachmentEnabled'
+        : s.key === 'feature_image_upload_enabled'
+        ? 'imageUploadEnabled'
+        : s.key === 'feature_document_upload_enabled'
+        ? 'documentUploadEnabled'
+        : s.key === 'feature_video_upload_enabled'
+        ? 'videoUploadEnabled'
+        : s.key === 'feature_audio_upload_enabled'
+        ? 'audioUploadEnabled'
+        : s.key === 'feature_other_file_upload_enabled'
+        ? 'otherFileUploadEnabled'
+        : s.key === 'max_file_size_mb'
+        ? 'maxFileSizeMB'
+        : s.key === 'max_image_size_mb'
+        ? 'maxImageSizeMB'
+        : s.key === 'max_document_size_mb'
+        ? 'maxDocumentSizeMB'
+        : s.key === 'max_video_size_mb'
+        ? 'maxVideoSizeMB'
+        : s.key === 'max_audio_size_mb'
+        ? 'maxAudioSizeMB'
+        : s.key === 'max_other_file_size_mb'
+        ? 'maxOtherFileSizeMB'
+        : s.key === 'max_files_per_session'
+        ? 'maxFilesPerSession'
+        : s.key === 'max_files_total'
+        ? 'maxFilesTotal'
+        : s.key === 'file_upload_limit_free'
+        ? 'fileUploadLimitFree'
+        : s.key === 'file_upload_limit_pro'
+        ? 'fileUploadLimitPro'
+        : s.key === 'file_upload_limit_enterprise'
+        ? 'fileUploadLimitEnterprise'
+        : s.key;
       if (s.type === 'boolean') {
-        result[s.key] = s.value === 'true';
+        result[frontendKey] = s.value === 'true';
       } else if (s.type === 'number') {
-        result[s.key] = Number(s.value);
+        result[frontendKey] = Number(s.value);
       } else if (s.type === 'json') {
-        result[s.key] = JSON.parse(s.value);
+        result[frontendKey] = JSON.parse(s.value);
       } else {
-        result[s.key] = s.value;
+        result[frontendKey] = s.value;
       }
     }
 

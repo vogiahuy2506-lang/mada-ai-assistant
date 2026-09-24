@@ -5,7 +5,7 @@ import { useSystemSettingsStore, useAuthStore, useLanguageStore, usePricingPlans
 import { translations, Language } from '@/lib/translations';
 import clsx from 'clsx';
 import { systemApi } from '@/lib/api';
-import { CheckCircle, Loader2, AlertCircle, Shield, Settings, Lock, Cloud, CreditCard, Mail, Bug, Sparkles, FileText, Zap, ArrowRight, Image, Video, Music, File, Pencil, Save, X } from 'lucide-react';
+import { CheckCircle, Check, Loader2, AlertCircle, Shield, Settings, Lock, Cloud, CreditCard, Mail, Bug, Sparkles, FileText, Zap, ArrowRight, Image, Video, Music, File, Pencil, Save, X } from 'lucide-react';
 import { PromptTemplates } from './PromptTemplates';
 
 type Tab = 'general' | 'plans' | 'security' | 'ai' | 'integrations' | 'live' | 'system' | 'templates';

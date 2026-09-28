@@ -931,14 +931,14 @@ export function AdminPrompts() {
             {/* Right Panel - Detail/Edit */}
             <div className="flex-1 bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col overflow-hidden">
               {showCreate ? (
-                <div className="flex-1 flex flex-col">
-                  <div className="p-5 border-b border-slate-100 flex items-center justify-between">
+                <div className="flex-1 flex flex-col min-h-0">
+                  <div className="p-5 border-b border-slate-100 shrink-0 flex items-center justify-between">
                     <h2 className="text-lg font-bold text-slate-800">{tPr('admin.prompts.createNew', language)}</h2>
                     <button onClick={() => setShowCreate(false)} className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors">
                       <X className="w-5 h-5 text-slate-400" />
                     </button>
                   </div>
-                  <div className="flex-1 overflow-y-auto p-5 space-y-4">
+                  <div className="flex-1 overflow-y-auto p-5 space-y-4 min-h-0">
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-1.5">
                         {tPr('admin.prompts.id', language)} <span className="text-red-500">*</span>

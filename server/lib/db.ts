@@ -1318,9 +1318,22 @@ db.exec(`
     value TEXT NOT NULL,
     type TEXT NOT NULL DEFAULT 'string' CHECK (type IN ('string', 'number', 'boolean', 'json')),
     description TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL
   );
 `);
+
+// Migration: Add created_at column if missing (for databases created before this column was added)
+try {
+  const columns = db.prepare("PRAGMA table_info(system_settings)").all() as { name: string }[];
+  const hasCreatedAt = columns.some(c => c.name === 'created_at');
+  if (!hasCreatedAt) {
+    db.exec("ALTER TABLE system_settings ADD COLUMN created_at TEXT NOT NULL DEFAULT (datetime('now'))");
+    console.log('✅ Migration: Added created_at column to system_settings');
+  }
+} catch (e) {
+  // Column might already exist in newer schemas, ignore error
+}
 
 // Seed default system settings
 function seedSystemSettings() {

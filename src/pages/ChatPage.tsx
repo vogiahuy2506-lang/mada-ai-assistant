@@ -28,11 +28,11 @@ import { onSettingsChange } from '@/lib/settingsBroadcast';
 
 // Attachment options - use getAttachmentOptions(language) inside component
 function getAttachmentOptions(lang: Language) {
-  const labels: Record<Language, { image: string; imageDesc: string; document: string; video: string; videoDesc: string; audio: string; audioDesc: string; file: string; fileDesc: string }> = {
-    vi: { image: 'Hình ảnh', imageDesc: 'Tải lên hình ảnh', document: 'Tài liệu', video: 'Video', videoDesc: 'Tải lên video', audio: 'Âm thanh', audioDesc: 'Ghi âm hoặc file', file: 'File khác', fileDesc: 'Mọi loại file' },
-    en: { image: 'Image', imageDesc: 'Upload image', document: 'Document', video: 'Video', videoDesc: 'Upload video', audio: 'Audio', audioDesc: 'Record or file', file: 'Other file', fileDesc: 'All files' },
-    ar: { image: 'صورة', imageDesc: 'تحميل صورة', document: 'مستند', video: 'فيديو', videoDesc: 'تحميل فيديو', audio: 'صوت', audioDesc: 'تسجيل أو ملف', file: 'ملف آخر', fileDesc: 'جميع الملفات' },
-    fr: { image: 'Image', imageDesc: 'Télécharger image', document: 'Document', video: 'Vidéo', videoDesc: 'Télécharger vidéo', audio: 'Audio', audioDesc: 'Enregistrer ou fichier', file: 'Autre fichier', fileDesc: 'Tous les fichiers' },
+  const labels: Record<Language, { addAttachment: string; image: string; imageDesc: string; document: string; video: string; videoDesc: string; audio: string; audioDesc: string; file: string; fileDesc: string; enterUrl: string; urlPlaceholder: string }> = {
+    vi: { addAttachment: 'Thêm tệp đính kèm', image: 'Hình ảnh', imageDesc: 'Tải lên hình ảnh', document: 'Tài liệu', video: 'Video', videoDesc: 'Tải lên video', audio: 'Âm thanh', audioDesc: 'Ghi âm hoặc file', file: 'File khác', fileDesc: 'Mọi loại file', enterUrl: 'Nhập link web để AI đọc và phân tích nội dung:', urlPlaceholder: 'https://example.com' },
+    en: { addAttachment: 'Add attachment', image: 'Image', imageDesc: 'Upload image', document: 'Document', video: 'Video', videoDesc: 'Upload video', audio: 'Audio', audioDesc: 'Record or file', file: 'Other file', fileDesc: 'All files', enterUrl: 'Enter a web link for AI to read and analyze content:', urlPlaceholder: 'https://example.com' },
+    ar: { addAttachment: 'إضافة مرفق', image: 'صورة', imageDesc: 'تحميل صورة', document: 'مستند', video: 'فيديو', videoDesc: 'تحميل فيديو', audio: 'صوت', audioDesc: 'تسجيل أو ملف', file: 'ملف آخر', fileDesc: 'جميع الملفات', enterUrl: 'أدخل رابط ويب لقراءة وتحليل المحتوى:', urlPlaceholder: 'https://example.com' },
+    fr: { addAttachment: 'Ajouter une pièce jointe', image: 'Image', imageDesc: 'Télécharger image', document: 'Document', video: 'Vidéo', videoDesc: 'Télécharger vidéo', audio: 'Audio', audioDesc: 'Enregistrer ou fichier', file: 'Autre fichier', fileDesc: 'Tous les fichiers', enterUrl: 'Entrez un lien web pour que l\'IA lise et analyse le contenu:', urlPlaceholder: 'https://example.com' },
   };
   const l = labels[lang] || labels.vi;
   
@@ -3272,7 +3272,7 @@ export function ChatPage() {
                   {showAttachmentMenu && (
                     <div className="absolute bottom-full left-0 mb-2 w-72 bg-white border border-white/80 backdrop-blur-xl rounded-2xl shadow-[4px_4px_0_0_rgba(25,27,35,1)] z-50 overflow-hidden">
                       <div className="px-4 py-3 border-b border-outline-variant/50 bg-primary flex items-center justify-between">
-                        <p className="text-sm font-bold text-white">Thêm tệp đính kèm</p>
+                        <p className="text-sm font-bold text-white">{t('chat.addAttachment')}</p>
                         <button
                           onClick={() => setShowUrlInput(!showUrlInput)}
                           className={clsx(
@@ -3289,14 +3289,14 @@ export function ChatPage() {
                       {/* URL Input Section */}
                       {showUrlInput && (
                         <div className="p-3 border-b border-outline-variant/50 bg-primary-fixed/30">
-                          <p className="text-xs text-primary mb-2">Nhập link web để AI đọc và phân tích nội dung:</p>
+                          <p className="text-xs text-primary mb-2">{t('chat.enterUrl')}</p>
                           <div className="flex gap-2">
                             <input
                               type="text"
                               value={urlInputValue}
                               onChange={(e) => setUrlInputValue(e.target.value)}
                               onKeyDown={(e) => e.key === 'Enter' && handleFetchUrl()}
-                              placeholder="https://example.com"
+                              placeholder={t('chat.urlPlaceholder')}
                               className="flex-1 px-3 py-2 text-sm border border-outline rounded-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 bg-white"
                             />
                             <button

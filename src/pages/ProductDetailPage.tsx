@@ -9,6 +9,7 @@ import { PublicLayout } from '@/components/PublicLayout';
 import { useLanguageStore } from '@/stores';
 import { useAuthStore } from '@/stores';
 import { formatPrice } from '@/lib/formatPrice';
+import { useTranslation } from '@/lib/translations';
 import clsx from 'clsx';
 
 interface Product {
@@ -38,6 +39,7 @@ export function ProductDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { language } = useLanguageStore();
   const { user } = useAuthStore();
+  const { t } = useTranslation();
   const navigate = useNavigate();
 
   const [product, setProduct] = useState<Product | null>(null);
@@ -133,9 +135,9 @@ export function ProductDetailPage() {
       {/* Breadcrumb */}
       <nav className="text-sm text-slate-600 mb-4" aria-label="Breadcrumb">
         <ol className="flex items-center gap-1 flex-wrap" role="list">
-          <li><Link to="/" className="hover:text-primary">Trang chủ</Link></li>
+          <li><Link to="/" className="hover:text-primary">{t('breadcrumb.home')}</Link></li>
           <li aria-hidden="true">/</li>
-          <li><Link to="/products" className="hover:text-primary">Sản phẩm</Link></li>
+          <li><Link to="/products" className="hover:text-primary">{t('breadcrumb.products')}</Link></li>
           {product.category && (
             <>
               <li aria-hidden="true">/</li>

@@ -34,6 +34,11 @@ const tL = (key: string): string => {
       'admin.layout.planFree': 'Miễn phí',
       'admin.layout.logout': 'Đăng xuất',
       'admin.layout.controlCenter': 'Trung tâm quản trị',
+      'admin.layout.switchLanguage': 'Chọn ngôn ngữ',
+      'admin.layout.langVi': 'Tiếng Việt',
+      'admin.layout.langEn': 'English',
+      'admin.layout.langAr': 'العربية',
+      'admin.layout.langFr': 'Français',
       // Top bar titles
       'admin.topBar.overview': 'Tổng quan',
       'admin.topBar.overviewSub': 'Xem nhanh tình trạng hệ thống',
@@ -79,6 +84,11 @@ const tL = (key: string): string => {
       'admin.layout.planFree': 'Free',
       'admin.layout.logout': 'Logout',
       'admin.layout.controlCenter': 'Control Center',
+      'admin.layout.switchLanguage': 'Switch language',
+      'admin.layout.langVi': 'Tiếng Việt',
+      'admin.layout.langEn': 'English',
+      'admin.layout.langAr': 'العربية',
+      'admin.layout.langFr': 'Français',
       // Top bar titles
       'admin.topBar.overview': 'Overview',
       'admin.topBar.overviewSub': 'Quick view of system status',
@@ -124,6 +134,11 @@ const tL = (key: string): string => {
       'admin.layout.planFree': 'مجاني',
       'admin.layout.logout': 'تسجيل الخروج',
       'admin.layout.controlCenter': 'مركز التحكم',
+      'admin.layout.switchLanguage': 'تبديل اللغة',
+      'admin.layout.langVi': 'Tiếng Việt',
+      'admin.layout.langEn': 'English',
+      'admin.layout.langAr': 'العربية',
+      'admin.layout.langFr': 'Français',
       // Top bar titles
       'admin.topBar.overview': 'نظرة عامة',
       'admin.topBar.overviewSub': 'عرض سريع لحالة النظام',
@@ -169,6 +184,11 @@ const tL = (key: string): string => {
       'admin.layout.planFree': 'Gratuit',
       'admin.layout.logout': 'Déconnexion',
       'admin.layout.controlCenter': 'Centre de contrôle',
+      'admin.layout.switchLanguage': 'Changer de langue',
+      'admin.layout.langVi': 'Tiếng Việt',
+      'admin.layout.langEn': 'English',
+      'admin.layout.langAr': 'العربية',
+      'admin.layout.langFr': 'Français',
       // Top bar titles
       'admin.topBar.overview': 'Aperçu',
       'admin.topBar.overviewSub': 'Vue rapide de l\'état du système',
@@ -414,7 +434,7 @@ export function AdminLayout({
                 
                 <div className="relative">
                   <div className="px-2.5 py-1 mb-1">
-                    <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">Chọn ngôn ngữ</p>
+                    <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">{tL('admin.layout.switchLanguage')}</p>
                   </div>
                   
                   {/* Vietnamese */}
@@ -438,7 +458,7 @@ export function AdminLayout({
                         'font-semibold text-xs transition-colors',
                         language === 'vi' ? 'text-primary' : 'text-gray-700'
                       )}>
-                        Tiếng Việt
+                        {tL('admin.layout.langVi')}
                       </p>
                       <p className="text-[10px] text-gray-400">Việt Nam</p>
                     </div>
@@ -468,7 +488,7 @@ export function AdminLayout({
                         'font-semibold text-xs transition-colors',
                         language === 'en' ? 'text-primary' : 'text-gray-700'
                       )}>
-                        English
+                        {tL('admin.layout.langEn')}
                       </p>
                       <p className="text-[10px] text-gray-400">United States</p>
                     </div>
@@ -498,7 +518,7 @@ export function AdminLayout({
                         'font-semibold text-xs transition-colors',
                         language === 'ar' ? 'text-primary' : 'text-gray-700'
                       )}>
-                        العربية
+                        {tL('admin.layout.langAr')}
                       </p>
                       <p className="text-[10px] text-gray-400">العربية</p>
                     </div>
@@ -528,7 +548,7 @@ export function AdminLayout({
                         'font-semibold text-xs transition-colors',
                         language === 'fr' ? 'text-primary' : 'text-gray-700'
                       )}>
-                        Français
+                        {tL('admin.layout.langFr')}
                       </p>
                       <p className="text-[10px] text-gray-400">France</p>
                     </div>

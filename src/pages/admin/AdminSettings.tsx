@@ -305,8 +305,8 @@ export function AdminSettings() {
           {/* File Upload Limits */}
           <div className="bg-white rounded-2xl border border-outline-variant overflow-hidden">
             <div className="px-8 py-6 border-b border-outline-variant">
-              <h3 className="text-lg font-black text-on-surface">Loại file hỗ trợ</h3>
-              <p className="text-sm text-on-surface-variant mt-1">Các loại file được phép tải lên</p>
+              <h3 className="text-lg font-black text-on-surface">{lang['admin.settings.fileUpload.sectionTitle']}</h3>
+              <p className="text-sm text-on-surface-variant mt-1">{lang['admin.settings.fileUpload.sectionDesc']}</p>
             </div>
             <div className="p-8">
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
@@ -314,7 +314,7 @@ export function AdminSettings() {
                   { icon: Image, label: 'Hình ảnh', color: 'from-pink-400 to-purple-500' },
                   { icon: FileText, label: 'PDF', color: 'from-blue-400 to-cyan-500' },
                   { icon: Video, label: 'Video', color: 'from-violet-500 to-purple-600' },
-                  { icon: Music, label: 'Nhạc', color: 'from-orange-400 to-amber-500' },
+                  { icon: Music, label: lang['admin.settings.fileUpload.audio'], color: 'from-orange-400 to-amber-500' },
                   { icon: File, label: 'File', color: 'from-gray-500 to-gray-600' },
                 ].map((item) => (
                   <div key={item.label} className={`flex flex-col items-center gap-3 p-4 rounded-2xl bg-gradient-to-br ${item.color}`}>
@@ -902,6 +902,9 @@ function PricingPlansEditor({ language }: PricingPlansEditorProps) {
   const [savedId, setSavedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const typedTranslations = translations as Record<Language, Record<string, string>>;
+  const lang = typedTranslations[language] || typedTranslations.vi;
+
   // Load plans from API
   useEffect(() => {
     loadPlans();
@@ -1054,9 +1057,9 @@ function PricingPlansEditor({ language }: PricingPlansEditorProps) {
       <div className="bg-white rounded-2xl border border-outline-variant p-6">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-lg font-black text-on-surface">Gói dịch vụ</h3>
+            <h3 className="text-lg font-black text-on-surface">{lang['admin.settings.plans.servicePackage'] || 'Service Packages'}</h3>
             <p className="text-sm text-on-surface-variant mt-1">
-              Chỉnh sửa thông tin các gói dịch vụ. Thay đổi sẽ áp dụng ngay cho toàn bộ website.
+              {lang['admin.settings.plans.servicePackageDesc'] || 'Edit service package information. Changes will apply immediately to the entire website.'}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -1064,7 +1067,7 @@ function PricingPlansEditor({ language }: PricingPlansEditorProps) {
               onClick={loadPlans}
               className="px-4 py-2 rounded-lg border border-outline-variant text-sm font-semibold hover:bg-surface-variant/50 transition-colors"
             >
-              Làm mới
+              {lang['admin.settings.plans.refresh'] || 'Refresh'}
             </button>
           </div>
         </div>
@@ -1171,7 +1174,7 @@ function PricingPlansEditor({ language }: PricingPlansEditorProps) {
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-xs font-semibold text-on-surface-variant">Tiền tệ</label>
+                      <label className="text-xs font-semibold text-on-surface-variant">{lang['admin.settings.plans.currency'] || 'Currency'}</label>
                       <select
                         value={plan.price_currency}
                         onChange={(e) => updatePlan(plan.id, { price_currency: e.target.value })}
@@ -1229,7 +1232,7 @@ function PricingPlansEditor({ language }: PricingPlansEditorProps) {
                       onClick={() => addFeature(plan.id, 'vi')}
                       className="w-full py-2 border border-dashed border-outline rounded-lg text-sm text-on-surface-variant hover:bg-surface-variant/50 transition-colors"
                     >
-                      + Thêm tính năng
+                      + {lang['admin.settings.plans.addFeature'].replace('+ ', '')}
                     </button>
                   </div>
 
@@ -1263,7 +1266,7 @@ function PricingPlansEditor({ language }: PricingPlansEditorProps) {
                       onChange={(e) => updatePlan(plan.id, { is_active: e.target.checked })}
                       className="w-4 h-4 rounded text-primary focus:ring-primary"
                     />
-                    <span className="text-sm font-semibold">Đang hoạt động</span>
+                    <span className="text-sm font-semibold">{lang['admin.settings.plans.active']}</span>
                   </label>
 
                   {/* Save Button */}
@@ -1273,7 +1276,7 @@ function PricingPlansEditor({ language }: PricingPlansEditorProps) {
                     className="w-full py-2.5 rounded-xl bg-primary text-white font-semibold text-sm flex items-center justify-center gap-2 hover:bg-primary/90 transition-colors disabled:opacity-50"
                   >
                     {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                    Lưu thay đổi
+                    {lang['admin.settings.plans.saveChanges']}
                   </button>
                 </div>
               ) : (

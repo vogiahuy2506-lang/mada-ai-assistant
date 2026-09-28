@@ -7,20 +7,22 @@ import {
 } from 'lucide-react';
 import clsx from 'clsx';
 import { userHistoryApi, userFavoritesApi, ChatConversation, UserFavorite } from '@/lib/api';
+import { useTranslation } from '@/lib/translations';
 
 type TabType = 'profile' | 'settings' | 'history' | 'favorites' | 'security';
 
 const TABS = [
-  { id: 'profile' as TabType, label: 'Hồ sơ', icon: User },
-  { id: 'settings' as TabType, label: 'Cài đặt', icon: Settings },
-  { id: 'history' as TabType, label: 'Lịch sử', icon: History },
-  { id: 'favorites' as TabType, label: 'Yêu thích', icon: Star },
-  { id: 'security' as TabType, label: 'Bảo mật', icon: Shield },
+  { id: 'profile' as TabType, labelKey: 'profile.tabs.profile', icon: User },
+  { id: 'settings' as TabType, labelKey: 'profile.tabs.settings', icon: Settings },
+  { id: 'history' as TabType, labelKey: 'profile.tabs.history', icon: History },
+  { id: 'favorites' as TabType, labelKey: 'profile.tabs.favorites', icon: Star },
+  { id: 'security' as TabType, labelKey: 'profile.tabs.security', icon: Shield },
 ];
 
 export function ProfilePage() {
   const { isDark, toggleTheme } = useThemeStore();
   const { language, setLanguage } = useLanguageStore();
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<TabType>('profile');
   const [isEditing, setIsEditing] = useState(false);
   const [notifications, setNotifications] = useState({
@@ -90,7 +92,7 @@ export function ProfilePage() {
               )}
             >
               <tab.icon className="w-5 h-5" />
-              <span className="text-sm">{tab.label}</span>
+              <span className="text-sm">{t(tab.labelKey)}</span>
               <ChevronRight className={clsx('w-4 h-4 ml-auto transition-transform', activeTab === tab.id && 'rotate-90')} />
             </button>
           ))}
@@ -100,7 +102,7 @@ export function ProfilePage() {
         <div className="p-3 border-t-2 border-[#191b23]">
           <button className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
             <LogOut className="w-5 h-5" />
-            <span className="text-sm font-medium">Đăng xuất</span>
+            <span className="text-sm font-medium">{t('profile.logout')}</span>
           </button>
         </div>
       </aside>
@@ -110,7 +112,7 @@ export function ProfilePage() {
         {/* Top Bar */}
         <header className="h-14 border-b-2 border-[#191b23] flex items-center justify-between px-6 bg-white dark:bg-[#2e3038]">
           <h1 className="font-black text-lg">
-            {TABS.find((t) => t.id === activeTab)?.label}
+            {t(TABS.find((t) => t.id === activeTab)?.labelKey || 'profile.tabs.profile')}
           </h1>
           <button onClick={toggleTheme} className="p-2 rounded-lg hover:bg-[#ecedf7] dark:hover:bg-[#424754] transition-colors">
             {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
@@ -159,6 +161,8 @@ function ProfileTab({
   handleSaveProfile,
   handleCancelEdit,
 }: any) {
+  const { t } = useTranslation();
+  
   return (
     <div className="max-w-2xl space-y-6">
       {/* Avatar Section */}
@@ -189,14 +193,14 @@ function ProfileTab({
       {/* Profile Form */}
       <div className="bg-white dark:bg-[#2e3038] rounded-xl border-2 border-[#191b23] p-6">
         <div className="flex items-center justify-between mb-6">
-          <h3 className="font-bold text-lg">Thông tin cá nhân</h3>
+          <h3 className="font-bold text-lg">{t('profile.personalInfo')}</h3>
           {!isEditing ? (
             <button
               onClick={() => setIsEditing(true)}
               className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#3b82f6] text-white font-bold border-2 border-[#191b23] hover:-translate-y-0.5 hover:-translate-x-0.5 hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-all"
             >
               <Edit3 className="w-4 h-4" />
-              Chỉnh sửa
+              {t('profile.edit')}
             </button>
           ) : (
             <div className="flex gap-2">
@@ -205,14 +209,14 @@ function ProfileTab({
                 className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gray-200 font-bold border-2 border-[#191b23] hover:-translate-y-0.5 hover:-translate-x-0.5 hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-all"
               >
                 <X className="w-4 h-4" />
-                Hủy
+                {t('profile.cancel')}
               </button>
               <button
                 onClick={handleSaveProfile}
                 className="flex items-center gap-2 px-4 py-2 rounded-xl bg-green-500 text-white font-bold border-2 border-[#191b23] hover:-translate-y-0.5 hover:-translate-x-0.5 hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-all"
               >
                 <Check className="w-4 h-4" />
-                Lưu
+                {t('profile.save')}
               </button>
             </div>
           )}
@@ -220,7 +224,7 @@ function ProfileTab({
 
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium mb-2">Họ và tên</label>
+            <label className="block text-sm font-medium mb-2">{t('profile.fullName')}</label>
             {isEditing ? (
               <input
                 type="text"
@@ -234,7 +238,7 @@ function ProfileTab({
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-2">Email</label>
+            <label className="block text-sm font-medium mb-2">{t('profile.email')}</label>
             {isEditing ? (
               <input
                 type="email"
@@ -248,7 +252,7 @@ function ProfileTab({
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-2">Số điện thoại</label>
+            <label className="block text-sm font-medium mb-2">{t('profile.phone')}</label>
             {isEditing ? (
               <input
                 type="tel"
@@ -262,7 +266,7 @@ function ProfileTab({
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-2">Giới thiệu</label>
+            <label className="block text-sm font-medium mb-2">{t('profile.bio')}</label>
             {isEditing ? (
               <textarea
                 value={tempUserData.bio}
@@ -289,13 +293,15 @@ function SettingsTab({ notifications, setNotifications, language, setLanguage }:
     { code: 'fr', name: 'Français', flag: '🇫🇷' },
   ];
 
+  const { t } = useTranslation();
+  
   return (
     <div className="max-w-2xl space-y-6">
       {/* Language Settings */}
       <div className="bg-white dark:bg-[#2e3038] rounded-xl border-2 border-[#191b23] p-6">
         <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
           <Languages className="w-5 h-5 text-[#3b82f6]" />
-          Ngôn ngữ
+          {t('profile.language')}
         </h3>
         <div className="grid grid-cols-2 gap-3">
           {LANGUAGES.map((lang) => (
@@ -321,24 +327,24 @@ function SettingsTab({ notifications, setNotifications, language, setLanguage }:
       <div className="bg-white dark:bg-[#2e3038] rounded-xl border-2 border-[#191b23] p-6">
         <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
           <Bell className="w-5 h-5 text-[#3b82f6]" />
-          Thông báo
+          {t('profile.notifications')}
         </h3>
         <div className="space-y-4">
           <ToggleSetting
-            label="Email thông báo"
-            description="Nhận thông báo qua email"
+            label={t('profile.emailNotification')}
+            description={t('profile.emailNotificationDesc')}
             checked={notifications.email}
             onChange={(checked) => setNotifications({ ...notifications, email: checked })}
           />
           <ToggleSetting
-            label="Push thông báo"
-            description="Nhận thông báo trên trình duyệt"
+            label={t('profile.pushNotification')}
+            description={t('profile.pushNotificationDesc')}
             checked={notifications.push}
             onChange={(checked) => setNotifications({ ...notifications, push: checked })}
           />
           <ToggleSetting
-            label="SMS thông báo"
-            description="Nhận thông báo qua tin nhắn SMS"
+            label={t('profile.smsNotification')}
+            description={t('profile.smsNotificationDesc')}
             checked={notifications.sms}
             onChange={(checked) => setNotifications({ ...notifications, sms: checked })}
           />
@@ -347,15 +353,15 @@ function SettingsTab({ notifications, setNotifications, language, setLanguage }:
 
       {/* Theme Settings */}
       <div className="bg-white dark:bg-[#2e3038] rounded-xl border-2 border-[#191b23] p-6">
-        <h3 className="font-bold text-lg mb-4">Giao diện</h3>
+        <h3 className="font-bold text-lg mb-4">{t('profile.theme')}</h3>
         <div className="flex gap-4">
           <button className="flex-1 p-4 rounded-xl border-2 border-[#3b82f6] bg-white">
             <div className="w-full h-20 bg-[#f9f9ff] rounded-lg mb-2 border" />
-            <p className="font-medium text-center">Sáng</p>
+            <p className="font-medium text-center">{t('profile.themeLight')}</p>
           </button>
           <button className="flex-1 p-4 rounded-xl border-2 border-[#191b23] bg-white dark:bg-[#191b23]">
             <div className="w-full h-20 bg-[#191b23] rounded-lg mb-2 border" />
-            <p className="font-medium text-center dark:text-white">Tối</p>
+            <p className="font-medium text-center dark:text-white">{t('profile.themeDark')}</p>
           </button>
         </div>
       </div>
@@ -392,7 +398,7 @@ function ToggleSetting({ label, description, checked, onChange }: { label: strin
 // History Tab Component - Lấy data thật từ backend
 function HistoryTab() {
   const navigate = useNavigate();
-  const { language } = useLanguageStore();
+  const { t } = useTranslation();
   const [conversations, setConversations] = useState<ChatConversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -427,7 +433,7 @@ function HistoryTab() {
 
   async function handleDelete(id: string, e: React.MouseEvent) {
     e.stopPropagation();
-    if (!confirm(language === 'vi' ? 'Xóa cuộc trò chuyện này?' : 'Delete this conversation?')) return;
+    if (!confirm(t('profile.delete.confirm'))) return;
     try {
       await userHistoryApi.delete(id);
       setConversations((cs) => cs.filter((c) => c.id !== id));
@@ -444,17 +450,10 @@ function HistoryTab() {
     const diffH = Math.floor(diffMin / 60);
     const diffD = Math.floor(diffH / 24);
 
-    if (language === 'vi') {
-      if (diffMin < 1) return 'Vừa xong';
-      if (diffMin < 60) return `${diffMin} phút trước`;
-      if (diffH < 24) return `${diffH} giờ trước`;
-      if (diffD < 7) return `${diffD} ngày trước`;
-      return d.toLocaleDateString('vi-VN');
-    }
-    if (diffMin < 1) return 'Just now';
-    if (diffMin < 60) return `${diffMin}m ago`;
-    if (diffH < 24) return `${diffH}h ago`;
-    if (diffD < 7) return `${diffD}d ago`;
+    if (diffMin < 1) return t('profile.justNow');
+    if (diffMin < 60) return `${diffMin} ${t('profile.minutesAgo')}`;
+    if (diffH < 24) return `${diffH} ${t('profile.hoursAgo')}`;
+    if (diffD < 7) return `${diffD} ${t('profile.daysAgo')}`;
     return d.toLocaleDateString();
   }
 
@@ -471,7 +470,7 @@ function HistoryTab() {
       <div className="max-w-2xl">
         <input
           type="text"
-          placeholder={language === 'vi' ? 'Tìm kiếm lịch sử...' : 'Search history...'}
+          placeholder={t('profile.history.search')}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="w-full mb-4 px-4 py-2 rounded-lg border-2 border-[#191b23] dark:border-[#3a3d48] dark:bg-[#1a1c23] focus:outline-none focus:border-blue-500"
@@ -479,9 +478,7 @@ function HistoryTab() {
         <div className="bg-white dark:bg-[#2e3038] rounded-xl border-2 border-[#191b23] p-8 text-center">
           <History className="w-12 h-12 mx-auto text-gray-400 mb-3" />
           <p className="text-[#727785]">
-            {language === 'vi'
-              ? 'Chưa có lịch sử trò chuyện. Hãy bắt đầu chat để lưu lại!'
-              : 'No chat history yet. Start chatting to save your conversations!'}
+            {t('profile.history.empty')}
           </p>
         </div>
       </div>
@@ -492,7 +489,7 @@ function HistoryTab() {
     <div className="max-w-2xl space-y-4">
       <input
         type="text"
-        placeholder={language === 'vi' ? 'Tìm kiếm lịch sử...' : 'Search history...'}
+        placeholder={t('profile.history.search')}
         value={searchQuery}
         onChange={(e) => setSearchQuery(e.target.value)}
         className="w-full mb-4 px-4 py-2 rounded-lg border-2 border-[#191b23] dark:border-[#3a3d48] dark:bg-[#1a1c23] focus:outline-none focus:border-blue-500"
@@ -510,7 +507,7 @@ function HistoryTab() {
                 {conv.title}
               </h3>
               <p className="text-sm text-[#727785] mt-1">
-                {conv.message_count} {language === 'vi' ? 'tin nhắn' : 'messages'} • {formatDate(conv.updated_at)}
+                {conv.message_count} {t('profile.history.messages')} • {formatDate(conv.updated_at)}
               </p>
               {conv.last_message_preview && (
                 <p className="text-xs text-[#727785] mt-2 line-clamp-2 italic">
@@ -521,7 +518,7 @@ function HistoryTab() {
             <button
               onClick={(e) => handleDelete(conv.id, e)}
               className="p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-              title={language === 'vi' ? 'Xóa' : 'Delete'}
+              title={t('profile.history.delete')}
             >
               <Trash2 className="w-4 h-4 text-red-500" />
             </button>
@@ -534,7 +531,7 @@ function HistoryTab() {
 
 // Favorites Tab Component - Lấy data thật từ backend
 function FavoritesTab() {
-  const { language } = useLanguageStore();
+  const { t } = useTranslation();
   const [favorites, setFavorites] = useState<UserFavorite[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -583,9 +580,7 @@ function FavoritesTab() {
         <div className="bg-white dark:bg-[#2e3038] rounded-xl border-2 border-[#191b23] p-8 text-center">
           <Star className="w-12 h-12 mx-auto text-gray-400 mb-3" />
           <p className="text-[#727785]">
-            {language === 'vi'
-              ? 'Chưa có mục yêu thích. Hãy đánh dấu sao các sản phẩm/tiêu chuẩn bạn quan tâm!'
-              : 'No favorites yet. Star the products/standards you care about!'}
+            {t('profile.favorites.empty')}
           </p>
         </div>
       </div>
@@ -609,7 +604,7 @@ function FavoritesTab() {
             <button
               onClick={(e) => handleDelete(item.id, e)}
               className="p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-              title={language === 'vi' ? 'Bỏ yêu thích' : 'Unfavorite'}
+              title={t('profile.favorites.remove')}
             >
               <Star className="w-5 h-5 text-yellow-500 fill-yellow-500" />
             </button>
@@ -622,13 +617,15 @@ function FavoritesTab() {
 
 // Security Tab Component
 function SecurityTab() {
+  const { t } = useTranslation();
+  
   return (
     <div className="max-w-2xl space-y-6">
       <div className="bg-white dark:bg-[#2e3038] rounded-xl border-2 border-[#191b23] p-6">
-        <h3 className="font-bold text-lg mb-4">Đổi mật khẩu</h3>
+        <h3 className="font-bold text-lg mb-4">{t('profile.changePassword')}</h3>
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium mb-2">Mật khẩu hiện tại</label>
+            <label className="block text-sm font-medium mb-2">{t('profile.currentPassword')}</label>
             <input
               type="password"
               placeholder="••••••••"
@@ -636,7 +633,7 @@ function SecurityTab() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-2">Mật khẩu mới</label>
+            <label className="block text-sm font-medium mb-2">{t('profile.newPassword')}</label>
             <input
               type="password"
               placeholder="••••••••"
@@ -644,7 +641,7 @@ function SecurityTab() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-2">Xác nhận mật khẩu mới</label>
+            <label className="block text-sm font-medium mb-2">{t('profile.confirmPassword')}</label>
             <input
               type="password"
               placeholder="••••••••"
@@ -652,16 +649,16 @@ function SecurityTab() {
             />
           </div>
           <button className="w-full py-3 rounded-xl bg-[#3b82f6] text-white font-bold border-2 border-[#191b23] hover:-translate-y-0.5 hover:-translate-x-0.5 hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-all">
-            Cập nhật mật khẩu
+            {t('profile.updatePassword')}
           </button>
         </div>
       </div>
 
       <div className="bg-white dark:bg-[#2e3038] rounded-xl border-2 border-[#191b23] p-6">
-        <h3 className="font-bold text-lg mb-4">Xác thực hai yếu tố</h3>
-        <p className="text-sm text-[#727785] mb-4">Bảo vệ tài khoản của bạn bằng cách bật xác thực hai yếu tố.</p>
+        <h3 className="font-bold text-lg mb-4">{t('profile.twoFactor')}</h3>
+        <p className="text-sm text-[#727785] mb-4">{t('profile.twoFactorDesc')}</p>
         <button className="px-6 py-3 rounded-xl bg-green-500 text-white font-bold border-2 border-[#191b23] hover:-translate-y-0.5 hover:-translate-x-0.5 hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-all">
-          Bật 2FA
+          {t('profile.enable2FA')}
         </button>
       </div>
     </div>

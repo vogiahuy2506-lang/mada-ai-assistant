@@ -24,6 +24,10 @@ const t = (key: string): string => {
       'admin.common.refresh': 'Làm mới',
       'admin.agents.importMada': 'Import bot MADA',
       'admin.agents.viewKb': 'Xem Knowledge Base',
+      'admin.sq.category': 'Danh mục',
+      'admin.sq.language': 'Ngôn ngữ',
+      'admin.sq.sortOrder': 'Thứ tự',
+      'admin.sq.questionContent': 'Nội dung câu hỏi',
     },
     en: {
       'admin.overview.totalUsers': 'Total users',
@@ -39,6 +43,10 @@ const t = (key: string): string => {
       'admin.common.refresh': 'Refresh',
       'admin.agents.importMada': 'Import MADA Bots',
       'admin.agents.viewKb': 'View Knowledge Base',
+      'admin.sq.category': 'Category',
+      'admin.sq.language': 'Language',
+      'admin.sq.sortOrder': 'Sort Order',
+      'admin.sq.questionContent': 'Question Content',
     },
     ar: {
       'admin.overview.totalUsers': 'إجمالي المستخدمين',
@@ -54,6 +62,10 @@ const t = (key: string): string => {
       'admin.common.refresh': 'تحديث',
       'admin.agents.importMada': 'استيراد روبوتات MADA',
       'admin.agents.viewKb': 'عرض قاعدة المعرفة',
+      'admin.sq.category': 'الفئة',
+      'admin.sq.language': 'اللغة',
+      'admin.sq.sortOrder': 'الترتيب',
+      'admin.sq.questionContent': 'محتوى السؤال',
     },
     fr: {
       'admin.overview.totalUsers': 'Total utilisateurs',
@@ -69,6 +81,10 @@ const t = (key: string): string => {
       'admin.common.refresh': 'Actualiser',
       'admin.agents.importMada': 'Importer les bots MADA',
       'admin.agents.viewKb': 'Voir la base de connaissances',
+      'admin.sq.category': 'Catégorie',
+      'admin.sq.language': 'Langue',
+      'admin.sq.sortOrder': 'Ordre',
+      'admin.sq.questionContent': 'Contenu de la question',
     },
   };
   return translations[lang]?.[key] || translations['vi'][key] || key;
@@ -296,6 +312,32 @@ const agentTranslations: Record<string, Record<Language, string>> = {
   'admin.common.off': { vi: 'TẮT', en: 'OFF', ar: 'إيقاف', fr: 'OFF' },
   'admin.common.active': { vi: 'Hoạt động', en: 'Active', ar: 'نشط', fr: 'Actif' },
   'admin.common.disabled': { vi: 'Tắt', en: 'Disabled', ar: 'معطل', fr: 'Désactivé' },
+
+  // Suggested questions
+  'agent.sq.confirmDelete': { vi: 'Xóa câu hỏi này?', en: 'Delete this question?', ar: 'حذف هذا السؤال؟', fr: 'Supprimer cette question ?' },
+  'agent.sq.deleted': { vi: 'Đã xóa câu hỏi!', en: 'Question deleted!', ar: 'تم حذف السؤال!', fr: 'Question supprimée !' },
+  'agent.sq.disabled': { vi: 'Đã tắt câu hỏi', en: 'Question disabled', ar: 'تم تعطيل السؤال', fr: 'Question désactivée' },
+  'agent.sq.enabled': { vi: 'Đã bật câu hỏi', en: 'Question enabled', ar: 'تم تفعيل السؤال', fr: 'Question activée' },
+  'agent.sq.privateQuestion': { vi: 'Câu hỏi riêng cho agent này', en: 'Private questions for this agent', ar: 'أسئلة خاصة لهذا الوكيل', fr: 'Questions privées pour cet agent' },
+  'agent.sq.saveAgentFirst': { vi: 'Lưu Agent trước để thêm câu hỏi', en: 'Save Agent first to add questions', ar: 'احفظ الوكيل أولاً لإضافة أسئلة', fr: 'Enregistrez l\'agent d\'abord pour ajouter des questions' },
+  'agent.sq.add': { vi: 'Thêm', en: 'Add', ar: 'إضافة', fr: 'Ajouter' },
+  'agent.sq.update': { vi: 'Cập nhật', en: 'Update', ar: 'تحديث', fr: 'Mettre à jour' },
+  'agent.sq.addNew': { vi: 'Thêm mới', en: 'Add New', ar: 'إضافة جديد', fr: 'Ajouter nouveau' },
+  'agent.sq.hint': { vi: 'Nhấn "Thêm" hoặc "AI gợi ý" để tạo câu hỏi đầu tiên', en: 'Press "Add" or "AI Suggest" to create your first question', ar: 'اضغط "إضافة" أو "اقتراح الذكاء الاصطناعي" لإنشاء سؤالك الأول', fr: 'Appuyez sur "Ajouter" ou "Suggestion IA" pour créer votre première question' },
+  'agent.sq.noQuestions': { vi: 'Chưa có câu hỏi nào', en: 'No questions yet', ar: 'لا توجد أسئلة بعد', fr: 'Pas encore de questions' },
+  'agent.sq.statusActive': { vi: '✓ Hoạt động', en: '✓ Active', ar: '✓ نشط', fr: '✓ Actif' },
+  'agent.sq.statusDisabled': { vi: '✕ Tắt', en: '✕ Disabled', ar: '✕ معطل', fr: '✕ Désactivé' },
+  'agent.sq.aiSuggest': { vi: 'AI gợi ý', en: 'AI Suggest', ar: 'اقتراح الذكاء الاصطناعي', fr: 'Suggestion IA' },
+  'agent.sq.aiSuggestHint': { vi: 'Gợi ý câu hỏi với AI', en: 'Suggest questions with AI', ar: 'اقتراح أسئلة مع الذكاء الاصطناعي', fr: 'Suggérer des questions avec l\'IA' },
+  'agent.sq.quickChips': { vi: 'Kiểm tra đơn hàng?', en: 'Check order status?', ar: 'التحقق من حالة الطلب؟', fr: 'Vérifier l\'état de la commande ?' },
+  'agent.sq.quickChips2': { vi: 'Chính sách đổi trả?', en: 'Return policy?', ar: 'سياسة الإرجاع؟', fr: 'Politique de retour ?' },
+  'agent.sq.quickChips3': { vi: 'Thời gian hỗ trợ?', en: 'Support hours?', ar: 'ساعات الدعم؟', fr: 'Heures de support ?' },
+
+  // Custom bots
+  'agent.custom.autoAvailable': { vi: 'Tự động có sẵn', en: 'Auto available', ar: 'متاح تلقائيًا', fr: 'Auto disponible' },
+  'agent.custom.noImportNeeded': { vi: 'Custom bots tự động có sẵn — không cần import', en: 'Custom bots auto available — no import needed', ar: 'الروبوتات المخصصة متاحة تلقائيًا - لا حاجة للاستيراد', fr: 'Les bots personnalisés sont automatiquement disponibles — pas besoin d\'importer' },
+  'agent.custom.allImported': { vi: 'Tất cả MADA bots đã import. Custom bots tự động có sẵn!', en: 'All MADA bots imported. Custom bots auto available!', ar: 'تم استيراد جميع روبوتات MADA. الروبوتات المخصصة متاحة تلقائيًا!', fr: 'Tous les bots MADA importés. Bots personnalisés automatiquement disponibles !' },
+  'agent.custom.sectionTitle': { vi: 'CUSTOM BOTS Section - Tự động có sẵn, không cần import', en: 'CUSTOM BOTS Section - Auto available, no import needed', ar: 'قسم CUSTOM BOTS - متاح تلقائيًا، لا حاجة للاستيراد', fr: 'Section CUSTOM BOTS - Auto disponible, pas besoin d\'importer' },
 };
 
 // ============== TRANSLATION HELPER ==============
@@ -608,11 +650,11 @@ export function AdminAgents() {
   };
 
   const handleSqDelete = async (id: string) => {
-    if (!confirm('Xóa câu hỏi này?')) return;
+    if (!confirm(tAgent('agent.sq.confirmDelete'))) return;
     try {
       await adminApi.deleteSuggestedQuestion(id);
       if (editingId) loadSqQuestions(editingId);
-      setSqSuccess('Đã xóa câu hỏi!');
+      setSqSuccess(tAgent('agent.sq.deleted'));
       setTimeout(() => setSqSuccess(null), 3000);
     } catch (err: any) {
       alert(err.message);
@@ -623,7 +665,7 @@ export function AdminAgents() {
     try {
       await adminApi.updateSuggestedQuestion(q.id, { is_active: q.is_active !== 1 });
       if (editingId) loadSqQuestions(editingId);
-      setSqSuccess(q.is_active === 1 ? 'Đã tắt câu hỏi' : 'Đã bật câu hỏi');
+      setSqSuccess(q.is_active === 1 ? tAgent('agent.sq.disabled') : tAgent('agent.sq.enabled'));
       setTimeout(() => setSqSuccess(null), 3000);
     } catch (err: any) {
       alert(err.message);
@@ -1668,7 +1710,7 @@ export function AdminAgents() {
                           )}
                         </div>
                         <p className="text-[10px] text-slate-400 mt-0.5">
-                          {editingId ? 'Câu hỏi riêng cho agent này' : 'Lưu Agent trước để thêm câu hỏi'}
+                          {editingId ? tAgent('agent.sq.privateQuestion') : tAgent('agent.sq.saveAgentFirst')}
                         </p>
                       </div>
                     </div>
@@ -1691,10 +1733,10 @@ export function AdminAgents() {
                             setSqShowForm(true);
                           }}
                           className="relative group overflow-hidden flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-semibold rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-600 border border-amber-200/70 shadow-xs transition-all"
-                          title="Gợi ý câu hỏi với AI"
+                          title={tAgent('agent.sq.aiSuggestHint')}
                         >
                           <span className="material-symbols-outlined text-[11px] text-amber-500">auto_awesome</span>
-                          <span>AI gợi ý</span>
+                          <span>{tAgent('agent.sq.aiSuggest')}</span>
                         </button>
                       )}
                       {/* Quick Add Button */}
@@ -1705,7 +1747,7 @@ export function AdminAgents() {
                           className="flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-bold rounded-lg bg-blue-500 hover:bg-blue-600 text-white shadow-sm border border-blue-600 transition-all active:scale-95"
                         >
                           <span className="material-symbols-outlined text-[11px]">add</span>
-                          <span>Thêm</span>
+                          <span>{tAgent('agent.sq.add')}</span>
                         </button>
                       )}
                     </div>
@@ -1721,17 +1763,17 @@ export function AdminAgents() {
                         <span className="material-symbols-outlined text-blue-400 text-xl">chat_bubble</span>
                       </div>
                       <p className="text-[11px] text-slate-500 font-medium">
-                        Chưa có câu hỏi nào
+                        {tAgent('agent.sq.noQuestions')}
                       </p>
                       <p className="text-[10px] text-slate-400 mt-1">
-                        Nhấn <b className="text-blue-600">"Thêm"</b> hoặc <b className="text-amber-600">"AI gợi ý"</b> để tạo câu hỏi đầu tiên
+                        {tAgent('agent.sq.hint')}
                       </p>
                       {/* Quick chips */}
                       <div className="flex flex-wrap items-center justify-center gap-1.5 mt-3">
                         {[
-                          'Kiểm tra đơn hàng?',
-                          'Chính sách đổi trả?',
-                          'Thời gian hỗ trợ?',
+                          tAgent('agent.sq.quickChips'),
+                          tAgent('agent.sq.quickChips2'),
+                          tAgent('agent.sq.quickChips3'),
                         ].map((txt) => (
                           <button
                             key={txt}
@@ -1759,7 +1801,7 @@ export function AdminAgents() {
                         <div className="grid grid-cols-3 gap-2">
                           {/* Category */}
                           <div>
-                            <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1 ml-1">Danh mục</label>
+                            <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1 ml-1">{t('admin.sq.category')}</label>
                             <select
                               value={sqFormData.category}
                               onChange={(e) => setSqFormData(prev => ({ ...prev, category: e.target.value as ATCategory }))}
@@ -1772,7 +1814,7 @@ export function AdminAgents() {
                           </div>
                           {/* Language */}
                           <div>
-                            <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1 ml-1">Ngôn ngữ</label>
+                            <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1 ml-1">{t('admin.sq.language')}</label>
                             <select
                               value={sqFormData.language}
                               onChange={(e) => setSqFormData(prev => ({ ...prev, language: e.target.value as LanguageType }))}
@@ -1785,7 +1827,7 @@ export function AdminAgents() {
                           </div>
                           {/* Sort Order */}
                           <div>
-                            <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1 ml-1">Thứ tự</label>
+                            <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1 ml-1">{t('admin.sq.sortOrder')}</label>
                             <div className="relative flex items-center bg-white border border-slate-200 rounded-lg overflow-hidden hover:border-blue-400 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-400/40 transition-all">
                               <button
                                 type="button"
@@ -1814,7 +1856,7 @@ export function AdminAgents() {
                         {/* Question Input */}
                         <div>
                           <div className="flex items-center justify-between mb-1 ml-1">
-                            <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Nội dung câu hỏi</label>
+                            <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">{t('admin.sq.questionContent')}</label>
                             <span className={clsx('text-[9px] font-semibold', sqFormData.question.length >= 200 ? 'text-red-500' : sqFormData.question.length >= 180 ? 'text-amber-500' : 'text-slate-400')}>{sqFormData.question.length}/200</span>
                           </div>
                           <div className="relative">
@@ -1864,7 +1906,7 @@ export function AdminAgents() {
                               onClick={() => { setSqShowForm(false); resetSqForm(); }}
                               className="px-3 py-1.5 rounded-lg bg-white text-slate-600 text-[10px] font-semibold border border-slate-200 hover:bg-slate-50 transition-all active:scale-95"
                             >
-                              Hủy
+                              {tAgent('admin.common.cancel')}
                             </button>
                             <button
                               type="button"
@@ -1872,7 +1914,7 @@ export function AdminAgents() {
                               disabled={!sqFormData.question.trim() || sqFormData.question.length > 200}
                               className="px-4 py-1.5 rounded-lg bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-[10px] font-bold hover:from-blue-600 hover:to-indigo-600 shadow-sm border border-blue-600 transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:from-blue-500 disabled:hover:to-indigo-500"
                             >
-                              {sqEditingId ? 'Cập nhật' : 'Thêm mới'}
+                              {sqEditingId ? tAgent('agent.sq.update') : tAgent('agent.sq.addNew')}
                             </button>
                           </div>
                         </div>
@@ -1884,7 +1926,7 @@ export function AdminAgents() {
                   {sqLoading ? (
                     <div className="flex items-center justify-center gap-2 py-4">
                       <div className="w-4 h-4 rounded-full border-2 border-blue-500 border-t-transparent animate-spin"></div>
-                      <span className="text-[11px] text-blue-500 font-medium">Đang tải...</span>
+                      <span className="text-[11px] text-blue-500 font-medium">{tAgent('admin.common.loading')}</span>
                     </div>
                   ) : sqQuestions.length > 0 && !sqShowForm && (
                     <div className="space-y-1.5 max-h-52 overflow-y-auto pr-1">
@@ -1915,7 +1957,7 @@ export function AdminAgents() {
                                 <span className="text-[9px] text-slate-400">{SQ_CATEGORIES.find(c => c.value === q.category)?.label}</span>
                                 <span className="text-[9px] text-slate-300">•</span>
                                 <span className={clsx('text-[9px] px-1.5 py-0.5 rounded-full font-semibold', q.is_active === 1 ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-400')}>
-                                  {q.is_active === 1 ? '✓ Hoạt động' : '✕ Tắt'}
+                                  {q.is_active === 1 ? tAgent('agent.sq.statusActive') : tAgent('agent.sq.statusDisabled')}
                                 </span>
                               </div>
                             </div>
@@ -1937,7 +1979,7 @@ export function AdminAgents() {
                                   type="button"
                                   onClick={() => handleSqEdit(q)}
                                   className="w-7 h-7 rounded-lg hover:bg-blue-50 flex items-center justify-center transition-colors"
-                                  title="Sửa"
+                                  title={tAgent('admin.common.edit')}
                                 >
                                   <span className="material-symbols-outlined text-[13px] text-blue-500">edit</span>
                                 </button>
@@ -1945,7 +1987,7 @@ export function AdminAgents() {
                                   type="button"
                                   onClick={() => handleSqDelete(q.id)}
                                   className="w-7 h-7 rounded-lg hover:bg-red-50 flex items-center justify-center transition-colors"
-                                  title="Xóa"
+                                  title={tAgent('admin.common.delete')}
                                 >
                                   <span className="material-symbols-outlined text-[13px] text-red-400">delete</span>
                                 </button>
@@ -2545,82 +2587,177 @@ export function AdminAgents() {
                 </div>
               </div>
 
-              {/* CUSTOM BOTS Section - Tự động có sẵn, không cần import */}
-              {getImportableAgents().filter(item => item.source === 'custom').length > 0 && (
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="w-6 h-6 rounded bg-green-500 text-white flex items-center justify-center">
-                      <span className="material-symbols-outlined text-xs" style={{ fontVariationSettings: "'FILL' 1" }}>auto_awesome</span>
+              {/* CUSTOM BOTS Section - Modern Redesign */}
+              {(() => {
+                const customBots = getImportableAgents().filter(item => item.source === 'custom');
+                if (customBots.length === 0) return null;
+                return (
+                  <div className="mt-6">
+                    {/* Section Header */}
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center shadow-lg shadow-emerald-500/30">
+                          <span className="material-symbols-outlined text-white text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>auto_awesome</span>
+                        </div>
+                        <div>
+                          <h3 className="font-bold text-sm text-slate-800">{tAgent('agent.importCustomBots')}</h3>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full border border-emerald-200">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                              {tAgent('agent.custom.autoAvailable')}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-2xl font-black text-slate-300">{customBots.length}</span>
+                        <span className="text-xs text-slate-500 font-medium">bot{customBots.length !== 1 ? 's' : ''}</span>
+                      </div>
                     </div>
-                    <h3 className="font-bold text-xs text-on-surface uppercase tracking-wide">{tAgent('agent.importCustomBots', language)}</h3>
-                    <span className="text-[10px] font-bold bg-green-100 text-green-700 px-1.5 py-0.5 rounded border border-green-300">
-                      Tự động có sẵn
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                    {getImportableAgents()
-                      .filter(item => item.source === 'custom')
-                      .map((bot) => {
-                      return (
-                        <label
-                          key={bot.id}
-                          className="relative flex flex-col gap-1 p-2 rounded-lg border border-green-300 bg-green-50 cursor-default transition-all hover:border-green-400"
-                        >
-                          <div className="flex items-center gap-2">
-                            <span className="text-lg">{bot.avatar}</span>
-                            <div className="flex-1 min-w-0">
-                              <div className="font-bold text-[11px] text-on-surface truncate">{bot.name}</div>
-                            </div>
-                            <span className="material-symbols-outlined text-green-500 text-sm flex-shrink-0" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
-                          </div>
-                          {/* Action buttons for Super Admin */}
-                          <div className="flex items-center gap-1 mt-1 pt-1 border-t border-green-200">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const agent = agents.find(a => a.id === bot.id);
-                                if (agent) {
-                                  handleEdit(agent);
-                                  setShowImportModal(false);
-                                }
-                              }}
-                              className="flex-1 flex items-center justify-center gap-1 py-1 rounded-md bg-blue-500 text-white text-[11px] font-bold hover:bg-blue-600 transition-colors"
-                              title={tAgent('admin.common.edit', language)}
-                            >
-                              <span className="material-symbols-outlined text-xs">edit</span>
-                              Sửa
-                            </button>
-                            <button
-                              type="button"
-                              onClick={async () => {
-                                if (!confirm(tAgent('agent.confirmDeleteQuestion', language))) return;
-                                setShowImportModal(false);
-                                await handleDelete(bot.id);
-                              }}
-                              className="flex-1 flex items-center justify-center gap-1 py-1 rounded-md bg-red-500 text-white text-[11px] font-bold hover:bg-red-600 transition-colors"
-                              title={tAgent('admin.common.delete', language)}
-                            >
-                              <span className="material-symbols-outlined text-xs">delete</span>
-                              Xóa
-                            </button>
-                          </div>
-                        </label>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
 
-              {/* Empty State */}
-              {getImportableAgents().filter(item => !agents.some(a => a.id === item.id)).length === 0 && (
-                <div className="text-center py-8">
-                  <div className="w-12 h-12 rounded-lg bg-green-100 flex items-center justify-center mx-auto mb-3">
-                    <span className="material-symbols-outlined text-2xl text-green-600">verified</span>
+                    {/* Bot Cards Grid */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {customBots.map((bot) => {
+                        const agent = agents.find(a => a.id === bot.id);
+                        const isActive = agent?.is_active || agent?.isActive;
+                        return (
+                          <div
+                            key={bot.id}
+                            className="group relative bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-xl hover:border-emerald-300 transition-all duration-300 overflow-hidden"
+                          >
+                            {/* Active Status Bar */}
+                            <div className={clsx(
+                              "h-1 w-full",
+                              isActive ? "bg-gradient-to-r from-emerald-400 to-teal-400" : "bg-slate-200"
+                            )} />
+
+                            <div className="p-4">
+                              {/* Bot Header */}
+                              <div className="flex items-start gap-3 mb-3">
+                                {/* Avatar */}
+                                <div className="relative flex-shrink-0">
+                                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 border-2 border-white shadow-md flex items-center justify-center text-2xl overflow-hidden">
+                                    {bot.avatar_url || /^https?:\/\//.test(bot.avatar || '') ? (
+                                      <img src={bot.avatar_url || bot.avatar} alt={bot.name} className="w-full h-full object-cover" />
+                                    ) : (
+                                      <span>{bot.avatar}</span>
+                                    )}
+                                  </div>
+                                  {/* Status Dot */}
+                                  <div className={clsx(
+                                    "absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full border-2 border-white",
+                                    isActive ? "bg-emerald-500" : "bg-slate-400"
+                                  )}>
+                                    {isActive && (
+                                      <span className="absolute inset-0 rounded-full bg-emerald-400 animate-ping opacity-75"></span>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {/* Bot Info */}
+                                <div className="flex-1 min-w-0">
+                                  <h4 className="font-bold text-sm text-slate-800 truncate mb-0.5">{bot.name}</h4>
+                                  <p className="text-[11px] text-slate-500 line-clamp-2 leading-relaxed">
+                                    {bot.description || 'Không có mô tả'}
+                                  </p>
+                                </div>
+                              </div>
+
+                              {/* Agent Status Badge */}
+                              <div className="flex items-center gap-2 mb-3">
+                                <span className={clsx(
+                                  "inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide",
+                                  isActive 
+                                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200" 
+                                    : "bg-slate-100 text-slate-500 border border-slate-200"
+                                )}>
+                                  <span className={clsx("w-1.5 h-1.5 rounded-full", isActive ? "bg-emerald-500" : "bg-slate-400")}></span>
+                                  {isActive ? 'ON' : 'OFF'}
+                                </span>
+                                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                                  <span className="material-symbols-outlined text-[10px]">smart_toy</span>
+                                  Custom
+                                </span>
+                              </div>
+
+                              {/* Action Buttons */}
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const agent = agents.find(a => a.id === bot.id);
+                                    if (agent) {
+                                      handleEdit(agent);
+                                      setShowImportModal(false);
+                                    }
+                                  }}
+                                  className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-gradient-to-r from-blue-500 to-blue-600 text-white text-xs font-bold shadow-sm hover:shadow-md hover:from-blue-600 hover:to-blue-700 transition-all duration-200 active:scale-95"
+                                  title={tAgent('admin.common.edit')}
+                                >
+                                  <span className="material-symbols-outlined text-sm">edit</span>
+                                  Sửa
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    if (!confirm(tAgent('agent.confirmDeleteQuestion', language))) return;
+                                    setShowImportModal(false);
+                                    await handleDelete(bot.id);
+                                  }}
+                                  className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-white border border-red-200 text-red-600 text-xs font-bold hover:bg-red-50 hover:border-red-300 transition-all duration-200 active:scale-95"
+                                  title={tAgent('admin.common.delete')}
+                                >
+                                  <span className="material-symbols-outlined text-sm">delete</span>
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Hover Glow Effect */}
+                            <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-emerald-500/5 to-teal-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
-                  <h3 className="font-black text-sm text-on-surface mb-1">{tAgent('agent.importAllBotsImported', language)}</h3>
-                  <p className="text-xs text-on-surface-variant">Tất cả MADA bots đã import. Custom bots tự động có sẵn!</p>
-                </div>
-              )}
+                );
+              })()}
+
+              {/* Empty State - Modern Design */}
+              {(() => {
+                const madaNotImported = getImportableAgents().filter(item => item.source === 'mada' && !agents.some(a => a.id === item.id));
+                const customBots = getImportableAgents().filter(item => item.source === 'custom');
+                if (madaNotImported.length > 0 || customBots.length > 0) return null;
+                return (
+                  <div className="text-center py-12 px-6">
+                    {/* Animated Icon */}
+                    <div className="relative w-20 h-20 mx-auto mb-6">
+                      <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-500 opacity-20 animate-pulse"></div>
+                      <div className="relative w-full h-full rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center shadow-xl shadow-emerald-500/30">
+                        <span className="material-symbols-outlined text-4xl text-white" style={{ fontVariationSettings: "'FILL' 1" }}>verified</span>
+                      </div>
+                      {/* Sparkle Effects */}
+                      <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-yellow-400 animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                      <div className="absolute -bottom-1 -left-1 w-3 h-3 rounded-full bg-pink-400 animate-bounce" style={{ animationDelay: '0.4s' }}></div>
+                    </div>
+                    
+                    <h3 className="font-bold text-lg text-slate-800 mb-2">{tAgent('agent.importAllBotsImported')}</h3>
+                    <p className="text-sm text-slate-500 max-w-xs mx-auto">{tAgent('agent.custom.allImported')}</p>
+                    
+                    {/* Stats Summary */}
+                    <div className="flex items-center justify-center gap-4 mt-6">
+                      <div className="text-center">
+                        <div className="text-2xl font-black text-emerald-600">{agents.length}</div>
+                        <div className="text-[10px] text-slate-500 font-medium uppercase tracking-wide">Tổng Bots</div>
+                      </div>
+                      <div className="w-px h-8 bg-slate-200"></div>
+                      <div className="text-center">
+                        <div className="text-2xl font-black text-blue-600">{agents.filter(a => a.is_active || a.isActive).length}</div>
+                        <div className="text-[10px] text-slate-500 font-medium uppercase tracking-wide">Đang hoạt động</div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Footer */}

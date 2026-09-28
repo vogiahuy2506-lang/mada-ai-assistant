@@ -76,6 +76,8 @@ const tW = (key: string): string => {
       'admin.widget.noPermission': 'Bạn không có quyền chỉnh sửa cấu hình này.',
       'admin.widget.section': 'Phần',
       'admin.widget.aiReady': 'Trợ lý AI sẵn sàng hỗ trợ',
+      'admin.widget.reset': 'Đặt lại',
+      'admin.widget.activateButton': 'Kích hoạt nút nổi',
     },
     en: {
       'admin.widget.saveFailed': 'Save failed',
@@ -141,6 +143,8 @@ const tW = (key: string): string => {
       'admin.widget.noPermission': 'You do not have permission to edit this configuration.',
       'admin.widget.section': 'Section',
       'admin.widget.aiReady': 'AI Assistant ready to help',
+      'admin.widget.reset': 'Reset',
+      'admin.widget.activateButton': 'Activate floating button',
     },
     ar: {
       'admin.widget.saveFailed': 'فشل الحفظ',
@@ -206,6 +210,8 @@ const tW = (key: string): string => {
       'admin.widget.noPermission': 'ليس لديك صلاحية لتعديل هذا التكوين.',
       'admin.widget.section': 'القسم',
       'admin.widget.aiReady': 'المساعد الذكي جاهز للمساعدة',
+      'admin.widget.reset': 'إعادة تعيين',
+      'admin.widget.activateButton': 'تفعيل الزر العائم',
     },
     fr: {
       'admin.widget.saveFailed': 'Échec de la sauvegarde',
@@ -271,6 +277,8 @@ const tW = (key: string): string => {
       'admin.widget.noPermission': 'Vous n\'avez pas la permission de modifier cette configuration.',
       'admin.widget.section': 'Section',
       'admin.widget.aiReady': 'Assistant IA prêt à aider',
+      'admin.widget.reset': 'Réinitialiser',
+      'admin.widget.activateButton': 'Activer le bouton flottant',
     },
   };
   return translations[lang]?.[key] || translations['vi'][key] || key;
@@ -712,7 +720,7 @@ export function WidgetCustomization({ userRole: propUserRole }: Omit<WidgetCusto
                 className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 bg-white/90 text-sm font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-300 shadow-sm transition-all"
               >
                 <Eye className="w-4 h-4 text-slate-500" />
-                <span>Xem preview</span>
+                <span>{tW('admin.widget.viewPreview')}</span>
               </button>
               
               {/* Reset button */}
@@ -721,10 +729,10 @@ export function WidgetCustomization({ userRole: propUserRole }: Omit<WidgetCusto
                   onClick={() => setShowResetConfirm(true)}
                   disabled={saving || !hasUnsavedChanges}
                   className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 bg-white/90 text-sm font-medium text-slate-600 hover:bg-slate-50 hover:border-slate-300 shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  title="Khôi phục cấu hình mặc định"
+                  title={tW('admin.widget.reset')}
                 >
                   <Settings className="w-4 h-4" />
-                  <span>Đặt lại</span>
+                  <span>{tW('admin.widget.reset')}</span>
                 </button>
               )}
               
@@ -1010,7 +1018,7 @@ export function WidgetCustomization({ userRole: propUserRole }: Omit<WidgetCusto
                       <span className={clsx('w-2 h-2 rounded-full bg-white animate-pulse', !config.chatBubbleEnabled && 'animate-none opacity-50')} />
                       <span>{config.chatBubbleEnabled ? tW('admin.widget.enabled') : tW('admin.widget.disabled')}</span>
                     </button>
-                    <span className="text-xs text-slate-500">Kích hoạt nút nổi</span>
+                    <span className="text-xs text-slate-500">{tW('admin.widget.activateButton')}</span>
                   </div>
 
                   {/* Icon Selector */}

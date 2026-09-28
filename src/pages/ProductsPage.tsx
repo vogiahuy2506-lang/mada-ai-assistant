@@ -181,11 +181,11 @@ export function ProductsPage() {
             className="px-4 py-3 bg-white border-2 border-outline rounded-xl font-bold text-sm hover:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
             aria-label={sortText}
           >
-            <option value="created_at-DESC">Mới nhất</option>
-            <option value="created_at-ASC">Cũ nhất</option>
-            <option value="title-ASC">Tên A-Z</option>
-            <option value="title-DESC">Tên Z-A</option>
-            <option value="brand-ASC">Thương hiệu A-Z</option>
+            <option value="created_at-DESC">{t('sort.newest')}</option>
+            <option value="created_at-ASC">{t('sort.oldest')}</option>
+            <option value="title-ASC">A-Z</option>
+            <option value="title-DESC">Z-A</option>
+            <option value="brand-ASC">A-Z (Brand)</option>
           </select>
         </div>
       </div>

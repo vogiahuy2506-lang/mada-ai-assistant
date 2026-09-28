@@ -204,8 +204,8 @@ router.put('/:key', requireAdmin, (req, res) => {
       db.prepare("UPDATE system_settings SET value = ?, updated_at = ? WHERE `key` = ?")
         .run(value, now, dbKey);
     } else {
-      db.prepare("INSERT INTO system_settings (key, value, type, description, created_at, updated_at)")
-        .run(dbKey, value, 'string', `System prompt: ${config.name}`, now, now);
+      db.prepare("INSERT INTO system_settings (key, value, type, description, updated_at)")
+        .run(dbKey, value, 'string', `System prompt: ${config.name}`, now);
     }
 
     // Log admin action

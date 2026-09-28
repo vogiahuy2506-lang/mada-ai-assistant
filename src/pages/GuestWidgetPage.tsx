@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { EmbedWidget } from '@/components/widget/EmbedWidget';
 import { useLanguageStore, useChatSettingsStore } from '@/stores';
 import { Home, ChevronDown, ChevronUp, ExternalLink, Copy, MessageSquare, Globe2, FileText, Accessibility, Check, Languages } from 'lucide-react';
+import { useTranslation } from '@/lib/translations';
 import clsx from 'clsx';
 
 // Labels cho trang Khách
@@ -79,6 +80,7 @@ export function GuestWidgetPage() {
   const [copyFeedback, setCopyFeedback] = useState<'success' | 'error' | null>(null);
   const { language, setLanguage } = useLanguageStore();
   const { fileAttachmentEnabled, loadFromBackend } = useChatSettingsStore();
+  const { t } = useTranslation();
   const labels = LABELS[language];
 
   // Load chat settings on mount
@@ -135,7 +137,7 @@ export function GuestWidgetPage() {
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-600"></span>
               </span>
               <span>
-                Xem trước Widget: <span className="font-semibold text-amber-900">Đang hoạt động</span>
+                {t('widget.preview')}: <span className="font-semibold text-amber-900">{t('widget.active')}</span>
               </span>
             </div>
             <div className="hidden md:flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-stone-700 bg-white border border-stone-200 rounded-lg shadow-sm relative">

@@ -356,6 +356,25 @@ class RAGEngine {
       // ⚡ PERFORMANCE OPTIMIZATION: Reduce docs retrieved (was topK * 4, now topK * 2)
       let relevantDocs = await this.retrieveDocuments(userQuery, topK * 2, { botId, madaCategory, agentId, priority });
 
+      // ⭐ Custom agent KHÔNG có dữ liệu → trả lời rằng không tìm thấy thông tin
+      // Không cho AI trả lời sai bằng kiến thức chung
+      if (agentId && relevantDocs.length === 0) {
+        console.log(`⚠️ [RAG] Agent "${agentId}" - no relevant docs found for query: "${userQuery.slice(0, 50)}..."`);
+        const noDataMsgs: Record<string, string> = {
+          vi: `Xin lỗi, tôi không tìm thấy thông tin liên quan đến câu hỏi của bạn trong cơ sở dữ liệu của bot này. Vui lòng thử hỏi về chủ đề khác hoặc liên hệ quản trị viên để thêm dữ liệu.`,
+          en: `Sorry, I couldn't find information related to your question in this bot's knowledge base. Please try asking about a different topic or contact the administrator to add data.`,
+          ar: `عذراً، لم أتمكن من العثور على معلومات متعلقة بسؤالك في قاعدة معرفة هذا البوت. يرجى محاولة السؤال عن موضوع آخر أو الاتصال بالمسؤول لإضافة البيانات.`,
+          fr: `Désolé, je n'ai pas trouvé d'informations concernant votre question dans la base de connaissances de ce bot. Veuillez essayer de poser une question sur un autre sujet ou contacter l'administrateur pour ajouter des données.`,
+        };
+        const lang = config.language || 'vi';
+        return {
+          answer: noDataMsgs[lang] || noDataMsgs.vi,
+          confidence: 0,
+          sources: [],
+          contextUsed: false,
+        };
+      }
+
       // Apply re-ranking only if top score is low (relevance uncertain)
       // Re-ranking costs ~2s extra per query. For seed/migration KB, vector search
       // is usually enough. Only rerank when top-1 score < 0.5 (uncertain relevance).
@@ -576,16 +595,44 @@ class RAGEngine {
     }
 
     const topK = config.topK || 10;
-    const { botId, madaCategory, priority = false } = config;
+    const { botId, madaCategory, agentId, priority = false } = config;
 
     // Retrieve relevant documents (với filter MADA nếu có)
-    const rawDocs = await this.retrieveDocuments(userQuery, topK * 4, { botId, madaCategory, priority });
+    const rawDocs = await this.retrieveDocuments(userQuery, topK * 4, { botId, madaCategory, agentId, priority });
 
     // ⭐ FIX: Pinecone trả score=1.0 cho mọi doc (do metric config), không dùng được.
     // → BẮT BUỘC gọi rerankService (LLM-based) để có relevance score thật.
     // Nếu rerank fail → fallback dùng rawDocs nhưng đánh confidence thấp.
     let relevantDocs: any[] = rawDocs;
     let usedRerank = false;
+
+    // ⭐ Custom agent KHÔNG có dữ liệu → trả lời rằng không tìm thấy thông tin
+    if (agentId && relevantDocs.length === 0) {
+      console.log(`⚠️ [RAG Stream] Agent "${agentId}" - no relevant docs found`);
+      const noDataMsgs: Record<string, string> = {
+        vi: `Xin lỗi, tôi không tìm thấy thông tin liên quan đến câu hỏi của bạn trong cơ sở dữ liệu của bot này.`,
+        en: `Sorry, I couldn't find information related to your question in this bot's knowledge base.`,
+        ar: `عذراً، لم أتمكن من العثور على معلومات متعلقة بسؤالك.`,
+        fr: `Désolé, je n'ai pas trouvé d'informations concernant votre question.`,
+      };
+      const lang = config.language || 'vi';
+      const noDataAnswer = noDataMsgs[lang] || noDataMsgs.vi;
+      
+      const noDataStream = (async function* () {
+        yield { text: () => noDataAnswer };
+      })();
+      
+      return {
+        stream: noDataStream,
+        sources: [],
+        confidence: 0,
+        answer: noDataAnswer,
+      };
+    }
+
+    // ⭐ FIX: Pinecone trả score=1.0 cho mọi doc (do metric config), không dùng được.
+    // → BẮT BUỘC gọi rerankService (LLM-based) để có relevance score thật.
+    // Nếu rerank fail → fallback dùng rawDocs nhưng đánh confidence thấp.
     if (rerankService.isReady() && rawDocs.length > 0) {
       try {
         const items: RerankableItem[] = rawDocs.map((doc, idx) => ({
@@ -848,8 +895,13 @@ ${tail.answerPrompt}`;
       }
     }
 
+    // Nếu có agentId (custom agent) → KHÔNG BAO GIỜ fallback sang MADA KB
+    // Custom agent phải dùng DỮ LIỆU RIÊNG, không trộn với MADA
+    const hasAgentId = !!agentId;
+    
     // Nếu priority mode VÀ chưa đủ → fallback hybrid search toàn bộ KB
-    if (priority && searchFilter && primary.length < topK) {
+    // NHƯNG: Nếu có agentId (custom agent), KHÔNG fallback - dùng kết quả hiện có
+    if (priority && searchFilter && primary.length < topK && !hasAgentId) {
       const need = topK - primary.length;
       console.log(`🔁 [RAG] Priority fallback: cần thêm ${need} docs từ toàn bộ KB`);
       try {
@@ -885,6 +937,11 @@ ${tail.answerPrompt}`;
           console.warn('⚠️ [RAG] Fallback search also failed:', err2);
         }
       }
+    } else if (hasAgentId && primary.length === 0) {
+      // ⭐ Custom agent KHÔNG có dữ liệu - log cảnh báo và trả về rỗng
+      // KHÔNG fallback sang MADA để tránh trả lời sai
+      console.log(`⚠️ [RAG] Agent "${agentId}" has no knowledge base data. Not falling back to MADA.`);
+      return [];
     }
 
     // Nếu không có searchFilter hoặc không priority → trả về primary hoặc search toàn bộ

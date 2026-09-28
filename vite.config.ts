@@ -3,20 +3,43 @@ import react from '@vitejs/plugin-react'
 import path from 'path'
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react({
+      // Ensure consistent JSX runtime
+      jsxImportSource: 'react',
+    }),
+  ],
   optimizeDeps: {
-    include: ['react', 'react-dom'],
-    // Exclude libraries that bundle their own React
+    include: ['react', 'react-dom', 'react-dom/client'],
     exclude: ['mammoth', 'pdfjs-dist'],
+    // Force re-bundle React to avoid multiple instances
+    esbuildOptions: {
+      define: {
+        'process.env.NODE_ENV': '"development"',
+      },
+    },
   },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
+      // Ensure single React instance
+      'react': path.resolve(__dirname, 'node_modules/react'),
+      'react-dom': path.resolve(__dirname, 'node_modules/react-dom'),
     },
   },
   server: {
     port: 5173,
     strictPort: false,
+    // Force full reload on certain file changes to avoid HMR issues
+    watch: {
+      ignored: ['**/node_modules/**', '**/.git/**'],
+    },
+    hmr: {
+      // Overlay to show errors
+      overlay: true,
+      // Force connection through WebSocket
+      overlayLimit: 5,
+    },
     proxy: {
       '/api': {
         target: 'http://localhost:3008',
@@ -34,7 +57,7 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: (id) => {
-          // Put all React-related modules in the same chunk
+          // Put all React-related modules in the same chunk to avoid multiple React instances
           if (id.includes('node_modules/react') || id.includes('node_modules/react-dom') || id.includes('node_modules/react-router-dom')) {
             return 'vendor-react';
           }
@@ -52,5 +75,10 @@ export default defineConfig({
     },
     reportCompressedSize: true,
     chunkSizeWarningLimit: 500,
+    // Minimize runtime errors
+    minify: 'esbuild',
+    target: 'esnext',
   },
+  // Clear cache on rebuild
+  cacheDir: 'node_modules/.vite',
 })

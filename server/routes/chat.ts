@@ -319,6 +319,17 @@ router.post('/', async (req, res) => {
       ragConfig.priority = true;
     }
     
+    console.log('🤖 Chat RAG config:', { 
+      agentId, 
+      isMadaBot: !!madaMapping, 
+      ragConfig: { 
+        hasAgentId: !!ragConfig.agentId, 
+        hasBotId: !!ragConfig.botId,
+        hasMadaCategory: !!ragConfig.madaCategory,
+        priority: ragConfig.priority 
+      }
+    });
+    
     // Query RAG
     const ragResponse = await ragEngine.query(message, chatHistory.get(convId) || [], ragConfig);
     
@@ -644,6 +655,17 @@ router.post('/stream', async (req: any, res: any) => {
       ragConfig.agentId = agentId;
       ragConfig.priority = true;
     }
+    
+    console.log('🤖 Stream Chat RAG config:', { 
+      agentId, 
+      isMadaBot: !!madaMapping, 
+      ragConfig: { 
+        hasAgentId: !!ragConfig.agentId, 
+        hasBotId: !!ragConfig.botId,
+        hasMadaCategory: !!ragConfig.madaCategory,
+        priority: ragConfig.priority 
+      }
+    });
     
     // Check RAG engine
     if (!ragEngine.isConfigured) {

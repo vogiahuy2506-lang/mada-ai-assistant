@@ -1,8 +1,9 @@
-import { ReactNode } from 'react';
+import { ReactNode, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore, useLanguageStore } from '@/stores';
 import clsx from 'clsx';
 import madaLogo from '@/assets/mada-logo.png';
+import { Menu, X, ChevronLeft } from 'lucide-react';
 
 // Admin Layout translations - Vietnamese, English, Arabic, French
 const tL = (key: string): string => {
@@ -260,6 +261,7 @@ export function AdminLayout({
   const { user, logout, isSuperAdmin } = useAuthStore();
   const { language, setLanguage } = useLanguageStore();
   const isUserSuperAdmin = isSuperAdmin();
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Get the title
   const getCurrentTitle = () => {
@@ -315,8 +317,8 @@ export function AdminLayout({
         nav::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
       `}</style>
 
-      {/* SIDEBAR */}
-      <aside className="h-screen w-64 fixed left-0 top-0 border-r border-white/10 z-50 flex flex-col p-4 gap-2 backdrop-blur-xl bg-white/70 border-white/40 shadow-[0_4px_12px_rgba(0,0,0,0.03)]">
+      {/* SIDEBAR - Desktop */}
+      <aside className="hidden md:flex h-screen w-64 fixed left-0 top-0 border-r border-white/10 z-50 flex-col p-4 gap-2 backdrop-blur-xl bg-white/70 border-white/40 shadow-[0_4px_12px_rgba(0,0,0,0.03)]">
         {/* Logo */}
         <div className="mb-6 px-2 flex items-center">
           <img src={madaLogo} alt="MADA" className="h-12 w-auto" />
@@ -385,15 +387,24 @@ export function AdminLayout({
       </aside>
 
       {/* MAIN CONTENT */}
-      <main className="ml-64 min-h-screen overflow-y-auto flex-1 flex flex-col">
+      <main className="md:ml-64 min-h-screen overflow-y-auto flex-1 flex flex-col w-full">
         {/* TOP BAR */}
-        <div className="sticky top-0 z-40 backdrop-blur-xl bg-white/70 border-b border-outline-variant/30 px-8 py-3 flex items-center gap-4 shrink-0">
+        <div className="sticky top-0 z-40 backdrop-blur-xl bg-white/70 border-b border-outline-variant/30 px-4 md:px-8 py-3 flex items-center gap-3 md:gap-4 shrink-0">
+          {/* Mobile Menu Toggle */}
+          <button
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className="md:hidden p-2 rounded-lg bg-surface-variant/50 hover:bg-surface-variant transition-colors"
+            aria-label="Toggle menu"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+          
           <div className="flex-1 min-w-0">
             {showLayoutTitle && (
               <div>
-                <h1 className="font-display-lg text-xl font-bold text-on-surface truncate">{currentTitle}</h1>
+                <h1 className="font-display-lg text-lg md:text-xl font-bold text-on-surface truncate">{currentTitle}</h1>
                 {currentSubtitle && (
-                  <p className="text-xs text-on-surface-variant truncate mt-0.5">{currentSubtitle}</p>
+                  <p className="text-xs text-on-surface-variant truncate mt-0.5 hidden sm:block">{currentSubtitle}</p>
                 )}
               </div>
             )}
@@ -564,11 +575,99 @@ export function AdminLayout({
 
         {/* PAGE BODY */}
         <div className="flex-1 overflow-y-auto">
-          <div className="p-8 pb-36 max-w-[1600px] mx-auto space-y-8">
+          <div className="p-4 md:p-8 pb-36 max-w-[1600px] mx-auto space-y-6 md:space-y-8">
             {children}
           </div>
         </div>
       </main>
+
+      {/* MOBILE MENU OVERLAY */}
+      {isMobileMenuOpen && (
+        <div className="fixed inset-0 z-[60] md:hidden">
+          {/* Backdrop */}
+          <div 
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm" 
+            onClick={() => setIsMobileMenuOpen(false)} 
+          />
+          
+          {/* Mobile Sidebar */}
+          <aside className="absolute left-0 top-0 bottom-0 w-72 bg-white shadow-2xl flex flex-col animate-in slide-in-from-left-2 duration-200">
+            {/* Mobile Header */}
+            <div className="flex items-center justify-between p-4 border-b border-outline-variant/30">
+              <div className="flex items-center gap-3">
+                <img src={madaLogo} alt="MADA" className="h-10 w-auto" />
+              </div>
+              <button
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="p-2 rounded-lg hover:bg-surface-variant transition-colors"
+                aria-label="Close menu"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Mobile Navigation */}
+            <nav className="flex-1 overflow-y-auto p-4 space-y-1">
+              {NAV_ITEMS
+                .filter((item) => {
+                  if (item.superAdminOnly && !isUserSuperAdmin) return false;
+                  return true;
+                })
+                .map((item) => {
+                  const isActive = location.pathname === item.href ||
+                    (item.href !== '/admin' && location.pathname.startsWith(item.href));
+                  return (
+                    <Link
+                      key={item.href}
+                      to={item.href}
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className={clsx(
+                        'flex items-center gap-3 px-4 py-3 rounded-xl font-semibold transition-all duration-150 active:scale-95',
+                        isActive
+                          ? 'bg-primary-container text-on-primary-container shadow-md'
+                          : 'text-on-surface-variant hover:bg-surface-variant/50 hover:scale-[1.02]'
+                      )}
+                    >
+                      <span className="material-symbols-outlined">{item.icon}</span>
+                      <span className="font-label-md">{tL(item.labelKey)}</span>
+                      {item.superAdminOnly && (
+                        <span className="material-symbols-outlined text-xs text-warning ml-auto" title={tL('admin.layout.superAdminOnly')}>lock</span>
+                      )}
+                    </Link>
+                  );
+                })}
+            </nav>
+
+            {/* Mobile Footer */}
+            <div className="p-4 border-t border-outline-variant/30 space-y-3">
+              {/* User Info */}
+              <div className="px-4 py-3 rounded-2xl border border-primary/10 bg-primary/5">
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-primary">account_circle</span>
+                  <span className="font-label-sm font-bold text-primary truncate flex-1">{user?.name || user?.email || tL('admin.layout.admin')}</span>
+                  {isUserSuperAdmin ? (
+                    <span className="px-2 py-0.5 rounded-full bg-gradient-to-r from-amber-400 to-orange-500 text-white text-[10px] font-bold shadow-sm">
+                      {tL('admin.layout.super')}
+                    </span>
+                  ) : (
+                    <span className="px-2 py-0.5 rounded-full bg-primary/20 text-primary text-[10px] font-bold">
+                      {tL('admin.layout.admin')}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <button
+                onClick={handleLogout}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-on-surface-variant hover:bg-error/5 hover:text-error transition-all text-left"
+              >
+                <span className="material-symbols-outlined">logout</span>
+                <span className="font-label-md">{tL('admin.layout.logout')}</span>
+              </button>
+            </div>
+          </aside>
+        </div>
+      )}
     </div>
   );
 }

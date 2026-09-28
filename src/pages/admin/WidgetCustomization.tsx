@@ -416,10 +416,10 @@ function LiveWidgetPreview({ config, initialChatOpen = false, onClose }: { confi
 
   return (
     <>
-      <div className="fixed inset-0 bg-black/20 z-[99] cursor-pointer" onClick={onClose} />
+      <div className="fixed inset-0 bg-black/40 md:bg-black/20 z-[99] cursor-pointer" onClick={onClose} />
       
       {/* Mock Browser Window */}
-      <div className={`fixed ${positionClass} bottom-4 z-[100] w-80`}>
+      <div className={`fixed ${positionClass} bottom-4 z-[100] w-[calc(100%-32px)] sm:w-80 max-w-sm right-4 md:right-auto md:left-auto ${config.position === 'bottom-left' ? 'left-4 md:left-auto' : ''}`}>
         {/* Chat Window */}
         {isChatOpen && (
           <div className="bg-white rounded-2xl shadow-2xl border border-slate-200/90 overflow-hidden mb-3 animate-in slide-in-from-bottom-2 duration-200">

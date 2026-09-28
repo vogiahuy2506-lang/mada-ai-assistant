@@ -784,7 +784,7 @@ export function AdminPrompts() {
           </div>
         </div>
       ) : (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 mb-4 flex flex-col" style={{ height: 'calc(100vh - 340px)' }}>
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 mb-4 flex flex-col" style={{ minHeight: 'calc(100vh - 200px)' }}>
           <div className="flex items-center gap-3 mb-3">
             <h2 className="text-base font-bold text-slate-800 shrink-0">{tPr('admin.prompts.prompts', language)}</h2>
             <div className="relative flex-1">
@@ -929,7 +929,7 @@ export function AdminPrompts() {
             </div>
 
             {/* Right Panel - Detail/Edit */}
-            <div className="flex-1 bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col overflow-hidden">
+            <div className="flex-1 bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col overflow-hidden min-h-0">
               {showCreate ? (
                 <div className="flex-1 flex flex-col min-h-0">
                   <div className="p-5 border-b border-slate-100 shrink-0 flex items-center justify-between">
@@ -1030,14 +1030,14 @@ export function AdminPrompts() {
                 </div>
               ) : selectedPrompt ? (
                 isEditing ? (
-                  <div className="flex-1 flex flex-col">
-                    <div className="p-5 border-b border-slate-100 flex items-center justify-between">
+                  <div className="flex-1 flex flex-col min-h-0">
+                    <div className="p-5 border-b border-slate-100 shrink-0 flex items-center justify-between">
                       <h2 className="text-lg font-bold text-slate-800">{tPr('admin.prompts.edit', language)}</h2>
                       <button onClick={() => setIsEditing(false)} className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors">
                         <X className="w-5 h-5 text-slate-400" />
                       </button>
                     </div>
-                    <div className="flex-1 overflow-y-auto p-5 space-y-4">
+                    <div className="flex-1 overflow-y-auto p-5 space-y-4 min-h-0">
                       <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1.5">{tPr('admin.prompts.id', language)}</label>
                         <input

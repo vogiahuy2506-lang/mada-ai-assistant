@@ -892,6 +892,7 @@ export const translations = {
     'promptsEditor.serverError': 'Lỗi server',
     'promptsEditor.loadFailed': 'Không thể tải prompts',
     'promptsEditor.networkError': 'Lỗi kết nối',
+    'promptsEditor.retry': 'Thử lại',
 
     // ============== PROMPT HISTORY ==============
     'promptHistory.noHistory': 'Chưa có lịch sử chỉnh sửa',
@@ -1833,6 +1834,7 @@ export const translations = {
     'promptsEditor.serverError': 'Server error',
     'promptsEditor.loadFailed': 'Failed to load prompts',
     'promptsEditor.networkError': 'Network error',
+    'promptsEditor.retry': 'Retry',
 
     // ============== PROMPT HISTORY ==============
     'promptHistory.noHistory': 'No edit history',
@@ -2774,6 +2776,8 @@ export const translations = {
     'promptsEditor.serverError': 'خطأ في الخادم',
     'promptsEditor.loadFailed': 'فشل تحميل prompts',
     'promptsEditor.networkError': 'خطأ في الشبكة',
+    'promptsEditor.retry': 'إعادة المحاولة',
+    'promptsEditor.retry': 'إعادة المحاولة',
 
     // ============== PROMPT HISTORY ==============
     'promptHistory.noHistory': 'لا يوجد سجل تعديلات',
@@ -3715,6 +3719,7 @@ export const translations = {
     'promptsEditor.serverError': 'Erreur serveur',
     'promptsEditor.loadFailed': 'Échec du chargement des prompts',
     'promptsEditor.networkError': 'Erreur réseau',
+    'promptsEditor.retry': 'Réessayer',
 
     // ============== PROMPT HISTORY ==============
     'promptHistory.noHistory': 'Pas d\'historique de modifications',

@@ -2367,8 +2367,21 @@ export function ChatPage() {
       >
           {/* Logo Area */}
           <div className="p-4 border-b border-white/50 shrink-0">
-            <div className="flex items-center justify-center">
-              <img src={madaLogo} alt="MADA" className="h-14" />
+            <div className="flex items-center justify-between">
+              {/* Close button on mobile */}
+              <button
+                onClick={() => setSidebarOpen(false)}
+                className="md:hidden w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition-colors"
+                aria-label={language === 'vi' ? 'Đóng menu' : language === 'en' ? 'Close menu' : 'إغلاق القائمة'}
+              >
+                <ChevronRight className="w-4 h-4 text-slate-600" />
+              </button>
+              {/* Logo */}
+              <div className={clsx(sidebarOpen ? 'flex-1 flex justify-center' : 'hidden')}>
+                <img src={madaLogo} alt="MADA" className="h-14" />
+              </div>
+              {/* Spacer for alignment when close button is hidden on desktop */}
+              <div className="hidden md:block w-8" />
             </div>
           </div>
 
@@ -2779,6 +2792,18 @@ export function ChatPage() {
 
       {/* ============== MAIN CONTENT ============== */}
       <main className="flex-1 flex flex-col relative overflow-hidden h-full">
+        
+        {/* Mobile Sidebar Toggle Button - Chỉ hiển thị trên mobile khi sidebar đóng */}
+        {!sidebarOpen && (
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="md:hidden fixed top-4 left-4 z-[60] w-10 h-10 bg-white rounded-full shadow-lg border-2 border-slate-200 flex items-center justify-center hover:bg-slate-50 active:scale-95 transition-all"
+            aria-label={language === 'vi' ? 'Mở menu' : language === 'en' ? 'Open menu' : 'فتح القائمة'}
+          >
+            <ChevronRight className="w-5 h-5 text-slate-600 rotate-180" />
+          </button>
+        )}
+
         {/* Top Navigation Bar - Glass Morphism - Unified Style */}
         <header className="hidden md:flex items-center justify-between p-4 bg-white/40 backdrop-blur-md border-b border-white/40 z-20 sticky top-0 h-16">
           {/* Left Section */}

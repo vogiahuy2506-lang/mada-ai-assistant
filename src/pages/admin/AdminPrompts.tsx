@@ -784,7 +784,7 @@ export function AdminPrompts() {
           </div>
         </div>
       ) : (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 mb-4 flex flex-col" style={{ minHeight: 'calc(100vh - 200px)' }}>
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 mb-4 flex flex-col">
           <div className="flex items-center gap-3 mb-3">
             <h2 className="text-base font-bold text-slate-800 shrink-0">{tPr('admin.prompts.prompts', language)}</h2>
             <div className="relative flex-1">
@@ -929,7 +929,7 @@ export function AdminPrompts() {
             </div>
 
             {/* Right Panel - Detail/Edit */}
-            <div className="flex-1 bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col overflow-hidden min-h-0">
+            <div className="flex-1 bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col overflow-hidden">
               {showCreate ? (
                 <div className="flex-1 flex flex-col min-h-0">
                   <div className="p-5 border-b border-slate-100 shrink-0 flex items-center justify-between">

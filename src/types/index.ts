@@ -110,6 +110,16 @@ export interface SuggestedProduct {
   availability?: string;
   match_reason?: string;
   confidence?: number;
+  // Chi tiết sản phẩm
+  patient_indications?: string[]; // Chỉ định cho bệnh nhân
+  medical_indications?: string[]; // Chỉ định y khoa
+  contraindications?: string[]; // Chống chỉ định
+  specifications?: { label: string; value: string }[]; // Thông số kỹ thuật
+  compatibility?: string[]; // Tương thích với
+  financial_support?: string[]; // Hỗ trợ tài chính
+  insurance_coverage?: string[]; // Bảo hiểm chi trả
+  mada_advice?: string; // Lời khuyến từ MADA
+  warranty?: string; // Bảo hành
 }
 
 // Consultation Request

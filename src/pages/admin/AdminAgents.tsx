@@ -152,11 +152,18 @@ const agentTranslations: Record<string, Record<Language, string>> = {
   // Form
   'agent.form.name': { vi: 'Tên Agent', en: 'Agent Name', ar: 'اسم الوكيل', fr: 'Nom de l\'agent' },
   'agent.form.namePlaceholder': { vi: 'VD: MADA Assistant', en: 'Example: MADA Assistant', ar: 'مثال: مساعد MADA', fr: 'Exemple: Assistant MADA' },
+  'agent.form.sortOrder': { vi: 'Thứ tự hiển thị', en: 'Display Order', ar: 'ترتيب العرض', fr: 'Ordre d\'affichage' },
+  'agent.form.sortOrderHint': { vi: 'Số nhỏ hơn hiển thị trước. VD: 1, 2, 3...', en: 'Smaller number appears first. E.g.: 1, 2, 3...', ar: 'الرقم الأصغر يظهر أولاً. مثال: 1، 2، 3...', fr: 'Le plus petit nombre apparaît en premier. Ex: 1, 2, 3...' },
   'agent.form.description': { vi: 'Mô tả', en: 'Description', ar: 'الوصف', fr: 'Description' },
   'agent.form.descriptionPlaceholder': { vi: 'Mô tả ngắn về Agent...', en: 'Brief description of the Agent...', ar: 'وصف موجز للوكيل...', fr: 'Brève description de l\'agent...' },
   'agent.form.systemPrompt': { vi: 'System Prompt', en: 'System Prompt', ar: 'مطالبة النظام', fr: 'Prompt système' },
   'agent.form.systemPromptOptional': { vi: '(tùy chọn)', en: '(optional)', ar: '(اختياري)', fr: '(facultatif)' },
   'agent.form.systemPromptOverride': { vi: '(override nếu có tham chiếu ở trên)', en: '(override if reference above)', ar: '(يتجاوز إذا كان هناك مرجع أعلاه)', fr: '(remplace si référence ci-dessus)' },
+  'agent.form.systemPromptSize': { vi: 'Kích thước', en: 'Size', ar: 'الحجم', fr: 'Taille' },
+  'agent.form.editPrompt': { vi: 'Chỉnh sửa', en: 'Edit', ar: 'تحرير', fr: 'Éditer' },
+  'agent.form.editPromptTitle': { vi: 'Chỉnh sửa System Prompt', en: 'Edit System Prompt', ar: 'تحرير مطالبة النظام', fr: 'Modifier le prompt système' },
+  'agent.form.promptEditorHint': { vi: 'Chỉnh sửa thoải mái trong cửa sổ này', en: 'Edit freely in this window', ar: 'تحرير بحرية في هذه النافذة', fr: 'Modifiez librement dans cette fenêtre' },
+  'agent.form.apply': { vi: 'Áp dụng', en: 'Apply', ar: 'تطبيق', fr: 'Appliquer' },
   'agent.form.systemPromptPlaceholder': { vi: 'VD: Bạn là trợ lý ảo của MADA...', en: 'Example: You are a virtual assistant of MADA...', ar: 'مثال: أنت مساعد MADA الافتراضي...', fr: 'Exemple: Vous êtes l\'assistant virtuel de MADA...' },
   'agent.form.welcome': { vi: 'Tin nhắn chào mừng', en: 'Welcome Message', ar: 'رسالة الترحيب', fr: 'Message de bienvenue' },
   'agent.form.placeholder': { vi: 'Placeholder', en: 'Placeholder', ar: 'نص بديل', fr: 'Placeholder' },
@@ -372,6 +379,7 @@ interface Agent {
   last_crawl_at?: string | null;
   last_crawl_status?: string | null;
   last_crawl_count?: number;
+  sort_order?: number;
 }
 
 type CrawlResult = {
@@ -428,6 +436,7 @@ export function AdminAgents() {
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<string | null>(null);
+  const [filterTab, setFilterTab] = useState<'all' | 'active' | 'disabled'>('all');
 
   // Test Agent state
   const [testAgentId, setTestAgentId] = useState<string | null>(null);
@@ -527,9 +536,10 @@ export function AdminAgents() {
     capabilities: [] as string[],
     knowledge_url: '',
     product_urls: [] as string[],
-    crawl_follow_links: false,
-    crawl_max_depth: 1,
-    crawl_max_pages: 5,
+    sort_order: 0,
+    crawl_follow_links: true,  // ⭐ Mặc định bật để cào sâu
+    crawl_max_depth: 3,       // ⭐ Mặc định 3 cấp độ sâu
+    crawl_max_pages: 20,      // ⭐ Mặc định 20 trang
   });
   const [newProductUrl, setNewProductUrl] = useState('');
   const [productUrlError, setProductUrlError] = useState('');
@@ -541,6 +551,10 @@ export function AdminAgents() {
   const [crawling, setCrawling] = useState(false);
   const [crawlResult, setCrawlResult] = useState<{ totalDocs: number; results: CrawlResult[] } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // System prompt editor modal
+  const [systemPromptModalOpen, setSystemPromptModalOpen] = useState(false);
+  const [systemPromptDraft, setSystemPromptDraft] = useState('');
 
   // ============== SUGGESTED QUESTIONS STATE ==============
   const [sqQuestions, setSqQuestions] = useState<SuggestedQuestion[]>([]);
@@ -706,27 +720,11 @@ export function AdminAgents() {
       return;
     }
     try {
-      const res = await adminApi.getPrompts();
+      // Use simplified single system prompt API
+      const res = await adminApi.getSystemPrompt();
       if (res.success && res.data) {
-        const mapped = (res.data as any[])
-          .filter((p: any) => p.isActive ?? p.is_active === 1)
-          .map((p: any) => ({ id: p.id, name: p.name, isSystem: p.isSystem ?? p.is_system === 1 }));
-        setAvailablePrompts(mapped);
-        // Seed shared store
-        usePromptStore.getState().setPrompts(
-          (res.data as any[]).map((p: any) => ({
-            id: p.id,
-            name: p.name,
-            description: p.description || '',
-            prompt: p.prompt,
-            category: p.category,
-            language: p.language,
-            isActive: p.isActive ?? p.is_active === 1,
-            isSystem: p.isSystem ?? p.is_system === 1,
-            createdAt: p.createdAt || p.created_at || '',
-            updatedAt: p.updatedAt || p.updated_at || '',
-          }))
-        );
+        // Single prompt: show as "System Default"
+        setAvailablePrompts([{ id: 'system-default', name: 'System Default', isSystem: true }]);
       }
     } catch (err) {
       console.warn('Failed to load prompts:', err);
@@ -765,9 +763,10 @@ export function AdminAgents() {
       capabilities: [],
       knowledge_url: '',
       product_urls: [],
-      crawl_follow_links: false,
-      crawl_max_depth: 1,
-      crawl_max_pages: 5,
+      sort_order: 0,
+      crawl_follow_links: true,  // ⭐ Mặc định bật để cào sâu
+      crawl_max_depth: 3,       // ⭐ Mặc định 3 cấp độ sâu
+      crawl_max_pages: 20,      // ⭐ Mặc định 20 trang
     });
     setNewProductUrl('');
     setCrawlResult(null);
@@ -787,6 +786,9 @@ export function AdminAgents() {
         capabilities: formData.capabilities,
         knowledge_url: formData.knowledge_url || null,
         product_urls: formData.product_urls.length > 0 ? formData.product_urls : null,
+        sort_order: editingId 
+          ? (Number(formData.sort_order) || 0)  // Giữ nguyên STT khi edit
+          : (Math.max(0, ...agents.map(a => (a as any).sort_order ?? 0)) + 1),  // ⭐ Tự động gán STT kế tiếp cho agent mới
         crawl_follow_links: formData.crawl_follow_links ? 1 : 0,
         crawl_max_depth: Number(formData.crawl_max_depth) || 1,
         crawl_max_pages: Number(formData.crawl_max_pages) || 5,
@@ -896,8 +898,12 @@ export function AdminAgents() {
       alert(tAgent('agent.noPermissionEdit', language));
       return;
     }
+    // Get translated name for MADA bots
+    const madaBot = MADA_BOTS.find(m => m.id === agent.id);
+    const displayName = madaBot ? (language === 'vi' ? madaBot.nameVi : madaBot.name) : agent.name;
+    
     setFormData({
-      name: agent.name,
+      name: displayName,
       description: agent.description || '',
       avatar: agent.avatar,
       avatar_url: agent.avatar_url || '',
@@ -906,6 +912,7 @@ export function AdminAgents() {
       capabilities: agent.capabilities,
       knowledge_url: agent.knowledge_url || '',
       product_urls: agent.product_url ? [agent.product_url] : [],
+      sort_order: (agent as any).sort_order ?? 0,
       crawl_follow_links: !!(agent as any).crawl_follow_links,
       crawl_max_depth: (agent as any).crawl_max_depth || 1,
       crawl_max_pages: (agent as any).crawl_max_pages || 5,
@@ -929,6 +936,36 @@ export function AdminAgents() {
         // ⭐ Broadcast để ChatPage ở tab khác cập nhật tức thì
         broadcastAgentChange({ type: 'agent-deleted', agentId: id });
         await loadAgents();
+        void loadAgentsForChat();
+        save();
+      } else {
+        alert(res.error);
+      }
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
+  // ============== SORT ORDER HANDLER ==============
+  const handleSortChange = async (id: string, direction: 'up' | 'down') => {
+    if (!isSuperAdmin) {
+      alert(tAgent('agent.noPermissionEdit', language));
+      return;
+    }
+    const agent = agents.find(a => a.id === id);
+    if (!agent) return;
+    const currentOrder = (agent as any).sort_order ?? 0;
+    let newOrder: number;
+    if (direction === 'up') {
+      newOrder = currentOrder + 1;
+    } else {
+      newOrder = Math.max(1, currentOrder - 1);
+    }
+    try {
+      const res = await adminApi.updateAgent(id, { sort_order: newOrder });
+      if (res.success) {
+        await loadAgents();
+        broadcastAgentChange({ type: 'agent-updated', agentId: id });
         void loadAgentsForChat();
         save();
       } else {
@@ -1057,11 +1094,11 @@ export function AdminAgents() {
   // ⭐ Lấy tất cả agents từ DB (bao gồm cả MADA_BOTS và custom bots)
   // để hiển thị trong modal import - không giới hạn ở 7 bots MADA
   const getImportableAgents = () => {
-    // Lấy MADA bots (từ madaBots.ts)
+    // Lấy MADA bots (từ madaBots.ts) - dùng nameVi nếu là tiếng Việt
     const madaBotItems = MADA_BOTS.map(bot => ({
       id: bot.id,
-      name: bot.name,
-      description: bot.description,
+      name: language === 'vi' ? bot.nameVi : bot.name,
+      description: language === 'vi' ? bot.descriptionVi : bot.description,
       avatar: bot.avatar,
       isMada: true,
       madaCategory: bot.madaCategory,
@@ -1076,6 +1113,7 @@ export function AdminAgents() {
         name: a.name,
         description: a.description || '',
         avatar: a.avatar,
+        avatar_url: (a as any).avatar_url || null,
         isMada: false,
         madaCategory: a.mada_category,
         source: 'custom' as const,
@@ -1110,16 +1148,17 @@ export function AdminAgents() {
         try {
           const res = await adminApi.createAgent({
             id: madaBot.id,
-            name: madaBot.name,
-            description: `${madaBot.description} (ISO: ${madaBot.isoCodes.join(', ') || 'general'})`,
+            name: language === 'vi' ? madaBot.nameVi : madaBot.name,
+            description: `${language === 'vi' ? madaBot.descriptionVi : madaBot.description} (ISO: ${madaBot.isoCodes.join(', ') || 'general'})`,
             avatar: madaBot.avatar,
             avatar_url: null,
-            system_prompt: `Bạn là ${madaBot.nameVi} của MADA AI Assistant.\n\nChuyên môn: ${madaBot.description}\n\nURL MADA: ${madaBot.madaUrl}\n\nTiêu chuẩn ISO: ${madaBot.isoCodes.join(', ') || 'general'}\n\nKhi user hỏi ngoài domain, lịch sự hướng dẫn chọn bot phù hợp khác.`,
+            system_prompt: `Bạn là ${madaBot.nameVi} của MADA AI Assistant.\n\nChuyên môn: ${madaBot.descriptionVi}\n\nURL MADA: ${madaBot.madaUrl}\n\nTiêu chuẩn ISO: ${madaBot.isoCodes.join(', ') || 'general'}\n\nKhi user hỏi ngoài domain, lịch sự hướng dẫn chọn bot phù hợp khác.`,
             capabilities: ['chat', 'device_recommendation', ...madaBot.isoCodes.slice(0, 2).map(c => `iso_${c.replace(/\./g, '_')}`)],
             is_active: true,
             mada_category: madaBot.madaCategory,
             bot_id: madaBot.id,
             knowledge_url: madaBot.madaUrl || null,
+            sort_order: Math.max(0, ...agents.map(a => (a as any).sort_order ?? 0)) + 1, // ⭐ Tự động gán STT kế tiếp
           });
           if (!res.success) { skipped++; continue; }
           imported++;
@@ -1216,81 +1255,13 @@ export function AdminAgents() {
         </div>
       </section>
 
+      {/* Permission Warning */}
       {!isSuperAdmin && (
-        <div className="mb-4 p-3 bg-amber-50 border-2 border-amber-300 rounded-xl text-amber-800 text-sm flex items-center gap-2">
+        <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-sm flex items-center gap-2">
           <span className="material-symbols-outlined text-base">lock</span>
           {tAgent('agent.viewingAsRole', language)} <b>{user?.role || 'guest'}</b>. {tAgent('agent.onlySuperAdminCan', language)}
         </div>
       )}
-
-      {/* Metrics Row */}
-      <section className="grid grid-cols-3 gap-3 mb-6">
-        <div className="relative bg-gradient-to-br from-primary/10 to-primary/5 backdrop-blur-xl rounded-xl p-3 border border-slate-300 flex items-center gap-2 shadow-sm">
-          <div className="w-8 h-8 rounded-lg bg-primary/20 border border-slate-300 flex items-center justify-center shadow-sm">
-            <span className="material-symbols-outlined text-primary text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>smart_toy</span>
-          </div>
-          <div>
-            <p className="text-[9px] font-bold text-gray-500 uppercase tracking-wider">{t('admin.overview.totalUsers').split(' ')[0].toUpperCase()}</p>
-            <h3 className="text-lg font-black text-on-surface">{agents.length}</h3>
-          </div>
-        </div>
-
-        <div className="relative bg-gradient-to-br from-green-50 to-green-100/40 backdrop-blur-xl rounded-xl p-3 border border-slate-300 flex items-center gap-2 shadow-sm">
-          <div className="w-8 h-8 rounded-lg bg-green-200 border border-slate-300 flex items-center justify-center shadow-sm">
-            <span className="material-symbols-outlined text-green-600 text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>toggle_on</span>
-          </div>
-          <div>
-            <p className="text-[9px] font-bold text-green-700 uppercase tracking-wider">{t('admin.common.active').split(' ')[0].toUpperCase()}</p>
-            <h3 className="text-lg font-black text-green-700">{agents.filter(a => a.isActive).length}</h3>
-          </div>
-        </div>
-
-        <div className="relative bg-gradient-to-br from-gray-50 to-gray-100/40 backdrop-blur-xl rounded-xl p-3 border border-slate-300 flex items-center gap-2 shadow-sm">
-          <div className="w-8 h-8 rounded-lg bg-gray-200 border border-slate-300 flex items-center justify-center shadow-sm">
-            <span className="material-symbols-outlined text-gray-600 text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>pause_circle</span>
-          </div>
-          <div>
-            <p className="text-[9px] font-bold text-gray-700 uppercase tracking-wider">{t('admin.common.disabled').split(' ')[0].toUpperCase()}</p>
-            <h3 className="text-lg font-black text-gray-700">{agents.filter(a => !a.isActive).length}</h3>
-          </div>
-        </div>
-      </section>
-
-      {/* Action Bar */}
-      <div className="flex items-center justify-between mb-6 gap-3 flex-wrap">
-        <span className="text-sm text-on-surface-variant font-medium">
-          {loading ? tAgent('agent.loading', language) : `${agents.length} ${tAgent('agent.count', language)}`}
-        </span>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => { loadAgents(); loadPrompts(); }}
-            title={tAgent('admin.common.refresh', language)}
-            className="flex items-center gap-1 bg-white text-on-surface px-3 py-2 rounded-full font-bold text-xs border border-slate-200 shadow-sm hover:shadow-md transition-all"
-          >
-            <span className="material-symbols-outlined text-sm">refresh</span>
-            {tAgent('admin.common.refresh', language)}
-          </button>
-          {isSuperAdmin && (
-            <>
-              <button
-                onClick={openImportModal}
-                className="flex items-center gap-2 bg-secondary text-white px-4 py-2 rounded-full font-bold text-xs border border-slate-200 shadow-sm hover:shadow-sm transition-all"
-                title={tAgent('agent.selectBotImport', language)}
-              >
-                <span className="material-symbols-outlined text-sm">download</span>
-                {tAgent('agent.importMada', language)}
-              </button>
-              <button
-                onClick={openCreateForm}
-                className="flex items-center gap-2 bg-primary text-white px-4 py-2 rounded-full font-bold text-xs border border-slate-200 shadow-sm hover:shadow-sm transition-all"
-              >
-                <span className="material-symbols-outlined text-sm">add</span>
-                {tAgent('agent.create', language)}
-              </button>
-            </>
-          )}
-        </div>
-      </div>
 
       {/* Error state */}
       {error && (
@@ -1438,17 +1409,29 @@ export function AdminAgents() {
               )}
 
               {/* System Prompt */}
-              <div>
-                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">
-                  {tAgent('agent.form.systemPrompt', language)} <span className="text-red-500">*</span>
-                  <span className="text-gray-400 font-normal ml-1">{tAgent('agent.form.systemPromptOverride', language)}</span>
-                </label>
+              <div className="p-3 rounded-xl bg-gradient-to-br from-indigo-50 to-white border border-indigo-200">
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-[10px] font-bold text-indigo-700 uppercase tracking-wider">
+                    {tAgent('agent.form.systemPrompt', language)} <span className="text-red-500">*</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSystemPromptDraft(formData.system_prompt);
+                      setSystemPromptModalOpen(true);
+                    }}
+                    className="px-2 py-1 rounded-full bg-indigo-100 hover:bg-indigo-200 text-indigo-700 font-semibold text-[10px] border border-indigo-300 transition-all flex items-center gap-1"
+                  >
+                    <span className="material-symbols-outlined text-[10px]">edit</span>
+                    <span>{tAgent('agent.form.editPrompt', language)}</span>
+                  </button>
+                </div>
                 <textarea
                   value={formData.system_prompt}
                   onChange={e => setFormData(prev => ({ ...prev, system_prompt: e.target.value }))}
                   placeholder={tAgent('agent.form.systemPromptPlaceholder', language)}
-                  rows={3}
-                  className="w-full px-3 py-2 rounded-lg bg-white/60 border border-slate-300 text-sm resize-none font-mono focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  rows={2}
+                  className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-indigo-200 text-xs resize-none font-mono focus:outline-none focus:ring-2 focus:ring-indigo-300"
                 />
               </div>
 
@@ -1568,6 +1551,11 @@ export function AdminAgents() {
                 <summary className="cursor-pointer text-[10px] font-bold text-purple-700 uppercase tracking-wider flex items-center gap-1.5 select-none">
                   <span className="material-symbols-outlined text-purple-600 text-base">tune</span>
                   {tAgent('agent.form.crawlOptions', language)}
+                  {formData.crawl_follow_links && (
+                    <span className="ml-1 px-1.5 py-0.5 bg-green-100 text-green-700 text-[9px] font-bold rounded-full">
+                      ⭐ DEEP
+                    </span>
+                  )}
                 </summary>
                 <div className="mt-3 space-y-2">
                   <label className="flex items-start gap-2 p-2 rounded-lg bg-white/60 border border-purple-200 cursor-pointer">
@@ -1589,27 +1577,50 @@ export function AdminAgents() {
                       <label className="block text-[10px] font-bold text-purple-700 uppercase mb-1">{tAgent('agent.form.maxDepth', language)}</label>
                       <input
                         type="number"
-                        min={0}
-                        max={3}
+                        min={1}
+                        max={10}
                         disabled={!formData.crawl_follow_links}
                         value={formData.crawl_max_depth}
-                        onChange={e => setFormData(prev => ({ ...prev, crawl_max_depth: Math.max(0, Math.min(3, Number(e.target.value))) }))}
+                        onChange={e => setFormData(prev => ({ ...prev, crawl_max_depth: Math.max(1, Math.min(10, Number(e.target.value))) }))}
                         className="w-full px-2 py-1.5 rounded-lg bg-white border-2 border-purple-300 text-sm disabled:opacity-40"
                       />
+                      <div className="text-[9px] text-purple-600 mt-0.5">1-10 cấp độ</div>
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-purple-700 uppercase mb-1">{tAgent('agent.form.maxPages', language)}</label>
                       <input
                         type="number"
                         min={1}
-                        max={50}
+                        max={100}
                         disabled={!formData.crawl_follow_links}
                         value={formData.crawl_max_pages}
-                        onChange={e => setFormData(prev => ({ ...prev, crawl_max_pages: Math.max(1, Math.min(50, Number(e.target.value))) }))}
+                        onChange={e => setFormData(prev => ({ ...prev, crawl_max_pages: Math.max(1, Math.min(100, Number(e.target.value))) }))}
                         className="w-full px-2 py-1.5 rounded-lg bg-white border-2 border-purple-300 text-sm disabled:opacity-40"
                       />
+                      <div className="text-[9px] text-purple-600 mt-0.5">1-100 trang</div>
                     </div>
                   </div>
+                  {/* ⭐ Enhanced Features Info */}
+                  {formData.crawl_follow_links && (
+                    <div className="text-[10px] text-purple-800 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg p-2 border border-purple-200 space-y-1">
+                      <div className="font-bold text-purple-900 flex items-center gap-1">
+                        <span className="material-symbols-outlined text-purple-600 text-xs">auto_awesome</span>
+                        Tính năng cào nâng cao:
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span className="text-green-600">✓</span> Trích xuất JSON-LD & Schema.org
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span className="text-green-600">✓</span> Giữ nguyên cấu trúc bảng
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span className="text-green-600">✓</span> Trích xuất FAQs tự động
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span className="text-green-600">✓</span> Ưu tiên links có giá trị cao
+                      </div>
+                    </div>
+                  )}
                   <div className="text-[10px] text-purple-700/80 bg-white/60 rounded-lg p-2 border border-purple-200">
                     💡 {tAgent('agent.form.googleSheetsTip', language)}
                   </div>
@@ -2023,192 +2034,260 @@ export function AdminAgents() {
         </div>
       )}
 
-      {/* ============== AGENTS GRID ============== */}
-      <div className="relative bg-gradient-to-br from-white/80 to-white/40 backdrop-blur-xl rounded-2xl border border-slate-300 p-5 shadow-[6px_6px_0px_0px_#000]">
-        <div className="absolute inset-0 bg-gradient-to-b from-white/40 to-transparent rounded-2xl"></div>
-
-        {loading ? (
-          <div className="relative z-10 flex flex-col items-center justify-center py-12">
-            <div className="w-16 h-16 rounded-xl bg-gray-100 border border-slate-300 flex items-center justify-center mb-4 text-gray-400 shadow-sm animate-pulse">
-              <span className="material-symbols-outlined text-3xl">hourglass_empty</span>
-            </div>
-            <p className="text-lg font-bold text-gray-500">{tAgent('agent.loading', language)}</p>
+      {/* ============== ACTION BAR ============== */}
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Quick filters */}
+          <div className="inline-flex bg-slate-100 p-0.5 rounded-lg text-xs font-medium text-slate-600">
+            <button 
+              onClick={() => setFilterTab('all')}
+              className={`px-3 py-1.5 rounded-md shadow-sm transition-all ${filterTab === 'all' ? 'bg-white text-[#006575] font-semibold' : 'hover:text-slate-900'}`}
+            >Tất cả ({agents.length})</button>
+            <button 
+              onClick={() => setFilterTab('active')}
+              className={`px-3 py-1.5 rounded-md transition-all ${filterTab === 'active' ? 'bg-white text-[#006575] font-semibold shadow-sm' : 'hover:text-slate-900'}`}
+            >{t('admin.common.active')} ({agents.filter(a => a.isActive).length})</button>
+            <button 
+              onClick={() => setFilterTab('disabled')}
+              className={`px-3 py-1.5 rounded-md transition-all ${filterTab === 'disabled' ? 'bg-white text-[#006575] font-semibold shadow-sm' : 'hover:text-slate-900'}`}
+            >{t('admin.common.disabled')} ({agents.filter(a => !a.isActive).length})</button>
           </div>
-        ) : agents.length === 0 ? (
-          <div className="relative z-10 flex flex-col items-center justify-center py-12">
-            <div className="w-16 h-16 rounded-xl bg-gray-100 border border-slate-300 flex items-center justify-center mb-4 text-gray-400 shadow-sm">
-              <span className="material-symbols-outlined text-3xl">smart_toy</span>
-            </div>
-            <h4 className="text-lg font-black text-on-surface mb-1">{tAgent('agent.empty', language)}</h4>
-            <p className="text-sm text-on-surface-variant text-center mb-4">
-              {tAgent('agent.emptyHint', language)}
-            </p>
-            {isSuperAdmin && (
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => { loadAgents(); loadPrompts(); }}
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-all shadow-sm"
+          >
+            <span className="material-symbols-outlined text-sm">refresh</span>
+            Làm mới
+          </button>
+          {isSuperAdmin && (
+            <>
               <button
-                onClick={() => setShowImportModal(true)}
-                className="px-4 py-2 rounded-full bg-secondary text-white font-bold text-xs border border-slate-200 shadow-sm hover:-translate-y-0.5 hover:shadow-sm transition-all"
+                onClick={openImportModal}
+                className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-white bg-[#004d5a] hover:bg-[#003c46] rounded-lg transition-all shadow-sm"
               >
-                <span className="material-symbols-outlined text-xs mr-1">download</span>
-                {t('admin.agents.importMada')}
+                <span className="material-symbols-outlined text-sm">download</span>
+                Import bot MADA
               </button>
-            )}
-          </div>
-        ) : (
-          <div className="relative z-10 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {agents.map(agent => (
-              <div
-                key={agent.id}
-                className={clsx(
-                  'p-4 rounded-xl border border-slate-300 transition-all shadow-sm hover:shadow-md',
-                  (agent.is_active || agent.isActive)
-                    ? 'bg-gradient-to-br from-primary/10 to-primary/5'
-                    : 'bg-gray-50'
-                )}
+              <button
+                onClick={openCreateForm}
+                className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-white bg-[#006575] hover:bg-[#00515e] rounded-lg transition-all shadow-md"
               >
-                <div className="flex items-start gap-3 mb-3">
-                  <AgentAvatar agent={agent} size="md" />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h4 className="font-bold text-on-surface truncate text-sm">{agent.name}</h4>
-                      <span className={clsx(
-                        'px-2 py-0.5 rounded-full text-[9px] font-bold border border-slate-300',
-                        (agent.is_active || agent.isActive) ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
-                      )}>
-                        {(agent.is_active || agent.isActive) ? 'ON' : 'OFF'}
-                      </span>
-                      {agent.mada_category && (
-                        <span className="px-2 py-0.5 rounded-full text-[9px] font-bold border border-slate-300 bg-blue-100 text-blue-700">
-                          🏷️ {agent.mada_category}
-                        </span>
-                      )}
-                      {agent.created_by && agent.created_by !== 'system' && (
-                        <span className="px-2 py-0.5 rounded-full text-[9px] font-bold border border-slate-300 bg-purple-100 text-purple-700">
-                          ✨ {tAgent('agent.custom', language)}
-                        </span>
-                      )}
+                <span className="material-symbols-outlined text-sm">add</span>
+                Tạo Agent mới
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* ============== AGENTS GRID ============== */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 overflow-hidden">
+        {[...agents]
+          .filter(a => filterTab === 'all' || (filterTab === 'active' ? a.isActive : !a.isActive))
+          .sort((a, b) => ((a as any).sort_order ?? 0) - ((b as any).sort_order ?? 0))
+          .map((agent, idx) => {
+          // Get translated name for MADA bots
+          const madaBot = MADA_BOTS.find(m => m.id === agent.id);
+          const displayName = madaBot ? (language === 'vi' ? madaBot.nameVi : madaBot.name) : agent.name;
+          
+          // Generate consistent color based on agent name
+          const colorOptions = [
+            { bg: 'bg-amber-50', border: 'border-amber-100', icon: '👂' },
+            { bg: 'bg-blue-50', border: 'border-blue-100', icon: '👁️' },
+            { bg: 'bg-emerald-50', border: 'border-emerald-100', icon: '💬' },
+            { bg: 'bg-purple-50', border: 'border-purple-100', icon: '🧠' },
+            { bg: 'bg-orange-50', border: 'border-orange-100', icon: '🦾' },
+            { bg: 'bg-cyan-50', border: 'border-cyan-100', icon: '♿' },
+            { bg: 'bg-teal-50', border: 'border-teal-100', icon: '📋' },
+          ];
+          const colorIdx = idx % colorOptions.length;
+          const colors = colorOptions[colorIdx];
+          const isActive = agent.is_active || agent.isActive;
+          
+          return (
+            <article
+              key={agent.id}
+              className={clsx(
+                'group relative bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm hover:shadow-md hover:border-teal-300 transition-all duration-200 flex flex-col justify-between min-h-[220px] overflow-hidden min-w-[320px]',
+                isActive ? '' : 'opacity-70'
+              )}
+            >
+              {/* Card Header */}
+              <div>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className={clsx(
+                      'w-14 h-14 rounded-xl border flex items-center justify-center text-3xl shadow-inner group-hover:scale-105 transition-transform',
+                      colors.bg,
+                      colors.border
+                    )}>
+                      {agent.avatar || colors.icon}
                     </div>
-                    <p className="text-[10px] text-on-surface-variant mt-0.5 line-clamp-1">
-                      {agent.description || tAgent('agent.form.noDescription', language)}
-                    </p>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className={clsx(
+                          'inline-block px-2 py-0.5 rounded-md text-sm font-bold tracking-tight group-hover:text-[#006575] transition-colors',
+                          colors.bg,
+                          colors.border.replace('border-', 'text-').replace('-100', '-700')
+                        )}>
+                          {displayName}
+                        </span>
+                        <span className={clsx(
+                          'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border shrink-0',
+                          isActive 
+                            ? 'bg-emerald-50 text-emerald-600 border-emerald-200/70' 
+                            : 'bg-slate-100 text-slate-500 border-slate-200'
+                        )}>
+                          {isActive && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>}
+                          {isActive ? tAgent('agent.on', language) : tAgent('agent.off', language)}
+                        </span>
+                      </div>
+                      <div className="mt-1.5 flex items-center gap-1 flex-wrap">
+                        {agent.mada_category && (
+                          <span className={clsx(
+                            'inline-flex items-center text-[10px] font-medium px-2 py-0.5 rounded border shrink-0',
+                            colors.bg,
+                            colors.border.replace('border-', 'text-').replace('-100', '-800')
+                          )}>
+                            🏷️ {agent.mada_category}
+                          </span>
+                        )}
+                        {agent.created_by && agent.created_by !== 'system' && (
+                          <span className="inline-flex items-center text-[10px] font-medium px-2 py-0.5 rounded border bg-purple-50 text-purple-700 border-purple-200 shrink-0">
+                            ✨ Custom
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
-
-                {/* Capabilities */}
-                <div className="flex flex-wrap gap-1 mb-3">
-                  {agent.capabilities.slice(0, 3).map((cap, i) => (
-                    <span
-                      key={i}
-                      className="px-1.5 py-0.5 rounded bg-white border border-slate-300 text-[9px] text-on-surface-variant"
-                    >
+                
+                {/* Description */}
+                <p className="mt-3 text-xs text-slate-600 leading-relaxed line-clamp-2">
+                  {agent.description || tAgent('agent.form.noDescription', language)}
+                </p>
+                
+                {/* Tags */}
+                <div className="mt-2.5 flex flex-wrap items-center gap-1">
+                  {agent.capabilities.slice(0, 2).map((cap, i) => (
+                    <span key={i} className="text-[10px] font-medium px-2 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200/60">
                       {language === 'en' ? (capabilityOptions.find(c => c.value === cap)?.labelEn || cap) : (capabilityOptions.find(c => c.value === cap)?.label || cap)}
                     </span>
                   ))}
                 </div>
-
-                {/* Knowledge sources indicator */}
-                {(agent.knowledge_url || agent.product_url || agent.last_crawl_count) && (
-                  <div className="mb-3 space-y-1">
-                    {agent.knowledge_url && (
-                      <p className="text-[9px] text-blue-700 flex items-center gap-1 truncate">
-                        <span className="material-symbols-outlined text-xs">language</span>
-                        <span className="truncate">{agent.knowledge_url}</span>
-                      </p>
-                    )}
-                    {agent.product_url && (
-                      <p className="text-[9px] text-emerald-700 flex items-center gap-1 truncate">
-                        <span className="material-symbols-outlined text-xs">inventory_2</span>
-                        <span className="truncate">{agent.product_url}</span>
-                      </p>
-                    )}
-                    {/* KB badge */}
-                    {agent.last_crawl_count != null && (
-                      <div className="flex items-center gap-1.5 mt-1">
-                        <span className={clsx(
-                          'px-1.5 py-0.5 rounded-md text-[9px] font-bold border border-slate-300 flex items-center gap-1',
-                          agent.last_crawl_status === 'completed' ? 'bg-emerald-100 text-emerald-700' :
-                          agent.last_crawl_status === 'partial' ? 'bg-amber-100 text-amber-700' :
-                          agent.last_crawl_status === 'running' ? 'bg-blue-100 text-blue-700' :
-                          agent.last_crawl_status?.startsWith('failed') ? 'bg-red-100 text-red-700' :
-                          'bg-slate-100 text-slate-600'
-                        )}>
-                          <span className="material-symbols-outlined text-[10px]">database</span>
-                          KB: {agent.last_crawl_count} {tAgent('agent.documents', language)}
-                        </span>
-                        {agent.last_crawl_at && (
-                          <span className="text-[9px] text-gray-500">
-                            {new Date(agent.last_crawl_at).toLocaleDateString({'en': 'en-US', 'fr': 'fr-FR', 'ar': 'ar-SA', 'vi': 'vi-VN'}[language] ?? 'vi-VN')}
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Actions */}
-                <div className="flex items-center gap-1.5 pt-2 border-t border-slate-200">
+                
+              </div>
+              
+              {/* Card Footer: Actions & STT */}
+              <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between gap-1.5 min-w-0 overflow-hidden">
+                {/* Action Buttons - Left Side, tiny */}
+                <div className="flex items-center gap-0.5 flex-shrink-0">
                   <button
                     onClick={() => toggleAgentActive(agent.id)}
                     disabled={!isSuperAdmin}
                     className={clsx(
-                      'flex-none min-w-[60px] py-1.5 px-2 rounded-lg font-bold text-xs border border-slate-300 transition-all shadow-sm',
-                      (agent.is_active || agent.isActive)
-                        ? 'bg-yellow-100 text-yellow-700  disabled:opacity-50'
-                        : 'bg-green-100 text-green-700  disabled:opacity-50'
+                      'inline-flex items-center justify-center w-2 h-2 rounded-full transition-all hover:scale-110 active:scale-95',
+                      isActive
+                        ? 'text-emerald-600 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200'
+                        : 'text-slate-400 bg-slate-100 hover:bg-slate-200 border border-slate-200'
                     )}
-                    title={isSuperAdmin ? '' : t('admin.common.noPermission')}
+                    title={isActive ? 'Đang Bật - Bấm để Tắt' : 'Đang Tắt - Bấm để Bật'}
                   >
-                    {(agent.is_active || agent.isActive) ? t('admin.common.off') : t('admin.common.on')}
+                    <span className="material-symbols-outlined text-[4px]">power_settings_new</span>
                   </button>
                   <button
                     onClick={() => handleEdit(agent)}
                     disabled={!isSuperAdmin}
-                    className="flex-none min-w-[60px] py-1.5 px-2 rounded-lg bg-primary text-white font-bold text-xs border border-slate-300 shadow-sm  transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                    title={isSuperAdmin ? t('admin.common.edit') : t('admin.common.noPermission')}
+                    className="w-2 h-2 flex items-center justify-center rounded-full text-slate-500 hover:text-[#006575] bg-slate-50 hover:bg-teal-50 border border-slate-200 transition-all hover:scale-110 active:scale-95 disabled:opacity-50"
+                    title="Chỉnh sửa"
                   >
-                    {isSuperAdmin ? t('admin.common.edit') : (
-                      <span className="inline-flex items-center gap-1 justify-center">
-                        <span className="material-symbols-outlined text-xs">lock</span>
-                        {t('admin.common.disabled')}
-                      </span>
-                    )}
+                    <span className="material-symbols-outlined text-[4px]">edit</span>
                   </button>
                   <button
                     onClick={() => {
+                      const madaBot = MADA_BOTS.find(m => m.id === agent.id);
+                      const displayName = madaBot ? (language === 'vi' ? madaBot.nameVi : madaBot.name) : agent.name;
                       setTestAgentId(agent.id);
-                      setTestAgentObj(agent);
+                      setTestAgentObj({ ...agent, name: displayName });
                       setTestMessages([]);
                     }}
-                    title="Test agent này"
-                    className="w-8 h-8 rounded-lg bg-cyan-100 text-cyan-700 flex items-center justify-center border border-slate-300 shadow-sm "
+                    className="w-2 h-2 flex items-center justify-center rounded-full text-sky-600 bg-sky-50 hover:bg-sky-100 border border-sky-200 transition-all hover:scale-110 active:scale-95"
+                    title="Test"
                   >
-                    <span className="material-symbols-outlined text-xs">play_arrow</span>
+                    <span className="material-symbols-outlined text-[4px]">play_arrow</span>
                   </button>
                   <button
-                    onClick={() => openKbModal({ id: agent.id, name: agent.name })}
-                    title={t('admin.agents.viewKb')}
-                    className="w-8 h-8 rounded-lg bg-violet-100 text-violet-700 flex items-center justify-center border border-slate-300 shadow-sm "
+                    onClick={() => {
+                      const madaBot = MADA_BOTS.find(m => m.id === agent.id);
+                      const displayName = madaBot ? (language === 'vi' ? madaBot.nameVi : madaBot.name) : agent.name;
+                      openKbModal({ id: agent.id, name: displayName });
+                    }}
+                    className="w-2 h-2 flex items-center justify-center rounded-full text-violet-600 bg-violet-50 hover:bg-violet-100 border border-violet-200 transition-all hover:scale-110 active:scale-95"
+                    title="KB"
                   >
-                    <span className="material-symbols-outlined text-xs">database</span>
+                    <span className="material-symbols-outlined text-[4px]">database</span>
                   </button>
                   {isSuperAdmin ? (
                     <button
                       onClick={() => handleDelete(agent.id)}
-                      title={t('admin.common.delete')}
-                      className="w-8 h-8 rounded-lg bg-red-100 text-red-600 flex items-center justify-center border border-slate-300 shadow-sm "
+                      className="w-2 h-2 flex items-center justify-center rounded-full text-rose-500 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition-all hover:scale-110 active:scale-95"
+                      title="Xóa"
                     >
-                      <span className="material-symbols-outlined text-xs">delete</span>
+                      <span className="material-symbols-outlined text-[4px]">delete</span>
                     </button>
                   ) : (
-                    <div
-                      title={t('admin.common.noPermission')}
-                      className="w-8 h-8 rounded-lg bg-gray-100 text-gray-400 flex items-center justify-center border border-gray-300 cursor-not-allowed"
-                    >
-                      <span className="material-symbols-outlined text-xs">lock</span>
+                    <div className="w-2 h-2 flex items-center justify-center rounded-full text-gray-400 bg-gray-100 border border-gray-200 cursor-not-allowed">
+                      <span className="material-symbols-outlined text-[4px]">lock</span>
                     </div>
                   )}
                 </div>
+
+                {/* STT Stepper - Right Side */}
+                <div className="flex items-center bg-slate-100 px-0.5 py-0.5 rounded-full border border-slate-200 gap-0.5 flex-shrink-0">
+                  {isSuperAdmin ? (
+                    <>
+                      <button
+                        onClick={() => handleSortChange(agent.id, 'down')}
+                        className="w-3 h-3 flex items-center justify-center rounded-full bg-white text-slate-500 hover:text-slate-800 hover:bg-slate-50 border border-slate-200 active:scale-90 transition-all"
+                        title="Giảm"
+                      >
+                        <span className="text-[6px] font-bold leading-none select-none">−</span>
+                      </button>
+                      <span className="w-3 text-center font-mono font-bold text-[7px] text-[#006575] leading-none flex items-center justify-center">
+                        {String((agent as any).sort_order ?? 0).padStart(2, '0')}
+                      </span>
+                      <button
+                        onClick={() => handleSortChange(agent.id, 'up')}
+                        className="w-3 h-3 flex items-center justify-center rounded-full bg-white text-slate-500 hover:text-slate-800 hover:bg-slate-50 border border-slate-200 active:scale-90 transition-all"
+                        title="Tăng"
+                      >
+                        <span className="text-[6px] font-bold leading-none select-none">+</span>
+                      </button>
+                    </>
+                  ) : (
+                    <span className="w-3 text-center font-mono font-bold text-[7px] text-[#006575] leading-none flex items-center justify-center px-0.5">
+                      {String((agent as any).sort_order ?? 0).padStart(2, '0')}
+                    </span>
+                  )}
+                </div>
               </div>
-            ))}
+            </article>
+          );
+        })}
+        
+        {/* Add New Agent Card */}
+        {isSuperAdmin && (
+          <div 
+            onClick={openCreateForm}
+            className="border-2 border-dashed border-slate-200 hover:border-[#006575] rounded-xl p-8 flex flex-col items-center justify-center text-center bg-slate-50/50 hover:bg-teal-50/30 transition-all group cursor-pointer min-h-[220px]"
+          >
+            <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 shadow-sm flex items-center justify-center text-[#006575] group-hover:scale-110 group-hover:bg-[#006575] group-hover:text-white transition-all duration-200">
+              <span className="material-symbols-outlined text-xl">add</span>
+            </div>
+            <h4 className="mt-3 font-bold text-slate-700 text-sm group-hover:text-[#006575]">Thêm Agent Mới</h4>
+            <p className="mt-1 text-[10px] text-slate-500">Tạo trợ lý AI mới</p>
           </div>
         )}
       </div>
@@ -2547,7 +2626,7 @@ export function AdminAgents() {
                     {getImportableAgents().filter(item => item.source === 'mada' && !agents.some(a => a.id === item.id)).length} available
                   </span>
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {getImportableAgents()
                     .filter(item => item.source === 'mada')
                     .map((bot) => {
@@ -2557,7 +2636,7 @@ export function AdminAgents() {
                       <label
                         key={bot.id}
                         className={clsx(
-                          'relative flex items-center gap-2 p-2 rounded-lg border-2 cursor-pointer transition-all',
+                          'relative flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all',
                           exists 
                             ? 'border-slate-200 bg-slate-50 opacity-60 cursor-not-allowed' 
                             : checked 
@@ -2570,14 +2649,14 @@ export function AdminAgents() {
                           checked={checked}
                           onChange={() => !exists && toggleImportBot(bot.id)}
                           disabled={exists}
-                          className="w-4 h-4 accent-primary cursor-pointer"
+                          className="w-5 h-5 accent-primary cursor-pointer"
                         />
-                        <span className="text-lg">{bot.avatar}</span>
+                        <span className="text-2xl">{bot.avatar}</span>
                         <div className="flex-1 min-w-0">
-                          <div className="font-bold text-[11px] text-on-surface truncate">{bot.name}</div>
+                          <div className="font-bold text-sm text-on-surface truncate">{bot.name}</div>
                         </div>
                         {exists && (
-                          <span className="absolute -top-1 -right-1 text-[8px] font-bold bg-slate-200 text-slate-500 px-1 py-0.5 rounded">
+                          <span className="absolute -top-1 -right-1 text-[10px] font-bold bg-slate-200 text-slate-500 px-2 py-0.5 rounded">
                             ✓
                           </span>
                         )}
@@ -2616,7 +2695,7 @@ export function AdminAgents() {
                     </div>
 
                     {/* Bot Cards Grid */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
                       {customBots.map((bot) => {
                         const agent = agents.find(a => a.id === bot.id);
                         const isActive = agent?.is_active || agent?.isActive;
@@ -2627,16 +2706,16 @@ export function AdminAgents() {
                           >
                             {/* Active Status Bar */}
                             <div className={clsx(
-                              "h-1 w-full",
+                              "h-1.5 w-full",
                               isActive ? "bg-gradient-to-r from-emerald-400 to-teal-400" : "bg-slate-200"
                             )} />
 
-                            <div className="p-4">
+                            <div className="p-5">
                               {/* Bot Header */}
-                              <div className="flex items-start gap-3 mb-3">
+                              <div className="flex items-start gap-4 mb-4">
                                 {/* Avatar */}
                                 <div className="relative flex-shrink-0">
-                                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 border-2 border-white shadow-md flex items-center justify-center text-2xl overflow-hidden">
+                                  <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 border-2 border-white shadow-md flex items-center justify-center text-3xl overflow-hidden">
                                     {bot.avatar_url || /^https?:\/\//.test(bot.avatar || '') ? (
                                       <img src={bot.avatar_url || bot.avatar} alt={bot.name} className="w-full h-full object-cover" />
                                     ) : (
@@ -2645,7 +2724,7 @@ export function AdminAgents() {
                                   </div>
                                   {/* Status Dot */}
                                   <div className={clsx(
-                                    "absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full border-2 border-white",
+                                    "absolute -bottom-1 -right-1 w-5 h-5 rounded-full border-2 border-white",
                                     isActive ? "bg-emerald-500" : "bg-slate-400"
                                   )}>
                                     {isActive && (
@@ -2656,32 +2735,32 @@ export function AdminAgents() {
 
                                 {/* Bot Info */}
                                 <div className="flex-1 min-w-0">
-                                  <h4 className="font-bold text-sm text-slate-800 truncate mb-0.5">{bot.name}</h4>
-                                  <p className="text-[11px] text-slate-500 line-clamp-2 leading-relaxed">
+                                  <h4 className="font-bold text-base text-slate-800 truncate mb-1">{bot.name}</h4>
+                                  <p className="text-sm text-slate-500 line-clamp-2 leading-relaxed">
                                     {bot.description || 'Không có mô tả'}
                                   </p>
                                 </div>
                               </div>
 
                               {/* Agent Status Badge */}
-                              <div className="flex items-center gap-2 mb-3">
+                              <div className="flex items-center gap-3 mb-4">
                                 <span className={clsx(
-                                  "inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide",
+                                  "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wide",
                                   isActive 
                                     ? "bg-emerald-50 text-emerald-700 border border-emerald-200" 
                                     : "bg-slate-100 text-slate-500 border border-slate-200"
                                 )}>
-                                  <span className={clsx("w-1.5 h-1.5 rounded-full", isActive ? "bg-emerald-500" : "bg-slate-400")}></span>
-                                  {isActive ? 'ON' : 'OFF'}
+                                  <span className={clsx("w-2 h-2 rounded-full", isActive ? "bg-emerald-500" : "bg-slate-400")}></span>
+                                  {isActive ? tAgent('agent.on', language) : tAgent('agent.off', language)}
                                 </span>
-                                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
-                                  <span className="material-symbols-outlined text-[10px]">smart_toy</span>
-                                  Custom
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                                  <span className="material-symbols-outlined text-sm">smart_toy</span>
+                                  {tAgent('agent.custom', language)}
                                 </span>
                               </div>
 
                               {/* Action Buttons */}
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-3">
                                 <button
                                   type="button"
                                   onClick={() => {
@@ -2691,7 +2770,7 @@ export function AdminAgents() {
                                       setShowImportModal(false);
                                     }
                                   }}
-                                  className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-gradient-to-r from-blue-500 to-blue-600 text-white text-xs font-bold shadow-sm hover:shadow-md hover:from-blue-600 hover:to-blue-700 transition-all duration-200 active:scale-95"
+                                  className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-gradient-to-r from-blue-500 to-blue-600 text-white text-xs font-bold shadow-sm hover:shadow-md hover:from-blue-600 hover:to-blue-700 transition-all duration-200 active:scale-95"
                                   title={tAgent('admin.common.edit')}
                                 >
                                   <span className="material-symbols-outlined text-sm">edit</span>
@@ -2704,7 +2783,7 @@ export function AdminAgents() {
                                     setShowImportModal(false);
                                     await handleDelete(bot.id);
                                   }}
-                                  className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-white border border-red-200 text-red-600 text-xs font-bold hover:bg-red-50 hover:border-red-300 transition-all duration-200 active:scale-95"
+                                  className="flex items-center justify-center gap-1 px-3 py-2 rounded-lg bg-white border border-red-200 text-red-600 text-xs font-bold hover:bg-red-50 hover:border-red-300 transition-all duration-200 active:scale-95"
                                   title={tAgent('admin.common.delete')}
                                 >
                                   <span className="material-symbols-outlined text-sm">delete</span>
@@ -2835,6 +2914,66 @@ export function AdminAgents() {
         <div className="fixed bottom-6 left-6 px-3 py-2 rounded-lg bg-primary text-white font-bold text-xs border border-slate-200 shadow-sm animate-pulse">
           ✓ {tAgent('agent.saved', language)} {savedAt}
         </div>
+      )}
+
+      {/* System Prompt Full Editor Modal - TRUE MODAL: blocks all interaction behind it */}
+      {systemPromptModalOpen && (
+        <>
+          {/* Backdrop - blocks all interaction with content below */}
+          <div 
+            className="fixed inset-0 z-[150] bg-black/50 pointer-events-auto"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                setSystemPromptModalOpen(false);
+              }
+            }}
+          />
+          {/* Modal Content - positioned above backdrop */}
+          <div className="fixed inset-0 z-[151] flex items-center justify-center p-4 pointer-events-none">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl h-[85vh] flex flex-col overflow-hidden border-2 border-indigo-200 pointer-events-auto">
+              {/* Modal Header */}
+              <div className="flex items-center justify-between px-6 py-4 border-b-2 border-indigo-100 bg-gradient-to-r from-indigo-50 to-white">
+                <div>
+                  <h3 className="text-lg font-bold text-indigo-800">
+                    {tAgent('agent.form.editPromptTitle', language)}
+                  </h3>
+                  <p className="text-xs text-indigo-600 mt-0.5">
+                    {tAgent('agent.form.promptEditorHint', language)}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      setFormData(prev => ({ ...prev, system_prompt: systemPromptDraft }));
+                      setSystemPromptModalOpen(false);
+                    }}
+                    className="px-4 py-2 rounded-xl bg-primary text-white font-semibold text-sm border border-slate-200 shadow-sm hover:-translate-y-0.5 transition-all flex items-center gap-2"
+                  >
+                    <span className="material-symbols-outlined text-base">check</span>
+                    {tAgent('agent.form.apply', language)}
+                  </button>
+                  <button
+                    onClick={() => setSystemPromptModalOpen(false)}
+                    className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 font-bold text-lg border-2 border-slate-300 hover:bg-slate-200 transition-colors flex items-center justify-center"
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
+
+              {/* Modal Body - Full Editor */}
+              <div className="flex-1 p-6 overflow-hidden">
+                <textarea
+                  value={systemPromptDraft}
+                  onChange={e => setSystemPromptDraft(e.target.value)}
+                  className="w-full h-full rounded-xl bg-slate-50 border-2 border-slate-300 p-4 font-mono text-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400"
+                  placeholder={tAgent('agent.form.systemPromptPlaceholder', language)}
+                  spellCheck={false}
+                />
+              </div>
+            </div>
+          </div>
+        </>
       )}
     </AdminLayout>
   );

@@ -5,10 +5,10 @@ import { useSystemSettingsStore, useAuthStore, useLanguageStore, usePricingPlans
 import { translations, Language } from '@/lib/translations';
 import clsx from 'clsx';
 import { systemApi } from '@/lib/api';
-import { CheckCircle, Check, Loader2, AlertCircle, Shield, Settings, Lock, Cloud, CreditCard, Mail, Bug, Sparkles, FileText, Zap, ArrowRight, Image, Video, Music, File, Pencil, Save, X } from 'lucide-react';
-import { PromptTemplates } from './PromptTemplates';
+import { CheckCircle, Check, Loader2, AlertCircle, Shield, Settings, Lock, Cloud, CreditCard, Mail, Bug, Sparkles, FileText, Zap, ArrowRight, Image, Video, Music, File, Pencil, Save, X, GripVertical, ArrowUp, ArrowDown } from 'lucide-react';
+import { CheckCircle, Check, Loader2, AlertCircle, Shield, Settings, Lock, Cloud, CreditCard, Mail, Bug, Sparkles, FileText, Zap, ArrowRight, Image, Video, Music, File, Pencil, Save, X, GripVertical, ArrowUp, ArrowDown } from 'lucide-react';
 
-type Tab = 'general' | 'plans' | 'security' | 'ai' | 'integrations' | 'live' | 'system' | 'templates';
+type Tab = 'general' | 'plans' | 'security' | 'ai' | 'integrations' | 'live' | 'system';
 
 export function AdminSettings() {
   const [tab, setTab] = useState<Tab>('general');
@@ -35,8 +35,10 @@ export function AdminSettings() {
     maxFilesPerSession,
     maxFilesTotal,
     maxFileSizeMB,
+    categoryOrder,
     setAnonymousLimit,
     setDefaultPlanLimit,
+    setCategoryOrder,
     loadFromBackend,
     setAllSettings,
   } = useSystemSettingsStore();
@@ -74,6 +76,7 @@ export function AdminSettings() {
         maxFilesPerSession,
         maxFilesTotal,
         maxFileSizeMB,
+        categoryOrder,
       });
 
       if (res.success) {
@@ -120,20 +123,7 @@ export function AdminSettings() {
                 </div>
               </div>
               
-              {/* Prompt Templates Banner */}
-              <button
-                onClick={() => setTab('templates')}
-                className="group flex items-center gap-4 p-4 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl border border-indigo-200/50 hover:border-indigo-300 hover:shadow-md transition-all w-full md:w-auto"
-              >
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                  <Zap className="w-6 h-6 text-white" />
-                </div>
-                <div className="text-left flex-1">
-                  <h3 className="font-bold text-slate-800">{lang['admin.settings.promptTemplates']}</h3>
-                  <p className="text-xs text-slate-500 mt-0.5">{lang['admin.settings.templates.bannerDesc']}</p>
-                </div>
-                <ArrowRight className="w-5 h-5 text-indigo-400 group-hover:translate-x-1 transition-transform" />
-              </button>
+
             </div>
 
             {/* Right: Role Badge */}
@@ -166,7 +156,6 @@ export function AdminSettings() {
             { id: 'integrations', label: lang['admin.settings.tabs.integrations'], icon: Cloud },
             { id: 'live', label: lang['admin.settings.tabs.live'], icon: AlertCircle },
             { id: 'system', label: lang['admin.settings.tabs.system'], icon: Lock },
-            { id: 'templates', label: lang['admin.settings.tabs.templates'], icon: FileText },
           ] as { id: Tab; label: string; icon: any }[]
         ).map((tabItem) => (
           <button
@@ -324,6 +313,95 @@ export function AdminSettings() {
                     <span className="text-sm font-bold text-white">{item.label}</span>
                   </div>
                 ))}
+              </div>
+            </div>
+          </div>
+
+          {/* ⭐ Bot Order - Sắp xếp thứ tự hiển thị các bot */}
+          <div className="bg-white rounded-2xl border border-outline-variant overflow-hidden">
+            <div className="px-8 py-6 border-b border-outline-variant">
+              <h3 className="text-lg font-black text-on-surface">Sắp xếp Bot</h3>
+              <p className="text-sm text-on-surface-variant mt-1">Kéo thả để thay đổi thứ tự hiển thị của các bot trong sidebar</p>
+            </div>
+            <div className="p-8">
+              {/* Bot order list */}
+              <div className="space-y-2">
+                {(categoryOrder || ['vision', 'hearing', 'communication', 'cognition', 'mobility', 'daily_living', 'education']).map((botId, index) => {
+                  const botNames: Record<string, { name: string; icon: string; color: string }> = {
+                    vision: { name: 'Cảm giác - Thị giác', icon: '👁️', color: 'bg-violet-100 text-violet-700' },
+                    hearing: { name: 'Cảm giác - Thính giác', icon: '👂', color: 'bg-blue-100 text-blue-700' },
+                    communication: { name: 'Giọng nói & Lời nói', icon: '🎤', color: 'bg-rose-100 text-rose-700' },
+                    cognition: { name: 'Tâm thần - Nhận thức', icon: '🧠', color: 'bg-amber-100 text-amber-700' },
+                    mobility: { name: 'Vận động thần kinh', icon: '🦾', color: 'bg-green-100 text-green-700' },
+                    daily_living: { name: 'Hỗ trợ sinh hoạt', icon: '🏠', color: 'bg-purple-100 text-purple-700' },
+                    education: { name: 'Giáo dục', icon: '📚', color: 'bg-teal-100 text-teal-700' },
+                  };
+                  const bot = botNames[botId] || { name: botId, icon: '🤖', color: 'bg-gray-100 text-gray-700' };
+
+                  return (
+                    <div
+                      key={botId}
+                      className="flex items-center gap-3 p-4 rounded-xl bg-surface-variant/30 border border-outline-variant hover:border-primary/50 hover:bg-primary/5 transition-all group"
+                    >
+                      {/* Drag handle */}
+                      <div className="flex-shrink-0 cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600 opacity-50 group-hover:opacity-100 transition-opacity">
+                        <GripVertical className="w-5 h-5" />
+                      </div>
+
+                      {/* Order number */}
+                      <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary font-bold text-sm flex items-center justify-center flex-shrink-0">
+                        {index + 1}
+                      </div>
+
+                      {/* Bot icon and name */}
+                      <div className={`w-10 h-10 rounded-xl ${bot.color} flex items-center justify-center text-xl flex-shrink-0`}>
+                        {bot.icon}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-on-surface">{bot.name}</p>
+                        <p className="text-xs text-on-surface-variant">{botId}</p>
+                      </div>
+
+                      {/* Move buttons */}
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <button
+                          onClick={() => {
+                            if (index > 0 && categoryOrder) {
+                              const newOrder = [...categoryOrder];
+                              [newOrder[index - 1], newOrder[index]] = [newOrder[index], newOrder[index - 1]];
+                              setCategoryOrder(newOrder);
+                            }
+                          }}
+                          disabled={index === 0}
+                          className="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                          title="Di chuyển lên"
+                        >
+                          <ArrowUp className="w-4 h-4 text-gray-600" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            const maxIndex = (categoryOrder || ['vision', 'hearing', 'communication', 'cognition', 'mobility', 'daily_living', 'education']).length - 1;
+                            if (index < maxIndex && categoryOrder) {
+                              const newOrder = [...categoryOrder];
+                              [newOrder[index], newOrder[index + 1]] = [newOrder[index + 1], newOrder[index]];
+                              setCategoryOrder(newOrder);
+                            }
+                          }}
+                          disabled={index === (categoryOrder || ['vision', 'hearing', 'communication', 'cognition', 'mobility', 'daily_living', 'education']).length - 1}
+                          className="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                          title="Di chuyển xuống"
+                        >
+                          <ArrowDown className="w-4 h-4 text-gray-600" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="mt-4 flex items-center gap-2 text-sm text-on-surface-variant">
+                <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                Thứ tự sẽ được áp dụng ngay lập tức sau khi lưu
               </div>
             </div>
           </div>

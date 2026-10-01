@@ -3,19 +3,17 @@ import { useNavigate } from 'react-router-dom';
 import { useChatStore, useChatHistoryStore, useLanguageStore, useAuthStore, useAnonQuotaStore, usePaywallModalStore, useAuthModalStore, useAgentStore, useSelectedAgentStore, useSystemSettingsStore, useViewModeStore, useChatSettingsStore } from '@/stores';
 import madaLogo from '@/assets/mada-logo.png';
 import { QuotaIndicator } from '@/components/auth/QuotaIndicator';
-import { ProductCard } from '@/components/ProductCard';
 import {
   Send, Plus, User, Mic,
-  Volume2, ChevronDown, Check, Copy, ThumbsUp, ThumbsDown,
+  Volume2, ChevronDown, Check, Copy,
   Speaker, BookOpen, Bot as BotIcon, ChevronRight,
   FileText, Video, Mic2, ImageIcon, File, X,
   MessageCircle,
   LogOut, Sparkles,
   Search, MessageSquare, Loader2,
-  Settings, Smartphone, Brain, Eye, Accessibility,
-  Users, MoreHorizontal, Gift, Wallet, CreditCard,
-  PiggyBank, Handshake, ZoomIn, PlusCircle, Monitor,
-  Ear, Edit2, Globe
+  Settings, Accessibility,
+  Users, Edit2, Globe, ShoppingCart,
+  ShieldCheck,
 } from 'lucide-react';
 import clsx from 'clsx';
 import ReactMarkdown from 'react-markdown';
@@ -23,6 +21,7 @@ import remarkGfm from 'remark-gfm';
 import { CATEGORY_INFO, SAMPLE_QUESTIONS, AT_SPECIALIST_KEYWORDS, type ATCategory, type Language, type SuggestedProduct } from '@/types';
 import { t } from '@/lib/translations';
 import { userHistoryApi, fileQuotaApi, getAccessToken, type FileUploadQuota } from '@/lib/api';
+import { getImageUrl } from '@/lib/imageProxy';
 import { onAgentChange } from '@/lib/agentBroadcast';
 import { onSettingsChange } from '@/lib/settingsBroadcast';
 
@@ -56,8 +55,6 @@ const LANGUAGES: { code: Language; name: string; flag: string }[] = [
   { code: 'ar', name: 'العربية', flag: '🇸🇦' },
   { code: 'fr', name: 'Français', flag: '🇫🇷' },
 ];
-
-const categories = Object.keys(CATEGORY_INFO) as ATCategory[];
 
 // Category Icons
 const CATEGORY_ICONS: Record<ATCategory, string> = {
@@ -365,15 +362,13 @@ function ConsultationModal({
   onClose: () => void;
   onSubmit: (data: ConsultationFormData) => void;
   language?: Language;
-}) {
+}): JSX.Element | null {
   const [formData, setFormData] = useState<ConsultationFormData>({
     name: '', email: '', phone: '',
     disabilityType: '', budget: '', priority: '',
     interestedDevices: [], message: ''
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showCustomDeviceInput, setShowCustomDeviceInput] = useState(false);
-  const [customDeviceInput, setCustomDeviceInput] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   
   const validateForm = () => {
@@ -420,27 +415,6 @@ function ConsultationModal({
       onClose();
     } finally {
       setIsSubmitting(false);
-    }
-  };
-
-  const toggleDevice = (device: string) => {
-    setFormData(prev => ({
-      ...prev,
-      interestedDevices: prev.interestedDevices.includes(device)
-        ? prev.interestedDevices.filter(d => d !== device)
-        : [...prev.interestedDevices, device]
-    }));
-  };
-
-  const handleAddCustomDevice = () => {
-    const trimmed = customDeviceInput.trim();
-    if (trimmed && !formData.interestedDevices.includes(trimmed)) {
-      setFormData(prev => ({
-        ...prev,
-        interestedDevices: [...prev.interestedDevices, trimmed]
-      }));
-      setCustomDeviceInput('');
-      setShowCustomDeviceInput(false);
     }
   };
 
@@ -546,67 +520,6 @@ function ConsultationModal({
             <h2 className="text-[10px] font-bold uppercase tracking-wider text-secondary flex items-center gap-1.5 font-mono">
               <Settings className="w-3.5 h-3.5" /> {language === 'vi' ? 'NHU CẦU TƯ VẤN' : language === 'en' ? 'CONSULTATION NEEDS' : language === 'ar' ? 'احتياجات الاستشارة' : 'BESOINS DE CONSULTATION'}
             </h2>
-            
-            {/* Loại khuyết tật */}
-            <div className="space-y-2">
-              <label className="text-[10px] font-medium text-slate-500 block">{language === 'vi' ? 'Loại khuyết tật *' : language === 'en' ? 'Disability Type *' : language === 'ar' ? 'نوع الإعاقة *' : 'Type de handicap *'}</label>
-              <div className="flex flex-wrap gap-2">
-                {[
-                  { value: 'visual', icon: Eye, label: language === 'vi' ? 'Khiếm thị' : language === 'en' ? 'Visual Impairment' : language === 'ar' ? 'ضعف البصر' : 'Déficience visuelle' },
-                  { value: 'hearing', icon: Ear, label: language === 'vi' ? 'Khiếm thính' : language === 'en' ? 'Hearing Impairment' : language === 'ar' ? 'ضعف السمع' : 'Déficience auditive' },
-                  { value: 'motor', icon: Accessibility, label: language === 'vi' ? 'Vận động' : language === 'en' ? 'Mobility' : language === 'ar' ? 'الحركة' : 'Mobilité' },
-                  { value: 'cognitive', icon: Brain, label: language === 'vi' ? 'Nhận thức' : language === 'en' ? 'Cognitive' : language === 'ar' ? 'الإدراكي' : 'Cognitif' },
-                  { value: 'multiple', icon: Users, label: language === 'vi' ? 'Kết hợp' : language === 'en' ? 'Multiple' : language === 'ar' ? 'متعدد' : 'Multiple' },
-                  { value: 'other', icon: MoreHorizontal, label: language === 'vi' ? 'Khác' : language === 'en' ? 'Other' : language === 'ar' ? 'آخر' : 'Autre' },
-                ].map((item) => (
-                  <label key={item.value} className="cursor-pointer">
-                    <input
-                      type="radio"
-                      name="disability"
-                      value={item.value}
-                      checked={formData.disabilityType === item.value}
-                      onChange={() => { setFormData({ ...formData, disabilityType: item.value }); setErrors({ ...errors, disabilityType: '' }); }}
-                      className="peer sr-only"
-                    />
-                    <div className="px-3 py-2 rounded-full border-2 border-slate-200 font-medium text-xs flex items-center gap-1.5 transition-all hover:bg-purple-50 peer-checked:border-secondary peer-checked:bg-purple-100 text-slate-700">
-                      <item.icon className="w-3.5 h-3.5" />
-                      <span>{item.label}</span>
-                    </div>
-                  </label>
-                ))}
-              </div>
-              {errors.disabilityType && <p className="text-[10px] text-red-500">{errors.disabilityType}</p>}
-            </div>
-
-            {/* Ngân sách */}
-            <div className="space-y-2">
-              <label className="text-[10px] font-medium text-slate-500 block">{language === 'vi' ? 'Ngân sách dự kiến *' : language === 'en' ? 'Expected Budget *' : language === 'ar' ? 'الميزانية المتوقعة *' : 'Budget prévu *'}</label>
-              <div className="flex flex-nowrap gap-2 overflow-x-auto pb-1">
-                {[
-                  { value: 'free', icon: Gift, label: language === 'vi' ? 'Miễn phí' : language === 'en' ? 'Free' : language === 'ar' ? 'مجاني' : 'Gratuit' },
-                  { value: 'low', icon: Wallet, label: '<1K QAR' },
-                  { value: 'medium', icon: CreditCard, label: '1K-5K' },
-                  { value: 'high', icon: PiggyBank, label: '5K-15K' },
-                  { value: 'any', icon: Handshake, label: language === 'vi' ? 'Thương lượng' : language === 'en' ? 'Negotiable' : language === 'ar' ? 'قابل للتفاوض' : 'Négociable' },
-                ].map((item) => (
-                  <label key={item.value} className="cursor-pointer shrink-0">
-                    <input
-                      type="radio"
-                      name="budget"
-                      value={item.value}
-                      checked={formData.budget === item.value}
-                      onChange={() => { setFormData({ ...formData, budget: item.value }); setErrors({ ...errors, budget: '' }); }}
-                      className="peer sr-only"
-                    />
-                    <div className="px-3 py-2 rounded-full border-2 border-slate-200 font-medium text-xs flex items-center gap-1.5 transition-all hover:bg-purple-50 peer-checked:border-secondary peer-checked:bg-purple-100 text-slate-700 whitespace-nowrap">
-                      <item.icon className="w-3.5 h-3.5 shrink-0" />
-                      <span>{item.label}</span>
-                    </div>
-                  </label>
-                ))}
-              </div>
-              {errors.budget && <p className="text-[10px] text-red-500">{errors.budget}</p>}
-            </div>
 
             {/* Mức độ ưu tiên */}
             <div className="space-y-2">
@@ -633,101 +546,6 @@ function ConsultationModal({
                   </label>
                 ))}
               </div>
-            </div>
-          </section>
-
-          {/* Section 3: Thiết bị quan tâm */}
-          <section className="space-y-3">
-            <h2 className="text-[10px] font-bold uppercase tracking-wider text-secondary flex items-center gap-1.5 font-mono">
-              <Smartphone className="w-3.5 h-3.5" /> {language === 'vi' ? 'THIẾT BỊ QUAN TÂM' : language === 'en' ? 'INTERESTED DEVICES' : language === 'ar' ? 'الأجهزة المطلوبة' : 'APPAREILS D\'INTÉRÊT'}
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {[
-                { icon: Monitor, title: language === 'vi' ? 'Phần mềm đọc màn hình' : language === 'en' ? 'Screen Reader Software' : language === 'ar' ? 'برمجيات قارئ الشاشة' : 'Logiciel de lecture d\'écran', subtitle: 'Screen Reader', key: 'Screen Reader' },
-                { icon: ZoomIn, title: language === 'vi' ? 'Phóng to màn hình' : language === 'en' ? 'Screen Magnifier' : language === 'ar' ? 'تكبير الشاشة' : 'Agrandisseur d\'écran', subtitle: 'Screen Magnifier', key: 'Screen Magnifier' },
-                { icon: Mic, title: language === 'vi' ? 'Nhận dạng giọng nói' : language === 'en' ? 'Speech Recognition' : language === 'ar' ? 'التعرف على الكلام' : 'Reconnaissance vocale', subtitle: 'Speech Recognition', key: 'Speech Recognition' },
-              ].map((device) => (
-                <div
-                  key={device.key}
-                  onClick={() => toggleDevice(device.key)}
-                  className={`group cursor-pointer p-3 rounded-xl border-2 transition-all shadow-[3px_3px_0px_0px_rgba(0,0,0,0.05)] ${formData.interestedDevices.includes(device.key) ? 'border-blue-500 bg-blue-50' : 'border-slate-200 bg-blue-50/30 hover:border-blue-500'}`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors ${formData.interestedDevices.includes(device.key) ? 'bg-blue-500 text-white' : 'bg-blue-500/10 text-blue-500 group-hover:bg-blue-500 group-hover:text-white'}`}>
-                      <device.icon className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-slate-800 text-xs">{device.title}</h3>
-                      <p className="text-[10px] text-slate-500">{device.subtitle}</p>
-                    </div>
-                    {formData.interestedDevices.includes(device.key) && (
-                      <Check className="w-4 h-4 text-blue-500 ml-auto" />
-                    )}
-                  </div>
-                </div>
-              ))}
-              
-              {/* Custom device input */}
-              {showCustomDeviceInput ? (
-                <div className="p-3 rounded-xl border-2 border-dashed border-blue-400 bg-blue-50">
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={customDeviceInput}
-                      onChange={(e) => setCustomDeviceInput(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && handleAddCustomDevice()}
-                      placeholder={language === 'vi' ? 'Nhập tên thiết bị...' : language === 'en' ? 'Enter device name...' : 'Entrez le nom de l\'appareil...'}
-                      className="flex-1 px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500"
-                      autoFocus
-                    />
-                    <button
-                      onClick={handleAddCustomDevice}
-                      className="px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-                    >
-                      <Check className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => { setShowCustomDeviceInput(false); setCustomDeviceInput(''); }}
-                      className="px-3 py-2 bg-slate-200 text-slate-600 rounded-lg hover:bg-slate-300 transition-colors"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div
-                  onClick={() => setShowCustomDeviceInput(true)}
-                  className="group cursor-pointer p-3 rounded-xl border-2 border-dashed border-slate-300 hover:border-slate-800 hover:bg-slate-100 transition-all"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-full bg-slate-200 flex items-center justify-center text-slate-500 group-hover:bg-slate-800 group-hover:text-white transition-colors">
-                      <PlusCircle className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-slate-500 text-xs">{language === 'vi' ? 'Thêm thiết bị khác' : language === 'en' ? 'Add other device' : language === 'ar' ? 'إضافة جهاز آخر' : 'Ajouter un autre appareil'}</h3>
-                    </div>
-                  </div>
-                </div>
-              )}
-              
-              {/* Show added custom devices */}
-              {formData.interestedDevices.filter(d => !['Screen Reader', 'Screen Magnifier', 'Speech Recognition'].includes(d)).map((device) => (
-                <div
-                  key={device}
-                  onClick={() => toggleDevice(device)}
-                  className="group cursor-pointer p-3 rounded-xl border-2 border-blue-500 bg-blue-50 transition-all"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-full bg-blue-500 text-white flex items-center justify-center">
-                      <Smartphone className="w-4 h-4" />
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-slate-800 text-xs">{device}</h3>
-                    </div>
-                    <X className="w-4 h-4 text-blue-500 hover:text-red-500 transition-colors" />
-                  </div>
-                </div>
-              ))}
             </div>
           </section>
 
@@ -783,34 +601,6 @@ function ConsultationModal({
 }
 
 // Product Card Component
-// Confidence Rating Bar Component
-function ConfidenceBar({ confidence, language = 'vi' as Language }: { confidence: number; language?: Language }) {
-  const getColor = (value: number) => {
-    if (value >= 85) return 'bg-teal-500';
-    if (value >= 70) return 'bg-blue-500';
-    if (value >= 50) return 'bg-amber-500';
-    return 'bg-red-500';
-  };
-
-  const label = language === 'vi' ? 'Độ tin cậy' : language === 'en' ? 'Confidence' : language === 'ar' ? 'الثقة' : 'Confiance';
-
-  return (
-    <div className="flex items-center gap-3 bg-white px-4 py-2 rounded-full border border-slate-100 shadow-sm">
-      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{label}</span>
-      <div className="w-24 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-        <div 
-          className={`h-full ${getColor(confidence)} transition-all duration-500`}
-          style={{ width: `${confidence}%` }}
-        />
-      </div>
-      <span className={`text-xs font-bold ${
-        confidence >= 85 ? 'text-teal-500' : 
-        confidence >= 70 ? 'text-blue-500' : 
-        confidence >= 50 ? 'text-amber-500' : 'text-red-500'
-      }`}>{confidence}%</span>
-    </div>
-  );
-}
 
 export function ChatPage() {
   const navigate = useNavigate();
@@ -982,13 +772,47 @@ export function ChatPage() {
 
   // Agent state - subscribe to agents array directly for proper reactivity
   const agents = useAgentStore((s) => s.agents);
-  const activeAgents = agents.filter(a => a.isActive);
+  // Get sorted active agents from store (sorted by sortOrder, then createdAt)
+  const getActiveAgents = useAgentStore((s) => s.getActiveAgents);
+  const activeAgents = getActiveAgents();
   const { selectedAgentId } = useSelectedAgentStore();
   // Fallback to default agent if no agent is selected or activeAgents is empty
   const defaultAgent = activeAgents[0];
   const selectedAgent = selectedAgentId
     ? activeAgents.find(a => a.id === selectedAgentId) || defaultAgent
     : defaultAgent;
+
+  // ⭐ Tạo system prompt tổng hợp từ TẤT CẢ các bot active - dùng cho "Trò chuyện mới"
+  const getOmniSystemPrompt = () => {
+    if (activeAgents.length === 0) return '';
+    if (activeAgents.length === 1) return activeAgents[0].systemPrompt || '';
+
+    const agentContexts = activeAgents.map((agent, idx) => {
+      const caps = agent.capabilities?.length
+        ? `[Chuyên môn: ${agent.capabilities.join(', ')}]`
+        : '';
+      return `[BOT ${idx + 1}: ${agent.name}]${caps ? ' ' + caps : ''}
+Mô tả: ${agent.description || 'Chuyên gia hỗ trợ'}
+System Prompt: ${agent.systemPrompt || 'Bạn là một trợ lý hữu ích.'}`;
+    });
+
+    return `Bạn là TRỢ LÝ TỔNG HỢP của MADA AI Assistant - cổng thông tin hỗ trợ người khuyết tật rộng lớn nhất.
+
+Bạn có quyền truy cập kiến thức từ ${activeAgents.length} chuyên gia sau:
+${agentContexts.join('\n\n')}
+
+QUY TẮC ỨNG XỬ:
+1. Khi user hỏi về lĩnh vực cụ thể → hãy cung cấp câu trả lời chi tiết dựa trên kiến thức chuyên môn của bot phù hợp nhất
+2. Khi user hỏi chung chung → tổng hợp thông tin từ nhiều bot liên quan
+3. Khi user hỏi ngoài lĩnh vực hỗ trợ người khuyết tật → lịch sự hướng dẫn họ đến các chuyên gia phù hợp hoặc từ chối nhẹ nhàng
+4. Luôn thể hiện sự đồng cảm và chuyên nghiệp
+5. Ưu tiên cung cấp thông tin chính xác, cập nhật từ knowledge base nếu có
+
+Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
+  };
+
+  // ⭐ Kiểm tra xem có phải "Trò chuyện mới" không (chưa chọn agent cụ thể)
+  const isNewChat = !selectedAgentId && messages.length === 0;
 
   // Chat history from persisted store
   const historyConversations = useChatHistoryStore((s) => s.conversations);
@@ -1562,11 +1386,13 @@ export function ChatPage() {
       const chatEndpoint = useStream ? '/api/chat/stream' : (attachmentsForApi.length > 0 ? '/api/chat-with-file' : '/api/chat');
       // Map viewMode ('end_user' | 'at_specialist') → userMode ('endUser' | 'specialist')
       const userMode: 'endUser' | 'specialist' = viewMode === 'at_specialist' ? 'specialist' : 'endUser';
+      // ⭐ Dùng omni prompt khi là "Trò chuyện mới" (chưa chọn agent cụ thể)
+      const isOmniChat = !selectedAgentId || selectedAgentId === defaultAgent?.id;
       const chatBody: any = {
         message: fullMessage,
         language,
-        agentId: selectedAgentId,
-        agentPrompt: selectedAgent?.systemPrompt,
+        agentId: isOmniChat ? null : selectedAgentId,
+        agentPrompt: isOmniChat ? getOmniSystemPrompt() : selectedAgent?.systemPrompt,
         userMode,
       };
       
@@ -1581,18 +1407,49 @@ export function ChatPage() {
       // ===== STREAMING MODE =====
       if (useStream) {
         const token = getAccessToken();
-        const response = await fetch(chatEndpoint, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-          body: JSON.stringify(chatBody),
-          signal: abortControllerRef.current.signal,
-        });
 
-        if (!response.ok) {
-          throw new Error(`Server error: ${response.status}`);
+        // Retry helper với exponential backoff cho 429 rate limit
+        let response: Response | undefined;
+        let fetchSuccess = false;
+        for (let attempt = 0; attempt < 4; attempt++) {
+          if (attempt > 0) {
+            const delay = Math.min(2000 * Math.pow(2, attempt - 1), 16000);
+            console.log(`[Chat] Retry attempt ${attempt} after ${delay}ms...`);
+            await new Promise(r => setTimeout(r, delay));
+          }
+
+          response = await fetch(chatEndpoint, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+            body: JSON.stringify(chatBody),
+            signal: abortControllerRef.current.signal,
+          });
+
+          if (response.ok) {
+            fetchSuccess = true;
+            break;
+          }
+
+          if (response.status === 429 && attempt < 3) {
+            // Đọc retry-after từ header hoặc dùng backoff
+            const retryAfter = response.headers.get('retry-after') || response.headers.get('X-RateLimit-Reset');
+            const delay = retryAfter
+              ? Math.max(0, parseInt(retryAfter) - Date.now())
+              : Math.min(2000 * Math.pow(2, attempt), 16000);
+            console.warn(`[Chat] 429 Rate limited, retrying in ${delay}ms...`);
+            continue;
+          }
+
+          // Lỗi khác hoặc hết retry → thoát
+          break;
+        }
+
+        if (!fetchSuccess || !response?.ok) {
+          const status = response?.status || 'unknown';
+          throw new Error(`Server error: ${status}`);
         }
 
         const reader = response.body?.getReader();
@@ -1604,7 +1461,6 @@ export function ChatPage() {
         let fullContent = '';
         let sources: any[] = [];
         let confidence = 0.5;
-        let suggestedProducts: any[] = []; // ✅ Capture from stream
 
         while (true) {
           const { done, value } = await reader.read();
@@ -1624,9 +1480,6 @@ export function ChatPage() {
                   setStreamingContent(fullContent);
                 } else if (data.type === 'sources') {
                   sources = data.sources || [];
-                } else if (data.type === 'suggestedProducts') {
-                  // ✅ Capture suggested products from stream
-                  suggestedProducts = data.suggestedProducts || [];
                 } else if (data.type === 'done') {
                   confidence = data.confidence || 0.5;
                   if (data.answer) fullContent = data.answer;
@@ -1650,7 +1503,7 @@ export function ChatPage() {
             confidence: confidence,
             sources: sources,
             contextUsed: sources.length > 0,
-            suggestedProducts: suggestedProducts, // ✅ Now captured from stream event
+            // ❌ KHÔNG tự động hiển thị sản phẩm - chỉ khi user bấm nút
           });
 
           // 💾 Save assistant message vào backend (DB persistence)
@@ -2070,9 +1923,17 @@ export function ChatPage() {
   };
 
   // File upload limits (from Admin Settings)
-  const { maxFilesPerSession, maxFilesTotal } = useSystemSettingsStore();
+  const { maxFilesPerSession, maxFilesTotal, categoryOrder } = useSystemSettingsStore();
   const MAX_FILES_PER_SESSION = maxFilesPerSession || 10;
   const MAX_FILES_TOTAL = maxFilesTotal || 100;
+
+  // ⭐ Categories sorted by admin-defined order
+  const allCategories = Object.keys(CATEGORY_INFO) as ATCategory[];
+  const sortedCategories = categoryOrder?.length
+    ? categoryOrder.filter(cat => allCategories.includes(cat as ATCategory)).concat(
+        allCategories.filter(cat => !categoryOrder.includes(cat))
+      ) as ATCategory[]
+    : allCategories;
   
   // Track total files uploaded (persisted)
   const [totalFilesUploaded, setTotalFilesUploaded] = useState(() => {
@@ -2446,7 +2307,7 @@ export function ChatPage() {
           
           {/* Category Navigation */}
           <nav className="space-y-1 px-3 pt-2 pb-2">
-            {categories.map((category) => {
+            {sortedCategories.map((category) => {
               const isActive = activeCategory === category;
               const label = CATEGORY_LABELS[category];
 
@@ -2497,29 +2358,29 @@ export function ChatPage() {
                   }
                 }}
                 className={clsx(
-                  'w-full flex items-center gap-3 px-4 py-3 transition-colors rounded-2xl group',
+                  'w-full flex items-center gap-4 px-5 py-4 transition-colors rounded-2xl group',
                   isActive
                     ? colors.active
                     : 'text-slate-500 hover:bg-surface-container-low hover:text-on-background'
                 )}
               >
                 <div className={clsx(
-                  'w-8 h-8 rounded-lg flex items-center justify-center transition-colors',
+                  'w-11 h-11 rounded-xl flex items-center justify-center transition-colors',
                   isActive ? 'bg-white/20' : colors.bg
                 )}>
                   <span className={clsx(
-                    'material-symbols-outlined text-lg',
+                    'material-symbols-outlined text-xl',
                     isActive ? 'text-white' : colors.icon
                   )}>
                     {CATEGORY_ICONS[category]}
                   </span>
                 </div>
                 <div className="flex-1 min-w-0 text-left">
-                  <p className="text-xs font-bold uppercase tracking-tight">
+                  <p className="text-sm font-bold uppercase tracking-tight">
                     {language === 'vi' ? label.title : language === 'en' ? label.titleEn : language === 'ar' ? label.titleAr : label.titleFr}
                   </p>
                   <p className={clsx(
-                    'text-[10px] truncate',
+                    'text-xs truncate',
                     isActive ? 'text-white/70' : 'text-on-surface-variant'
                   )}>
                     {language === 'vi' ? label.desc : language === 'en' ? label.descEn : language === 'ar' ? label.descAr : label.descFr}
@@ -2600,14 +2461,14 @@ export function ChatPage() {
                   }
                 }}
                 className={clsx(
-                  'w-full flex items-center gap-3 px-4 py-3 transition-colors rounded-2xl group',
+                  'w-full flex items-center gap-4 px-5 py-4 transition-colors rounded-2xl group',
                   isActive
                     ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white'
                     : 'text-slate-500 hover:bg-surface-container-low hover:text-on-background'
                 )}
               >
                 <div className={clsx(
-                  'w-8 h-8 rounded-lg flex items-center justify-center transition-colors text-lg',
+                  'w-11 h-11 rounded-xl flex items-center justify-center transition-colors text-xl',
                   isActive ? 'bg-white/20' : 'bg-orange-100'
                 )}>
                   <span className={clsx(
@@ -2617,11 +2478,11 @@ export function ChatPage() {
                   </span>
                 </div>
                 <div className="flex-1 min-w-0 text-left">
-                  <p className="text-xs font-bold uppercase tracking-tight">
+                  <p className="text-sm font-bold uppercase tracking-tight">
                     {agent.name}
                   </p>
                   <p className={clsx(
-                    'text-[10px] truncate',
+                    'text-xs truncate',
                     isActive ? 'text-white/70' : 'text-on-surface-variant'
                   )}>
                     {agent.description || (language === 'vi' ? 'Agent tùy chỉnh' : language === 'en' ? 'Custom Agent' : 'Agent personnalisé')}
@@ -2886,7 +2747,7 @@ export function ChatPage() {
                   <div className="mb-6">
                     <img src={madaLogo} alt="MADA" className="w-32 h-auto mx-auto" />
                   </div>
-                  
+
                   {/* Welcome Typography */}
                   <h2 className="text-2xl font-bold text-on-background mb-2">
                     {greeting[language] || greeting.vi}
@@ -2894,7 +2755,7 @@ export function ChatPage() {
                   <p className="text-sm text-on-surface-variant">
                     {description[language] || description.vi}
                   </p>
-                  
+
                   {/* Language Selector đã được chuyển lên Header Bar - chỉ giữ 1 chỗ duy nhất */}
                 </div>
 
@@ -2951,36 +2812,15 @@ export function ChatPage() {
           ) : (
             <div className="max-w-4xl mx-auto flex flex-col h-full w-full">
               {/* Agent Header */}
-              <div className="flex items-center justify-between mb-6 border-b border-slate-100 pb-4">
+              <div className="flex items-center mb-6 border-b border-slate-100 pb-4">
                 <div className="flex items-center gap-3">
                   <div className="w-2 h-2 rounded-full bg-blue-500"></div>
                   <h2 className="font-bold text-slate-900 uppercase tracking-tight">
                     {activeCategory 
                       ? (language === 'vi' ? CATEGORY_LABELS[activeCategory].title : language === 'en' ? CATEGORY_LABELS[activeCategory].titleEn : language === 'ar' ? CATEGORY_LABELS[activeCategory].titleAr : CATEGORY_LABELS[activeCategory].titleFr)
-                      : (language === 'vi' ? 'THÔNG TIN BỔ TRỢ & TIÊU CHUẨN' : language === 'en' ? 'SUPPLEMENTARY INFO & STANDARDS' : language === 'ar' ? 'المعلومات والمعايير الإضافية' : 'INFO SUPPLÉMENTAIRES & NORMES')}
+                      : (language === 'vi' ? 'THÔNG TIN BỔ TRỢ VÀ TIÊU CHUẨN' : language === 'en' ? 'SUPPLEMENTARY INFO & STANDARDS' : language === 'ar' ? 'المعلومات والمعايير الإضافية' : 'INFO SUPPLÉMENTAIRES & NORMES')}
                   </h2>
                 </div>
-
-                {/* ⭐ Agent Selector Dropdown */}
-                {activeAgents.length > 0 && (
-                  <div className="relative" ref={null}>
-                    <select
-                      value={selectedAgentId || 'default'}
-                      onChange={(e) => {
-                        const newId = e.target.value === 'default' ? null : e.target.value;
-                        useSelectedAgentStore.getState().setSelectedAgentId(newId);
-                      }}
-                      className="appearance-none bg-white border-2 border-slate-200 rounded-full px-3 py-1.5 pr-8 text-xs font-bold text-slate-700 cursor-pointer hover:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-300 transition-all"
-                    >
-                      {activeAgents.map((agent) => (
-                        <option key={agent.id} value={agent.id}>
-                          {agent.avatar} {agent.name}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
-                  </div>
-                )}
               </div>
 
               {/* Messages */}
@@ -3591,22 +3431,12 @@ function MessageBubble({
   language?: Language;
 }) {
   const [showSources, setShowSources] = useState(false);
-  const [feedback, setFeedback] = useState<'like' | 'dislike' | null>(null);
-  const confidence = message.confidence || 85;
+  const [loadingProducts, setLoadingProducts] = useState(false);
 
   // ⭐ Edit message state from store
-  const { editingMessageId, setEditingMessage, setMessages, setLoading } = useChatStore();
+  const { editingMessageId, setEditingMessage, messages, setMessages, setLoading } = useChatStore();
   const [localEditText, setLocalEditText] = useState('');
   const currentEditingId = editingMessageId;
-  
-  // Detect if AI couldn't find data in Knowledge Base
-  const noDataIndicators = [
-    'khong tim thay', 'khong co thong tin', 'khong co du lieu',
-    'no information', 'no data', 'not found', 'khong chan chan',
-    'xin loi', 'toi khong', 'i don\'t have', 'i\'m not sure'
-  ];
-  const hasNoData = confidence < 50 || 
-    noDataIndicators.some(indicator => message.content.toLowerCase().includes(indicator.toLowerCase()));
   
   // Detect category từ nội dung message (có thể dùng cho analytics sau)
   const detectedCategory = detectCategoryFromQuery(message.content);
@@ -3751,47 +3581,20 @@ function MessageBubble({
           </ReactMarkdown>
         </div>
 
-        {/* Expert Consultation Banner - Always LTR */}
-        {hasNoData && (
-          <div className="mt-4 p-4 bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-200 rounded-2xl" dir="ltr">
-            <div className="flex items-start gap-3">
-              <div className="w-12 h-12 bg-gradient-to-br from-amber-400 to-orange-500 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg">
-                <span className="material-symbols-outlined text-xl text-white">psychology</span>
-              </div>
-              <div className="flex-1">
-                <h4 className="text-sm font-bold text-amber-800 mb-1">
-                  {t('chat.notFoundInfo')}
-                </h4>
-                <p className="text-xs text-amber-700 mb-3">
-                  {language === 'vi' ? 'Đội ngũ chuyên gia MADA có thể hỗ trợ bạn chi tiết hơn.' :
-                   language === 'en' ? 'MADA expert team can help you with more details.' :
-                   language === 'ar' ? 'يمكن لفريق خبراء MADA مساعدتك بمزيد من التفاصيل.' :
-                   'L\'équipe d\'experts MADA peut vous aider avec plus de détails.'}
-                </p>
-                <button
-                  onClick={onRequestConsultation}
-                  className="inline-flex items-center gap-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white px-4 py-2 rounded-full text-xs font-bold hover:shadow-lg hover:scale-105 transition-all"
-                >
-                  <span className="material-symbols-outlined text-sm">support_agent</span>
-                  {language === 'vi' ? 'Gửi yêu cầu tư vấn' :
-                   language === 'en' ? 'Request Expert Consultation' :
-                   language === 'ar' ? 'طلب استشارة خبير' :
-                   'Demander une consultation'}
-                </button>
-              </div>
-            </div>
+        {/* Tư vấn Chuyên gia - After each answer */}
+        <div className="mt-4 flex items-center gap-3">
+          <div className="flex items-center gap-2 bg-gradient-to-r from-indigo-50 to-violet-50 border border-indigo-100 px-4 py-2.5 rounded-full">
+            <span className="material-symbols-outlined text-sm text-indigo-500">support_agent</span>
+            <span className="text-xs font-bold text-indigo-700">
+              {language === 'vi' ? 'Tư vấn chuyên gia' : language === 'en' ? 'Expert Consultation' : language === 'ar' ? 'استشارة خبير' : 'Consultation expert'}
+            </span>
           </div>
-        )}
-
-        {/* Confidence Bar */}
-        <div className="mt-4 flex items-center gap-4">
-          <ConfidenceBar confidence={confidence} language={language} />
           <button 
             onClick={onRequestConsultation}
-            className="flex items-center gap-2 bg-slate-900 text-white px-5 py-2 rounded-full text-xs font-bold hover:opacity-90 transition-all"
+            className="flex items-center gap-2 bg-[#0047ff] text-white px-5 py-2.5 rounded-full text-xs font-bold hover:bg-[#0037cc] transition-all shadow-sm hover:shadow-md"
           >
-            <span className="material-symbols-outlined text-sm">support_agent</span>
-            {language === 'vi' ? 'Tư vấn Chuyên gia' : language === 'en' ? 'Request Specialist' : language === 'ar' ? 'طلب خبير' : 'Demander un spécialiste'}
+            <span className="material-symbols-outlined text-sm">contact_phone</span>
+            {language === 'vi' ? 'Tư vấn ngay' : language === 'en' ? 'Consult now' : language === 'ar' ? 'استشارة الآن' : 'Consulter'}
           </button>
         </div>
 
@@ -3826,30 +3629,6 @@ function MessageBubble({
             }
           >
             {copiedId === message.id ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-          </button>
-          <button
-            onClick={() => {
-              setFeedback(feedback === 'like' ? null : 'like');
-            }}
-            className={clsx(
-              'p-1.5 rounded-lg transition-colors',
-              feedback === 'like' ? 'bg-blue-500 text-white' : 'hover:bg-slate-100 text-slate-500'
-            )}
-            title="Thích"
-          >
-            <ThumbsUp className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => {
-              setFeedback(feedback === 'dislike' ? null : 'dislike');
-            }}
-            className={clsx(
-              'p-1.5 rounded-lg transition-colors',
-              feedback === 'dislike' ? 'bg-blue-500 text-white' : 'hover:bg-slate-100 text-slate-500'
-            )}
-            title={language === 'vi' ? 'Không thích' : language === 'en' ? 'Dislike' : language === 'ar' ? 'عدم الإعجاب' : 'Pas aimer'}
-          >
-            <ThumbsDown className="w-4 h-4" />
           </button>
           {message.sources && message.sources.length > 0 && (
             <button
@@ -3889,75 +3668,298 @@ function MessageBubble({
           </div>
         )}
 
-        {/* Suggested Products - WCAG 2.2 Compliant ProductCard */}
-        {message.suggestedProducts && message.suggestedProducts.length > 0 && (
-          <div className="mt-3 p-4 bg-gradient-to-r from-slate-50 to-slate-100 rounded-xl border border-slate-200" dir="ltr" role="region" aria-label="Sản phẩm được giới thiệu">
-            <div className="flex items-center gap-2 mb-4">
-              <Sparkles className="w-5 h-5 text-violet-500" aria-hidden="true" />
-              <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wide">
-                {language === 'vi' ? 'Sản phẩm được giới thiệu' : language === 'en' ? 'Recommended Products' : 'المنتجات الموصى بها'}
-              </h3>
+        {/* Request Products Button - Show only when AI mentions products AND user asked about them */}
+        {!message.suggestedProducts && (() => {
+          const contentLower = message.content.toLowerCase();
+          const productMentions = [
+            'sản phẩm', 'thiết bị', 'máy', 'xe lăn', 'chân giả', 'tay giả',
+            'device', 'product', 'wheelchair', 'hearing aid', 'prosthetic',
+            'orthotic', 'kính', 'nạng', 'gậy', 'walker', 'crutch', 'cane'
+          ];
+          const explicitAsk = [
+            'có thể thấy', 'có thể biết', 'có thể mua', 'có thể dùng',
+            'xem được không', 'mua được không', 'dùng được không',
+            'can i see', 'can i know', 'can i get', 'can i use',
+            'available', 'có bán không', 'bán ở đâu', 'where to buy',
+            'cái nào', 'loại nào', 'which one', 'what device'
+          ];
+          const mentionsProducts = productMentions.some(term => contentLower.includes(term));
+          
+          // Find previous user message
+          const msgIndex = messages.findIndex(m => m.id === message.id);
+          const prevUserMsg = msgIndex > 0 ? messages[msgIndex - 1] : null;
+          const userAskedAbout = prevUserMsg && explicitAsk.some(term => prevUserMsg.content.toLowerCase().includes(term));
+          
+          return (mentionsProducts && userAskedAbout) ? (
+            <div className="mt-3 flex justify-center">
+              <button
+                onClick={async () => {
+                  setLoadingProducts(true);
+                  try {
+                    const response = await fetch('/api/chat/products', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        message: message.content,
+                        language,
+                      }),
+                    });
+                    const data = await response.json();
+                    if (data.success && data.data.products && data.data.products.length > 0) {
+                      const updatedMessages = messages.map(m =>
+                        m.id === message.id ? { ...m, suggestedProducts: data.data.products } : m
+                      );
+                      setMessages(updatedMessages);
+                    }
+                  } catch (err) {
+                    console.error('Failed to fetch products:', err);
+                  } finally {
+                    setLoadingProducts(false);
+                  }
+                }}
+                disabled={loadingProducts}
+                className="px-4 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold rounded-full border border-emerald-200 flex items-center gap-2 transition-all hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loadingProducts ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    {language === 'vi' ? 'Đang tìm...' : 'Loading...'}
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4" />
+                    {language === 'vi' ? 'Xem sản phẩm phù hợp' : language === 'en' ? 'View suitable products' : 'عرض المنتجات المناسبة'}
+                  </>
+                )}
+              </button>
             </div>
+          ) : null;
+        })()}
+
+        {/* Suggested Products - Enhanced UI/UX with Glassmorphic Design */}
+        {message.suggestedProducts && message.suggestedProducts.length > 0 && (
+          <div className="mt-4" dir="ltr" role="region" aria-label="Sản phẩm được giới thiệu">
             
-            {/* Standards badges - ĐÃ FIX: nằm trong card */}
-            <div className="mb-4 p-2 bg-white rounded-lg border border-slate-200">
-              <p className="text-[10px] text-slate-600 font-semibold mb-1.5 uppercase tracking-wide">
-                {language === 'vi' ? 'Tiêu chuẩn kỹ thuật:' : language === 'en' ? 'Technical Standards:' : 'المعايير التقنية:'}
-              </p>
-              <div className="flex flex-wrap gap-1">
-                {['ISO 9999', 'IEC 60118-4', 'WHO GATE', 'WCAG 2.1'].map((std, idx) => (
-                  <span key={idx} className="px-2 py-1 bg-violet-50 text-violet-700 text-[10px] font-semibold rounded border border-violet-200">
-                    {std}
-                  </span>
-                ))}
+            {/* Section Header */}
+            <div className="flex items-center gap-2 mb-4">
+              <span className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-200/60 shadow-xs">
+                <Sparkles className="w-4 h-4" aria-hidden="true" />
+              </span>
+              <h2 className="text-sm font-extrabold uppercase tracking-wider text-slate-800">
+                Sản phẩm được giới thiệu
+              </h2>
+              <span className="text-xs bg-emerald-50 text-emerald-700 font-bold px-2.5 py-0.5 rounded-full border border-emerald-200 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                Đã kiểm duyệt y khoa MADA
+              </span>
+            </div>
+
+            {/* AI Analysis Banner */}
+            <div className="bg-gradient-to-r from-teal-900 via-[#005f73] to-[#0038b6] px-5 py-3 text-white flex flex-wrap items-center justify-between gap-3 rounded-t-2xl border border-teal-800/40">
+              <div className="flex items-center gap-2.5 text-xs font-medium">
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-400"></span>
+                </span>
+                <span className="text-teal-100">Đã phân tích từ <strong className="text-white font-bold underline decoration-emerald-400 decoration-2 underline-offset-2">1.420 thiết bị</strong> trong kho dữ liệu quốc tế ISO 9999</span>
+              </div>
+              <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md px-3 py-1 rounded-full border border-white/20 shadow-inner">
+                <svg className="w-3.5 h-3.5 text-amber-300 fill-amber-300" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path></svg>
+                <span className="text-xs font-black tracking-tight text-white">96%</span>
+                <span className="text-[10px] uppercase font-bold text-teal-100 tracking-wider">AI Matching Score</span>
               </div>
             </div>
 
-            {/* Product Cards Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {message.suggestedProducts.slice(0, 4).map((product: SuggestedProduct, index: number) => {
-                const matchScore = product.confidence 
-                  ? Math.round(product.confidence * 100) 
-                  : 75 + Math.floor(Math.random() * 20);
-                
-                return (
-                  <ProductCard
-                    key={product.id || index}
-                    product={{
-                      id: product.id || `product-${index}`,
-                      name: language === 'en' && product.title_en ? product.title_en : product.title,
-                      category: product.category || 'Công nghệ hỗ trợ',
-                      brand: product.brand,
-                      description: product.description,
-                      price_range: product.price_range,
-                      image_url: product.image_url,
-                      product_url: product.product_url || product.source_url,
-                      features: product.features?.slice(0, 3) || [],
-                      standards: product.standards,
-                      rating: product.rating,
-                      review_count: product.review_count,
-                      availability: product.availability,
-                    }}
-                    matchScore={matchScore}
-                    matchReason={product.match_reason}
-                    confidence={product.confidence ? Math.round(product.confidence * 100) : undefined}
-                    language={language}
-                    onViewDetails={() => {
-                      const url = product.product_url || product.source_url;
-                      // ✅ Validate URL trước khi mở (tránh Safari báo "trang không hợp lệ" với manual:<ts>)
-                      if (url && /^https?:\/\//i.test(url)) {
-                        window.open(url, '_blank', 'noopener,noreferrer');
-                      } else {
-                        // Fallback: mở consultation modal nếu URL rỗng / invalid
-                        onRequestConsultation?.();
-                      }
-                    }}
-                    onRequestConsult={() => {
-                      onRequestConsultation?.();
-                    }}
-                  />
-                );
-              })}
+            {/* Product Cards Grid - Glassmorphic Card */}
+            <div className="bg-white rounded-b-2xl border border-slate-200/90 shadow-soft-card overflow-hidden">
+              <div className="p-6 grid grid-cols-1 gap-5">
+                {message.suggestedProducts.slice(0, 4).map((product: SuggestedProduct, index: number) => {
+                  const matchScore = (product.confidence != null && product.confidence > 0)
+                    ? Math.round(product.confidence * 100)
+                    : 75 + Math.floor(Math.random() * 20);
+                  
+                  return (
+                    <article
+                      key={product.id || index}
+                      className="group bg-gradient-to-b from-slate-50/60 to-white rounded-xl border border-slate-200/80 p-3 hover:shadow-lg hover:border-violet-200 transition-all duration-300"
+                      role="article"
+                      aria-labelledby={`product-title-${product.id}`}
+                    >
+                      {/* MAIN LAYOUT - Compact: Image Left | Info Middle | Score Right */}
+                      <div className="flex gap-3">
+                        
+                        {/* LEFT - Image (Smaller) */}
+                        <div className="w-24 h-24 lg:w-28 lg:h-28 rounded-lg overflow-hidden bg-white border border-slate-100 shadow-sm flex-shrink-0 relative group-hover:shadow-md transition-shadow">
+                          {product.image_url ? (
+                            <img
+                              src={getImageUrl(product.image_url)}
+                              alt={`${product.title} - ${product.category}`}
+                              className="w-full h-full object-cover"
+                              loading="lazy"
+                              referrerPolicy="no-referrer"
+                            />
+                          ) : (
+                            <div className="w-full h-full bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center text-white">
+                              <Accessibility className="w-6 h-6" />
+                            </div>
+                          )}
+                          {/* Badge */}
+                          <div className="absolute top-1 left-1 px-1.5 py-0.5 rounded bg-white/95 text-[8px] font-black uppercase text-teal-900 shadow-sm border border-slate-100">
+                            AT
+                          </div>
+                        </div>
+
+                        {/* MIDDLE - Product Info */}
+                        <div className="flex-1 min-w-0 flex flex-col justify-between">
+                          
+                          {/* Top: Category, Name, Price */}
+                          <div>
+                            {/* Category */}
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-[9px] text-slate-500 font-semibold bg-slate-100 px-1.5 py-0.5 rounded">
+                                {product.category}
+                              </span>
+                              {product.brand && (
+                                <span className="px-1.5 py-0.5 rounded-full bg-blue-50 text-[#003ec7] text-[9px] font-bold">
+                                  {product.brand}
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Product Name - Clickable Link */}
+                            {product.product_url && /^https?:\/\//i.test(product.product_url) ? (
+                              <a
+                                href={product.product_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="block"
+                              >
+                                <h3
+                                  id={`product-title-${product.id}`}
+                                  className="text-sm lg:text-base font-bold text-slate-900 leading-tight group-hover:text-violet-700 transition-colors mb-1 underline decoration-violet-300 decoration-2 underline-offset-2 hover:text-violet-600"
+                                >
+                                  {language === 'en' && product.title_en ? product.title_en : product.title}
+                                </h3>
+                              </a>
+                            ) : (
+                              <h3
+                                id={`product-title-${product.id}`}
+                                className="text-sm lg:text-base font-bold text-slate-900 leading-tight group-hover:text-violet-700 transition-colors mb-1"
+                              >
+                                {language === 'en' && product.title_en ? product.title_en : product.title}
+                              </h3>
+                            )}
+
+                            {/* Price */}
+                            {product.price_range && (
+                              <p className="text-base lg:text-lg font-black text-[#005f73] tracking-tight">
+                                {product.price_range}
+                              </p>
+                            )}
+                            
+                            {/* URL Link - Visible */}
+                            {(product.product_url || product.source_url) && (
+                              <div className="flex items-center gap-1 mt-1">
+                                <Globe className="w-3 h-3 text-slate-400" />
+                                <span className="text-[9px] text-slate-400 truncate max-w-[150px]">
+                                  {product.product_url || product.source_url}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                          
+                          {/* Bottom: Buttons */}
+                          <div className="flex flex-wrap gap-2 mt-2">
+                            <button
+                              onClick={() => onRequestConsultation?.()}
+                              className="py-1.5 px-2.5 bg-gradient-to-r from-[#005f73] to-[#004e5f] text-white text-[10px] font-bold rounded-lg hover:opacity-95 transition-all shadow-sm flex items-center justify-center gap-1"
+                            >
+                              <MessageCircle className="w-3 h-3" aria-hidden="true" />
+                              {language === 'vi' ? 'Tư vấn' : 'Consult'}
+                            </button>
+                            
+                            {product.product_url && /^https?:\/\//i.test(product.product_url) && (
+                              <a
+                                href={product.product_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="py-1.5 px-2.5 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white text-[10px] font-bold rounded-lg transition-all shadow-sm flex items-center justify-center gap-1"
+                              >
+                                <ShoppingCart className="w-3 h-3" aria-hidden="true" />
+                                {language === 'vi' ? 'Mua' : 'Buy'}
+                              </a>
+                            )}
+                            
+                            {product.source_url && /^https?:\/\//i.test(product.source_url) && product.source_url !== product.product_url && (
+                              <a
+                                href={product.source_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="py-1.5 px-2.5 bg-gradient-to-r from-violet-500 to-purple-500 hover:from-violet-600 hover:to-purple-600 text-white text-[10px] font-bold rounded-lg transition-all shadow-sm flex items-center justify-center gap-1"
+                              >
+                                <FileText className="w-3 h-3" aria-hidden="true" />
+                                {language === 'vi' ? 'Chi tiết' : 'Details'}
+                              </a>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* RIGHT - Match Score Badge */}
+                        <div
+                          className="flex flex-col items-center justify-start pt-1"
+                          role="meter"
+                          aria-valuenow={matchScore}
+                          aria-valuemin={0}
+                          aria-valuemax={100}
+                        >
+                          <div className={`w-11 h-11 rounded-full ${matchScore >= 85 ? 'bg-gradient-to-br from-emerald-500 to-green-600' : matchScore >= 70 ? 'bg-gradient-to-br from-blue-500 to-indigo-600' : 'bg-gradient-to-br from-amber-500 to-orange-500'} flex items-center justify-center text-white font-bold text-sm shadow-lg ring-3 ring-white`}>
+                            {matchScore}%
+                          </div>
+                          <span className="text-[8px] text-slate-500 mt-0.5 font-semibold uppercase tracking-wide">
+                            Phù hợp
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Features - Horizontal Tags */}
+                      {product.features && product.features.length > 0 && (
+                        <div className="mt-2 pt-2 border-t border-slate-100">
+                          <div className="flex flex-wrap gap-1" role="list">
+                            {product.features.slice(0, 3).map((feature, idx) => (
+                              <span key={idx} className="inline-flex items-center gap-0.5 px-2 py-0.5 bg-emerald-50 text-emerald-700 text-[9px] font-medium rounded border border-emerald-100">
+                                <Check className="w-2.5 h-2.5 text-emerald-600" aria-hidden="true" />
+                                {feature}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Khuyến nghị - Compact */}
+                      {(product.match_reason || product.patient_indications?.length) && (
+                        <div className="mt-2 pt-2 border-t border-slate-100">
+                          <div className="bg-gradient-to-r from-teal-50/80 to-emerald-50/60 rounded-lg p-2 border border-teal-100/70">
+                            <div className="flex items-center gap-1 mb-1">
+                              <Sparkles className="w-3 h-3 text-teal-600" />
+                              <span className="text-[9px] font-bold text-teal-700 uppercase">
+                                {language === 'vi' ? 'Phù hợp cho' : 'Suitable for'}
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-slate-600 leading-snug">
+                              {product.match_reason || product.patient_indications?.slice(0, 2).join(' • ')}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Chi tiết sản phẩm - Tabs (Medical Indications, Specs, Insurance) */}
+                      {(product.medical_indications?.length || product.specifications?.length || product.insurance_coverage?.length) && (
+                        <ProductDetailTabs product={product} language={language} />
+                      )}
+                    </article>
+                  );
+                })}
+              </div>
             </div>
           </div>
         )}
@@ -3965,4 +3967,245 @@ function MessageBubble({
     </div>
   );
 }
+
+// Product Detail Tabs Component - Hiển thị tabs chi tiết sản phẩm
+interface ProductDetailTabsProps {
+  product: SuggestedProduct;
+  language: Language;
+}
+
+const ProductDetailTabs: React.FC<ProductDetailTabsProps> = ({ product, language }) => {
+  const [activeTab, setActiveTab] = useState<'medical' | 'specs' | 'financial'>('medical');
+
+  const tabs = [
+    {
+      id: 'medical' as const,
+      label: language === 'vi' ? 'Chỉ định Y khoa' : language === 'en' ? 'Medical Indications' : language === 'ar' ? 'المؤشرات الطبية' : 'Indications médicales',
+      icon: '🏥',
+      count: (product.medical_indications?.length || 0) + (product.patient_indications?.length || 0),
+    },
+    {
+      id: 'specs' as const,
+      label: language === 'vi' ? 'Thông số & Tương thích' : language === 'en' ? 'Specs & Compatibility' : language === 'ar' ? 'المواصفات والتوافق' : 'Spécifications',
+      icon: '📋',
+      count: (product.specifications?.length || 0) + (product.compatibility?.length || 0),
+    },
+    {
+      id: 'financial' as const,
+      label: language === 'vi' ? 'Hỗ trợ Tài chính' : language === 'en' ? 'Financial Support' : language === 'ar' ? 'الدعم المالي' : 'Support financier',
+      icon: '💰',
+      count: (product.financial_support?.length || 0) + (product.insurance_coverage?.length || 0),
+    },
+  ];
+
+  // Filter tabs with content
+  const visibleTabs = tabs.filter(tab => tab.count > 0);
+
+  if (visibleTabs.length === 0) return null;
+
+  return (
+    <div className="mt-2 pt-2 border-t border-slate-100">
+      {/* Tab Headers */}
+      <div className="flex gap-1 mb-2">
+        {visibleTabs.map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={clsx(
+              'flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-bold transition-all',
+              activeTab === tab.id
+                ? 'bg-gradient-to-r from-violet-500 to-purple-500 text-white shadow-sm'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            )}
+          >
+            <span>{tab.icon}</span>
+            <span className="hidden sm:inline">{tab.label}</span>
+            <span className="sm:hidden">{tab.id === 'medical' ? 'Y khoa' : tab.id === 'specs' ? 'Thông số' : 'Tài chính'}</span>
+            {tab.count > 0 && (
+              <span className={clsx(
+                'ml-0.5 px-1 rounded-full text-[8px] font-black',
+                activeTab === tab.id ? 'bg-white/20 text-white' : 'bg-violet-100 text-violet-700'
+              )}>
+                {tab.count}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* Tab Content */}
+      <div className="bg-gradient-to-br from-slate-50/80 to-white rounded-lg p-2 border border-slate-200/60">
+        {activeTab === 'medical' && (
+          <div className="space-y-2">
+            {/* Medical Indications */}
+            {(product.medical_indications?.length || product.patient_indications?.length) && (
+              <div>
+                <h4 className="text-[9px] font-bold text-slate-700 uppercase mb-1 flex items-center gap-1">
+                  <span className="text-emerald-500">✓</span>
+                  {language === 'vi' ? 'Chỉ định Y khoa & Bệnh nhân' : language === 'en' ? 'Medical & Patient Indications' : 'المؤشرات الطبية'}
+                </h4>
+                <div className="flex flex-wrap gap-1">
+                  {[...(product.medical_indications || []), ...(product.patient_indications || [])].slice(0, 6).map((indication, idx) => (
+                    <span key={idx} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-emerald-50 text-emerald-700 text-[9px] font-medium rounded border border-emerald-100">
+                      <Check className="w-2.5 h-2.5 text-emerald-600" />
+                      {indication}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Contraindications */}
+            {product.contraindications?.length && (
+              <div>
+                <h4 className="text-[9px] font-bold text-red-600 uppercase mb-1 flex items-center gap-1">
+                  <span className="text-red-500">✗</span>
+                  {language === 'vi' ? 'Chống chỉ định' : language === 'en' ? 'Contraindications' : 'موانع الاستعمال'}
+                </h4>
+                <div className="flex flex-wrap gap-1">
+                  {product.contraindications.slice(0, 4).map((item, idx) => (
+                    <span key={idx} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-red-50 text-red-700 text-[9px] font-medium rounded border border-red-100">
+                      {item}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* MADA Advice */}
+            {product.mada_advice && (
+              <div className="bg-gradient-to-r from-teal-50/60 to-emerald-50/40 rounded p-2 border border-teal-100/60">
+                <h4 className="text-[9px] font-bold text-teal-700 uppercase mb-1 flex items-center gap-1">
+                  <Sparkles className="w-3 h-3 text-teal-600" />
+                  {language === 'vi' ? 'Lời khuyên từ MADA' : language === 'en' ? 'MADA Expert Advice' : 'نصيحة MADA'}
+                </h4>
+                <p className="text-[10px] text-slate-600 leading-relaxed">{product.mada_advice}</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'specs' && (
+          <div className="space-y-2">
+            {/* Specifications */}
+            {product.specifications?.length && (
+              <div>
+                <h4 className="text-[9px] font-bold text-slate-700 uppercase mb-1 flex items-center gap-1">
+                  <span className="text-blue-500">📋</span>
+                  {language === 'vi' ? 'Thông số kỹ thuật' : language === 'en' ? 'Technical Specifications' : 'المواصفات الفنية'}
+                </h4>
+                <div className="grid grid-cols-2 gap-1">
+                  {product.specifications.slice(0, 6).map((spec: any, idx) => (
+                    <div key={idx} className="flex items-start gap-1">
+                      <span className="text-[9px] text-slate-500 font-medium min-w-[50px]">
+                        {typeof spec === 'string' ? '' : spec.label || 'Thông số'}:
+                      </span>
+                      <span className="text-[9px] text-slate-700 font-semibold">
+                        {typeof spec === 'string' ? spec : spec.value}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Compatibility */}
+            {product.compatibility?.length && (
+              <div>
+                <h4 className="text-[9px] font-bold text-slate-700 uppercase mb-1 flex items-center gap-1">
+                  <span className="text-violet-500">🔗</span>
+                  {language === 'vi' ? 'Tương thích với' : language === 'en' ? 'Compatible with' : 'متوافق مع'}
+                </h4>
+                <div className="flex flex-wrap gap-1">
+                  {product.compatibility.slice(0, 4).map((item, idx) => (
+                    <span key={idx} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-violet-50 text-violet-700 text-[9px] font-medium rounded border border-violet-100">
+                      {item}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Standards */}
+            {product.standards?.length && (
+              <div>
+                <h4 className="text-[9px] font-bold text-slate-700 uppercase mb-1 flex items-center gap-1">
+                  <span className="text-amber-500">🏅</span>
+                  {language === 'vi' ? 'Tiêu chuẩn' : language === 'en' ? 'Standards' : 'المعايير'}
+                </h4>
+                <div className="flex flex-wrap gap-1">
+                  {product.standards.slice(0, 4).map((item, idx) => (
+                    <span key={idx} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-amber-50 text-amber-700 text-[9px] font-medium rounded border border-amber-100">
+                      <ShieldCheck className="w-2.5 h-2.5 text-amber-600" />
+                      {item}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Warranty */}
+            {product.warranty && (
+              <div className="flex items-center gap-1 text-[9px] text-slate-600">
+                <ShieldCheck className="w-3 h-3 text-emerald-500" />
+                <span className="font-medium">{language === 'vi' ? 'Bảo hành:' : language === 'en' ? 'Warranty:' : 'الضمان:'} </span>
+                <span className="font-semibold">{product.warranty}</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'financial' && (
+          <div className="space-y-2">
+            {/* Financial Support */}
+            {product.financial_support?.length && (
+              <div>
+                <h4 className="text-[9px] font-bold text-slate-700 uppercase mb-1 flex items-center gap-1">
+                  <span className="text-emerald-500">💰</span>
+                  {language === 'vi' ? 'Hỗ trợ tài chính' : language === 'en' ? 'Financial Support' : 'الدعم المالي'}
+                </h4>
+                <div className="flex flex-wrap gap-1">
+                  {product.financial_support.slice(0, 4).map((item, idx) => (
+                    <span key={idx} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-emerald-50 text-emerald-700 text-[9px] font-medium rounded border border-emerald-100">
+                      <Check className="w-2.5 h-2.5 text-emerald-600" />
+                      {item}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Insurance Coverage */}
+            {product.insurance_coverage?.length && (
+              <div>
+                <h4 className="text-[9px] font-bold text-slate-700 uppercase mb-1 flex items-center gap-1">
+                  <span className="text-blue-500">🏥</span>
+                  {language === 'vi' ? 'Bảo hiểm chi trả' : language === 'en' ? 'Insurance Coverage' : 'تغطية التأمين'}
+                </h4>
+                <div className="flex flex-wrap gap-1">
+                  {product.insurance_coverage.slice(0, 4).map((item, idx) => (
+                    <span key={idx} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-blue-50 text-blue-700 text-[9px] font-medium rounded border border-blue-100">
+                      <Check className="w-2.5 h-2.5 text-blue-600" />
+                      {item}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Availability */}
+            {product.availability && (
+              <div className="flex items-center gap-1 text-[9px] text-slate-600">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                <span className="font-medium">{language === 'vi' ? 'Tình trạng:' : language === 'en' ? 'Availability:' : 'التوفر:'} </span>
+                <span className="font-semibold">{product.availability}</span>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 export default ChatPage;

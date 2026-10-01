@@ -16,16 +16,14 @@ import { GuestWidgetPage } from '@/pages/GuestWidgetPage';
 import { IntegrationGuidePage } from '@/pages/IntegrationGuidePage';
 const AdminOverview = lazy(() => import('@/pages/admin/AdminOverview'));
 const AdminUsers = lazy(() => import('@/pages/admin/AdminUsers'));
-const AdminAnalytics = lazy(() => import('@/pages/admin/AdminAnalytics'));
+const AdminReports = lazy(() => import('@/pages/admin/AdminReports'));
 const AdminSettings = lazy(() => import('@/pages/admin/AdminSettings'));
 const AdminAgents = lazy(() => import('@/pages/admin/AdminAgents'));
 const AdminPrompts = lazy(() => import('@/pages/admin/AdminPrompts'));
-const AdminTemplates = lazy(() => import('@/pages/admin/AdminTemplates'));
 const AdminConsultations = lazy(() => import('@/pages/admin/AdminConsultations'));
-const AdminSuggestedQuestions = lazy(() => import('@/pages/admin/AdminSuggestedQuestions'));
 const AdminProducts = lazy(() => import('@/pages/admin/AdminProducts'));
 const AdminScraper = lazy(() => import('@/pages/admin/AdminScraper'));
-const AdminAudit = lazy(() => import('@/pages/admin/AdminAudit'));
+const AdminSuggestedQuestions = lazy(() => import('@/pages/admin/AdminSuggestedQuestions'));
 const AdminPermissions = lazy(() => import('@/pages/admin/Permissions'));
 const FileManagement = lazy(() => import('@/pages/admin/FileManagement'));
 const WidgetCustomization = lazy(() => import('@/pages/admin/WidgetCustomization'));
@@ -141,17 +139,13 @@ function App() {
           />
           <Route
             path="/admin/logs"
-            element={
-              <RoleGuard requiredRole="admin">
-                <AdminAudit />
-              </RoleGuard>
-            }
+            element={<Navigate to="/admin/analytics" replace />}
           />
           <Route
             path="/admin/analytics"
             element={
               <RoleGuard requiredRole="admin">
-                <AdminAnalytics />
+                <AdminReports />
               </RoleGuard>
             }
           />
@@ -213,11 +207,7 @@ function App() {
           />
           <Route
             path="/admin/templates"
-            element={
-              <RoleGuard requiredRole="admin">
-                <AdminTemplates />
-              </RoleGuard>
-            }
+            element={<Navigate to="/admin/prompts" replace />}
           />
           <Route
             path="/admin/products"
@@ -249,7 +239,7 @@ function App() {
           <Route path="/admin/stats" element={<Navigate to="/admin/analytics" replace />} />
           <Route path="/admin/deploy" element={<Navigate to="/admin/settings" replace />} />
           <Route path="/admin/crawler" element={<Navigate to="/admin/scraper" replace />} />
-          <Route path="/admin/audit" element={<Navigate to="/admin/logs" replace />} />
+          <Route path="/admin/audit" element={<Navigate to="/admin/analytics" replace />} />
         </Routes>
       </Suspense>
 

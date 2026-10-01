@@ -463,7 +463,7 @@ export function ChatCustomization({ userRole = 'admin', onClose: _onClose }: Omi
         
         {showTemplates && (
           <div className="border-t border-slate-200">
-            <PromptTemplates />
+            <PromptTemplates isInline={true} />
           </div>
         )}
       </div>

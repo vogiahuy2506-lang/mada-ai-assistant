@@ -81,6 +81,7 @@ import scraperScheduleRoutes from './routes/scraper-schedule';
 import paymentRoutes from './routes/payments';
 import productsRoutes from './routes/products';
 import consultationRoutes from './routes/consultation';
+import consultationApiRoutes from './routes/consultation-api';
 import adminRoutes from './routes/admin';
 import adminScraperRoutes from './routes/admin-scraper';
 import promptsRoutes from './routes/prompts';
@@ -137,7 +138,7 @@ app.use('/api/admin/scraper', (_req, _res, next) => next());
 // Rate limit chặt hơn cho các endpoint đắt tài nguyên (chat, recommend, rag)
 const heavyApiRateLimiter = createRateLimiter({
   windowMs: 60 * 1000,
-  max: 30, // 30 requests / phút / IP cho AI endpoints (tăng từ 20)
+  max: 60, // 60 requests / phút / IP cho AI endpoints (tăng từ 30)
 });
 app.use('/api/recommend', heavyApiRateLimiter);
 app.use('/api/chat', heavyApiRateLimiter);
@@ -150,7 +151,7 @@ app.use((_req, res, next) => {
     "script-src 'self' 'unsafe-inline' 'unsafe-eval'; " +
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
     "font-src 'self' https://fonts.gstatic.com data:; " +
-    "img-src 'self' data: blob: http://localhost:* https://localhost:* https://api.dicebear.com; " +
+    "img-src 'self' data: blob: http://localhost:* https://localhost:* https://api.dicebear.com https://img.onelife.vn; " +
     "connect-src 'self' http://localhost:* https://localhost:* ws://localhost:* wss://localhost:* https://api.dicebear.com; " +
     "frame-ancestors 'self'; " +
     "worker-src 'self' blob:; " +
@@ -250,6 +251,7 @@ interface SystemSettings {
   maxFilesTotal: number;       // max files total per user
   maxFileSizeMB: number;       // max file size in MB
   websiteUrl: string;         // website URL for data collection
+  categoryOrder: string[];    // ⭐ Thứ tự hiển thị của các bot trong sidebar
 }
 
 let systemSettings: SystemSettings = {
@@ -259,6 +261,7 @@ let systemSettings: SystemSettings = {
   maxFilesTotal: 100,
   maxFileSizeMB: 50,
   websiteUrl: '',
+  categoryOrder: ['vision', 'hearing', 'communication', 'cognition', 'mobility', 'daily_living', 'education'],
 };
 
 // API endpoint to get system settings
@@ -268,7 +271,7 @@ app.get('/api/system/settings', (_req, res) => {
 
 // API endpoint to update system settings (admin only)
 app.put('/api/system/settings', authenticate as any, requireRole('admin') as any, (req, res) => {
-  const { anonymousLimit, defaultPlanLimit, maxFilesPerSession, maxFilesTotal, maxFileSizeMB, websiteUrl } = req.body;
+  const { anonymousLimit, defaultPlanLimit, maxFilesPerSession, maxFilesTotal, maxFileSizeMB, websiteUrl, categoryOrder } = req.body;
 
   if (anonymousLimit !== undefined) systemSettings.anonymousLimit = anonymousLimit;
   if (defaultPlanLimit !== undefined) systemSettings.defaultPlanLimit = defaultPlanLimit;
@@ -276,6 +279,7 @@ app.put('/api/system/settings', authenticate as any, requireRole('admin') as any
   if (maxFilesTotal !== undefined) systemSettings.maxFilesTotal = maxFilesTotal;
   if (maxFileSizeMB !== undefined) systemSettings.maxFileSizeMB = maxFileSizeMB;
   if (websiteUrl !== undefined) systemSettings.websiteUrl = websiteUrl;
+  if (categoryOrder !== undefined) systemSettings.categoryOrder = categoryOrder;
 
   console.log('📝 System settings updated:', systemSettings);
   res.json({ success: true, data: systemSettings });
@@ -525,6 +529,7 @@ app.use('/api/mada-scraper', madaScraperRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/admin', approvalRoutes);
 app.use('/api/consultation', consultationRoutes);
+app.use('/api/consult', consultationApiRoutes);
 app.use('/api/admin/scraper', adminScraperRoutes);
 app.use('/api/admin/prompts', promptsRoutes);
 app.use('/api/admin/prompt-templates', promptTemplatesRoutes);

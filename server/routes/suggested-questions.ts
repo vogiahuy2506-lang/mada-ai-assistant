@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import db from '../lib/db';
 import { authenticate, requireRole } from '../lib/auth';
+import { translateContent, type SupportedLanguage } from '../lib/translationService';
 
 const router = Router();
 
@@ -271,6 +272,118 @@ router.patch('/:id', requireAdmin, (req: Request, res: Response) => {
     
     const updated = db.prepare('SELECT * FROM suggested_questions WHERE id = ?').get(req.params.id);
     res.json({ success: true, data: updated });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// POST /api/admin/suggested-questions/auto-translate - Auto-translate and create questions in all 4 languages
+router.post('/auto-translate', requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { 
+      question_vi, 
+      category, 
+      view_mode = 'end_user', 
+      agent_id = null,
+      sort_order = 0,
+      is_active = true,
+      source_lang = 'vi' as SupportedLanguage 
+    } = req.body;
+
+    if (!question_vi || !category) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'question_vi và category là bắt buộc' 
+      });
+    }
+
+    // 1. Translate tiếng Việt sang EN, AR, FR
+    console.log(`🔄 Đang dịch câu hỏi: "${question_vi.slice(0, 50)}..."`);
+    const translations = await translateContent(question_vi, source_lang);
+
+    if (!translations.en && !translations.ar && !translations.fr) {
+      return res.status(500).json({ 
+        success: false, 
+        error: 'Dịch thuật thất bại. Vui lòng kiểm tra GEMINI_API_KEY.' 
+      });
+    }
+
+    // 2. Tạo 4 bản ghi cùng lúc
+    const now = new Date().toISOString();
+    const questions = [
+      { lang: 'vi', text: question_vi },
+      { lang: 'en', text: translations.en },
+      { lang: 'ar', text: translations.ar },
+      { lang: 'fr', text: translations.fr },
+    ].filter(q => q.text); // Chỉ tạo bản ghi có nội dung
+
+    const stmt = db.prepare(`
+      INSERT INTO suggested_questions (id, agent_id, category, view_mode, language, question, sort_order, is_active, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    const insertAll = db.transaction((items: typeof questions) => {
+      const created: any[] = [];
+      for (const item of items) {
+        const id = `sq_${uuidv4().slice(0, 8)}`;
+        stmt.run(
+          id,
+          agent_id,
+          category,
+          view_mode,
+          item.lang,
+          item.text,
+          sort_order,
+          is_active ? 1 : 0,
+          now,
+          now
+        );
+        created.push({
+          id,
+          language: item.lang,
+          question: item.text,
+        });
+      }
+      return created;
+    });
+
+    const createdQuestions = insertAll(questions);
+
+    console.log(`✅ Đã tạo ${createdQuestions.length} câu hỏi (VI, EN, AR, FR)`);
+
+    res.status(201).json({ 
+      success: true, 
+      message: `Đã tạo ${createdQuestions.length} câu hỏi tự động dịch`,
+      data: {
+        count: createdQuestions.length,
+        questions: createdQuestions,
+        translations: {
+          vi: question_vi,
+          en: translations.en,
+          ar: translations.ar,
+          fr: translations.fr,
+        }
+      }
+    });
+
+  } catch (error: any) {
+    console.error('❌ Auto-translate error:', error.message);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// POST /api/admin/suggested-questions/delete-non-vi - Delete all non-Vietnamese questions
+router.delete('/delete-non-vi', requireAdmin, (req: Request, res: Response) => {
+  try {
+    const result = db.prepare(`
+      DELETE FROM suggested_questions WHERE language != 'vi'
+    `).run();
+    
+    res.json({ 
+      success: true, 
+      message: `Đã xóa ${result.changes} câu hỏi không phải tiếng Việt`,
+      data: { count: result.changes }
+    });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
   }

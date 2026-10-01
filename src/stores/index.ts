@@ -606,6 +606,10 @@ interface SystemSettingsState {
   // Website URL for data collection
   websiteUrl: string;
 
+  // ⭐ Category Order - thứ tự hiển thị của các bot trong sidebar
+  // Mặc định: ['vision', 'hearing', 'communication', 'cognition', 'mobility', 'daily_living', 'education']
+  categoryOrder: string[];
+
   // Actions
   setAnonymousLimit: (limit: number) => void;
   setDefaultPlanLimit: (limit: number) => void;
@@ -613,6 +617,7 @@ interface SystemSettingsState {
   setMaxFilesPerSession: (limit: number) => void;
   setMaxFilesTotal: (limit: number) => void;
   setMaxFileSizeMB: (size: number) => void;
+  setCategoryOrder: (order: string[]) => void;
   setAllSettings: (settings: Partial<SystemSettingsState>) => void; // Set all from backend
   loadFromBackend: () => Promise<void>; // Load from API
 }
@@ -629,12 +634,16 @@ export const useSystemSettingsStore = create<SystemSettingsState>()(
       maxFilesTotal: 100,
       maxFileSizeMB: 50,
 
+      // ⭐ Default category order - có thể thay đổi trong admin
+      categoryOrder: ['vision', 'hearing', 'communication', 'cognition', 'mobility', 'daily_living', 'education'],
+
       setAnonymousLimit: (limit) => set({ anonymousLimit: limit }),
       setDefaultPlanLimit: (limit) => set({ defaultPlanLimit: limit }),
       setWebsiteUrl: (url) => set({ websiteUrl: url }),
       setMaxFilesPerSession: (limit) => set({ maxFilesPerSession: limit }),
       setMaxFilesTotal: (limit) => set({ maxFilesTotal: limit }),
       setMaxFileSizeMB: (size) => set({ maxFileSizeMB: size }),
+      setCategoryOrder: (order) => set({ categoryOrder: order }),
       setAllSettings: (settings) => set(settings),
       loadFromBackend: async () => {
         try {
@@ -648,6 +657,10 @@ export const useSystemSettingsStore = create<SystemSettingsState>()(
               maxFilesTotal: data.data.maxFilesTotal ?? 100,
               maxFileSizeMB: data.data.maxFileSizeMB ?? 50,
               websiteUrl: data.data.websiteUrl ?? '',
+              // ⭐ Load category order from backend, fallback to default
+              categoryOrder: data.data.categoryOrder?.length 
+                ? data.data.categoryOrder 
+                : ['vision', 'hearing', 'communication', 'cognition', 'mobility', 'daily_living', 'education'],
             });
           }
         } catch (e) {

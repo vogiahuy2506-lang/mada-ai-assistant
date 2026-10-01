@@ -236,6 +236,7 @@ export interface SystemSettings {
   maxFilesTotal: number;       // max files total per user
   maxFileSizeMB: number;       // max file size in MB
   websiteUrl: string;          // website URL for data collection
+  categoryOrder?: string[];    // ⭐ Thứ tự hiển thị của các bot trong sidebar
 }
 
 export const systemApi = {

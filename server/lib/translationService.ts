@@ -11,9 +11,39 @@
  */
 
 // ============ PROXY BYPASS ============
+
+// Retry helper for 429 Too Many Requests
+async function fetchWithRetry(
+  fn: () => Promise<Response>,
+  options: { retries?: number; baseDelayMs?: number; maxDelayMs?: number } = {}
+): Promise<Response> {
+  const { retries = 3, baseDelayMs = 1000, maxDelayMs = 16000 } = options;
+
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const response = await fn();
+
+    if (response.status === 429) {
+      if (attempt === retries) {
+        const body = await response.text().catch(() => '');
+        throw new Error(`Gemini API 429 Too Many Requests (after ${retries} retries). ${body}`);
+      }
+      const retryAfter = response.headers.get('retry-after');
+      const retryDelay = retryAfter
+        ? parseInt(retryAfter) * 1000
+        : Math.min(baseDelayMs * Math.pow(2, attempt), maxDelayMs);
+      console.warn(`⚠️ [translation 429] Attempt ${attempt + 1}/${retries + 1} — waiting ${retryDelay}ms before retry...`);
+      await new Promise((resolve) => setTimeout(resolve, retryDelay));
+      continue;
+    }
+
+    return response;
+  }
+  throw new Error('fetchWithRetry: unreachable');
+}
+
 async function callGeminiNoProxy(apiKey: string, modelName: string, prompt: string): Promise<any> {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
-  
+
   // Clear proxy env vars for this call
   const savedEnv: Record<string, string | undefined> = {
     HTTP_PROXY: process.env.HTTP_PROXY,
@@ -25,21 +55,24 @@ async function callGeminiNoProxy(apiKey: string, modelName: string, prompt: stri
   delete process.env.HTTPS_PROXY;
   delete process.env.http_proxy;
   delete process.env.https_proxy;
-  
+
   try {
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.3, maxOutputTokens: 4096 },
+    const response = await fetchWithRetry(
+      () => fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.3, maxOutputTokens: 4096 },
+        }),
       }),
-    });
-    
+      { retries: 3, baseDelayMs: 2000, maxDelayMs: 16000 }
+    );
+
     if (!response.ok) {
       throw new Error(`Gemini API error: ${response.status}`);
     }
-    
+
     return response.json();
   } finally {
     for (const [key, val] of Object.entries(savedEnv)) {

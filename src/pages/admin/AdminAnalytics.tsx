@@ -1,47 +1,210 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AdminLayout } from './AdminLayout';
 import { adminApi, UserStats, KnowledgeStats } from './adminApi';
 import { getAccessToken } from '@/lib/api';
-import { translations, type Language } from '@/lib/translations';
-import { useLanguageStore } from '@/stores';
 import clsx from 'clsx';
+import {
+  Users, BarChart2, Library, Receipt,
+  Activity, Globe, Server, CheckCircle2,
+} from 'lucide-react';
 
-// Translation helper function using useLanguageStore
-function useAnalyticsTranslation() {
-  const language = useLanguageStore((state) => state.language ?? 'vi') as Language;
-  const t = (key: string, params?: Record<string, string>) => {
-    // Fallback to Vietnamese if language not found
-    let text = (translations[language]?.[key as keyof typeof translations[typeof language]] || translations.vi[key as keyof typeof translations.vi]) as string || key;
-    if (params) {
-      Object.entries(params).forEach(([k, v]) => {
-        text = text.replace(`{${k}}`, v);
-      });
-    }
-    return text;
-  };
-  return { t, language };
+// ============== TRANSLATIONS ==============
+type Language = 'vi' | 'en' | 'ar' | 'fr';
+
+const translations: Record<Language, Record<string, string>> = {
+  vi: {
+    title: 'Phân tích & Thống kê',
+    subtitle: 'Theo dõi hiệu suất chat, phân bố ngôn ngữ và xu hướng sử dụng hệ thống MADA AI.',
+    // Stats
+    totalUsers: 'Tổng người dùng',
+    totalChats: 'Tổng cuộc trò chuyện',
+    kbDocuments: 'Tài liệu tri thức',
+    logEvents: 'Sự kiện hệ thống',
+    // Filters
+    timeRange: 'Khoảng thời gian:',
+    range24h: '24 giờ',
+    range7d: '7 ngày',
+    range30d: '30 ngày',
+    range90d: '90 ngày',
+    // Sections
+    chatPerformance: 'Hiệu suất Chat',
+    hourlyActivity: 'Hoạt động theo giờ',
+    topQueries: 'Câu hỏi phổ biến nhất',
+    noQueries: 'Chưa có câu hỏi nào',
+    languageDistribution: 'Phân bố ngôn ngữ',
+    categoryDistribution: 'Phân bố danh mục',
+    serverHealth: 'Sức khỏe Server',
+    serverHealthSub: 'Trạng thái & tài nguyên hệ thống',
+    userBreakdown: 'Phân bố người dùng',
+    userBreakdownSub: 'Theo vai trò và gói dịch vụ',
+    logActivity: 'Hoạt động hệ thống',
+    // Server info
+    nodeVersion: 'Node version',
+    platform: 'Platform',
+    uptime: 'Uptime',
+    memoryRss: 'Memory (RSS)',
+    heapUsed: 'Heap used',
+    // User stats
+    total: 'Tổng',
+    active: 'Hoạt động',
+    suspended: 'Bị khóa',
+    pending: 'Chờ duyệt',
+    admins: 'Quản trị',
+    enterprise: 'Enterprise',
+    pro: 'Pro',
+    free: 'Free',
+    // KB
+    categories: 'Danh mục',
+    // Log levels
+    logInfo: 'Thông tin',
+    logSuccess: 'Thành công',
+    logWarn: 'Cảnh báo',
+    logError: 'Lỗi',
+    // Status
+    loading: 'Đang tải...',
+    noData: 'Chưa có dữ liệu',
+  },
+  en: {
+    title: 'Analytics & Statistics',
+    subtitle: 'Track chat performance, language distribution, and usage trends across MADA AI.',
+    totalUsers: 'Total Users',
+    totalChats: 'Total Conversations',
+    kbDocuments: 'Knowledge Documents',
+    logEvents: 'System Events',
+    timeRange: 'Time range:',
+    range24h: '24 hours',
+    range7d: '7 days',
+    range30d: '30 days',
+    range90d: '90 days',
+    chatPerformance: 'Chat Performance',
+    hourlyActivity: 'Hourly Activity',
+    topQueries: 'Top Queries',
+    noQueries: 'No queries yet',
+    languageDistribution: 'Language Distribution',
+    categoryDistribution: 'Category Distribution',
+    serverHealth: 'Server Health',
+    serverHealthSub: 'System status & resources',
+    userBreakdown: 'User Breakdown',
+    userBreakdownSub: 'By role and subscription plan',
+    logActivity: 'System Activity',
+    nodeVersion: 'Node version',
+    platform: 'Platform',
+    uptime: 'Uptime',
+    memoryRss: 'Memory (RSS)',
+    heapUsed: 'Heap used',
+    total: 'Total',
+    active: 'Active',
+    suspended: 'Suspended',
+    pending: 'Pending',
+    admins: 'Admins',
+    enterprise: 'Enterprise',
+    pro: 'Pro',
+    free: 'Free',
+    categories: 'Categories',
+    logInfo: 'Info',
+    logSuccess: 'Success',
+    logWarn: 'Warning',
+    logError: 'Error',
+    loading: 'Loading...',
+    noData: 'No data',
+  },
+  ar: {
+    title: 'التحليلات والإحصائيات',
+    subtitle: 'تتبع أداء المحادثة وتوزيع اللغة واتجاهات الاستخدام في MADA AI.',
+    totalUsers: 'إجمالي المستخدمين',
+    totalChats: 'إجمالي المحادثات',
+    kbDocuments: 'مستندات المعرفة',
+    logEvents: 'أحداث النظام',
+    timeRange: 'النطاق الزمني:',
+    range24h: '24 ساعة',
+    range7d: '7 أيام',
+    range30d: '30 يوم',
+    range90d: '90 يوم',
+    chatPerformance: 'أداء المحادثة',
+    hourlyActivity: 'النشاط حسب الساعة',
+    topQueries: 'أهم الاستفسارات',
+    noQueries: 'لا توجد استفسارات بعد',
+    languageDistribution: 'توزيع اللغة',
+    categoryDistribution: 'توزيع الفئة',
+    serverHealth: 'صحة الخادم',
+    serverHealthSub: 'حالة النظام والموارد',
+    userBreakdown: 'تفصيل المستخدمين',
+    userBreakdownSub: 'حسب الدور وخطة الاشتراك',
+    logActivity: 'نشاط النظام',
+    nodeVersion: 'إصدار Node',
+    platform: 'المنصة',
+    uptime: 'وقت التشغيل',
+    memoryRss: 'الذاكرة (RSS)',
+    heapUsed: 'الذاكرة المستخدمة',
+    total: 'الإجمالي',
+    active: 'نشط',
+    suspended: 'معلق',
+    pending: 'قيد الانتظار',
+    admins: 'مديرو النظام',
+    enterprise: 'Enterprise',
+    pro: 'Pro',
+    free: 'Free',
+    categories: 'الفئات',
+    logInfo: 'معلومات',
+    logSuccess: 'نجاح',
+    logWarn: 'تحذير',
+    logError: 'خطأ',
+    loading: 'جاري التحميل...',
+    noData: 'لا توجد بيانات',
+  },
+  fr: {
+    title: 'Analyses & Statistiques',
+    subtitle: "Suivez les performances du chat, la distribution linguistique et les tendances d'utilisation de MADA AI.",
+    totalUsers: 'Total utilisateurs',
+    totalChats: 'Total conversations',
+    kbDocuments: 'Documents de connaissances',
+    logEvents: "Événements système",
+    timeRange: 'Période:',
+    range24h: '24 heures',
+    range7d: '7 jours',
+    range30d: '30 jours',
+    range90d: '90 jours',
+    chatPerformance: 'Performance du chat',
+    hourlyActivity: 'Activité horaire',
+    topQueries: 'Questions populaires',
+    noQueries: 'Pas de questions encore',
+    languageDistribution: 'Distribution linguistique',
+    categoryDistribution: 'Distribution par catégorie',
+    serverHealth: 'Santé du serveur',
+    serverHealthSub: "État et ressources du système",
+    userBreakdown: 'Répartition utilisateurs',
+    userBreakdownSub: 'Par rôle et plan de abonnement',
+    logActivity: "Activité système",
+    nodeVersion: 'Version Node',
+    platform: 'Plateforme',
+    uptime: 'Temps de fonctionnement',
+    memoryRss: 'Mémoire (RSS)',
+    heapUsed: 'Heap utilisé',
+    total: 'Total',
+    active: 'Actif',
+    suspended: 'Suspendu',
+    pending: 'En attente',
+    admins: 'Administrateurs',
+    enterprise: 'Enterprise',
+    pro: 'Pro',
+    free: 'Free',
+    categories: 'Catégories',
+    logInfo: 'Info',
+    logSuccess: 'Succès',
+    logWarn: 'Avertissement',
+    logError: 'Erreur',
+    loading: 'Chargement...',
+    noData: 'Pas de données',
+  },
+};
+
+function useT() {
+  const lang = (localStorage.getItem('mada-language') || 'vi') as Language;
+  const t = (key: string) => translations[lang]?.[key] || translations.vi[key] || key;
+  return { t, lang };
 }
 
-type TimeRange = '24h' | '7d' | '30d' | '90d';
-
-interface ApiAnalytics {
-  kb: KnowledgeStats;
-  logs: { total: number; byLevel: Record<string, number> };
-  server: { uptime: number; memory: any; nodeVersion: string; platform: string };
-}
-
-// Extended analytics for advanced dashboard
-interface ChatMetrics {
-  totalChats: number;
-  avgResponseTime: number;
-  avgConfidence: number;
-  topQueries: Array<{ query: string; count: number }>;
-  chatsByHour: Array<{ hour: number; count: number }>;
-  categoryUsage: Array<{ category: string; count: number }>;
-  languageDistribution: Array<{ language: string; count: number; color?: string }>;
-  errorRate: number;
-}
-
+// ============== HELPERS ==============
 function bytesToMB(b: number) {
   return (b / 1024 / 1024).toFixed(1);
 }
@@ -53,35 +216,51 @@ function formatUptime(seconds: number) {
   return `${h}h ${m}m ${s}s`;
 }
 
-// Simple bar chart component
+// ============== SHARED CARD COMPONENT ==============
+function StatCard({ label, value, icon, color }: { label: string; value: number | string; icon: React.ReactNode; color: string }) {
+  return (
+    <div className="bg-white rounded-xl border border-slate-300 p-4 shadow-sm">
+      <div className="flex items-center gap-3">
+        <div className={`w-10 h-10 rounded-lg ${color} flex items-center justify-center text-white`}>
+          {icon}
+        </div>
+        <div>
+          <p className="text-2xl font-black text-black">{value}</p>
+          <p className="text-xs text-slate-500 font-medium">{label}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============== CHART COMPONENTS ==============
 function BarChart({ data, maxValue }: { data: Array<{ label: string; value: number }>; maxValue: number }) {
   return (
-    <div className="flex items-end gap-1 h-32">
+    <div className="flex items-end gap-[2px] h-28">
       {data.map((item, i) => (
         <div key={i} className="flex-1 flex flex-col items-center">
           <div
-            className="w-full bg-gradient-to-t from-primary to-secondary rounded-t-sm transition-all hover:opacity-80"
-            style={{ height: `${(item.value / maxValue) * 100}%`, minHeight: item.value > 0 ? '4px' : '0' }}
+            className="w-full bg-indigo-500 rounded-t-sm transition-all hover:opacity-80 cursor-pointer"
+            style={{ height: `${maxValue > 0 ? Math.max((item.value / maxValue) * 100, item.value > 0 ? 4 : 0) : 0}%` }}
             title={`${item.label}: ${item.value}`}
           />
-          <span className="text-[8px] text-gray-500 mt-1 truncate w-full text-center">{item.label}</span>
+          <span className="text-[7px] text-gray-400 mt-1 truncate w-full text-center select-none">{item.label}</span>
         </div>
       ))}
     </div>
   );
 }
 
-// Pie chart component
-function PieChart({ data }: { data: Array<{ label: string; value: number; color: string }> }) {
-  const total = data.reduce((sum, item) => sum + item.value, 0);
+function PieChart({ data, total }: { data: Array<{ label: string; value: number; color: string }>; total: number }) {
   let currentAngle = 0;
-
   return (
     <div className="flex items-center gap-4">
-      <div className="relative w-24 h-24">
-        <svg viewBox="0 0 100 100" className="transform -rotate-90">
+      <div className="relative w-20 h-20 flex-shrink-0">
+        <svg viewBox="0 0 100 100" className="transform -rotate-90 w-full h-full">
           {data.map((item, i) => {
+            if (total === 0) return null;
             const angle = (item.value / total) * 360;
+            if (angle === 0) return null;
             const startAngle = currentAngle;
             currentAngle += angle;
             const largeArc = angle > 180 ? 1 : 0;
@@ -90,24 +269,48 @@ function PieChart({ data }: { data: Array<{ label: string; value: number; color:
             const x2 = 50 + 45 * Math.cos((currentAngle * Math.PI) / 180);
             const y2 = 50 + 45 * Math.sin((currentAngle * Math.PI) / 180);
             const path = `M 50 50 L ${x1} ${y1} A 45 45 0 ${largeArc} 1 ${x2} ${y2} Z`;
-            return <path key={i} d={path} fill={item.color} className="hover:opacity-80 transition-opacity" />;
+            return <path key={i} d={path} fill={item.color} className="hover:opacity-80 transition-opacity cursor-pointer"><title>{`${item.label}: ${item.value}`}</title></path>;
           })}
-          <circle cx="50" cy="50" r="20" fill="white" />
+          <circle cx="50" cy="50" r="22" fill="white" />
         </svg>
       </div>
-      <div className="space-y-1">
+      <div className="space-y-1.5 min-w-0">
         {data.slice(0, 5).map((item, i) => (
           <div key={i} className="flex items-center gap-2 text-xs">
-            <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: item.color }} />
-            <span className="text-gray-600">{item.label}</span>
-            <span className="font-bold">{Math.round((item.value / total) * 100)}%</span>
+            <div className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor: item.color }} />
+            <span className="text-gray-600 truncate flex-1">{item.label}</span>
+            <span className="font-bold text-gray-800 flex-shrink-0 ml-1">{total > 0 ? Math.round((item.value / total) * 100) : 0}%</span>
           </div>
         ))}
+        {data.length === 0 && (
+          <div className="text-xs text-gray-400 italic">—</div>
+        )}
       </div>
     </div>
   );
 }
 
+// ============== TYPES ==============
+type TimeRange = '24h' | '7d' | '30d' | '90d';
+
+interface ApiAnalytics {
+  kb: KnowledgeStats;
+  logs: { total: number; byLevel: Record<string, number> };
+  server: { uptime: number; memory: any; nodeVersion: string; platform: string };
+}
+
+interface ChatMetrics {
+  totalChats: number;
+  avgResponseTime: number;
+  avgConfidence: number;
+  topQueries: Array<{ query: string; count: number }>;
+  chatsByHour: Array<{ hour: number; count: number }>;
+  categoryUsage: Array<{ category: string; count: number }>;
+  languageDistribution: Array<{ language: string; count: number; color?: string }>;
+  errorRate: number;
+}
+
+// ============== MAIN COMPONENT ==============
 export function AdminAnalytics() {
   const [range, setRange] = useState<TimeRange>('7d');
   const [userStats, setUserStats] = useState<UserStats | null>(null);
@@ -115,14 +318,11 @@ export function AdminAnalytics() {
   const [chatMetrics, setChatMetrics] = useState<ChatMetrics | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Translation hook
-  const { t } = useAnalyticsTranslation();
+  const { t, lang } = useT();
 
-  // Load analytics data
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
-      // Skip when not authenticated to avoid 401 spam in console
       if (!getAccessToken()) {
         if (!cancelled) setLoading(false);
         return;
@@ -135,11 +335,10 @@ export function AdminAnalytics() {
         ]);
         if (cancelled) return;
         if (us.success && us.data) setUserStats(us.data);
-        if (an.success && an.data) setAnalytics(an.data);
+        if (an.success && an.data) setAnalytics(an.data as ApiAnalytics);
         if (cm.success && cm.data) setChatMetrics(cm.data as ChatMetrics);
       } catch (err: unknown) {
         if (cancelled) return;
-        // Ignore AbortError (timeout)
         if (err instanceof Error && err.name === 'AbortError') {
           console.warn('AdminAnalytics: Request timed out');
         } else {
@@ -150,11 +349,8 @@ export function AdminAnalytics() {
       }
     };
     void load();
-    const id = setInterval(() => { void load(); }, 10000);
-    return () => {
-      cancelled = true;
-      clearInterval(id);
-    };
+    const id = setInterval(() => { void load(); }, 30000);
+    return () => { cancelled = true; clearInterval(id); };
   }, [range]);
 
   const kb = analytics?.kb;
@@ -162,339 +358,284 @@ export function AdminAnalytics() {
   const srv = analytics?.server;
 
   const logLevelBars = [
-    { level: 'info', count: logs?.byLevel.info || 0, color: 'bg-primary' },
-    { level: 'success', count: logs?.byLevel.success || 0, color: 'bg-secondary' },
-    { level: 'warn', count: logs?.byLevel.warn || 0, color: 'bg-tertiary' },
-    { level: 'error', count: logs?.byLevel.error || 0, color: 'bg-red-500' },
+    { level: 'logInfo', count: logs?.byLevel.info || 0, color: 'bg-indigo-500' },
+    { level: 'logSuccess', count: logs?.byLevel.success || 0, color: 'bg-emerald-500' },
+    { level: 'logWarn', count: logs?.byLevel.warn || 0, color: 'bg-amber-500' },
+    { level: 'logError', count: logs?.byLevel.error || 0, color: 'bg-red-500' },
   ];
-  const maxLog = Math.max(...logLevelBars.map((l) => l.count), 1);
+  const maxLog = Math.max(...logLevelBars.map(l => l.count), 1);
 
-  const rangeLabel = (r: TimeRange) => t(`admin.analytics.range.${r}`);
+  const hourlyData = (chatMetrics?.chatsByHour ?? []).map(h => ({
+    label: h.hour.toString().padStart(2, '0') + 'h',
+    value: h.count,
+  }));
+  const maxHourly = Math.max(...hourlyData.map(d => d.value), 1);
+
+  const catColors = ['#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#6366f1'];
+  const categoryData = (chatMetrics?.categoryUsage ?? []).map((c, i) => ({
+    label: c.category,
+    value: c.count,
+    color: catColors[i % catColors.length],
+  }));
+  const totalCat = categoryData.reduce((s, d) => s + d.value, 0);
+
+  const langColors: Record<string, string> = {
+    'Tiếng Việt': '#ef4444',
+    'English': '#3b82f6',
+    'العربية': '#10b981',
+    'Français': '#f59e0b',
+  };
+  const langData = (chatMetrics?.languageDistribution ?? []).map(l => ({
+    label: l.language,
+    value: l.count,
+    color: langColors[l.language] || '#6b7280',
+  }));
+  const totalLang = langData.reduce((s, d) => s + d.value, 0);
+
   return (
     <AdminLayout
       titleKey="admin.topBar.analytics"
       subtitleKey="admin.topBar.analyticsSub"
       showLayoutTitle={false}
     >
-      {/* Hero Banner Section */}
-      <section className="mb-12">
+      {/* Hero Banner */}
+      <section className="mb-8">
         <div className="flex justify-between items-end mb-8 relative">
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-white to-secondary/10 backdrop-blur-xl rounded-3xl"></div>
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-primary/10 via-transparent to-transparent rounded-3xl"></div>
+          <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/20 via-white to-violet-500/10 backdrop-blur-xl rounded-3xl"></div>
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-indigo-500/10 via-transparent to-transparent rounded-3xl"></div>
           <div className="max-w-2xl relative z-10 py-8 px-6">
-            <h2 className="text-4xl font-black text-on-surface mb-4 tracking-tight">
-              {t('admin.analytics.title')}
+            <h2 className="text-4xl font-black text-on-surface mb-4 tracking-tight" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
+              {t('title')}
             </h2>
-            <p className="text-lg font-medium text-on-surface-variant border-l-4 border-primary pl-6 py-2 bg-white/40 backdrop-blur-sm rounded-r-xl">
-              {t('admin.analytics.subtitle')}
+            <p className="text-lg font-medium text-on-surface-variant border-l-4 border-primary pl-6 py-2 bg-white/40 backdrop-blur-sm rounded-r-xl" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
+              {t('subtitle')}
             </p>
           </div>
         </div>
       </section>
 
-      {/* Time Range Tabs */}
-      <div className="flex items-center gap-3 p-1.5 bg-white/60 backdrop-blur-xl rounded-full border border-slate-300 mb-8 w-fit">
-        {(['24h', '7d', '30d', '90d'] as TimeRange[]).map((r) => (
+      {/* Stats Row */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div className="relative bg-gradient-to-br from-indigo-500/10 to-violet-500/10 backdrop-blur-xl rounded-2xl p-4 border-[3px] border-black flex items-center gap-3 shadow-[6px_6px_0px_0px_#000] transform rotate-[-0.3deg] hover:rotate-0 transition-all">
+          <div className="w-10 h-10 rounded-xl bg-indigo-100 border border-slate-300 flex items-center justify-center shadow-sm">
+            <Users className="w-5 h-5 text-indigo-600" />
+          </div>
+          <div>
+            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">{t('totalUsers')}</p>
+            <h3 className="text-xl font-black text-on-surface">{userStats?.total ?? '—'}</h3>
+          </div>
+        </div>
+        <div className="relative bg-gradient-to-br from-violet-500/10 to-purple-500/10 backdrop-blur-xl rounded-2xl p-4 border-[3px] border-black flex items-center gap-3 shadow-[6px_6px_0px_0px_#000] transform rotate-[0.3deg] hover:rotate-0 transition-all">
+          <div className="w-10 h-10 rounded-xl bg-violet-100 border border-slate-300 flex items-center justify-center shadow-sm">
+            <BarChart2 className="w-5 h-5 text-violet-600" />
+          </div>
+          <div>
+            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">{t('totalChats')}</p>
+            <h3 className="text-xl font-black text-on-surface">{chatMetrics?.totalChats?.toLocaleString() ?? '—'}</h3>
+          </div>
+        </div>
+        <div className="relative bg-gradient-to-br from-teal-500/10 to-emerald-500/10 backdrop-blur-xl rounded-2xl p-4 border-[3px] border-black flex items-center gap-3 shadow-[6px_6px_0px_0px_#000] transform rotate-[-0.3deg] hover:rotate-0 transition-all">
+          <div className="w-10 h-10 rounded-xl bg-teal-100 border border-slate-300 flex items-center justify-center shadow-sm">
+            <Library className="w-5 h-5 text-teal-600" />
+          </div>
+          <div>
+            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">{t('kbDocuments')}</p>
+            <h3 className="text-xl font-black text-on-surface">{kb?.totalDocuments ?? '—'}</h3>
+          </div>
+        </div>
+        <div className="relative bg-gradient-to-br from-red-500/10 to-orange-500/10 backdrop-blur-xl rounded-2xl p-4 border-[3px] border-black flex items-center gap-3 shadow-[6px_6px_0px_0px_#000] transform rotate-[0.3deg] hover:rotate-0 transition-all">
+          <div className="w-10 h-10 rounded-xl bg-red-100 border border-slate-300 flex items-center justify-center shadow-sm">
+            <Receipt className="w-5 h-5 text-red-600" />
+          </div>
+          <div>
+            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">{t('logEvents')}</p>
+            <h3 className="text-xl font-black text-on-surface">{logs?.total ?? '—'}</h3>
+          </div>
+        </div>
+      </div>
+
+      {/* ====== TIME RANGE FILTER ====== */}
+      <div className="bg-white rounded-xl border border-slate-300 p-3 mb-6 shadow-sm flex flex-wrap items-center gap-3">
+        <span className="text-sm font-bold text-slate-600">{t('timeRange')}</span>
+        {(['24h', '7d', '30d', '90d'] as TimeRange[]).map(r => (
           <button
             key={r}
             onClick={() => setRange(r)}
             className={clsx(
-              'px-4 py-1.5 rounded-full font-bold text-xs transition-all border-2',
+              'px-4 py-1.5 rounded-lg text-sm font-bold border transition-all',
               range === r
-                ? 'bg-primary text-white border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]'
-                : 'bg-transparent text-on-surface-variant hover:bg-white/80 border-transparent hover:border-black'
+                ? 'bg-indigo-500 text-white border-indigo-600 shadow-sm'
+                : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'
             )}
           >
-            {rangeLabel(r)}
+            {t(`range${r}`)}
           </button>
         ))}
       </div>
 
-      {/* ====== NEW ADVANCED METRICS ROW ====== */}
-      <section className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 mb-8">
-        {/* Total Chats */}
-        <div className="bg-gradient-to-br from-violet-50 to-violet-100 rounded-2xl p-3 border-2 border-violet-200">
-          <p className="text-[10px] font-bold text-violet-600 uppercase">{t('analytics.totalChat')}</p>
-          <p className="text-xl font-black text-violet-700">{chatMetrics?.totalChats?.toLocaleString() || '—'}</p>
-          <p className="text-[10px] text-violet-500">{t('analytics.conversations')}</p>
-        </div>
-
-        {/* Avg Response Time */}
-        <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl p-3 border-2 border-blue-200">
-          <p className="text-[10px] font-bold text-blue-600 uppercase">{t('analytics.avgResponseTime')}</p>
-          <p className="text-xl font-black text-blue-700">{chatMetrics?.avgResponseTime != null ? (Math.round(chatMetrics.avgResponseTime / 100) / 10) + 's' : '—'}</p>
-          <p className="text-[10px] text-blue-500">{t('analytics.milliseconds')}</p>
-        </div>
-
-        {/* Avg Confidence */}
-        <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-2xl p-3 border-2 border-green-200">
-          <p className="text-[10px] font-bold text-green-600 uppercase">{t('analytics.avgConfidence')}</p>
-          <p className="text-xl font-black text-green-700">{chatMetrics?.avgConfidence != null ? chatMetrics.avgConfidence.toFixed(0) + '%' : '—'}</p>
-          <p className="text-[10px] text-green-500">{t('analytics.confidence')}</p>
-        </div>
-
-        {/* Error Rate */}
-        <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-2xl p-3 border-2 border-red-200">
-          <p className="text-[10px] font-bold text-red-600 uppercase">{t('analytics.errorRate')}</p>
-          <p className="text-xl font-black text-red-700">{chatMetrics?.errorRate != null ? chatMetrics.errorRate.toFixed(1) + '%' : '—'}</p>
-          <p className="text-[10px] text-red-500">{t('analytics.failures')}</p>
-        </div>
-
-        {/* Total Users */}
-        <div className="bg-gradient-to-br from-primary/10 to-primary/5 rounded-2xl p-3 border-2 border-primary/20">
-          <p className="text-[10px] font-bold text-primary uppercase">{t('admin.analytics.totalUsers')}</p>
-          <p className="text-xl font-black text-primary">{userStats?.total ?? '—'}</p>
-          <p className="text-[10px] text-primary/70">{t('admin.analytics.users')}</p>
-        </div>
-
-        {/* KB Documents */}
-        <div className="bg-gradient-to-br from-secondary/10 to-secondary/5 rounded-2xl p-3 border-2 border-secondary/20">
-          <p className="text-[10px] font-bold text-secondary uppercase">{t('admin.analytics.documents')}</p>
-          <p className="text-xl font-black text-secondary">{kb?.totalDocuments ?? '—'}</p>
-          <p className="text-[10px] text-secondary/70">{t('admin.analytics.documents')}</p>
-        </div>
-      </section>
-
       {/* ====== CHARTS ROW ====== */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        {/* Hourly Activity Chart */}
-        <div className="bg-white rounded-2xl border border-slate-300 p-6 shadow-sm">
-          <h3 className="text-lg font-bold mb-4">{t('analytics.hourlyActivity')}</h3>
-          <BarChart
-            data={(chatMetrics?.chatsByHour ?? []).map(h => ({
-              label: h.hour.toString().padStart(2, '0') + 'h',
-              value: h.count,
-            }))}
-            maxValue={Math.max(...((chatMetrics?.chatsByHour ?? []).map(h => h.count).length ? chatMetrics!.chatsByHour.map(h => h.count) : [1]))}
-          />
-        </div>
-
-        {/* Category Distribution */}
-        <div className="bg-white rounded-2xl border border-slate-300 p-6 shadow-sm">
-          <h3 className="text-lg font-bold mb-4">{t('analytics.categoryDistribution')}</h3>
-          <PieChart
-            data={(chatMetrics?.categoryUsage ?? []).map((c, i) => ({
-              label: c.category,
-              value: c.count,
-              color: ['#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#6366f1'][i % 7],
-            }))}
-          />
-        </div>
-      </div>
-
-      {/* ====== TOP QUERIES & LANGUAGE ====== */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-        {/* Top Queries */}
-        <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-300 p-6 shadow-sm">
-          <h3 className="text-lg font-bold mb-4">{t('analytics.topQueries')}</h3>
-          <div className="space-y-2">
-            {(chatMetrics?.topQueries ?? []).map((q, i) => (
-              <div key={i} className="flex items-center gap-3 p-2 bg-gray-50 rounded-lg">
-                <span className={clsx(
-                  'w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold',
-                  i === 0 ? 'bg-primary text-white' : i === 1 ? 'bg-secondary text-white' : 'bg-gray-200 text-gray-600'
-                )}>
-                  {i + 1}
-                </span>
-                <span className="flex-1 text-sm truncate">{q.query}</span>
-                <span className="text-sm font-bold text-gray-500">{q.count}</span>
-              </div>
-            ))}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+        {/* Hourly Activity */}
+        <div className="bg-white rounded-xl border border-slate-300 p-6 shadow-sm">
+          <div className="flex items-center gap-2 mb-4">
+            <Activity className="w-4 h-4 text-indigo-500" />
+            <h3 className="text-sm font-black text-slate-800">{t('hourlyActivity')}</h3>
           </div>
+          {loading ? (
+            <div className="h-28 flex items-center justify-center text-xs text-slate-400">{t('loading')}</div>
+          ) : hourlyData.length === 0 ? (
+            <div className="h-28 flex items-center justify-center text-xs text-slate-400">{t('noData')}</div>
+          ) : (
+            <BarChart data={hourlyData} maxValue={maxHourly} />
+          )}
         </div>
 
         {/* Language Distribution */}
-        <div className="bg-white rounded-2xl border border-slate-300 p-6 shadow-sm">
-          <h3 className="text-lg font-bold mb-4">{t('analytics.languageDistribution')}</h3>
-          <div className="space-y-3">
-            {(chatMetrics?.languageDistribution ?? []).map((l, i) => (
-              <div key={i}>
-                <div className="flex justify-between mb-1">
-                  <span className="text-sm font-medium">{l.language}</span>
-                  <span className="text-sm font-bold">{l.count}</span>
-                </div>
-                <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                  <div
-                    className="h-full rounded-full transition-all"
-                    style={{
-                      width: `${(l.count / (chatMetrics?.totalChats || 1)) * 100}%`,
-                      backgroundColor: l.color,
-                    }}
-                  />
-                </div>
+        <div className="bg-white rounded-xl border border-slate-300 p-6 shadow-sm">
+          <div className="flex items-center gap-2 mb-4">
+            <Globe className="w-4 h-4 text-indigo-500" />
+            <h3 className="text-sm font-black text-slate-800">{t('languageDistribution')}</h3>
+          </div>
+          {loading ? (
+            <div className="h-20 flex items-center justify-center text-xs text-slate-400">{t('loading')}</div>
+          ) : (
+            <PieChart data={langData} total={totalLang} />
+          )}
+        </div>
+
+        {/* Category Distribution */}
+        <div className="bg-white rounded-xl border border-slate-300 p-6 shadow-sm">
+          <div className="flex items-center gap-2 mb-4">
+            <BarChart2 className="w-4 h-4 text-indigo-500" />
+            <h3 className="text-sm font-black text-slate-800">{t('categoryDistribution')}</h3>
+          </div>
+          {loading ? (
+            <div className="h-20 flex items-center justify-center text-xs text-slate-400">{t('loading')}</div>
+          ) : categoryData.length === 0 ? (
+            <div className="h-20 flex items-center justify-center text-xs text-slate-400">{t('noData')}</div>
+          ) : (
+            <PieChart data={categoryData} total={totalCat} />
+          )}
+        </div>
+      </div>
+
+      {/* ====== TOP QUERIES ====== */}
+      <div className="bg-white rounded-xl border border-slate-300 p-6 mb-4 shadow-sm">
+        <div className="flex items-center gap-2 mb-4">
+          <CheckCircle2 className="w-4 h-4 text-indigo-500" />
+          <h3 className="text-sm font-black text-slate-800">{t('topQueries')}</h3>
+        </div>
+        {loading ? (
+          <p className="text-xs text-slate-400">{t('loading')}</p>
+        ) : (chatMetrics?.topQueries ?? []).length === 0 ? (
+          <p className="text-xs text-slate-400">{t('noQueries')}</p>
+        ) : (
+          <div className="space-y-1.5">
+            {(chatMetrics?.topQueries ?? []).map((q, i) => (
+              <div key={i} className="flex items-center gap-3 p-2 bg-slate-50 rounded-lg border border-slate-200">
+                <span className={clsx(
+                  'w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0',
+                  i === 0 ? 'bg-indigo-500 text-white' : i === 1 ? 'bg-violet-500 text-white' : 'bg-slate-200 text-slate-600'
+                )}>
+                  {i + 1}
+                </span>
+                <span className="flex-1 text-sm truncate text-slate-700">{q.query}</span>
+                <span className="text-sm font-bold text-slate-500 flex-shrink-0">{q.count}x</span>
               </div>
             ))}
           </div>
-        </div>
+        )}
       </div>
 
-      {/* ====== LEGACY METRICS ROW ====== */}
-      <section className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-        <div className="relative bg-gradient-to-br from-primary/10 to-primary/5 backdrop-blur-xl rounded-2xl p-4 border-3 border-black flex items-center gap-3 transform rotate-[-0.5deg] hover:rotate-0 transition-transform shadow-[6px_6px_0px_0px_#000] hover:shadow-[8px_8px_0px_0px_#000]">
-          <div className="w-10 h-10 rounded-xl bg-primary/20 border border-slate-300 flex items-center justify-center shadow-sm">
-            <span className="material-symbols-outlined text-primary text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>group</span>
+      {/* ====== SERVER + LOGS + USER ROW ====== */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-8">
+        {/* Server Health */}
+        <div className="bg-white rounded-xl border border-slate-300 p-6 shadow-sm">
+          <div className="flex items-center gap-2 mb-4">
+            <Server className="w-4 h-4 text-indigo-500" />
+            <h3 className="text-sm font-black text-slate-800">{t('serverHealth')}</h3>
           </div>
-          <div>
-            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">{t('analytics.totalUsersUpper')}</p>
-            <h3 className="text-xl font-black text-on-surface">{userStats?.total ?? '—'}</h3>
-            <p className="text-[10px] text-on-surface-variant mt-1">{userStats?.active ?? 0} {t('analytics.active')}</p>
-          </div>
+          <p className="text-xs text-slate-500 mb-3">{t('serverHealthSub')}</p>
+          {loading || !srv ? (
+            <p className="text-xs text-slate-400">{t('loading')}</p>
+          ) : (
+            <div className="space-y-2">
+              {[
+                { label: t('nodeVersion'), value: srv.nodeVersion },
+                { label: t('platform'), value: srv.platform },
+                { label: t('uptime'), value: formatUptime(srv.uptime) },
+                { label: t('memoryRss'), value: `${bytesToMB(srv.memory.rss)} MB` },
+                { label: t('heapUsed'), value: `${bytesToMB(srv.memory.heapUsed)} MB` },
+              ].map(item => (
+                <div key={item.label} className="flex justify-between items-center p-2.5 bg-slate-50 rounded-lg border border-slate-200">
+                  <span className="text-xs font-medium text-slate-600">{item.label}</span>
+                  <span className="text-xs font-bold font-mono text-slate-800">{item.value}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
-        <div className="relative bg-gradient-to-br from-secondary/10 to-secondary/5 backdrop-blur-xl rounded-2xl p-4 border-3 border-black flex items-center gap-3 transform rotate-[0.5deg] hover:rotate-0 transition-transform shadow-[6px_6px_0px_0px_#000] hover:shadow-[8px_8px_0px_0px_#000]">
-          <div className="w-10 h-10 rounded-xl bg-secondary/20 border border-slate-300 flex items-center justify-center shadow-sm">
-            <span className="material-symbols-outlined text-secondary text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>description</span>
-          </div>
-          <div>
-            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">{t('analytics.kbDocuments')}</p>
-            <h3 className="text-xl font-black text-on-surface">{kb?.totalDocuments ?? '—'}</h3>
-            <p className="text-[10px] text-on-surface-variant mt-1">{kb?.totalCategories ?? 0} {t('analytics.categories')}</p>
-          </div>
-        </div>
-
-        <div className="relative bg-gradient-to-br from-tertiary/10 to-tertiary/5 backdrop-blur-xl rounded-2xl p-4 border-3 border-black flex items-center gap-3 transform rotate-[-0.5deg] hover:rotate-0 transition-transform shadow-[6px_6px_0px_0px_#000] hover:shadow-[8px_8px_0px_0px_#000]">
-          <div className="w-10 h-10 rounded-xl bg-tertiary/20 border border-slate-300 flex items-center justify-center shadow-sm">
-            <span className="material-symbols-outlined text-tertiary text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>list_alt</span>
-          </div>
-          <div>
-            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">{t('analytics.logEvents')}</p>
-            <h3 className="text-xl font-black text-on-surface">{logs?.total ?? '—'}</h3>
-            <p className="text-[10px] text-on-surface-variant mt-1">{t('analytics.total')}</p>
-          </div>
-        </div>
-
-        <div className="relative bg-gradient-to-br from-green-50/80 to-green-100/40 backdrop-blur-xl rounded-2xl p-4 border-3 border-black flex items-center gap-3 transform rotate-[0.5deg] hover:rotate-0 transition-transform shadow-[6px_6px_0px_0px_#000] hover:shadow-[8px_8px_0px_0px_#000]">
-          <div className="w-10 h-10 rounded-xl bg-green-200 border border-slate-300 flex items-center justify-center shadow-sm">
-            <span className="material-symbols-outlined text-green-600 text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>bolt</span>
-          </div>
-          <div>
-            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">UPTIME</p>
-            <h3 className="text-xl font-black text-on-surface">{srv ? formatUptime(srv.uptime) : '—'}</h3>
-            <p className="text-[10px] text-on-surface-variant mt-1">{srv?.nodeVersion || '—'}</p>
-          </div>
-        </div>
-      </section>
-
-      {/* Two Column Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
         {/* Log Activity */}
-        <div className="relative bg-gradient-to-br from-white/80 to-white/40 backdrop-blur-xl rounded-3xl border-3 border-black p-8 shadow-[12px_12px_0px_0px_#000]">
-          <div className="absolute inset-0 bg-gradient-to-b from-white/40 to-transparent rounded-3xl"></div>
-          <div className="relative z-10">
-            <h3 className="text-xl font-black text-on-surface mb-6">{t('analytics.logActivity')}</h3>
-            {loading ? (
-              <div className="py-10 text-center text-on-surface-variant">{t('common.loading')}</div>
-            ) : (
-              <div className="space-y-4">
-                {logLevelBars.map((b) => (
-                  <div key={b.level}>
-                    <div className="flex justify-between mb-2">
-                      <span className="text-sm font-bold capitalize">{b.level}</span>
-                      <span className="text-sm font-black">{b.count}</span>
-                    </div>
-                    <div className="h-3 w-full bg-gray-100 rounded-full overflow-hidden border border-slate-300">
-                      <div
-                        className={`h-full ${b.color} transition-all`}
-                        style={{ width: `${(b.count / maxLog) * 100}%` }}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+        <div className="bg-white rounded-xl border border-slate-300 p-6 shadow-sm">
+          <div className="flex items-center gap-2 mb-4">
+            <Receipt className="w-4 h-4 text-indigo-500" />
+            <h3 className="text-sm font-black text-slate-800">{t('logActivity')}</h3>
           </div>
+          {loading ? (
+            <p className="text-xs text-slate-400">{t('loading')}</p>
+          ) : (
+            <div className="space-y-3">
+              {logLevelBars.map(b => (
+                <div key={b.level}>
+                  <div className="flex justify-between mb-1.5">
+                    <span className="text-xs font-bold capitalize text-slate-700">{t(b.level)}</span>
+                    <span className="text-xs font-black text-slate-800">{b.count}</span>
+                  </div>
+                  <div className="h-2.5 w-full bg-slate-100 rounded-full overflow-hidden border border-slate-200">
+                    <div
+                      className={`h-full ${b.color} transition-all rounded-full`}
+                      style={{ width: `${(b.count / maxLog) * 100}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* Server Info */}
-        <div className="relative bg-gradient-to-br from-white/80 to-white/40 backdrop-blur-xl rounded-3xl border-3 border-black p-8 shadow-[12px_12px_0px_0px_#000]">
-          <div className="absolute inset-0 bg-gradient-to-b from-white/40 to-transparent rounded-3xl"></div>
-          <div className="relative z-10">
-            <h3 className="text-xl font-black text-on-surface mb-6">{t('analytics.serverInfo')}</h3>
-            {loading || !srv ? (
-              <div className="py-10 text-center text-on-surface-variant">{t('common.loading')}</div>
-            ) : (
-              <div className="space-y-3">
-                {[
-                  { label: 'Node version', value: srv.nodeVersion },
-                  { label: 'Platform', value: srv.platform },
-                  { label: 'Uptime', value: formatUptime(srv.uptime) },
-                  { label: 'Memory (RSS)', value: `${bytesToMB(srv.memory.rss)} MB` },
-                  { label: 'Heap used', value: `${bytesToMB(srv.memory.heapUsed)} MB` },
-                ].map((item) => (
-                  <div key={item.label} className="flex justify-between p-3 bg-gray-50/50 rounded-xl border border-black/10">
-                    <span className="text-sm font-medium text-on-surface-variant">{item.label}</span>
-                    <span className="text-sm font-bold font-mono text-on-surface">{item.value}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* User Stats & KB Info */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* User Breakdown */}
-        <div className="lg:col-span-2 relative bg-gradient-to-br from-white/80 to-white/40 backdrop-blur-xl rounded-3xl border-3 border-black p-8 shadow-[12px_12px_0px_0px_#000]">
-          <div className="absolute inset-0 bg-gradient-to-b from-white/40 to-transparent rounded-3xl"></div>
-          <div className="relative z-10">
-            <h3 className="text-xl font-black text-on-surface mb-6">{t('analytics.userStats')}</h3>
-            {loading || !userStats ? (
-              <div className="py-10 text-center text-on-surface-variant">{t('common.loading')}</div>
-            ) : (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {[
-                  { label: t('analytics.total'), value: userStats.total, color: 'primary' },
-                  { label: 'Active', value: userStats.active, color: 'secondary' },
-                  { label: 'Suspended', value: userStats.suspended, color: 'error' },
-                  { label: 'Pending', value: userStats.pending, color: 'tertiary' },
-                  { label: 'Admins', value: userStats.admins, color: 'primary' },
-                  { label: 'Enterprise', value: userStats.enterprise, color: 'secondary' },
-                  { label: 'Pro', value: userStats.pro, color: 'tertiary' },
-                  { label: 'Free', value: userStats.free, color: 'gray' },
-                ].map((s) => (
-                  <div key={s.label} className={`p-4 bg-${s.color}/5 rounded-2xl border-2 border-${s.color}/20`}>
-                    <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">{s.label}</p>
-                    <p className={`text-xl font-black text-${s.color}`}>{s.value}</p>
-                  </div>
-                ))}
-              </div>
-            )}
+        <div className="bg-white rounded-xl border border-slate-300 p-6 shadow-sm">
+          <div className="flex items-center gap-2 mb-4">
+            <Users className="w-4 h-4 text-indigo-500" />
+            <h3 className="text-sm font-black text-slate-800">{t('userBreakdown')}</h3>
           </div>
-        </div>
-
-        {/* KB Info */}
-        <div className="relative bg-gradient-to-br from-white/80 to-white/40 backdrop-blur-xl rounded-3xl border-3 border-black p-8 shadow-[12px_12px_0px_0px_#000]">
-          <div className="absolute inset-0 bg-gradient-to-b from-white/40 to-transparent rounded-3xl"></div>
-          <div className="relative z-10">
-            <h3 className="text-xl font-black text-on-surface mb-6">{t('analytics.knowledgeBase')}</h3>
-            {loading || !kb ? (
-              <div className="py-10 text-center text-on-surface-variant">{t('common.loading')}</div>
-            ) : (
-              <div className="space-y-3">
-                <div className="flex justify-between p-4 bg-primary/10 rounded-xl border-2 border-primary/30">
-                  <span className="text-sm font-medium">{t('analytics.totalDocs')}</span>
-                  <span className="text-lg font-black text-primary">{kb.totalDocuments}</span>
+          <p className="text-xs text-slate-500 mb-3">{t('userBreakdownSub')}</p>
+          {loading || !userStats ? (
+            <p className="text-xs text-slate-400">{t('loading')}</p>
+          ) : (
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { label: t('total'), value: userStats.total, color: 'text-indigo-600' },
+                { label: t('active'), value: userStats.active, color: 'text-emerald-600' },
+                { label: t('admins'), value: userStats.admins, color: 'text-violet-600' },
+                { label: t('enterprise'), value: userStats.enterprise, color: 'text-amber-600' },
+                { label: t('pro'), value: userStats.pro, color: 'text-blue-600' },
+                { label: t('free'), value: userStats.free, color: 'text-slate-500' },
+                { label: t('pending'), value: userStats.pending, color: 'text-amber-600' },
+                { label: t('suspended'), value: userStats.suspended, color: 'text-red-600' },
+              ].map(s => (
+                <div key={s.label} className="p-2.5 bg-slate-50 rounded-lg border border-slate-200 text-center">
+                  <p className="text-[10px] font-bold text-slate-500 uppercase mb-0.5">{s.label}</p>
+                  <p className={`text-lg font-black leading-tight ${s.color}`}>{s.value}</p>
                 </div>
-                <div className="flex justify-between p-4 bg-secondary/10 rounded-xl border-2 border-secondary/30">
-                  <span className="text-sm font-medium">{t('analytics.categories')}</span>
-                  <span className="text-lg font-black text-secondary">{kb.totalCategories}</span>
-                </div>
-                {kb.totalSize !== undefined && (
-                  <div className="flex justify-between p-4 bg-tertiary/10 rounded-xl border-2 border-tertiary/30">
-                    <span className="text-sm font-medium">{t('analytics.storage')}</span>
-                    <span className="text-lg font-black text-tertiary">{(kb.totalSize / 1024).toFixed(2)} KB</span>
-                  </div>
-                )}
-                <a href="/data" className="block mt-4 text-center py-3 bg-primary text-white rounded-xl font-bold text-sm border border-slate-200 shadow-sm hover:-translate-x-1 hover:-translate-y-1 hover:shadow-sm transition-all">
-                  {t('analytics.openKbPage')} →
-                </a>
-              </div>
-            )}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </AdminLayout>
   );
 }
+
 export default AdminAnalytics;

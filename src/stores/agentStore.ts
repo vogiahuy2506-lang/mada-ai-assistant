@@ -19,6 +19,7 @@ export interface Agent {
   avatarUrl?: string;
   knowledgeUrl?: string;
   productUrl?: string;
+  sortOrder?: number;
 }
 
 const API_BASE = '/api';
@@ -108,6 +109,7 @@ function mapBackendAgent(a: any): Agent {
     avatarUrl: a.avatar_url || a.avatarUrl,
     knowledgeUrl: a.knowledge_url || a.knowledgeUrl,
     productUrl: a.product_url || a.productUrl,
+    sortOrder: a.sort_order ?? a.sortOrder ?? 0,
   };
 }
 
@@ -258,7 +260,17 @@ const agentStore = create<AgentState>()(
         }
       },
 
-      getActiveAgents: () => get().agents.filter(a => a.isActive),
+      getActiveAgents: () => {
+        const agents = get().agents.filter(a => a.isActive);
+        // Sort by sort_order (if available), then by createdAt as fallback
+        return agents.sort((a, b) => {
+          const orderA = (a as any).sort_order ?? 0;
+          const orderB = (b as any).sort_order ?? 0;
+          if (orderA !== orderB) return orderA - orderB;
+          // Fallback: older agents first
+          return (a.createdAt || 0) - (b.createdAt || 0);
+        });
+      },
 
       getAgentsByCreator: (creator) => get().agents.filter(a => a.createdBy === creator),
 

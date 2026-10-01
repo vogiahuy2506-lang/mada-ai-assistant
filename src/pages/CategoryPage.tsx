@@ -70,9 +70,9 @@ export function CategoryPage() {
   const desc = language === 'en' ? category.description_en : category.description_vi;
 
   return (
-    <div>
-      {/* Category Hero */}
-      <div className="bg-gradient-to-br from-violet-50 via-blue-50 to-cyan-50 border-b-2 border-outline">
+    <PublicLayout>
+      {/* Category Hero — inside PublicLayout so it shares the same container */}
+      <div className="bg-gradient-to-br from-violet-50 via-blue-50 to-cyan-50 border-b-2 border-outline -mt-6 mb-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <nav className="text-sm text-slate-600 mb-4" aria-label="Breadcrumb">
             <ol className="flex items-center gap-1 flex-wrap" role="list">
@@ -94,10 +94,8 @@ export function CategoryPage() {
       </div>
 
       {/* Product grid (re-use ProductsPage logic with preset filter) */}
-      <PublicLayout>
-        <CategoryProducts categoryId={category.id} />
-      </PublicLayout>
-    </div>
+      <CategoryProducts categoryId={category.id} />
+    </PublicLayout>
   );
 }
 

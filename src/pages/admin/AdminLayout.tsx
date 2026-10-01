@@ -17,7 +17,7 @@ const tL = (key: string): string => {
       'admin.layout.navProducts': 'Sản phẩm',
       'admin.layout.navScraper': 'Scraper',
       'admin.layout.navActivityLogs': 'Nhật ký hoạt động',
-      'admin.layout.navAnalytics': 'Phân tích',
+      'admin.layout.navAnalytics': 'Báo cáo',
       'admin.layout.navAgents': 'AI Agents',
       'admin.layout.navSuggestedQuestions': 'Câu hỏi gợi ý',
       'admin.layout.navSystemPrompts': 'System Prompts',
@@ -67,7 +67,7 @@ const tL = (key: string): string => {
       'admin.layout.navProducts': 'Products',
       'admin.layout.navScraper': 'Scraper',
       'admin.layout.navActivityLogs': 'Activity Logs',
-      'admin.layout.navAnalytics': 'Analytics',
+      'admin.layout.navAnalytics': 'Reports',
       'admin.layout.navAgents': 'AI Agents',
       'admin.layout.navSuggestedQuestions': 'Suggested Questions',
       'admin.layout.navSystemPrompts': 'System Prompts',
@@ -117,7 +117,7 @@ const tL = (key: string): string => {
       'admin.layout.navProducts': 'المنتجات',
       'admin.layout.navScraper': 'المجمع',
       'admin.layout.navActivityLogs': 'سجلات النشاط',
-      'admin.layout.navAnalytics': 'التحليلات',
+      'admin.layout.navAnalytics': 'التقارير',
       'admin.layout.navAgents': 'وكلاء الذكاء الاصطناعي',
       'admin.layout.navSuggestedQuestions': 'الأسئلة المقترحة',
       'admin.layout.navSystemPrompts': 'طلبات النظام',
@@ -167,7 +167,7 @@ const tL = (key: string): string => {
       'admin.layout.navProducts': 'Produits',
       'admin.layout.navScraper': 'Extracteur',
       'admin.layout.navActivityLogs': 'Journaux d\'activité',
-      'admin.layout.navAnalytics': 'Analytique',
+      'admin.layout.navAnalytics': 'Rapports',
       'admin.layout.navAgents': 'Agents IA',
       'admin.layout.navSuggestedQuestions': 'Questions suggérées',
       'admin.layout.navSystemPrompts': 'Prompts système',
@@ -226,10 +226,10 @@ const NAV_ITEMS: NavItem[] = [
   { labelKey: 'admin.layout.navUsers', href: '/admin/users', icon: 'group' },
   { labelKey: 'admin.layout.navProducts', href: '/admin/products', icon: 'inventory_2' },
   { labelKey: 'admin.layout.navScraper', href: '/admin/scraper', icon: 'cloud_download' },
-  { labelKey: 'admin.layout.navActivityLogs', href: '/admin/logs', icon: 'history_edu' },
+  // Gộp Nhật ký hoạt động + Phân tích → chỉ còn "Báo cáo" (trỏ /admin/analytics)
   { labelKey: 'admin.layout.navAnalytics', href: '/admin/analytics', icon: 'analytics' },
   { labelKey: 'admin.layout.navAgents', href: '/admin/agents', icon: 'smart_toy' },
-  { labelKey: 'admin.layout.navSuggestedQuestions', href: '/admin/suggested-questions', icon: 'quiz', superAdminOnly: true },
+  // Gộp Câu hỏi gợi ý vào AI Agents tab → xoá khỏi sidebar
   { labelKey: 'admin.layout.navSystemPrompts', href: '/admin/prompts', icon: 'edit_note' },
   { labelKey: 'admin.layout.navConsultations', href: '/admin/consultations', icon: 'support_agent' },
   { labelKey: 'admin.layout.navFileUpload', href: '/admin/file-management', icon: 'upload_file', superAdminOnly: true },
@@ -346,9 +346,6 @@ export function AdminLayout({
               >
                 <span className="material-symbols-outlined">{item.icon}</span>
                 <span className="font-label-md">{tL(item.labelKey)}</span>
-                {item.superAdminOnly && (
-                  <span className="material-symbols-outlined text-xs text-warning ml-auto" title={tL('admin.layout.superAdminOnly')}>lock</span>
-                )}
               </Link>
             );
           })}
@@ -630,9 +627,6 @@ export function AdminLayout({
                     >
                       <span className="material-symbols-outlined">{item.icon}</span>
                       <span className="font-label-md">{tL(item.labelKey)}</span>
-                      {item.superAdminOnly && (
-                        <span className="material-symbols-outlined text-xs text-warning ml-auto" title={tL('admin.layout.superAdminOnly')}>lock</span>
-                      )}
                     </Link>
                   );
                 })}

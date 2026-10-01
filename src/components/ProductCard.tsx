@@ -1,16 +1,17 @@
 /**
- * ProductCard Component - WCAG 2.2 Compliant
+ * ProductCard Component - Modern UI/UX Design
  * Dành cho người khuyết tật, người cao tuổi
  * 
- * WCAG Compliance:
- * - 1.4.3: Contrast ratio tối thiểu 4.5:1
- * - 1.4.11: Non-text contrast tối thiểu 3:1
- * - 2.4.6: Headings and labels
- * - 4.1.2: Name, role, value for all components
+ * Features:
+ * - Modern card design với glassmorphism touch
+ * - Clear visual hierarchy
+ * - Smooth animations
+ * - WCAG 2.2 Compliant (contrast ≥ 4.5:1)
+ * - Horizontal layout for better readability
  */
 
 import React from 'react';
-import { ExternalLink, Check, Star, MapPin } from 'lucide-react';
+import { ExternalLink, Check, Star, MapPin, ShoppingCart } from 'lucide-react';
 import { getImageUrl } from '@/lib/imageProxy';
 import { t } from '@/lib/translations';
 
@@ -56,46 +57,46 @@ export function ProductCard({
     return /^https?:\/\//i.test(url.trim());
   };
   const hasValidUrl = isValidUrl(product.product_url) || isValidUrl(product.source_url);
+  
   const handleViewDetails = () => {
     if (!hasValidUrl) {
-      // URL không hợp lệ → fallback mở consultation thay vì báo lỗi
       onRequestConsult?.();
       return;
     }
     onViewDetails?.();
   };
+
   // Đảm bảo contrast ratio ≥ 4.5:1 (WCAG 1.4.3)
   const getScoreColor = (score: number) => {
-    if (score >= 85) return 'bg-emerald-500';
-    if (score >= 70) return 'bg-blue-500';
-    return 'bg-amber-500';
+    if (score >= 85) return 'bg-gradient-to-br from-emerald-500 to-green-600';
+    if (score >= 70) return 'bg-gradient-to-br from-blue-500 to-indigo-600';
+    return 'bg-gradient-to-br from-amber-500 to-orange-500';
   };
 
   /**
    * Map category → gradient colors cho fallback image.
-   * Giúp user phân biệt nhanh loại sản phẩm qua màu nền.
    */
   const getCategoryGradient = (cat: string): string => {
     const c = (cat || '').toLowerCase();
     if (c.includes('hearing') || c.includes('điếc') || c.includes('thính')) {
-      return '#06b6d4, #3b82f6'; // cyan → blue (thính giác - tai)
+      return '#06b6d4, #3b82f6';
     }
     if (c.includes('vision') || c.includes('mắt') || c.includes('thị giác') || c.includes('blind')) {
-      return '#8b5cf6, #ec4899'; // violet → pink (thị giác)
+      return '#8b5cf6, #ec4899';
     }
     if (c.includes('mobility') || c.includes('vận động') || c.includes('wheelchair')) {
-      return '#10b981, #06b6d4'; // emerald → cyan (di chuyển)
+      return '#10b981, #06b6d4';
     }
     if (c.includes('communication') || c.includes('giao tiếp') || c.includes('speech') || c.includes('aac')) {
-      return '#f59e0b, #ef4444'; // amber → red (giao tiếp)
+      return '#f59e0b, #ef4444';
     }
     if (c.includes('cognition') || c.includes('nhận thức') || c.includes('learn')) {
-      return '#3b82f6, #8b5cf6'; // blue → violet (nhận thức)
+      return '#3b82f6, #8b5cf6';
     }
     if (c.includes('daily') || c.includes('sinh hoạt')) {
-      return '#84cc16, #10b981'; // lime → emerald
+      return '#84cc16, #10b981';
     }
-    return '#6366f1, #8b5cf6'; // default indigo → violet
+    return '#6366f1, #8b5cf6';
   };
 
   /**
@@ -109,207 +110,207 @@ export function ProductCard({
     if (c.includes('communication') || c.includes('giao tiếp') || c.includes('speech') || c.includes('aac')) return 'record_voice_over';
     if (c.includes('cognition') || c.includes('nhận thức') || c.includes('learn')) return 'psychology';
     if (c.includes('daily') || c.includes('sinh hoạt')) return 'commute';
-    return 'accessibility'; // default assistive technology
+    return 'accessibility';
   };
 
   return (
     <article
-      className="bg-white rounded-2xl border-2 border-slate-200 shadow-sm overflow-hidden hover:shadow-lg hover:border-violet-200 transition-all duration-200"
+      className="group bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden hover:shadow-xl hover:border-violet-200 transition-all duration-300"
       role="article"
       aria-labelledby={`product-title-${product.id}`}
       aria-describedby={`product-desc-${product.id}`}
     >
-      {/* Header với hình ảnh và match score - ĐÃ FIX overflow */}
-      <div className="relative p-4 bg-gradient-to-br from-slate-50 to-slate-100 border-b border-slate-200">
-        {/* Image */}
-        <div className="flex gap-4">
-          <div className="w-24 h-24 rounded-xl overflow-hidden bg-white flex-shrink-0 border border-slate-200 relative">
-            {(() => {
-              const safeUrl = getImageUrl(product.image_url);
-              return safeUrl ? (
-                <img
-                  src={safeUrl}
-                  alt={`${product.name} - ${product.category}`}
-                  className="w-full h-full object-cover relative z-10"
-                  loading="lazy"
-                  decoding="async"
-                  referrerPolicy="no-referrer"
-                  crossOrigin="anonymous"
-                  onError={(e) => {
-                    // Ản img bị lỗi → fallback gradient + emoji tự động hiện ra
-                    const target = e.currentTarget as HTMLImageElement;
-                    target.style.display = 'none';
-                  }}
-                />
-              ) : null;
-            })()}
-            {/* Category-based fallback - gradient + icon. Layer dưới img với z-index thấp hơn (z-10 của img), nên khi img load thành công sẽ che fallback. Khi img lỗi/rỗng → fallback hiện ra. */}
-            <div
-              className="fallback-icon absolute inset-0 w-full h-full flex items-center justify-center text-white font-bold"
-              style={{
-                background: `linear-gradient(135deg, ${getCategoryGradient(product.category)})`,
-              }}
-              aria-hidden="true"
-            >
-              <span className="material-symbols-outlined text-3xl" style={{ fontVariationSettings: "'FILL' 1" }}>
-                {getCategoryIcon(product.category)}
-              </span>
+      {/* Main Content - Horizontal Layout */}
+      <div className="flex flex-col lg:flex-row">
+        
+        {/* LEFT SIDE - Image với Match Score */}
+        <div className="lg:w-64 xl:w-72 flex-shrink-0 p-4 lg:p-5 bg-gradient-to-br from-white to-slate-50 lg:border-r border-b lg:border-b-0 border-slate-100">
+          <div className="flex flex-col items-center gap-4">
+            {/* Image Container */}
+            <div className="w-36 h-36 lg:w-full lg:h-48 rounded-2xl overflow-hidden bg-white flex-shrink-0 border border-slate-100 shadow-sm relative group-hover:shadow-md transition-shadow">
+              {(() => {
+                const safeUrl = getImageUrl(product.image_url);
+                return safeUrl ? (
+                  <img
+                    src={safeUrl}
+                    alt={`${product.name} - ${product.category}`}
+                    className="w-full h-full object-cover relative z-10"
+                    loading="lazy"
+                    decoding="async"
+                    referrerPolicy="no-referrer"
+                    crossOrigin="anonymous"
+                    onError={(e) => {
+                      const target = e.currentTarget as HTMLImageElement;
+                      target.style.display = 'none';
+                    }}
+                  />
+                ) : null;
+              })()}
+              {/* Category-based fallback */}
+              <div
+                className="fallback-icon absolute inset-0 w-full h-full flex items-center justify-center text-white"
+                style={{
+                  background: `linear-gradient(135deg, ${getCategoryGradient(product.category)})`,
+                }}
+                aria-hidden="true"
+              >
+                <span className="material-symbols-outlined text-5xl lg:text-6xl" style={{ fontVariationSettings: "'FILL' 1" }}>
+                  {getCategoryIcon(product.category)}
+                </span>
+              </div>
             </div>
-          </div>
 
-          {/* Product Info */}
-          <div className="flex-1 min-w-0">
+            {/* Match Score Badge */}
+            {matchScore !== undefined && (
+              <div
+                className="flex flex-col items-center"
+                role="meter"
+                aria-valuenow={matchScore}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-label={`Phù hợp: ${matchScore}%`}
+              >
+                <div className={`w-16 h-16 rounded-full ${getScoreColor(matchScore)} flex items-center justify-center text-white font-bold text-xl shadow-lg ring-4 ring-white`}>
+                  {matchScore}%
+                </div>
+                <span className="text-xs text-slate-500 mt-2 font-semibold uppercase tracking-wide">
+                  Phù hợp
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* RIGHT SIDE - Product Info với Scroll */}
+        <div className="flex-1 p-5 flex flex-col">
+          
+          {/* Header - Product Info */}
+          <div className="mb-4">
+            {/* Category Badge */}
+            <span className="inline-block px-3 py-1 bg-violet-100 text-violet-700 text-xs font-semibold rounded-full mb-2">
+              {product.category}
+            </span>
+            
+            {/* Product Name */}
             <h3
               id={`product-title-${product.id}`}
-              className="text-sm font-bold text-slate-900 mb-1 leading-tight"
+              className="text-xl font-bold text-slate-900 leading-tight mb-2 group-hover:text-violet-700 transition-colors"
             >
               {product.name}
             </h3>
-            <p className="text-xs text-slate-600 mb-2">{product.category}</p>
+            
+            {/* Brand */}
+            {product.brand && (
+              <p className="text-sm text-slate-500 mb-2">
+                <span className="font-medium">{product.brand}</span>
+              </p>
+            )}
 
-            {/* Rating & Availability */}
-            <div className="flex items-center gap-3 mb-2">
+            {/* Rating & Availability Row */}
+            <div className="flex items-center gap-4 mb-3">
               {product.rating && (
-                <div className="flex items-center gap-1" role="img" aria-label={`${product.rating} ${t('productCard.reviews', language)}`}>
-                  <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400" aria-hidden="true" />
-                  <span className="text-xs font-semibold text-slate-700">{product.rating}</span>
+                <div className="flex items-center gap-1 bg-amber-50 px-2.5 py-1 rounded-full" role="img" aria-label={`${product.rating} sao`}>
+                  <Star className="w-4 h-4 text-amber-500 fill-amber-500" aria-hidden="true" />
+                  <span className="text-sm font-bold text-amber-700">{product.rating}</span>
                   {product.review_count && (
-                    <span className="text-xs text-slate-500">({product.review_count})</span>
+                    <span className="text-xs text-amber-600/70">({product.review_count})</span>
                   )}
                 </div>
               )}
               {product.availability && (
-                <div className="flex items-center gap-1 text-xs text-emerald-600">
-                  <MapPin className="w-3 h-3" aria-hidden="true" />
+                <div className="flex items-center gap-1 text-sm text-emerald-600">
+                  <MapPin className="w-4 h-4" aria-hidden="true" />
                   <span className="font-medium">{product.availability}</span>
                 </div>
               )}
             </div>
 
-            {/* Price */}
+            {/* Price - Nổi bật */}
             {product.price_range && (
-              <p className="text-sm font-bold text-violet-600">{product.price_range}</p>
+              <p className="text-2xl font-bold bg-gradient-to-r from-violet-600 to-indigo-600 bg-clip-text text-transparent">
+                {product.price_range}
+              </p>
             )}
           </div>
 
-          {/* Match Score Badge - ĐÃ FIX: nằm trong card */}
-          {matchScore !== undefined && (
-            <div
-              className="flex flex-col items-center justify-center"
-              role="meter"
-              aria-valuenow={matchScore}
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-label={`${t('productCard.matchScore', language)}: ${matchScore}%`}
-            >
-              <div className={`w-12 h-12 rounded-full ${getScoreColor(matchScore)} flex items-center justify-center text-white font-bold text-sm shadow-md`}>
-                {matchScore}%
-              </div>
-              <span className="text-[10px] text-slate-500 mt-1 font-medium">{t('productCard.matchScore', language)}</span>
+          {/* Description */}
+          {product.description && (
+            <div className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-100/50 mb-4">
+              <p className="text-sm text-slate-700 leading-relaxed">
+                {product.description}
+              </p>
             </div>
           )}
+
+          {/* Features - Horizontal Layout */}
+          {matchReason && product.features && product.features.length > 0 && (
+            <div className="mb-4">
+              <h4 className="text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-2 mb-3">
+                <span className="material-symbols-outlined text-sm text-violet-500">verified</span>
+                Tính năng nổi bật
+              </h4>
+              <div className="flex flex-wrap gap-2" role="list" aria-label="Tính năng nổi bật">
+                {product.features.slice(0, 4).map((feature, idx) => (
+                  <span key={idx} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-700 text-xs font-medium rounded-full border border-emerald-100">
+                    <Check className="w-3.5 h-3.5 text-emerald-600" aria-hidden="true" />
+                    {feature}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Spacer */}
+          <div className="flex-1"></div>
+
+          {/* Actions */}
+          <div className="flex flex-col sm:flex-row gap-3 mt-4">
+            {/* View Details Button */}
+            {(product.product_url || product.source_url) && (
+              <a
+                href={product.product_url || product.source_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 flex items-center justify-center gap-2 py-3 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold rounded-xl transition-all group/link"
+                onClick={(e) => {
+                  if (!hasValidUrl) {
+                    e.preventDefault();
+                    onRequestConsult?.();
+                  }
+                }}
+              >
+                <ExternalLink className="w-4 h-4 text-violet-600 group-hover/link:translate-x-0.5 transition-transform" aria-hidden="true" />
+                Xem chi tiết
+                <span className="material-symbols-outlined text-base ml-1 opacity-60">open_in_new</span>
+              </a>
+            )}
+
+            {/* Consult Button */}
+            <button
+              onClick={onRequestConsult}
+              className="flex-1 py-3 px-4 bg-gradient-to-r from-violet-600 to-indigo-600 text-white text-sm font-bold rounded-xl hover:from-violet-700 hover:to-indigo-700 transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-violet-500"
+              aria-label={`Tư vấn về ${product.name}`}
+            >
+              <ShoppingCart className="w-4 h-4" aria-hidden="true" />
+              {t('productCard.consult', language)}
+            </button>
+          </div>
         </div>
-      </div>
-
-      {/* Body */}
-      <div className="p-4 space-y-3">
-        {/* Match Reason - ĐÃ FIX: contrast ≥ 4.5:1 */}
-        {matchReason && (
-          <div>
-            <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wide mb-2">
-              {t('productCard.suitable', language)}
-            </h4>
-            <ul className="space-y-1.5" role="list" aria-label={t('productCard.suitable', language)}>
-              {product.features?.slice(0, 3).map((feature, idx) => (
-                <li key={idx} className="flex items-start gap-2">
-                  <Check className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0 mt-0.5" aria-hidden="true" />
-                  <span className="text-xs text-slate-700 leading-relaxed">{feature}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-
-        {/* Standards Badges - ĐÃ FIX: nằm trong card body */}
-        {product.standards && product.standards.length > 0 && (
-          <div>
-            <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wide mb-2">
-              {t('productCard.standards', language)}
-            </h4>
-            <div className="flex flex-wrap gap-1.5" role="list" aria-label={t('productCard.standards', language)}>
-              {product.standards.map((standard, idx) => (
-                <span
-                  key={idx}
-                  className="px-2 py-1 bg-slate-100 text-slate-700 text-[10px] font-semibold rounded-md border border-slate-200"
-                  role="listitem"
-                >
-                  {standard}
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Confidence Score */}
-        {confidence !== undefined && (
-          <div className="flex items-center gap-2 text-xs">
-            <span className="text-slate-500 font-medium">{t('productCard.confidence', language)}:</span>
-            <div className="flex-1 h-1.5 bg-slate-200 rounded-full overflow-hidden">
-              <div
-                className={`h-full ${getScoreColor(confidence)} transition-all`}
-                style={{ width: `${confidence}%` }}
-                role="progressbar"
-                aria-valuenow={confidence}
-                aria-valuemin={82}
-                aria-valuemax={99}
-              />
-            </div>
-            <span className="text-slate-700 font-semibold">{confidence}%</span>
-          </div>
-        )}
-      </div>
-
-      {/* Footer - Actions */}
-      <div className="px-4 pb-4 flex gap-2">
-        {/* Nút Chi tiết - Secondary (xám). Disable nếu URL không hợp lệ (vd: manual:<ts>). */}
-        <button
-          onClick={handleViewDetails}
-          disabled={!hasValidUrl}
-          title={hasValidUrl ? t('productCard.details', language) : t('productCard.contactForDetails', language)}
-          className={`flex-1 px-4 py-2.5 bg-slate-100 text-slate-700 text-xs font-bold rounded-xl transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-400 ${
-            hasValidUrl
-              ? 'hover:bg-slate-200 hover:text-slate-900 cursor-pointer'
-              : 'opacity-50 cursor-not-allowed'
-          }`}
-          aria-label={`${t('productCard.details', language)}: ${product.name}`}
-        >
-          {t('productCard.details', language)}
-        </button>
-
-        {/* Nút Tư vấn/Mua - Primary (xanh) */}
-        <button
-          onClick={onRequestConsult}
-          className="flex-1 px-4 py-2.5 bg-[#0047ff] text-white text-xs font-bold rounded-xl hover:bg-[#0037cc] transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 flex items-center justify-center gap-1.5"
-          aria-label={`${t('productCard.consult', language)}: ${product.name}`}
-        >
-          {t('productCard.consult', language)}
-          <ExternalLink className="w-3 h-3" aria-hidden="true" />
-        </button>
       </div>
 
       {/* Hidden description for screen readers */}
       <div id={`product-desc-${product.id}`} className="sr-only">
         {product.description || `${product.name} - ${product.category}`}
-        {product.brand && ` - ${product.brand}`}
-        {product.price_range && ` - ${product.price_range}`}
-        {matchScore && ` - ${t('productCard.matchScore', language)}: ${matchScore}%`}
-        {confidence && ` - ${t('productCard.confidence', language)}: ${confidence}%`}
+        {product.brand && ` - Thương hiệu: ${product.brand}`}
+        {product.price_range && ` - Giá: ${product.price_range}`}
+        {matchScore && ` - Phù hợp: ${matchScore}%`}
+        {confidence && ` - Độ tin cậy: ${confidence}%`}
       </div>
     </article>
   );
 }
 
-// Grid wrapper for ProductCards
+// Grid wrapper for ProductCards - Adjusted for horizontal cards
 export function ProductCardGrid({
   children,
   className = '',
@@ -321,7 +322,7 @@ export function ProductCardGrid({
 }) {
   return (
     <div
-      className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 ${className}`}
+      className={`grid grid-cols-1 xl:grid-cols-2 gap-6 ${className}`}
       role="list"
       aria-label={t('productCard.productList', language)}
     >

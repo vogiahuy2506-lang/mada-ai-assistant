@@ -582,27 +582,23 @@ export function AdminScraper() {
             {tr('admin.scraper.pipeline.heading')}
           </h3>
           <ol className="text-xs space-y-3 text-on-surface-variant">
-            <li className="flex items-center gap-3 p-2.5 rounded-xl bg-purple-50 border-2 border-purple-200">
-              <div className="w-8 h-8 rounded-full bg-purple-500 text-white border border-slate-300 flex items-center justify-center font-black text-xs shadow-sm">1</div>
-              <span className="material-symbols-outlined text-base text-purple-700" style={{ fontVariationSettings: "'FILL' 1" }}>cloud_download</span>
-              <span className="font-medium text-on-surface">{tr('admin.scraper.pipeline.step1')}</span>
+            <li className="flex items-center gap-2 p-2 rounded-lg bg-purple-50 border border-purple-200">
+              <span className="font-medium text-on-surface flex-1 truncate">{tr('admin.scraper.pipeline.step1')}</span>
+              <div className="w-7 h-7 rounded-full bg-purple-500 text-white border border-slate-300 flex items-center justify-center font-black text-xs shadow-sm shrink-0">1</div>
             </li>
-            <li className="flex items-center gap-3 p-2.5 rounded-xl bg-purple-50 border-2 border-purple-200">
-              <div className="w-8 h-8 rounded-full bg-purple-500 text-white border border-slate-300 flex items-center justify-center font-black text-xs shadow-sm">2</div>
-              <span className="material-symbols-outlined text-base text-purple-700" style={{ fontVariationSettings: "'FILL' 1" }}>auto_awesome</span>
-              <span className="font-medium text-on-surface">
+            <li className="flex items-center gap-2 p-2 rounded-lg bg-purple-50 border border-purple-200">
+              <span className="font-medium text-on-surface flex-1 truncate">
                 {tr('admin.scraper.pipeline.step2', { p: fileStats?.productCount || 0, c: fileStats?.chunkCount || 0 })}
               </span>
+              <div className="w-7 h-7 rounded-full bg-purple-500 text-white border border-slate-300 flex items-center justify-center font-black text-xs shadow-sm shrink-0">2</div>
             </li>
-            <li className="flex items-center gap-3 p-2.5 rounded-xl bg-purple-50 border-2 border-purple-200">
-              <div className="w-8 h-8 rounded-full bg-purple-500 text-white border border-slate-300 flex items-center justify-center font-black text-xs shadow-sm">3</div>
-              <span className="material-symbols-outlined text-base text-purple-700" style={{ fontVariationSettings: "'FILL' 1" }}>storage</span>
-              <span className="font-medium text-on-surface">{tr('admin.scraper.pipeline.step3')}</span>
+            <li className="flex items-center gap-2 p-2 rounded-lg bg-purple-50 border border-purple-200">
+              <span className="font-medium text-on-surface flex-1 truncate">{tr('admin.scraper.pipeline.step3')}</span>
+              <div className="w-7 h-7 rounded-full bg-purple-500 text-white border border-slate-300 flex items-center justify-center font-black text-xs shadow-sm shrink-0">3</div>
             </li>
-            <li className="flex items-center gap-3 p-2.5 rounded-xl bg-purple-50 border-2 border-purple-200">
-              <div className="w-8 h-8 rounded-full bg-purple-500 text-white border border-slate-300 flex items-center justify-center font-black text-xs shadow-sm">4</div>
-              <span className="material-symbols-outlined text-base text-purple-700" style={{ fontVariationSettings: "'FILL' 1" }}>smart_toy</span>
-              <span className="font-medium text-on-surface">{tr('admin.scraper.pipeline.step4')}</span>
+            <li className="flex items-center gap-2 p-2 rounded-lg bg-purple-50 border border-purple-200">
+              <span className="font-medium text-on-surface flex-1 truncate">{tr('admin.scraper.pipeline.step4')}</span>
+              <div className="w-7 h-7 rounded-full bg-purple-500 text-white border border-slate-300 flex items-center justify-center font-black text-xs shadow-sm shrink-0">4</div>
             </li>
           </ol>
           <div className="mt-4 pt-3 border-t border-slate-200/10 text-xs text-amber-700 bg-amber-50 p-3 rounded-xl border-2 border-amber-300 inline-flex items-start gap-2 w-full">

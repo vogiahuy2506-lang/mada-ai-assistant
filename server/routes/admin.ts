@@ -7,7 +7,7 @@ import db from '../lib/db';
 import { syncProductToKnowledge, syncAllPublishedProducts } from '../lib/syncKbProducts';
 import { syncItemToVector } from '../lib/syncItemToVector';
 import { authenticate, requireRole, hashPassword } from '../lib/auth';
-import { invalidateAiInstructionsCache, invalidateEmotionSettingsCache } from '../lib/prompts/systemPrompts';
+import { invalidateAiInstructionsCache, invalidateEmotionSettingsCache, invalidateSystemPromptCache, buildSystemPrompt } from '../lib/prompts/systemPrompts';
 
 const router = Router();
 
@@ -511,7 +511,7 @@ router.post('/products/bulk-unpublish', requireAdmin, (req: Request, res: Respon
 // GET /api/admin/agents
 router.get('/agents', (_req: Request, res: Response) => {
   try {
-    const rows = db.prepare('SELECT * FROM admin_agents ORDER BY created_at DESC').all() as any[];
+    const rows = db.prepare('SELECT * FROM admin_agents ORDER BY sort_order ASC, created_at ASC').all() as any[];
     const parsed = rows.map((a: any) => {
       let caps: any[] = [];
       try { caps = JSON.parse(a.capabilities || '[]'); } catch { caps = []; }
@@ -613,6 +613,7 @@ router.patch('/agents/:id', requireAdmin, (req: Request, res: Response) => {
       'name', 'description', 'avatar', 'system_prompt', 'capabilities',
       'is_active', 'mada_category', 'prompt_id',
       'avatar_url', 'knowledge_url', 'product_url',
+      'sort_order', 'crawl_follow_links', 'crawl_max_depth', 'crawl_max_pages',
     ];
 
     for (const field of fields) {
@@ -689,114 +690,62 @@ router.delete('/agents/:id', requireAdmin, (req: Request, res: Response) => {
   }
 });
 
-// ============== ADMIN SYSTEM PROMPTS CRUD (admin_prompts table) ==============
+// ============== SIMPLIFIED SYSTEM PROMPT API (single prompt for all languages) ==============
 
-// GET /api/admin/system-prompts — list all prompts (public for agent store)
-router.get('/system-prompts', (req: Request, res: Response) => {
+// GET /api/admin/system-prompts — get the single main system prompt
+router.get('/system-prompts', (_req: Request, res: Response) => {
   try {
-    const { active, category, language } = req.query;
-    let query = 'SELECT * FROM admin_prompts WHERE 1=1';
-    const params: any[] = [];
-    if (active !== undefined) { query += ' AND is_active = ?'; params.push(active === 'true' ? 1 : 0); }
-    if (category) { query += ' AND category = ?'; params.push(category); }
-    if (language) { query += ' AND language = ?'; params.push(language); }
-    query += ' ORDER BY is_system DESC, name ASC';
-    const prompts = db.prepare(query).all(...params) as any[];
-    const parsed = prompts.map((p: any) => ({
-      id: p.id, name: p.name, description: p.description, prompt: p.prompt,
-      category: p.category, language: p.language, isActive: p.is_active === 1,
-      isSystem: p.is_system === 1, createdAt: p.created_at, updatedAt: p.updated_at,
-    }));
-    res.json({ success: true, data: parsed });
+    const row = db.prepare(
+      "SELECT value, updated_at FROM system_settings WHERE \`key\` = 'main_system_prompt'"
+    ).get() as { value: string; updated_at: string } | undefined;
+    res.json({
+      success: true,
+      data: {
+        content: row?.value || '',
+        updatedAt: row?.updated_at || null,
+      },
+    });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// POST /api/admin/system-prompts — create prompt
-router.post('/system-prompts', requireAdmin, (req: Request, res: Response) => {
+// PUT /api/admin/system-prompts — save the main system prompt (admin only)
+router.put('/system-prompts', requireAdmin, (req: Request, res: Response) => {
   try {
-    const { id, name, description, prompt, category, language, is_active } = req.body;
-    if (!id || !name || !prompt) {
-      return res.status(400).json({ success: false, error: 'id, name, and prompt are required' });
+    const { content } = req.body;
+    if (content === undefined) {
+      return res.status(400).json({ success: false, error: 'content is required' });
     }
     const now = new Date().toISOString();
     db.prepare(`
-      INSERT INTO admin_prompts (id, name, description, prompt, category, language, is_active, is_system, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
-    `).run(id, name, description || '', prompt, category || 'general', language || 'vi', is_active !== false ? 1 : 0, now, now);
-    res.status(201).json({
-      success: true,
-      data: { id, name, description: description || '', prompt, category: category || 'general', language: language || 'vi', isActive: is_active !== false, isSystem: false, createdAt: now, updatedAt: now },
-    });
+      INSERT INTO system_settings (\`key\`, value, type, description, updated_at)
+      VALUES ('main_system_prompt', ?, 'string', 'Main system prompt for MADA AI chatbot', ?)
+      ON CONFLICT(\`key\`) DO UPDATE SET value = ?, updated_at = ?
+    `).run(content, now, content, now);
+    // Invalidate cache
+    try { invalidateSystemPromptCache(); } catch (e) { console.warn('[admin/system-prompts] Cache invalidation failed:', e); }
+    res.json({ success: true, data: { content, updatedAt: now } });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// GET /api/admin/system-prompts/:id — get single prompt
-router.get('/system-prompts/:id', (req: Request, res: Response) => {
+// GET /api/admin/system-prompts/preview — preview full built prompt for each language
+router.get('/system-prompts/preview', (req: Request, res: Response) => {
   try {
-    const p = db.prepare('SELECT * FROM admin_prompts WHERE id = ?').get(req.params.id) as any;
-    if (!p) return res.status(404).json({ success: false, error: 'Prompt not found' });
+    const lang = (req.query.lang as string) || 'vi';
+    const langCode = (['vi', 'en', 'ar', 'fr'].includes(lang) ? lang : 'vi') as 'vi' | 'en' | 'ar' | 'fr';
+    const userMode = (req.query.mode as 'endUser' | 'specialist') || 'endUser';
+    const fullPrompt = buildSystemPrompt(langCode, userMode);
     res.json({
       success: true,
-      data: { id: p.id, name: p.name, description: p.description, prompt: p.prompt, category: p.category, language: p.language, isActive: p.is_active === 1, isSystem: p.is_system === 1, createdAt: p.created_at, updatedAt: p.updated_at },
+      data: {
+        language: langCode,
+        mode: userMode,
+        prompt: fullPrompt,
+      },
     });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// PATCH /api/admin/system-prompts/:id — update prompt
-router.patch('/system-prompts/:id', requireAdmin, (req: Request, res: Response) => {
-  try {
-    const fields = ['name', 'description', 'prompt', 'category', 'language', 'is_active'];
-    const updates: string[] = [];
-    const params: any[] = [];
-    for (const field of fields) {
-      if (req.body[field] !== undefined) {
-        updates.push(`${field} = ?`);
-        let value = req.body[field];
-        if (field === 'is_active') value = value ? 1 : 0;
-        params.push(value);
-      }
-    }
-    if (updates.length === 0) return res.status(400).json({ success: false, error: 'No updates provided' });
-    updates.push('updated_at = ?');
-    params.push(new Date().toISOString());
-    params.push(req.params.id);
-    db.prepare(`UPDATE admin_prompts SET ${updates.join(', ')} WHERE id = ?`).run(...params);
-    const p = db.prepare('SELECT * FROM admin_prompts WHERE id = ?').get(req.params.id) as any;
-    if (!p) return res.status(404).json({ success: false, error: 'Prompt not found' });
-    res.json({
-      success: true,
-      data: { id: p.id, name: p.name, description: p.description, prompt: p.prompt, category: p.category, language: p.language, isActive: p.is_active === 1, isSystem: p.is_system === 1, createdAt: p.created_at, updatedAt: p.updated_at },
-    });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// DELETE /api/admin/system-prompts/:id — delete prompt (warn if agents use it)
-router.delete('/system-prompts/:id', requireAdmin, (req: Request, res: Response) => {
-  try {
-    const p = db.prepare('SELECT * FROM admin_prompts WHERE id = ?').get(req.params.id) as any;
-    if (!p) return res.status(404).json({ success: false, error: 'Prompt not found' });
-    if (p.is_system === 1) {
-      return res.status(403).json({ success: false, error: 'Cannot delete system prompt' });
-    }
-    const usingAgents = db.prepare("SELECT id, name FROM admin_agents WHERE prompt_id = ? AND is_active = 1").all(req.params.id) as any[];
-    if (usingAgents.length > 0) {
-      return res.status(409).json({
-        success: false,
-        error: `Prompt is being used by ${usingAgents.length} active agent(s)`,
-        usingAgents: usingAgents.map((a: any) => ({ id: a.id, name: a.name })),
-        warning: 'Please reassign or deactivate these agents before deleting this prompt.',
-      });
-    }
-    db.prepare('DELETE FROM admin_prompts WHERE id = ?').run(req.params.id);
-    res.json({ success: true, message: 'Prompt deleted successfully' });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
   }

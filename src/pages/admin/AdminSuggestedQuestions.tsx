@@ -83,10 +83,10 @@ export default function AdminSuggestedQuestions() {
   // Form state
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [isTranslating, setIsTranslating] = useState(false);
   const [formData, setFormData] = useState({
     category: 'vision' as ATCategory,
     view_mode: 'end_user' as ViewMode,
-    language: 'vi' as LanguageType,
     question: '',
     sort_order: 0,
     is_active: true,
@@ -149,7 +149,6 @@ export default function AdminSuggestedQuestions() {
     setFormData({
       category: 'vision',
       view_mode: 'end_user',
-      language: 'vi',
       question: '',
       sort_order: 0,
       is_active: true,
@@ -159,10 +158,10 @@ export default function AdminSuggestedQuestions() {
 
   const openEditForm = (q: SuggestedQuestion) => {
     if (!isSuperAdmin) return;
+    // For edit, still use auto-translate concept - edit Vietnamese and it will update all languages
     setFormData({
       category: q.category,
       view_mode: q.view_mode,
-      language: q.language,
       question: q.question,
       sort_order: q.sort_order,
       is_active: q.is_active === 1,
@@ -178,38 +177,32 @@ export default function AdminSuggestedQuestions() {
     }
 
     try {
-      if (editingId) {
-        const res = await adminApi.updateSuggestedQuestion(editingId, {
-          category: formData.category,
-          view_mode: formData.view_mode,
-          language: formData.language,
-          question: formData.question,
-          sort_order: formData.sort_order,
-          is_active: formData.is_active,
-        });
-        if (!res.success) {
-          alert(res.error || t('adminSuggested.errorUpdating'));
-          return;
-        }
-      } else {
-        const res = await adminApi.createSuggestedQuestion({
-          category: formData.category,
-          view_mode: formData.view_mode,
-          language: formData.language,
-          question: formData.question,
-          sort_order: formData.sort_order,
-        });
-        if (!res.success) {
-          alert(res.error || t('adminSuggested.errorCreating'));
-          return;
-        }
+      setIsTranslating(true);
+
+      // ⭐ Always use auto-translate: create all 4 languages from Vietnamese
+      const res = await adminApi.autoTranslateQuestion({
+        question_vi: formData.question,
+        category: formData.category,
+        view_mode: formData.view_mode,
+        sort_order: formData.sort_order,
+        is_active: formData.is_active,
+      });
+
+      if (!res.success) {
+        alert(res.error || t('adminSuggested.errorCreating'));
+        return;
       }
 
       setShowForm(false);
       resetForm();
       loadData();
+      alert(t('adminSuggested.autoTranslatedSuccess', { 
+        count: res.data?.count || 4 
+      }));
     } catch (err: any) {
       alert(err.message);
+    } finally {
+      setIsTranslating(false);
     }
   };
 
@@ -451,6 +444,29 @@ export default function AdminSuggestedQuestions() {
     }
   };
 
+  /** ⭐ Xóa tất cả câu hỏi không phải tiếng Việt */
+  const handleDeleteNonVietnamese = async () => {
+    if (!isSuperAdmin) return;
+    const count = stats?.byLanguage?.find((l: any) => l.language !== 'vi')?.count || 0;
+    if (count === 0) {
+      alert('Không có câu hỏi nào không phải tiếng Việt để xóa.');
+      return;
+    }
+    if (!confirm(`Bạn có chắc muốn xóa ${count} câu hỏi không phải tiếng Việt không?`)) return;
+
+    try {
+      const res = await adminApi.deleteNonVietnameseQuestions();
+      if (res.success) {
+        alert(`Đã xóa ${res.data?.count || count} câu hỏi không phải tiếng Việt.`);
+        loadData();
+      } else {
+        alert(res.error);
+      }
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
   const getCategoryLabelByLang = (cat: string) => {
     const c = CATEGORIES.find(x => x.value === cat);
     if (!c) return cat;
@@ -495,6 +511,13 @@ export default function AdminSuggestedQuestions() {
             </div>
             {isSuperAdmin && (
               <div className="flex gap-2 flex-wrap">
+                <button
+                  onClick={handleDeleteNonVietnamese}
+                  className="flex items-center gap-2 px-4 py-2 rounded-full bg-red-500 text-white font-bold text-sm border border-red-600 shadow-sm hover:shadow-sm transition-all"
+                >
+                  <span className="material-symbols-outlined text-sm">delete_sweep</span>
+                  {t('adminSuggested.deleteNonVi')}
+                </button>
                 <button
                   onClick={handleImportDefaults}
                   className="flex items-center gap-2 px-4 py-2 rounded-full bg-secondary text-white font-bold text-sm border border-slate-200 shadow-sm hover:shadow-sm transition-all"
@@ -935,23 +958,7 @@ export default function AdminSuggestedQuestions() {
                 </select>
               </div>
 
-              {/* Language */}
-              <div>
-                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">
-                  {t('adminSuggested.language')} <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={formData.language}
-                  onChange={(e) => setFormData(prev => ({ ...prev, language: e.target.value as LanguageType }))}
-                  className="w-full px-3 py-2 rounded-lg bg-white border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-                >
-                  {LANGUAGES.map(l => (
-                    <option key={l.value} value={l.value}>{l.flag} {getLanguageLabelByLang(l.value)}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Question */}
+              {/* ⭐ Question - Only Vietnamese input with auto-translate info */}
               <div>
                 <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">
                   {t('adminSuggested.question')} <span className="text-red-500">*</span>
@@ -959,10 +966,19 @@ export default function AdminSuggestedQuestions() {
                 <textarea
                   value={formData.question}
                   onChange={(e) => setFormData(prev => ({ ...prev, question: e.target.value }))}
-                  placeholder={t('adminSuggested.example')}
-                  rows={3}
+                  placeholder={t('adminSuggested.enterVietnameseQuestion')}
+                  rows={4}
                   className="w-full px-3 py-2 rounded-lg bg-white border border-slate-300 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/30"
                 />
+                <div className="mt-2 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                  <p className="text-xs text-blue-700 flex items-center gap-2">
+                    <span className="material-symbols-outlined text-sm">auto_awesome</span>
+                    <span className="font-bold">{t('adminSuggested.autoTranslateNote')}</span>
+                  </p>
+                  <p className="text-[10px] text-blue-600 mt-1 ml-6">
+                    {t('adminSuggested.autoTranslateHint')}
+                  </p>
+                </div>
               </div>
 
               {/* Sort Order */}
@@ -1028,9 +1044,20 @@ export default function AdminSuggestedQuestions() {
               <button
                 type="button"
                 onClick={handleSubmit}
-                className="flex-1 px-3 py-2 rounded-lg bg-primary text-white font-bold text-xs border border-slate-200 shadow-sm hover:-translate-y-0.5 hover:shadow-sm transition-all"
+                disabled={isTranslating}
+                className="flex-1 px-3 py-2 rounded-lg bg-primary text-white font-bold text-xs border border-slate-200 shadow-sm hover:-translate-y-0.5 hover:shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
-                {editingId ? t('adminSuggested.update') : t('adminSuggested.create')}
+                {isTranslating ? (
+                  <>
+                    <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span>
+                    {t('adminSuggested.translating')}
+                  </>
+                ) : (
+                  <>
+                    <span className="material-symbols-outlined text-sm">auto_awesome</span>
+                    {t('adminSuggested.saveAutoTranslate')}
+                  </>
+                )}
               </button>
             </div>
           </div>

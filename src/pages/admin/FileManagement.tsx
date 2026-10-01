@@ -168,6 +168,7 @@ const FileManagement: React.FC = () => {
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [hasPendingChanges, setHasPendingChanges] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' }>({ show: false, message: '', type: 'success' });
 
@@ -204,6 +205,7 @@ const FileManagement: React.FC = () => {
       const data = await res.json();
       if (data.success) {
         setSettings(prev => ({ ...prev, ...data.data }));
+        setHasPendingChanges(false); // Reset khi load thành công
       }
     } catch (error) {
       console.error('Failed to load settings:', error);
@@ -228,6 +230,7 @@ const FileManagement: React.FC = () => {
       const data = await res.json();
       if (data.success) {
         setMessage({ type: 'success', text: tFile('file.saveSuccess', language) });
+        setHasPendingChanges(false); // Reset sau khi lưu thành công
         // ⭐ Broadcast settings change to all ChatPage instances - immediate sync!
         broadcastSettingsChange(['feature_file_attachment_enabled']);
       } else {
@@ -242,6 +245,7 @@ const FileManagement: React.FC = () => {
 
   const updateSetting = <K extends keyof FileSettings>(key: K, value: FileSettings[K]) => {
     setSettings(prev => ({ ...prev, [key]: value }));
+    setHasPendingChanges(true);
   };
 
   // Custom Toggle Switch Component — matches the HTML sample exactly
@@ -950,6 +954,7 @@ const FileManagement: React.FC = () => {
                 audioUploadEnabled: true,
                 otherFileUploadEnabled: true,
               });
+              setHasPendingChanges(true);
               setToast({ show: true, message: tFile('file.enabledAllSuccess', language), type: 'success' });
             }}
             disabled={!settings.fileAttachmentEnabled}
@@ -968,6 +973,7 @@ const FileManagement: React.FC = () => {
                 audioUploadEnabled: false,
                 otherFileUploadEnabled: false,
               });
+              setHasPendingChanges(true);
               setToast({ show: true, message: tFile('file.disabledAllSuccess', language), type: 'success' });
             }}
             disabled={!settings.fileAttachmentEnabled}
@@ -989,7 +995,8 @@ const FileManagement: React.FC = () => {
         </div>
       </section>
 
-      {/* Sticky Bottom Save Bar */}
+      {/* Sticky Bottom Save Bar - Chỉ hiện khi có thay đổi chưa lưu */}
+      {hasPendingChanges && (
       <div className="fixed bottom-6 right-6 z-40 flex flex-col sm:flex-row items-center justify-between bg-white/90 backdrop-blur-xl p-4 sm:p-5 rounded-3xl border border-slate-200/90 shadow-2xl gap-4"
            style={{ left: 'max(1rem, 16rem)', maxWidth: 'calc(100vw - 2rem)' }}>
         <div className="flex items-center gap-3.5 text-slate-600 text-xs sm:text-sm">
@@ -1023,6 +1030,7 @@ const FileManagement: React.FC = () => {
           </button>
         </div>
       </div>
+      )}
     </AdminLayout>
   );
 };

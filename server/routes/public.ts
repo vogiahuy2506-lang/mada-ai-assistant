@@ -372,7 +372,7 @@ router.get('/agents', (_req, res) => {
 
     const rows = db
       .prepare(
-        'SELECT * FROM admin_agents WHERE is_active = 1 ORDER BY created_at DESC'
+        'SELECT * FROM admin_agents WHERE is_active = 1 ORDER BY sort_order ASC, created_at ASC'
       )
       .all() as any[];
 

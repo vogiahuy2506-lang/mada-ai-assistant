@@ -45,7 +45,7 @@ export const MADA_BOTS: MadaBotInfo[] = [
   {
     id: 'bot-hearing',
     name: 'Bot 1: Sensory – Hearing',
-    nameVi: 'Trợ lý Thính giác',
+    nameVi: 'CẢM GIÁC - THÍNH GIÁC',
     avatar: '👂',
     description: 'Hỗ trợ người suy giảm thính lực với thiết bị trợ thính và cảnh báo',
     descriptionVi: 'Hỗ trợ người dùng bị giảm thính lực nhẹ đến nặng, cung cấp thông tin về máy trợ thính, thiết bị cảnh báo bằng ánh sáng/xúc giác, hệ thống FM, và các tiêu chuẩn kiểm chứng an toàn kỹ thuật.',
@@ -131,7 +131,7 @@ CÁCH TRẢ LỜI:
   {
     id: 'bot-vision',
     name: 'Bot 2: Sensory – Vision',
-    nameVi: 'Trợ lý Thị giác',
+    nameVi: 'CẢM GIÁC - THỊ GIÁC',
     avatar: '👁️',
     description: 'Hỗ trợ người khiếm thị với phần mềm đọc màn hình và thiết bị hỗ trợ',
     descriptionVi: 'Hỗ trợ người khiếm thị từ nhẹ đến nặng, cung cấp thông tin về phần mềm đọc màn hình, kính lúp điện tử, thiết bị Braille, và các tiêu chuẩn tiếp cận WCAG 2.1.',
@@ -216,7 +216,7 @@ CÁCH TRẢ LỜI:
   {
     id: 'bot-speech',
     name: 'Bot 3: Voice and Speech',
-    nameVi: 'Trợ lý Giọng nói & Lời nói',
+    nameVi: 'GIỌNG NÓI VÀ LỜI NÓI',
     avatar: '💬',
     description: 'Hỗ trợ giao tiếp cho người khó nói với thiết bị AAC và SGD',
     descriptionVi: 'Hỗ trợ trẻ em và người lớn gặp khó khăn trong giao tiếp ngôn ngữ với nhiều nguyên nhân khác nhau. Cung cấp thiết bị giao tiếp tăng cường (AAC) và tích hợp dữ liệu cá nhân qua tiêu chuẩn HL7 FHIR v4.',
@@ -288,7 +288,7 @@ CÁCH TRẢ LỜI:
   {
     id: 'bot-cognitive',
     name: 'Bot 4: Mental – Cognitive',
-    nameVi: 'Trợ lý Nhận thức',
+    nameVi: 'TÂM THẦN - NHẬN THỨC',
     avatar: '🧠',
     description: 'Hỗ trợ nhận thức cho người cao tuổi và người sa sút trí tuệ',
     descriptionVi: 'Hỗ trợ người cao tuổi, người bị sa sút trí tuệ (dementia), hoặc các rối loạn nhận thức khác. Cung cấp thiết bị nhắc nhở, hỗ trợ trí nhớ, và danh mục công cụ được WHO công nhận.',
@@ -362,7 +362,7 @@ CÁCH TRẢ LỜI:
   {
     id: 'bot-neuro',
     name: 'Bot 5: Neuromusculoskeletal Movement',
-    nameVi: 'Trợ lý Vận động thần kinh – cơ xương',
+    nameVi: 'VẬN ĐỘNG THẦN KINH',
     avatar: '🦴',
     description: 'Hỗ trợ vận động cho người hạn chế chi trên và phục hồi chức năng',
     descriptionVi: 'Hỗ trợ người bị hạn chế vận động chi trên do chấn thương, bệnh lý thần kinh cơ, hoặc tàn phế. Cung cấp thiết bị điều khiển thay thế và công cụ phục hồi chức năng.',
@@ -441,7 +441,7 @@ CÁCH TRẢ LỜI:
   {
     id: 'bot-mobility',
     name: 'Bot 6: Mobility & Transportation',
-    nameVi: 'Trợ lý Di chuyển & Giao thông',
+    nameVi: 'DI CHUYỂN VÀ GIAO THÔNG',
     avatar: '🦽',
     description: 'Hỗ trợ di chuyển cho người khuyết tật vận động với xe lăn và thiết bị',
     descriptionVi: 'Hỗ trợ người khuyết tật vận động, cung cấp thông tin về xe lăn các loại, thiết bị hỗ trợ di chuyển, và các tiêu chuẩn an toàn châu Âu CE Medical Class II.',
@@ -529,7 +529,7 @@ CÁCH TRẢ LỜI:
   {
     id: 'bot-regulatory',
     name: 'Bot 7: Regulatory & Standards',
-    nameVi: 'Trợ lý Quy định & Tiêu chuẩn',
+    nameVi: 'THÔNG TIN BỔ TRỢ',
     avatar: '📋',
     description: 'Tra cứu quy định và tiêu chuẩn AT quốc tế cho người dùng và chuyên gia',
     descriptionVi: 'Cổng kết nối thông tin để người dùng tra cứu độ an toàn của thiết bị và chuyên gia CNHT tra cứu nhanh các danh mục quy định tiếp cận của Qatar, phân loại sản phẩm hỗ trợ theo chuẩn quốc tế ISO 9999:2022.',

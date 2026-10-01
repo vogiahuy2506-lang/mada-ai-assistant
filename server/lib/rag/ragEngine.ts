@@ -43,10 +43,45 @@ async function noProxyFetch(input: RequestInfo | URL, init?: RequestInit): Promi
   return fetch(input, init);
 }
 
-// Direct Gemini API call that bypasses proxy
+// Retry helper with exponential backoff — for handling 429 Too Many Requests from Gemini API
+async function fetchWithRetry(
+  fn: () => Promise<Response>,
+  options: { retries?: number; baseDelayMs?: number; maxDelayMs?: number } = {}
+): Promise<Response> {
+  const { retries = 3, baseDelayMs = 1000, maxDelayMs = 16000 } = options;
+
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const response = await fn();
+
+    // 429 = Too Many Requests — retry with backoff
+    if (response.status === 429) {
+      if (attempt === retries) {
+        const body = await response.text().catch(() => '');
+        throw new Error(`Gemini API error: 429 Too Many Requests (after ${retries} retries). ${body}`);
+      }
+
+      // Read retry-after hint if present, otherwise use exponential backoff
+      const retryAfter = response.headers.get('retry-after');
+      const retryDelay = retryAfter
+        ? parseInt(retryAfter) * 1000
+        : Math.min(baseDelayMs * Math.pow(2, attempt), maxDelayMs);
+
+      console.warn(`⚠️ [Gemini 429] Attempt ${attempt + 1}/${retries + 1} — waiting ${retryDelay}ms before retry...`);
+      await new Promise((resolve) => setTimeout(resolve, retryDelay));
+      continue;
+    }
+
+    return response;
+  }
+
+  // Should not reach here, but satisfy TypeScript
+  throw new Error('fetchWithRetry: unreachable');
+}
+
+// Direct Gemini API call that bypasses proxy, with automatic 429 retry
 async function callGeminiDirect(apiKey: string, modelName: string, prompt: string, tools?: any): Promise<any> {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
-  
+
   const body: any = {
     contents: [{ parts: [{ text: prompt }] }],
     generationConfig: {
@@ -56,22 +91,25 @@ async function callGeminiDirect(apiKey: string, modelName: string, prompt: strin
       topK: 20,
     },
   };
-  
+
   if (tools?.length > 0) {
     body.tools = tools;
   }
-  
-  const response = await noProxyFetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  
+
+  const response = await fetchWithRetry(
+    () => noProxyFetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }),
+    { retries: 3, baseDelayMs: 2000, maxDelayMs: 16000 }
+  );
+
   if (!response.ok) {
     const errorText = await response.text();
     throw new Error(`Gemini API error: ${response.status} - ${errorText}`);
   }
-  
+
   return response.json();
 }
 
@@ -711,14 +749,36 @@ class RAGEngine {
       },
     });
 
+    // Retry wrapper for streaming — detects 429 before starting the stream
+    async function streamWithRetry(model: any, prompt: string, retries = 3, baseDelayMs = 2000) {
+      for (let attempt = 0; attempt <= retries; attempt++) {
+        try {
+          const result = await model.generateContentStream({
+            contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          });
+          return result;
+        } catch (error: any) {
+          const msg = error?.message || '';
+          const is429 = msg.includes('429') || msg.includes('Too Many Requests') || error?.status === 429;
+
+          if (is429 && attempt < retries) {
+            const delay = Math.min(baseDelayMs * Math.pow(2, attempt), 16000);
+            console.warn(`⚠️ [RAG Stream 429] Attempt ${attempt + 1}/${retries + 1} — waiting ${delay}ms before retry...`);
+            await new Promise((r) => setTimeout(r, delay));
+            continue;
+          }
+          throw error;
+        }
+      }
+      throw new Error('streamWithRetry: unreachable');
+    }
+
     // Collect full answer for history
     let fullAnswer = '';
 
     const stream = (async function* () {
       try {
-        const result = await model.generateContentStream({
-          contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        });
+        const result = await streamWithRetry(model, prompt);
 
         for await (const chunk of result.stream) {
           const text = chunk.text();

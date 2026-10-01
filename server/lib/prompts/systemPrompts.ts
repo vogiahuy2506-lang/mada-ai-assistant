@@ -383,39 +383,48 @@ export const CATEGORY_LABELS: Record<MadaCategory, { vi: string; en: string }> =
  * Load prompt từ DB (admin_prompts) — nếu có, ưu tiên dùng trước hardcoded.
  * Fallback về hardcoded constants từ systemPrompts.ts.
  */
-let _dbPromptsCache: Map<string, string> | null = null;
-let _dbPromptsCacheAt = 0;
-const DB_PROMPTS_TTL_MS = 60_000; // 1 phút cache
+// DB prompts functions removed - using single main_system_prompt instead
 
-function loadDbPrompts(): Map<string, string> {
+
+// ============== MAIN SYSTEM PROMPT (Single Prompt) ==============
+
+let _systemPromptCache: { value: string; updatedAt: string | null } | null = null;
+let _systemPromptCacheAt = 0;
+const SYSTEM_PROMPT_TTL_MS = 30_000;
+
+function loadSystemPrompt(): { value: string; updatedAt: string | null } {
   const now = Date.now();
-  if (_dbPromptsCache && (now - _dbPromptsCacheAt) < DB_PROMPTS_TTL_MS) {
-    return _dbPromptsCache;
+  if (_systemPromptCache && (now - _systemPromptCacheAt) < SYSTEM_PROMPT_TTL_MS) {
+    return _systemPromptCache;
   }
   try {
-    // Lazy import tránh circular dependency (db.ts → systemPrompts.ts)
-    // Modules imported at top level
     const DATA_DIR = path.join(process.cwd(), 'data');
     const DB_PATH = path.join(DATA_DIR, 'mada.db');
-    if (!fs.existsSync(DB_PATH)) return new Map();
+    if (!fs.existsSync(DB_PATH)) {
+      return { value: '', updatedAt: null };
+    }
     const sqlite = new Database(DB_PATH, { readonly: true });
-    const rows = sqlite.prepare("SELECT id, prompt FROM admin_prompts WHERE is_active = 1").all() as { id: string; prompt: string }[];
+    const row = sqlite.prepare(
+      "SELECT value, updated_at FROM system_settings WHERE \`key\` = 'main_system_prompt'"
+    ).get() as { value: string; updated_at: string } | undefined;
     sqlite.close();
-    const map = new Map<string, string>();
-    for (const r of rows) map.set(r.id, r.prompt);
-    _dbPromptsCache = map;
-    _dbPromptsCacheAt = now;
-    return map;
+    const result = {
+      value: row?.value || '',
+      updatedAt: row?.updated_at || null,
+    };
+    _systemPromptCache = result;
+    _systemPromptCacheAt = now;
+    return result;
   } catch (e) {
-    // Fallback silently nếu DB chưa sẵn sàng
-    return new Map();
+    return { value: '', updatedAt: null };
   }
 }
 
-export function invalidatePromptCache() {
-  _dbPromptsCache = null;
-  _dbPromptsCacheAt = 0;
+export function invalidateSystemPromptCache() {
+  _systemPromptCache = null;
+  _systemPromptCacheAt = 0;
 }
+
 
 /**
  * Build complete system prompt từ các module
@@ -433,7 +442,6 @@ export function buildSystemPrompt(
   agentPrompt?: string
 ): string {
   const langCode = (['vi', 'en', 'ar', 'fr'].includes(lang) ? lang : 'vi') as 'vi' | 'en' | 'ar' | 'fr';
-  const dbPrompts = loadDbPrompts();
 
   // ⭐ Load AI Instructions từ system_settings table
   const aiInstructions = loadAiInstructions();
@@ -535,26 +543,25 @@ export function buildSystemPrompt(
     return parts.join('\n');
   };
 
-  const getPrompt = (dbKey: string, hardcoded: string) => {
-    return dbPrompts.get(dbKey) || hardcoded;
-  };
+  // Load the single main system prompt from DB
+  const { value: mainPrompt } = loadSystemPrompt();
 
   const parts = [
-    // 1. Core Identity — ưu tiên AI instruction custom, fallback hardcoded
-    aiInstructions.coreIdentity || getPrompt('mada-default-' + langCode, CORE_IDENTITY[langCode]),
-    // 2. Language Rules
-    getPrompt('mada-default-' + langCode === 'vi' ? 'mada-default-vi' : 'mada-default-' + langCode, LANGUAGE_RULES[langCode]),
-    // 3. Persona Mode
+    // 1. Main System Prompt (admin-written, language-agnostic)
+    mainPrompt || CORE_IDENTITY[langCode],
+    // 2. Language Rules (auto-added based on user's language)
+    LANGUAGE_RULES[langCode] || LANGUAGE_RULES.vi,
+    // 3. Persona Mode (auto-added based on userMode)
     PERSONA_MODES[langCode]?.[userMode] || PERSONA_MODES.vi.endUser,
-    // 4. Response Format — ưu tiên AI instruction custom
-    aiInstructions.responseFormat || RESPONSE_FORMAT[langCode] || RESPONSE_FORMAT.en,
+    // 4. Response Format
+    RESPONSE_FORMAT[langCode] || RESPONSE_FORMAT.en,
     // 5. Content Guidelines
     CONTENT_GUIDELINES[langCode as keyof typeof CONTENT_GUIDELINES] || CONTENT_GUIDELINES.en,
     // 6. Safety Rules
     SAFETY_RULES[langCode as keyof typeof SAFETY_RULES] || SAFETY_RULES.en,
     // 7. Product Knowledge
     PRODUCT_KNOWLEDGE[langCode as keyof typeof PRODUCT_KNOWLEDGE] || PRODUCT_KNOWLEDGE.en,
-    // 8. ⭐ Emotion Settings Instructions
+    // 8. Emotion Settings Instructions
     `🎨 CÀI ĐẶT CẢM XÚC VÀ PHONG CÁCH:\n${getEmotionInstructions()}`,
     // 9. Behavior Rules từ AI Instructions (nếu có)
     aiInstructions.behaviorRules ? `📋 QUY TẮC ỨNG XỬ BỔ SUNG:\n${aiInstructions.behaviorRules}` : null,

@@ -26,32 +26,17 @@ export default defineConfig({
       'react': path.resolve(__dirname, 'node_modules/react'),
       'react-dom': path.resolve(__dirname, 'node_modules/react-dom'),
     },
+    dedupe: ['react', 'react-dom', 'react-router-dom'],
   },
-  server: {
-    port: 5173,
-    strictPort: false,
-    // Force full reload on certain file changes to avoid HMR issues
-    watch: {
-      ignored: ['**/node_modules/**', '**/.git/**'],
-    },
-    hmr: {
-      // Overlay to show errors
-      overlay: true,
-      // Force connection through WebSocket
-      overlayLimit: 5,
-    },
-    proxy: {
-      '/api': {
-        target: 'http://localhost:3008',
-        changeOrigin: true,
-      },
-      '/ws': {
-        target: 'ws://localhost:3008',
-        ws: true,
-      },
+  css: {
+    modules: {
+      localsConvention: 'camelCase',
     },
   },
   build: {
+    commonjsOptions: {
+      transformMixedEsModules: true,
+    },
     outDir: 'dist/client',
     emptyOutDir: true,
     rollupOptions: {
@@ -78,6 +63,30 @@ export default defineConfig({
     // Minimize runtime errors
     minify: 'esbuild',
     target: 'esnext',
+  },
+  server: {
+    port: 5174,
+    strictPort: false,
+    // Force full reload on certain file changes to avoid HMR issues
+    watch: {
+      ignored: ['**/node_modules/**', '**/.git/**'],
+    },
+    hmr: {
+      // Overlay to show errors
+      overlay: true,
+      // Force connection through WebSocket
+      overlayLimit: 5,
+    },
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3012',
+        changeOrigin: true,
+      },
+      '/ws': {
+        target: 'ws://localhost:3012',
+        ws: true,
+      },
+    },
   },
   // Clear cache on rebuild
   cacheDir: 'node_modules/.vite',

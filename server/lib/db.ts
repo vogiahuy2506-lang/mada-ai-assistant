@@ -449,6 +449,24 @@ addColumnIfMissing('admin_agents', 'prompt_id', 'prompt_id TEXT');
 addColumnIfMissing('admin_agents', 'crawl_follow_links', 'crawl_follow_links INTEGER NOT NULL DEFAULT 0');
 addColumnIfMissing('admin_agents', 'crawl_max_depth', 'crawl_max_depth INTEGER NOT NULL DEFAULT 1');
 addColumnIfMissing('admin_agents', 'crawl_max_pages', 'crawl_max_pages INTEGER NOT NULL DEFAULT 5');
+addColumnIfMissing('admin_agents', 'sort_order', 'sort_order INTEGER NOT NULL DEFAULT 0');
+
+// Initialize sort_order for existing agents (if they don't have it set)
+try {
+  const agentsWithoutOrder = db.prepare('SELECT id FROM admin_agents WHERE sort_order = 0 OR sort_order IS NULL').all() as any[];
+  if (agentsWithoutOrder.length > 0) {
+    // Get max sort_order and assign sequential values
+    const maxOrder = db.prepare('SELECT MAX(sort_order) as max FROM admin_agents WHERE sort_order > 0').get() as { max: number };
+    let nextOrder = (maxOrder?.max || 0) + 1;
+    
+    for (const agent of agentsWithoutOrder) {
+      db.prepare('UPDATE admin_agents SET sort_order = ? WHERE id = ?').run(nextOrder++, agent.id);
+    }
+    console.log(`📋 Initialized sort_order for ${agentsWithoutOrder.length} agents`);
+  }
+} catch (e) {
+  console.warn('Could not initialize sort_order:', e);
+}
 
 // ============== SUGGESTED QUESTIONS SCHEMA ==============
 // Bảng lưu câu hỏi gợi ý cho từng agent, category, view mode và ngôn ngữ
@@ -1391,6 +1409,8 @@ function seedSystemSettings() {
     { key: 'widget_custom_css', value: '', type: 'string', description: 'Custom CSS for widget' },
     { key: 'widget_api_key_required', value: 'false', type: 'boolean', description: 'Require API key for widget' },
     { key: 'widget_allowed_domains', value: '[]', type: 'json', description: 'Allowed domains for widget' },
+    // Single main system prompt (used for all languages - language rules auto-appended)
+    { key: 'main_system_prompt', value: 'Bạn là MADA AI - trợ lý ảo chuyên về Công nghệ Hỗ trợ (Assistive Technology - AT). Được phát triển dựa trên cổng thông tin MADA Qatar (mada.org.qa). Nhiệm vụ: Hỗ trợ người khuyết tật và gia đình tìm hiểu về các thiết bị/công nghệ hỗ trợ phù hợp. Hãy trả lời bằng ngôn ngữ của người dùng. Nếu không có thông tin trong cơ sở tri thức, hãy nói rõ và gợi ý liên hệ chuyên gia AT. Bạn KHÔNG phải bác sĩ - không đưa ra lời khuyên y tế hay chẩn đoán bệnh.', type: 'string', description: 'Main system prompt for MADA AI chatbot' },
   ];
 
   const now = new Date().toISOString();

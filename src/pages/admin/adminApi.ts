@@ -315,6 +315,7 @@ export const adminApi = {
       last_crawl_at: string | null;
       last_crawl_status: string | null;
       last_crawl_count: number;
+      sort_order: number;
       created_at: string;
       updated_at: string;
     }>>('/admin/agents');
@@ -345,7 +346,7 @@ export const adminApi = {
     id: string,
     payload: {
       knowledge_url?: string;
-      product_url?: string;
+      product_urls?: string[];  // ⭐ Array thay vì single URL
       crawl_follow_links?: 0 | 1;
       crawl_max_depth?: number;
       crawl_max_pages?: number;
@@ -510,95 +511,28 @@ export const adminApi = {
     );
   },
 
-  // ============== SYSTEM PROMPTS (admin_prompts table) ==============
-  async getPrompts(params?: { active?: boolean; category?: string; language?: string }) {
-    const p = new URLSearchParams();
-    if (params?.active !== undefined) p.set('active', String(params.active));
-    if (params?.category) p.set('category', params.category);
-    if (params?.language) p.set('language', params.language);
-    const qs = p.toString();
-    return request<Array<{
-      id: string;
-      name: string;
-      description: string;
-      prompt: string;
-      category: string;
-      language: string;
-      isActive: boolean;
-      isSystem: boolean;
-      createdAt: string;
-      updatedAt: string;
-    }>>(`/admin/system-prompts${qs ? `?${qs}` : ''}`);
-  },
-  async getPrompt(id: string) {
+  // ============== SIMPLIFIED SYSTEM PROMPTS (single prompt) ==============
+  async getSystemPrompt() {
     return request<{
-      id: string;
-      name: string;
-      description: string;
-      prompt: string;
-      category: string;
-      language: string;
-      isActive: boolean;
-      isSystem: boolean;
-      createdAt: string;
-      updatedAt: string;
-    }>(`/admin/system-prompts/${id}`);
+      content: string;
+      updatedAt: string | null;
+    }>('/admin/system-prompts');
   },
-  async createPrompt(data: {
-    id: string;
-    name: string;
-    description?: string;
-    prompt: string;
-    category?: string;
-    language?: string;
-    is_active?: boolean;
-  }) {
+  async updateSystemPrompt(content: string) {
     return request<{
-      id: string;
-      name: string;
-      description: string;
-      prompt: string;
-      category: string;
-      language: string;
-      isActive: boolean;
-      isSystem: boolean;
-      createdAt: string;
+      content: string;
       updatedAt: string;
     }>('/admin/system-prompts', {
-      method: 'POST',
-      body: JSON.stringify(data),
+      method: 'PUT',
+      body: JSON.stringify({ content }),
     });
   },
-  async updatePrompt(id: string, data: {
-    name?: string;
-    description?: string;
-    prompt?: string;
-    category?: string;
-    language?: string;
-    is_active?: boolean;
-  }) {
+  async getSystemPromptPreview(lang: string = 'vi', mode: 'endUser' | 'specialist' = 'endUser') {
     return request<{
-      id: string;
-      name: string;
-      description: string;
-      prompt: string;
-      category: string;
       language: string;
-      isActive: boolean;
-      isSystem: boolean;
-      createdAt: string;
-      updatedAt: string;
-    }>(`/admin/system-prompts/${id}`, {
-      method: 'PATCH',
-      body: JSON.stringify(data),
-    });
-  },
-  async deletePrompt(id: string) {
-    return request<{
-      success: boolean;
-      usingAgents?: Array<{ id: string; name: string }>;
-      warning?: string;
-    }>(`/admin/system-prompts/${id}`, { method: 'DELETE' });
+      mode: string;
+      prompt: string;
+    }>(`/admin/system-prompts/preview?lang=${lang}&mode=${mode}`);
   },
 
   // ============== PROMPT TEMPLATES ==============
@@ -821,6 +755,32 @@ export const adminApi = {
     return request<any>('/admin/suggested-questions', {
       method: 'POST',
       body: JSON.stringify(data),
+    });
+  },
+
+  /** ⭐ Auto-translate: chỉ nhập tiếng Việt, tự động tạo 4 ngôn ngữ */
+  async autoTranslateQuestion(data: {
+    question_vi: string;
+    category: string;
+    view_mode?: string;
+    agent_id?: string | null;
+    sort_order?: number;
+    is_active?: boolean;
+  }) {
+    return request<{
+      count: number;
+      questions: Array<{ id: string; language: string; question: string }>;
+      translations: { vi: string; en: string; ar: string; fr: string };
+    }>('/admin/suggested-questions/auto-translate', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  /** ⭐ Xóa tất cả câu hỏi không phải tiếng Việt */
+  async deleteNonVietnameseQuestions() {
+    return request<{ success: boolean; count: number }>('/admin/suggested-questions/delete-non-vi', {
+      method: 'DELETE',
     });
   },
 

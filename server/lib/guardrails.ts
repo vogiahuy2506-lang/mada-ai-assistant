@@ -13,45 +13,22 @@
 // ============================================================================
 
 const MEDICAL_DIAGNOSIS_PATTERNS = [
-  // Vietnamese patterns
-  /\b(chẩn đoán|chẩn đoán giúp|được chẩn đoán là|bị chẩn đoán)\b/iu,
-  /\b(chẩn đoán|chuan đoán|bệnh|gây ra|bệnh lý|biến chứng|triệu chứng)\b.*\b(nặng|nhẹ|nguy hiểm|cấp tính|mãn tính)\b/iu,
-  /\b(tôi bị|tôi có|dấu hiệu|có phải là|mắc)\b.*\b(bệnh|ung thư|tiểu đường|cao huyết áp|tim mạch)\b/iu,
-  /\b(bị mắc|phải mắc)\s+(?:bệnh|chứng|rối loạn)\b/iu,
-  /\b(xác định|biet|nhận biết)\s*(?:bệnh|tình trạng)\b/iu,
-  /\b(tôi là|người bị)\s*(?:bệnh|gì|chứng)\b/iu,
-  
-  // English patterns
-  /\b(diagnos(is|ed|e|ing))\b/iu,
+  // Vietnamese: explicit diagnosis requests
+  /\b(chẩn đoán|chẩn đoán giúp|chuẩn đoán giúp|được chẩn đoán là|bị chẩn đoán)\b/iu,
+  /\b(chẩn đoán|chuan đoán)\s+(?:giúp|nào|bệnh gì|là)\b/iu,
+  /\b(tôi có phải|bạn nghĩ|tôi bị phải)\b.*\b(bệnh|bệnh gì)\b/iu,
+
+  // English: explicit diagnosis requests
+  /\b(diagnos(is|ed|e|ing)|can you diagnose|help me diagnose)\b/iu,
   /\b(i have|i was diagnosed with|i suffer from)\b/iu,
-  /\b(what(?:'s| is) wrong with me|do i have)\b/iu,
-  /\b(diagnosis|diagnostic|medical|prognosis|disease|symptoms)\b.*\b(serious|severe|cancer|diabetes|heart|terminal)\b/iu,
-  /\b(treatment|medication|prescription|dosage|surgery|chemotherapy)\b/iu,
-  /\b(blood pressure|sugar|cholesterol|vitamin|deficiency)\b/iu,
+  /\b(what(?:'s| is) wrong with me|do i have|what disease do i)\b/iu,
   /\b(should i take|what medicine|prescribe)\b/iu,
 
-  // Arabic patterns
+  // Arabic: explicit diagnosis requests
   /\b(تشخيص|مرض|أعاني من|علاج|وصفة|عملية|سرطان|سكري)\b/iu,
 
-  // French patterns
+  // French: explicit diagnosis requests
   /\b(diagnostic|diagnostiqué|j(?:e |')ai\s+(?:été\s+)?diagnostiqué)\b/iu,
-  /\b(médicament|ordonnance|traitement|prescription|opération)\b/iu,
-];
-
-const TREATMENT_PATTERNS = [
-  // Vietnamese
-  /\b(kê đơn|đơn thuốc|điều trị|chữa trị|uống thuốc|dùng thuốc)\b/iu,
-  /\b(thuốc gì|thuốc nào|tôi nên uống)\b/iu,
-  /\b(phẫu thuật|tiểu phẫu|can thiệp y khoa)\b/iu,
-  
-  // English
-  /\b(prescri(be|ption|bing)|treatment|medication|medicine|drug)\b/iu,
-];
-
-const SYMPTOM_PATTERNS = [
-  /\b(triệu chứng|biểu hiện|dấu hiệu)\b/iu,
-  /\b(symptom(s)?|signs?)\b.*\b(mean|indicate|suggest)\b/iu,
-  /\b(tại sao|vì sao|nguyên nhân là)\b.*\b(đau|sốt|ho|khó)\b/iu,
 ];
 
 // ============================================================================
@@ -280,14 +257,6 @@ export class GuardrailsSystem {
     return MEDICAL_DIAGNOSIS_PATTERNS.some(pattern => pattern.test(query));
   }
 
-  private containsTreatmentRequest(query: string): boolean {
-    return TREATMENT_PATTERNS.some(pattern => pattern.test(query));
-  }
-
-  private containsSymptomQuery(query: string): boolean {
-    return SYMPTOM_PATTERNS.some(pattern => pattern.test(query));
-  }
-
   // ==========================================================================
   // SCOPE DETECTION
   // ==========================================================================
@@ -375,31 +344,7 @@ export class GuardrailsSystem {
       };
     }
 
-    // Step 3: Check for treatment requests (redirect)
-    if (this.containsTreatmentRequest(query)) {
-      console.warn('⚠️ Guardrails: Treatment request pattern detected');
-      return {
-        isSafe: false,
-        shouldRedirect: true,
-        redirectResponse: MEDICAL_REDIRECT_RESPONSES[language] || MEDICAL_REDIRECT_RESPONSES['en'],
-        detectedPattern: 'medical_treatment',
-        suggestedTopic: 'assistive_technology',
-      };
-    }
-
-    // Step 4: Check for symptom queries (redirect)
-    if (this.containsSymptomQuery(query)) {
-      console.warn('⚠️ Guardrails: Symptom query pattern detected');
-      return {
-        isSafe: false,
-        shouldRedirect: true,
-        redirectResponse: MEDICAL_REDIRECT_RESPONSES[language] || MEDICAL_REDIRECT_RESPONSES['en'],
-        detectedPattern: 'medical_symptoms',
-        suggestedTopic: 'assistive_technology',
-      };
-    }
-
-    // Step 5: Check out of scope
+    // Step 3: Check out of scope
     const outOfScope = this.checkOutOfScope(query);
     if (outOfScope) {
       console.warn(`⚠️ Guardrails: Out of scope (${outOfScope.type})`);
@@ -412,7 +357,7 @@ export class GuardrailsSystem {
       };
     }
 
-    // Step 6: Check for PII (warn but allow)
+    // Step 4: Check for PII (warn but allow)
     const piiDetected = this.detectPII(query);
     if (piiDetected.length > 0) {
       console.info(`ℹ️ Guardrails: PII detected (${piiDetected.join(', ')})`);
@@ -442,10 +387,8 @@ export class GuardrailsSystem {
   calculateSafetyScore(query: string): number {
     let score = 100;
 
-    // Deduct for medical patterns
+    // Deduct for medical diagnosis patterns
     if (this.containsMedicalDiagnosis(query)) score -= 50;
-    if (this.containsTreatmentRequest(query)) score -= 30;
-    if (this.containsSymptomQuery(query)) score -= 20;
 
     // Deduct for out-of-scope
     if (this.checkOutOfScope(query)) score -= 30;

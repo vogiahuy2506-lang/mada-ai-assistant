@@ -1,6 +1,26 @@
 // API client for MADA AI backend
 const API_BASE = '/api'; // Use proxy in dev, full URL in production
 
+// Simple translation helper for API errors (doesn't use React hooks)
+const apiTranslations: Record<string, Record<string, string>> = {
+  vi: {
+    'connectionFailed': 'Không thể kết nối server. Vui lòng kiểm tra backend đang chạy.',
+  },
+  en: {
+    'connectionFailed': 'Cannot connect to server. Please check if the backend is running.',
+  },
+  ar: {
+    'connectionFailed': 'لا يمكن الاتصال بالخادم. يرجى التحقق من تشغيل الخلفية.',
+  },
+  fr: {
+    'connectionFailed': 'Impossible de se connecter au serveur. Veuillez vérifier si le backend est en cours d\'exécution.',
+  },
+};
+
+const getApiError = (key: string, lang: string = 'vi'): string => {
+  return apiTranslations[lang]?.[key] || apiTranslations.vi[key] || key;
+};
+
 export interface ApiUser {
   id: string;
   email: string;
@@ -136,11 +156,11 @@ async function request<T>(
 
     const data = await res.json();
     if (!res.ok) {
-      return { success: false, error: data.error || 'Lỗi không xác định', code: data.code };
+      return { success: false, error: data.error || 'Unknown error', code: data.code };
     }
     return data;
   } catch {
-    return { success: false, error: 'Không thể kết nối server. Vui lòng kiểm tra backend đang chạy.' };
+    return { success: false, error: 'Cannot connect to server. Please check if the backend is running.' };
   }
 }
 

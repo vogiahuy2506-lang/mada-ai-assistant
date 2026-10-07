@@ -79,18 +79,18 @@ export function ProductDetailPage() {
     } catch {}
   };
 
-  const buyText = language === 'en' ? 'Find Suppliers' : 'Tìm nơi mua';
-  const consultText = language === 'en' ? 'Request Consultation' : 'Yêu cầu tư vấn';
-  const compareText = language === 'en' ? 'Add to Compare' : 'Thêm vào so sánh';
-  const addedText = language === 'en' ? 'Added to Compare' : 'Đã thêm vào so sánh';
-  const shareText = language === 'en' ? 'Share' : 'Chia sẻ';
-  const standardsText = language === 'en' ? 'Technical Standards' : 'Tiêu chuẩn kỹ thuật';
-  const descriptionText = language === 'en' ? 'Description' : 'Mô tả';
-  const categoryText = language === 'en' ? 'Category' : 'Danh mục';
-  const brandText = language === 'en' ? 'Brand' : 'Thương hiệu';
-  const modelText = language === 'en' ? 'Model' : 'Mẫu';
-  const relatedText = language === 'en' ? 'Related Products' : 'Sản phẩm liên quan';
-  const notFoundText = language === 'en' ? 'Product not found' : 'Không tìm thấy sản phẩm';
+  const buyText = t('productDetail.findSuppliers');
+  const consultText = t('productDetail.requestConsultation');
+  const compareText = t('productDetail.addToCompare');
+  const addedText = t('productDetail.addedToCompare');
+  const shareText = t('productDetail.share');
+  const standardsText = t('productDetail.technicalStandards');
+  const descriptionText = t('productDetail.description');
+  const categoryText = t('products.category');
+  const brandText = t('products.brand');
+  const modelText = t('productDetail.model');
+  const relatedText = t('productDetail.relatedProducts');
+  const notFoundText = t('productDetail.notFound');
 
   if (loading) {
     return (
@@ -120,7 +120,7 @@ export function ProductDetailPage() {
             className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary text-on-primary rounded-xl font-bold"
           >
             <ArrowLeft className="w-4 h-4" aria-hidden="true" />
-            Quay lại danh sách
+            {t('productDetail.backToList')}
           </Link>
         </div>
       </PublicLayout>

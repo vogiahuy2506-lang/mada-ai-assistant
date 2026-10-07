@@ -1,9 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '@/stores';
-
-// Simple text - no i18n
-const LOADING_TEXT = 'Đang tải...';
+import { t } from '@/lib/translations';
 
 export function RoleLanding() {
   const user = useAuthStore((s) => s.user);
@@ -61,7 +59,7 @@ export function RoleLanding() {
           }} />
           <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
           <p style={{ marginTop: 16, color: '#64748b', fontFamily: 'Inter, sans-serif', fontSize: 14 }}>
-            {LOADING_TEXT}
+            {t('roleLanding.loading')}
           </p>
         </div>
       </div>

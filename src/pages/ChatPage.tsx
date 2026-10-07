@@ -2369,10 +2369,10 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
         
         console.error('Speech recognition error:', event.error);
         setVoiceError(event.error === 'not-allowed' 
-          ? (language === 'vi' ? 'Vui long cho phep truy cap microphone' : 'Please allow microphone access')
+          ? t('chat.allowMicAccess')
           : event.error === 'no-speech'
-            ? (language === 'vi' ? 'Khong phat hien giong noi' : 'No speech detected')
-            : (language === 'vi' ? 'Da xay ra loi Voice' : 'Voice error occurred'));
+            ? t('chat.noSpeechDetected')
+            : t('chat.voiceErrorOccurred'));
         setIsRecording(false);
         setIsListening(false);
         setInterimTranscript('');
@@ -2394,9 +2394,7 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
 
   const handleVoiceRecord = () => {
     if (!recognitionRef.current) {
-      alert(language === 'vi' 
-        ? 'Trinh duyet khong ho tro ghi am. Vui long su dung Chrome/Edge/Safari.' 
-        : 'Browser does not support recording. Please use Chrome/Edge/Safari.');
+      alert(t('chat.browserDoesNotSupportRecording'));
       return;
     }
 
@@ -2663,10 +2661,7 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
     console.log('Consultation submitted:', data);
     addMessage({
       role: 'user',
-      content: language === 'vi' ? 'Tôi đã gửi yêu cầu tư vấn. Cảm ơn bạn!' : 
-               language === 'en' ? 'I have submitted a consultation request. Thank you!' :
-               language === 'ar' ? 'لقد أرسلت طلب استشارة. شكراً لك!' :
-               'J\'ai soumis une demande de consultation. Merci!',
+      content: t('chat.consultationSent'),
     });
   };
 
@@ -2739,7 +2734,7 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
               <button
                 onClick={() => setSidebarOpen(false)}
                 className="md:hidden w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition-colors"
-                aria-label={language === 'vi' ? 'Đóng menu' : language === 'en' ? 'Close menu' : 'إغلاق القائمة'}
+                aria-label={t('chat.closeMenu')}
               >
                 <ChevronRight className="w-4 h-4 text-slate-600" />
               </button>
@@ -2759,7 +2754,7 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
             className="w-full text-white rounded-full py-2.5 px-4 flex items-center justify-center gap-2 font-semibold shadow-md hover:opacity-90 transition-all bg-primary hover:bg-primary/90 text-sm"
           >
             <Plus className="w-4 h-4" />
-            {language === 'vi' ? 'Trò chuyện mới' : language === 'en' ? 'New Chat' : language === 'ar' ? 'محادثة جديدة' : 'Nouvelle conversation'}
+            {t('chat.newChat')}
           </button>
         </div>
 
@@ -2868,7 +2863,7 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
             <div className="mt-4 pt-4 border-t border-slate-100 shrink-0">
               <p className="text-[10px] font-bold uppercase tracking-widest text-violet-600 px-4 mb-2 flex items-center gap-1">
                 <span className="material-symbols-outlined text-sm">lightbulb</span>
-                {language === 'vi' ? 'Câu hỏi gợi ý' : language === 'en' ? 'Suggested Questions' : language === 'ar' ? 'أسئلة مقترحة' : 'Questions suggérées'}
+                {t('chat.suggestedQuestions')}
               </p>
               <div className="space-y-1 px-2">
                 {SAMPLE_QUESTIONS[activeCategory][viewMode][language].slice(0, 4).map((question, idx) => (
@@ -2958,7 +2953,7 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
                     'text-xs truncate',
                     isActive ? 'text-white/70' : 'text-on-surface-variant'
                   )}>
-                    {agent.description || (language === 'vi' ? 'Agent tùy chỉnh' : language === 'en' ? 'Custom Agent' : 'Agent personnalisé')}
+                    {agent.description || t('chat.customAgent')}
                   </p>
                 </div>
               </button>
@@ -2972,7 +2967,7 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
               className="flex items-center justify-between px-4 mb-2 mt-2 w-full hover:bg-slate-50 rounded-lg transition-colors cursor-pointer"
             >
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                {language === 'vi' ? 'Lịch sử gần đây' : language === 'en' ? 'Recent History' : language === 'ar' ? 'السجل الأخير' : 'Historique récent'}
+                {t('chat.recentHistory')}
               </span>
               <div className="flex items-center gap-2">
                 {historyConversations.length > 0 && (
@@ -2993,7 +2988,7 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
                     type="text"
                     value={historySearch}
                     onChange={(e) => setHistorySearchQuery(e.target.value)}
-                    placeholder={language === 'vi' ? 'Tìm hội thoại...' : language === 'en' ? 'Search conversations...' : language === 'ar' ? 'البحث في المحادثات...' : 'Rechercher...'}
+                    placeholder={t('chat.searchConversations')}
                     className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 border border-slate-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-300 text-slate-700 placeholder:text-slate-400 transition-colors"
                   />
                 </div>
@@ -3068,7 +3063,7 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
                 </div>
               ) : (
                 <img
-                  alt={language === 'vi' ? 'Khách' : language === 'en' ? 'Guest' : language === 'ar' ? 'زائر' : 'Invité'}
+                  alt={t('chat.guest')}
                   className="w-10 h-10 rounded-full border-2 border-white shadow-sm bg-white"
                   src="https://api.dicebear.com/7.x/avataaars/svg?seed=anonymous-mada&backgroundColor=e0e7ff"
                 />
@@ -3081,8 +3076,8 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
                   </>
                 ) : (
                   <>
-                    <p className="text-sm font-bold truncate">{language === 'vi' ? 'Khách' : language === 'en' ? 'Guest' : language === 'ar' ? 'زائر' : 'Invité'}</p>
-                    <p className="text-xs text-slate-400 truncate">{language === 'vi' ? 'Chưa đăng nhập' : language === 'en' ? 'Not logged in' : language === 'ar' ? 'لم يتم تسجيل الدخول' : 'Non connecté'}</p>
+                    <p className="text-sm font-bold truncate">{t('chat.guest')}</p>
+                    <p className="text-xs text-slate-400 truncate">{t('chat.notLoggedIn')}</p>
                   </>
                 )}
               </div>
@@ -3113,14 +3108,14 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
                       className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-slate-50 text-sm transition-colors"
                     >
                       <User className="w-4 h-4" />
-                      {language === 'vi' ? 'Hồ sơ' : language === 'en' ? 'Profile' : language === 'ar' ? 'الملف الشخصي' : 'Profil'}
+                      {t('chat.profile')}
                     </button>
                     <button
                       onClick={() => { setShowProfileMenu(false); navigate('/profile'); }}
                       className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-slate-50 text-sm transition-colors"
                     >
                       <Sparkles className="w-4 h-4" />
-                      {language === 'vi' ? 'Nâng cấp gói' : language === 'en' ? 'Upgrade Plan' : language === 'ar' ? 'ترقية الخطة' : 'Plan supérieur'}
+                      {t('chat.upgradePlan')}
                     </button>
                     <hr className="my-1 border-slate-100" />
                     <button
@@ -3128,7 +3123,7 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
                       className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-red-50 text-red-600 text-sm font-bold transition-colors"
                     >
                       <LogOut className="w-4 h-4" />
-                      {language === 'vi' ? 'Đăng xuất' : language === 'en' ? 'Logout' : language === 'ar' ? 'تسجيل الخروج' : 'Déconnexion'}
+                      {t('chat.logout')}
                     </button>
                   </div>
                 </div>
@@ -3149,7 +3144,7 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
             <div className="flex items-center gap-2 bg-white/60 px-4 py-2 rounded-full border border-white/80">
               <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div>
               <span className="text-sm font-semibold text-on-background">
-                {isEndUser ? (language === 'vi' ? 'Premium Intelligence' : language === 'en' ? 'Premium Intelligence' : language === 'ar' ? 'ذكاء متميز' : 'Intelligence Premium') : (language === 'vi' ? 'AT Specialist Mode' : language === 'en' ? 'AT Specialist Mode' : language === 'ar' ? 'وضع خبير AT' : 'Mode Spécialiste AT')}
+                {isEndUser ? t('chat.premiumIntelligence') : t('chat.atSpecialistMode')}
               </span>
             </div>
           </div>
@@ -3177,7 +3172,7 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
               {showLanguageMenu && (
                 <div className="absolute right-0 top-full mt-2 w-64 bg-white border border-slate-200 rounded-2xl shadow-lg overflow-hidden z-50">
                   <div className="px-4 py-3 bg-gradient-to-r from-blue-500 to-indigo-500">
-                    <p className="text-sm font-semibold text-white">{language === 'vi' ? 'Chọn ngôn ngữ' : language === 'en' ? 'Select language' : 'اختر اللغة'}</p>
+                    <p className="text-sm font-semibold text-white">{t('chat.selectLanguage')}</p>
                   </div>
                   <div className="p-2">
                     {LANGUAGES.map((lang) => (
@@ -3241,7 +3236,7 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
                   <div className="flex items-center gap-1.5">
                     <span className="material-symbols-outlined text-blue-500 text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>forum</span>
                     <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide">
-                      {language === 'vi' ? 'Câu hỏi gợi ý' : language === 'en' ? 'Suggested Questions' : language === 'ar' ? 'الأسئلة المقترحة' : 'Questions suggérées'}
+                      {t('chat.suggestedQuestions')}
                     </h3>
                   </div>
                 </div>
@@ -3294,7 +3289,7 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
                   <h2 className="font-bold text-slate-900 uppercase tracking-tight">
                     {activeCategory 
                       ? (language === 'vi' ? CATEGORY_LABELS[activeCategory].title : language === 'en' ? CATEGORY_LABELS[activeCategory].titleEn : language === 'ar' ? CATEGORY_LABELS[activeCategory].titleAr : CATEGORY_LABELS[activeCategory].titleFr)
-                      : (language === 'vi' ? 'THÔNG TIN BỔ TRỢ VÀ TIÊU CHUẨN' : language === 'en' ? 'SUPPLEMENTARY INFO & STANDARDS' : language === 'ar' ? 'المعلومات والمعايير الإضافية' : 'INFO SUPPLÉMENTAIRES & NORMES')}
+                      : t('chat.supplementaryInfo')}
                   </h2>
                 </div>
               </div>
@@ -3394,7 +3389,7 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
 
             {/* File attachments display - Grid 2 cột, full width bên ngoài pill input */}
             {fileAttachmentEnabled && selectedFiles.length > 0 && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3 w-full" role="list" aria-label={language === 'vi' ? 'Danh sách tệp đính kèm' : 'Attached files list'}>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3 w-full" role="list" aria-label={t('chat.attachedFilesList')}>
                 {selectedFiles.map((file, index) => {
                   const isError = file.size > 50 * 1024 * 1024; // 50MB limit
                   const status = file.isLoading ? 'loading' : isError ? 'error' : 'ready';
@@ -3423,10 +3418,10 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
 
                   // Get file type label
                   const getTypeLabel = () => {
-                    if (isDocument) return language === 'vi' ? 'Tài liệu' : 'Document';
-                    if (isAudio) return language === 'vi' ? 'Âm thanh' : 'Audio';
-                    if (isVideo) return language === 'vi' ? 'Video' : 'Video';
-                    if (isText) return language === 'vi' ? 'Văn bản' : 'Text';
+                    if (isDocument) return t('chat.document');
+                    if (isAudio) return t('chat.audio');
+                    if (isVideo) return t('chat.video');
+                    if (isText) return t('chat.text');
                     return '';
                   };
 
@@ -3500,7 +3495,7 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
                             <>
                               <Loader2 className="w-3 h-3 text-blue-600 animate-spin flex-shrink-0" />
                               <span className="text-[10px] font-medium text-blue-700 truncate">
-                                {language === 'vi' ? 'Đang xử lý...' : 'Processing...'}
+                                {t('chat.processing')}
                               </span>
                             </>
                           )}
@@ -3510,7 +3505,7 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
                                 error
                               </span>
                               <span className="text-[10px] font-medium text-red-700 truncate">
-                                {language === 'vi' ? 'Quá lớn (>50MB)' : 'Too large (>50MB)'}
+                                {t('chat.tooLarge')}
                               </span>
                             </>
                           )}
@@ -3528,7 +3523,7 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
                         <button
                           onClick={() => handleRemoveFile(index)}
                           className="flex-shrink-0 w-6 h-6 rounded-full bg-slate-100 hover:bg-red-100 flex items-center justify-center text-slate-500 hover:text-red-600 transition-all hover:scale-110"
-                          title={language === 'vi' ? 'Xóa' : 'Remove'}
+                          title={t('chat.remove')}
                           aria-label={`Remove ${file.name}`}
                         >
                           <X className="w-3 h-3" />
@@ -3576,7 +3571,7 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
                     )}
                     title={
                       fileQuotaExhausted
-                        ? (language === 'vi' ? 'Đã hết lượt tải file tháng này' : language === 'en' ? 'Monthly upload limit reached' : language === 'ar' ? 'تم الوصول للحد الشهري' : 'Limite mensuelle atteinte')
+                        ? t('chat.monthlyLimitReached')
                         : 'Đính kèm'
                     }
                   >
@@ -3601,7 +3596,7 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
                       )}
                       title={
                         fileQuotaExhausted
-                          ? (language === 'vi' ? 'Đã hết lượt tải file' : language === 'en' ? 'File upload quota exhausted' : language === 'ar' ? 'تم استنفاد الحصة' : 'Quota de téléchargement épuisée')
+                          ? t('chat.uploadQuotaExhausted')
                           : (language === 'vi' ? `Còn ${fileQuota.remaining}/${fileQuota.limit} lượt upload tháng này` : `${fileQuota.remaining}/${fileQuota.limit} uploads left this month`)
                       }
                     >
@@ -3690,7 +3685,7 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
                     className="mb-2 flex items-center gap-2.5 px-3.5 py-2.5 rounded-2xl border-2 bg-gradient-to-r from-red-50 via-orange-50 to-red-50 border-red-300 shadow-sm animate-fade-in"
                     role="status"
                     aria-live="polite"
-                    aria-label={language === 'vi' ? 'Đang ghi âm' : 'Recording voice'}
+                    aria-label={t('chat.recordingVoice')}
                   >
                     {/* Animated waveform bars */}
                     <div className="flex items-center gap-0.5 flex-shrink-0">
@@ -3717,7 +3712,7 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
                       {interimTranscript ? (
                         <p className="text-xs text-slate-700 italic leading-relaxed">
                           <span className="font-bold text-red-600 uppercase text-[10px] tracking-wider mr-1">
-                            {language === 'vi' ? 'Đang nghe' : 'Listening'}
+                            {t('chat.listening')}
                           </span>
                           <span className="opacity-70">{interimTranscript}</span>
                           <span className="inline-block w-1 h-3 bg-red-500 ml-0.5 animate-pulse" />
@@ -3725,13 +3720,13 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
                       ) : transcript ? (
                         <p className="text-xs text-slate-700 leading-relaxed">
                           <span className="font-bold text-red-600 uppercase text-[10px] tracking-wider mr-1">
-                            {language === 'vi' ? 'Đã ghi' : 'Recorded'}
+                            {t('chat.recorded')}
                           </span>
                           {transcript}
                         </p>
                       ) : (
                         <p className="text-xs text-slate-500 italic">
-                          {language === 'vi' ? 'Hãy nói vào microphone...' : 'Speak into the microphone...'}
+                          {t('chat.speakIntoMic')}
                         </p>
                       )}
                     </div>
@@ -3752,10 +3747,7 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder={isEndUser 
-                    ? (language === 'vi' ? 'Hỏi MADA AI...' : language === 'en' ? 'Message MADA AI...' : language === 'ar' ? 'رسالة MADA AI...' : 'Message MADA AI...')
-                    : (language === 'vi' ? 'Hỏi chuyên gia AT...' : language === 'en' ? 'Ask AT Specialist...' : language === 'ar' ? 'اسأل خبير AT...' : 'Demander au spécialiste...')
-                  }
+                  placeholder={isEndUser ? t('chat.messageMadaAi') : t('chat.askAtSpecialist')}
                   rows={1}
                   className="flex-1 border-none focus:ring-0 text-on-background bg-transparent py-2.5 text-sm placeholder:text-on-surface-variant/60 resize-none leading-relaxed"
                   style={{ minHeight: '40px', maxHeight: '100px' }}
@@ -3774,9 +3766,7 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
                           ? 'bg-error/80 text-white animate-ping'
                           : 'text-on-surface-variant hover:text-on-background hover:bg-surface-container-low'
                     )}
-                    title={isRecording 
-                      ? (language === 'vi' ? 'Dừng ghi âm' : language === 'en' ? 'Stop recording' : language === 'ar' ? 'إيقاف التسجيل' : 'Arrêter l\'enregistrement')
-                      : (language === 'vi' ? 'Ghi âm' : language === 'en' ? 'Record' : language === 'ar' ? 'تسجيل' : 'Enregistrer')}
+                    title={isRecording ? t('chat.stopRecording') : t('chat.record')}
                   >
                     {isRecording || isListening ? <Volume2 className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
                   </button>
@@ -3786,7 +3776,7 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
                     <button
                       onClick={handleStopGeneration}
                       className="relative w-9 h-9 bg-red-500 text-white rounded-full flex items-center justify-center border-[2px] border-on-background shadow-[2px_2px_0_0_rgba(25,27,35,1)] hover:-translate-y-[1px] hover:shadow-[3px_3px_0_0_rgba(25,27,35,1)] transition-all"
-                      title={language === 'vi' ? 'Dừng' : 'Stop'}
+                      title={t('chat.stop')}
                     >
                       <span className="w-3 h-3 bg-white rounded-sm" />
                     </button>
@@ -3818,17 +3808,11 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-medium text-amber-800 dark:text-amber-300">
-                      {language === 'vi' ? 'Có vẻ câu hỏi của bạn liên quan đến thiết bị hỗ trợ' :
-                       language === 'en' ? 'Your question seems related to assistive devices' :
-                       language === 'ar' ? 'يبدو أن سؤالك يتعلق بأجهزة المساعدة' :
-                       'Votre question semble liée aux appareils d\'assistance'}
+                      {t('chat.relatedToAssistiveDevice')}
                     </p>
                     <p className="text-[11px] text-amber-700/80 dark:text-amber-400/80 mt-0.5 flex items-center gap-1">
                       <Accessibility className="w-3 h-3" />
-                      {language === 'vi' ? 'Nhấn vào đây để hỏi chuyên gia AT' :
-                       language === 'en' ? 'Click here to ask AT Specialist' :
-                       language === 'ar' ? 'انقر هنا للسؤال عن متخصص AT' :
-                       'Cliquez ici pour demander au spécialiste AT'}
+                      {t('chat.clickToAskAt')}
                     </p>
                   </div>
                   <ChevronRight className="w-4 h-4 text-amber-500 flex-shrink-0" />
@@ -3838,7 +3822,7 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
 
             {/* Footer - Professional AI Support */}
             <p className="text-center text-[11px] text-on-surface-variant/70 mt-6 uppercase tracking-wider font-medium">
-              {language === 'vi' ? 'MADA AI - HỖ TRỢ TƯ VẤN CHUYÊN GIA AT' : language === 'en' ? 'MADA AI - SUPPORTING AT EXPERTS' : language === 'ar' ? '.MADA AI - دعم خبراء AT' : 'MADA AI - SOUTIEN AUX EXPERTS AT'}
+              {t('chat.disclaimerFooter')}
             </p>
             {/* Powered by */}
             <p className="text-center text-[10px] text-on-surface-variant/60 mt-2 tracking-wider font-mono flex items-center justify-center gap-1.5 flex-wrap">
@@ -3943,7 +3927,7 @@ function MessageBubble({
       <div className="flex items-end gap-3 justify-end animate-fade-in group flex-col items-end">
         {/* Hiển thị file cards đã gửi */}
         {message.attachments && message.attachments.length > 0 && (
-          <div className="flex flex-col gap-2 justify-end mb-1 max-w-[80%]" role="list" aria-label={language === 'vi' ? 'Tệp đính kèm đã gửi' : 'Sent attachments'}>
+          <div className="flex flex-col gap-2 justify-end mb-1 max-w-[80%]" role="list" aria-label={t('chat.sentAttachments')}>
             {message.attachments.map((attachment, idx) => (
               <div
                 key={idx}
@@ -3971,7 +3955,7 @@ function MessageBubble({
                   <p className="text-xs font-semibold text-slate-900 truncate max-w-[200px]">{attachment.name}</p>
                   <p className="text-[10px] text-slate-500 mt-0.5 flex items-center gap-1">
                     <span className="material-symbols-outlined text-[10px]" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
-                    {language === 'vi' ? 'Đã đính kèm' : 'Attached'}
+                    {t('chat.attached')}
                   </p>
                 </div>
               </div>
@@ -3996,7 +3980,7 @@ function MessageBubble({
                   }}
                   className="px-3 py-1 text-xs bg-white/20 hover:bg-white/30 rounded-full transition-colors"
                 >
-                  {language === 'vi' ? 'Hủy' : 'Cancel'}
+                  {t('chat.cancel')}
                 </button>
                 <button
                   onClick={() => {
@@ -4017,7 +4001,7 @@ function MessageBubble({
                   }}
                   className="px-3 py-1 text-xs bg-white text-[#0047ff] hover:bg-white/90 rounded-full font-medium transition-colors"
                 >
-                  {language === 'vi' ? 'Gửi lại' : language === 'en' ? 'Resend' : language === 'ar' ? 'إعادة الإرسال' : 'Renvoyer'}
+                  {t('chat.resend')}
                 </button>
               </div>
             </div>
@@ -4054,12 +4038,12 @@ function MessageBubble({
                 {feedback === 'like' ? (
                   <>
                     <ThumbsUp className="w-3.5 h-3.5 text-emerald-500 fill-emerald-500" />
-                    <span className="hidden sm:inline">{language === 'vi' ? 'Đã thích' : 'Liked'}</span>
+                    <span className="hidden sm:inline">{t('chat.liked')}</span>
                   </>
                 ) : (
                   <>
                     <ThumbsDown className="w-3.5 h-3.5 text-red-400 fill-red-400" />
-                    <span className="hidden sm:inline">{language === 'vi' ? 'Đã phản hồi' : 'Feedback sent'}</span>
+                    <span className="hidden sm:inline">{t('chat.feedbackSent')}</span>
                   </>
                 )}
               </span>
@@ -4069,7 +4053,7 @@ function MessageBubble({
                   onClick={() => submitFeedback('like')}
                   disabled={submittingFeedback}
                   className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-emerald-500 transition-all disabled:opacity-50"
-                  title={language === 'vi' ? 'Hữu ích' : 'Helpful'}
+                  title={t('chat.helpful')}
                 >
                   <ThumbsUp className="w-4 h-4" />
                 </button>
@@ -4078,7 +4062,7 @@ function MessageBubble({
                     setShowDislikeReason(true);
                   }}
                   className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-red-400 transition-all"
-                  title={language === 'vi' ? 'Không hữu ích' : 'Not helpful'}
+                  title={t('chat.notHelpful')}
                 >
                   <ThumbsDown className="w-4 h-4" />
                 </button>
@@ -4086,10 +4070,10 @@ function MessageBubble({
                 <button 
                   onClick={onRequestConsultation}
                   className="flex items-center gap-1 bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 text-amber-900 px-2 py-1 rounded-full text-[10px] font-semibold transition-all shadow-sm shadow-amber-200 hover:shadow-md hover:shadow-amber-300 active:scale-95"
-                  title={language === 'vi' ? 'Liên hệ tư vấn viên' : 'Contact consultant'}
+                  title={t('chat.contactConsultant')}
                 >
                   <span className="material-symbols-outlined text-[10px]">support_agent</span>
-                  <span>{language === 'vi' ? 'Tư vấn' : 'Consult'}</span>
+                  <span>{t('chat.consult')}</span>
                 </button>
               </>
             )}
@@ -4189,7 +4173,7 @@ function MessageBubble({
                       
                       {/* Nút xem chi tiết */}
                       <div className="mt-2 flex items-center gap-1 text-[11px] font-medium text-secondary">
-                        <span>{language === 'vi' ? 'Xem chi tiết' : language === 'en' ? 'View details' : 'عرض التفاصيل'}</span>
+                        <span>{t('chat.viewDetails')}</span>
                         <ChevronRight className="w-3.5 h-3.5" />
                       </div>
                     </div>
@@ -4205,7 +4189,7 @@ function MessageBubble({
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 text-amber-900 text-[11px] font-semibold rounded-full shadow-sm hover:shadow-md transition-all active:scale-95"
               >
                 <span className="material-symbols-outlined text-[12px]">support_agent</span>
-                <span>{language === 'vi' ? 'Tư vấn thêm' : language === 'en' ? 'More advice' : 'استشارة'}</span>
+                <span>{t('chat.moreAdvice')}</span>
               </button>
             </div>
           </div>
@@ -4235,7 +4219,7 @@ function MessageBubble({
                 />
                 <div className="flex flex-col">
                   <h3 className="text-sm font-semibold text-slate-800">
-                    {language === 'vi' ? 'Phản hồi' : 'Feedback'}
+                    {t('chat.feedback')}
                   </h3>
                   <p className="text-[9px] text-slate-500">MADA AI</p>
                 </div>
@@ -4254,7 +4238,7 @@ function MessageBubble({
                 <div className="w-5 h-5 rounded-full bg-violet-100 flex items-center justify-center">
                   <BotIcon className="w-3 h-3 text-violet-600" />
                 </div>
-                {language === 'vi' ? 'Câu trả lời được phản hồi:' : language === 'en' ? 'Response being replied to:' : language === 'ar' ? 'الرد المراد التعليق عليه:' : 'Réponse à laquelle vous répondez:'}
+                {t('chat.responseBeingReplied')}
               </div>
               <div className="text-xs text-slate-700 leading-relaxed max-h-40 overflow-y-auto bg-white rounded-lg p-3 border border-slate-200/50 [&_p]:mb-1 [&_p]:leading-relaxed [&_strong]:font-semibold [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:list-decimal [&_ol]:pl-4 [&_a]:text-blue-500 [&_a]:underline [&_li]:my-0.5 [&_h1]:text-sm [&_h2]:text-sm [&_h3]:text-xs [&_h4]:text-xs [&_h5]:text-xs [&_h6]:text-xs">
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>
@@ -4268,29 +4252,29 @@ function MessageBubble({
             {/* Quick Reaction Buttons */}
             <div className="px-4 pt-4 pb-2">
               <p className="text-[10px] font-medium text-slate-600 mb-2">
-                {language === 'vi' ? 'Đánh giá nhanh:' : language === 'en' ? 'Quick feedback:' : 'Retour rapide:'}
+                {t('chat.quickFeedback')}
               </p>
               <div className="flex flex-wrap gap-2 justify-center">
                 <button
-                  onClick={() => setDislikeReason(language === 'vi' ? 'Hữu ích' : 'Helpful')}
+                  onClick={() => setDislikeReason(t('chat.accurate'))}
                   className="px-2 py-1 text-[10px] rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 transition-colors flex items-center gap-1 font-medium"
                 >
                   <ThumbsUp className="w-3 h-3" />
-                  <span>{language === 'vi' ? 'Hữu ích' : 'Helpful'}</span>
+                  <span>{t('chat.accurate')}</span>
                 </button>
                 <button
-                  onClick={() => setDislikeReason(language === 'vi' ? 'Chưa chính xác' : 'Not accurate')}
+                  onClick={() => setDislikeReason(t('chat.notAccurate'))}
                   className="px-2 py-1 text-[10px] rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 transition-colors flex items-center gap-1 font-medium"
                 >
                   <AlertCircle className="w-3 h-3" />
-                  <span>{language === 'vi' ? 'Chưa chính xác' : 'Not accurate'}</span>
+                  <span>{t('chat.notAccurate')}</span>
                 </button>
                 <button
-                  onClick={() => setDislikeReason(language === 'vi' ? 'Cần thêm chi tiết' : 'Need more detail')}
+                  onClick={() => setDislikeReason(t('chat.needMoreDetail'))}
                   className="px-2 py-1 text-[10px] rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 transition-colors flex items-center gap-1 font-medium"
                 >
                   <Lightbulb className="w-3 h-3" />
-                  <span>{language === 'vi' ? 'Cần thêm chi tiết' : 'Need more detail'}</span>
+                  <span>{t('chat.needMoreDetail')}</span>
                 </button>
               </div>
             </div>
@@ -4317,7 +4301,7 @@ function MessageBubble({
                   }}
                   className="px-4 py-2 text-xs text-slate-600 hover:bg-slate-100 rounded-lg transition-colors font-medium"
                 >
-                  {language === 'vi' ? 'Hủy' : 'Cancel'}
+                  {t('chat.cancel')}
                 </button>
                 <button
                   onClick={() => {
@@ -4327,7 +4311,7 @@ function MessageBubble({
                   }}
                   className="px-4 py-2 text-xs bg-gradient-to-r from-violet-600 to-violet-700 text-white hover:from-violet-700 hover:to-violet-800 rounded-lg transition-all font-medium shadow-md shadow-violet-200"
                 >
-                  {language === 'vi' ? 'Gửi phản hồi' : 'Send Feedback'}
+                  {t('chat.sendFeedback')}
                 </button>
               </div>
             </div>

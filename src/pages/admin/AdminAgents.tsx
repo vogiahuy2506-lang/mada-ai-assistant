@@ -28,6 +28,9 @@ const t = (key: string): string => {
       'admin.sq.language': 'Ngôn ngữ',
       'admin.sq.sortOrder': 'Thứ tự',
       'admin.sq.questionContent': 'Nội dung câu hỏi',
+      'agent.alert.enterQuestion': 'Vui lòng nhập câu hỏi',
+      'agent.alert.questionTooLong': 'Câu hỏi không được vượt quá 200 ký tự',
+      'agent.alert.saveAgentFirst': 'Vui lòng lưu Agent trước khi thêm câu hỏi',
     },
     en: {
       'admin.overview.totalUsers': 'Total users',
@@ -47,6 +50,9 @@ const t = (key: string): string => {
       'admin.sq.language': 'Language',
       'admin.sq.sortOrder': 'Sort Order',
       'admin.sq.questionContent': 'Question Content',
+      'agent.alert.enterQuestion': 'Please enter a question',
+      'agent.alert.questionTooLong': 'Question cannot exceed 200 characters',
+      'agent.alert.saveAgentFirst': 'Please save the Agent before adding questions',
     },
     ar: {
       'admin.overview.totalUsers': 'إجمالي المستخدمين',
@@ -66,6 +72,9 @@ const t = (key: string): string => {
       'admin.sq.language': 'اللغة',
       'admin.sq.sortOrder': 'الترتيب',
       'admin.sq.questionContent': 'محتوى السؤال',
+      'agent.alert.enterQuestion': 'الرجاء إدخال سؤال',
+      'agent.alert.questionTooLong': 'لا يمكن أن يتجاوز السؤال 200 حرف',
+      'agent.alert.saveAgentFirst': 'الرجاء حفظ الوكيل قبل إضافة الأسئلة',
     },
     fr: {
       'admin.overview.totalUsers': 'Total utilisateurs',
@@ -85,6 +94,9 @@ const t = (key: string): string => {
       'admin.sq.language': 'Langue',
       'admin.sq.sortOrder': 'Ordre',
       'admin.sq.questionContent': 'Contenu de la question',
+      'agent.alert.enterQuestion': 'Veuillez entrer une question',
+      'agent.alert.questionTooLong': 'La question ne peut pas dépasser 200 caractères',
+      'agent.alert.saveAgentFirst': 'Veuillez enregistrer l\'agent avant d\'ajouter des questions',
     },
   };
   return translations[lang]?.[key] || translations['vi'][key] || key;
@@ -607,15 +619,15 @@ export function AdminAgents() {
 
   const handleSqSubmit = async () => {
     if (!sqFormData.question.trim()) {
-      alert('Vui lòng nhập câu hỏi');
+      alert(t('agent.alert.enterQuestion'));
       return;
     }
     if (sqFormData.question.length > 200) {
-      alert('Câu hỏi không được vượt quá 200 ký tự');
+      alert(t('agent.alert.questionTooLong'));
       return;
     }
     if (!editingId) {
-      alert('Vui lòng lưu Agent trước khi thêm câu hỏi');
+      alert(t('agent.alert.saveAgentFirst'));
       return;
     }
 

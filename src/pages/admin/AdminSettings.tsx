@@ -319,21 +319,21 @@ export function AdminSettings() {
           {/* ⭐ Bot Order - Sắp xếp thứ tự hiển thị các bot */}
           <div className="bg-white rounded-2xl border border-outline-variant overflow-hidden">
             <div className="px-8 py-6 border-b border-outline-variant">
-              <h3 className="text-lg font-black text-on-surface">Sắp xếp Bot</h3>
-              <p className="text-sm text-on-surface-variant mt-1">Kéo thả để thay đổi thứ tự hiển thị của các bot trong sidebar</p>
+              <h3 className="text-lg font-black text-on-surface">{lang['admin.settings.arrangeBots'] || 'Sắp xếp Bot'}</h3>
+              <p className="text-sm text-on-surface-variant mt-1">{lang['admin.settings.dragToReorder'] || 'Kéo thả để thay đổi thứ tự hiển thị của các bot trong sidebar'}</p>
             </div>
             <div className="p-8">
               {/* Bot order list */}
               <div className="space-y-2">
                 {(categoryOrder || ['vision', 'hearing', 'communication', 'cognition', 'mobility', 'daily_living', 'education']).map((botId, index) => {
                   const botNames: Record<string, { name: string; icon: string; color: string }> = {
-                    vision: { name: 'Cảm giác - Thị giác', icon: '👁️', color: 'bg-violet-100 text-violet-700' },
-                    hearing: { name: 'Cảm giác - Thính giác', icon: '👂', color: 'bg-blue-100 text-blue-700' },
-                    communication: { name: 'Giọng nói & Lời nói', icon: '🎤', color: 'bg-rose-100 text-rose-700' },
-                    cognition: { name: 'Tâm thần - Nhận thức', icon: '🧠', color: 'bg-amber-100 text-amber-700' },
-                    mobility: { name: 'Vận động thần kinh', icon: '🦾', color: 'bg-green-100 text-green-700' },
-                    daily_living: { name: 'Hỗ trợ sinh hoạt', icon: '🏠', color: 'bg-purple-100 text-purple-700' },
-                    education: { name: 'Giáo dục', icon: '📚', color: 'bg-teal-100 text-teal-700' },
+                    vision: { name: lang['admin.settings.bot.vision'] || 'Cảm giác - Thị giác', icon: '👁️', color: 'bg-violet-100 text-violet-700' },
+                    hearing: { name: lang['admin.settings.bot.hearing'] || 'Cảm giác - Thính giác', icon: '👂', color: 'bg-blue-100 text-blue-700' },
+                    communication: { name: lang['admin.settings.bot.communication'] || 'Giọng nói & Lời nói', icon: '🎤', color: 'bg-rose-100 text-rose-700' },
+                    cognition: { name: lang['admin.settings.bot.cognition'] || 'Tâm thần - Nhận thức', icon: '🧠', color: 'bg-amber-100 text-amber-700' },
+                    mobility: { name: lang['admin.settings.bot.mobility'] || 'Vận động thần kinh', icon: '🦾', color: 'bg-green-100 text-green-700' },
+                    daily_living: { name: lang['admin.settings.bot.dailyLiving'] || 'Hỗ trợ sinh hoạt', icon: '🏠', color: 'bg-purple-100 text-purple-700' },
+                    education: { name: lang['admin.settings.bot.education'] || 'Giáo dục', icon: '📚', color: 'bg-teal-100 text-teal-700' },
                   };
                   const bot = botNames[botId] || { name: botId, icon: '🤖', color: 'bg-gray-100 text-gray-700' };
 
@@ -373,7 +373,7 @@ export function AdminSettings() {
                           }}
                           disabled={index === 0}
                           className="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                          title="Di chuyển lên"
+                          title={lang['common.moveUp'] || 'Di chuyển lên'}
                         >
                           <ArrowUp className="w-4 h-4 text-gray-600" />
                         </button>
@@ -388,7 +388,7 @@ export function AdminSettings() {
                           }}
                           disabled={index === (categoryOrder || ['vision', 'hearing', 'communication', 'cognition', 'mobility', 'daily_living', 'education']).length - 1}
                           className="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                          title="Di chuyển xuống"
+                          title={lang['common.moveDown'] || 'Di chuyển xuống'}
                         >
                           <ArrowDown className="w-4 h-4 text-gray-600" />
                         </button>
@@ -400,7 +400,7 @@ export function AdminSettings() {
 
               <div className="mt-4 flex items-center gap-2 text-sm text-on-surface-variant">
                 <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-                Thứ tự sẽ được áp dụng ngay lập tức sau khi lưu
+                {lang['admin.settings.orderApplied'] || 'Thứ tự sẽ được áp dụng ngay lập tức sau khi lưu'}
               </div>
             </div>
           </div>

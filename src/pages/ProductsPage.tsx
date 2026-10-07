@@ -116,18 +116,18 @@ export function ProductsPage() {
     setPage(1);
   };
 
-  const titleText = language === 'en' ? 'Products' : 'Sản phẩm';
-  const searchPlaceholder = language === 'en' ? 'Search products...' : 'Tìm kiếm sản phẩm...';
-  const noResultsText = t('product.noResults');
-  const filtersText = language === 'en' ? 'Filters' : 'Bộ lọc';
-  const sortText = language === 'en' ? 'Sort' : 'Sắp xếp';
-  const categoryText = language === 'en' ? 'Category' : 'Danh mục';
-  const brandText = language === 'en' ? 'Brand' : 'Thương hiệu';
-  const allText = language === 'en' ? 'All' : 'Tất cả';
-  const clearText = language === 'en' ? 'Clear filters' : 'Xóa bộ lọc';
-  const viewText = language === 'en' ? 'View details' : 'Xem chi tiết';
-  const showText = language === 'en' ? 'Showing' : 'Hiển thị';
-  const ofText = language === 'en' ? 'of' : 'trong';
+  const titleText = t('products.title');
+  const searchPlaceholder = t('products.searchPlaceholder');
+  const noResultsText = t('products.noResults');
+  const filtersText = t('products.filters');
+  const sortText = t('products.sort');
+  const categoryText = t('products.category');
+  const brandText = t('products.brand');
+  const allText = t('products.all');
+  const clearText = t('products.clearFilters');
+  const viewText = t('products.viewDetails');
+  const showText = t('products.showing');
+  const ofText = t('products.of');
 
   return (
     <PublicLayout>
@@ -182,11 +182,11 @@ export function ProductsPage() {
             className="px-4 py-3 bg-white border-2 border-outline rounded-xl font-bold text-sm hover:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
             aria-label={sortText}
           >
-            <option value="created_at-DESC">{t('sort.newest')}</option>
-            <option value="created_at-ASC">{t('sort.oldest')}</option>
-            <option value="title-ASC">A-Z</option>
-            <option value="title-DESC">Z-A</option>
-            <option value="brand-ASC">A-Z (Brand)</option>
+            <option value="created_at-DESC">{t('products.sortNewest')}</option>
+            <option value="created_at-ASC">{t('products.sortOldest')}</option>
+            <option value="title-ASC">{t('products.sortAZ')}</option>
+            <option value="title-DESC">{t('products.sortZA')}</option>
+            <option value="brand-ASC">{t('products.sortBrandAZ')}</option>
           </select>
         </div>
       </div>

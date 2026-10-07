@@ -90,6 +90,12 @@ site/
 # Tesseract trained data (large binary files)
 *.traineddata
 
+# Test files
+test-*.mjs
+test-*.cjs
+*.test.mjs
+*.test.cjs
+
 # TypeScript incremental build cache
 *.tsbuildinfo
 

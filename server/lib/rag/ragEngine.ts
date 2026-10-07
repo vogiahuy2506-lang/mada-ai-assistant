@@ -4,42 +4,10 @@ import { vectorStore } from './vectorStore';
 import { rerankService, type RerankableItem } from './rerankService';
 import db from '../db';
 
-// ============ PROXY BYPASS FETCH ============
-// Custom fetch that bypasses system proxy for Google API
-async function noProxyFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
-  const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
-  
-  // Only bypass proxy for Google APIs
-  if (url.includes('generativelanguage.googleapis.com') || url.includes('aiplatform.googleapis.com')) {
-    // Save and clear proxy environment
-    const savedEnv: Record<string, string | undefined> = {
-      HTTP_PROXY: process.env.HTTP_PROXY,
-      HTTPS_PROXY: process.env.HTTPS_PROXY,
-      http_proxy: process.env.http_proxy,
-      https_proxy: process.env.https_proxy,
-      ALL_PROXY: process.env.ALL_PROXY,
-      all_proxy: process.env.all_proxy,
-    };
-    
-    delete process.env.HTTP_PROXY;
-    delete process.env.HTTPS_PROXY;
-    delete process.env.http_proxy;
-    delete process.env.https_proxy;
-    delete process.env.ALL_PROXY;
-    delete process.env.all_proxy;
-    
-    try {
-      return await fetch(url, init);
-    } finally {
-      // Restore proxy settings
-      for (const [key, val] of Object.entries(savedEnv)) {
-        if (val !== undefined) {
-          process.env[key] = val;
-        }
-      }
-    }
-  }
-  
+// ============ PROXY-AWARE FETCH ============
+// Use proxy if configured (respects HTTP_PROXY/HTTPS_PROXY env vars)
+async function proxyAwareFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  // Simply use regular fetch - Node.js 18+ respects HTTP_PROXY/HTTPS_PROXY env vars
   return fetch(input, init);
 }
 
@@ -97,7 +65,7 @@ async function callGeminiDirect(apiKey: string, modelName: string, prompt: strin
   }
 
   const response = await fetchWithRetry(
-    () => noProxyFetch(url, {
+    () => proxyAwareFetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -149,7 +117,7 @@ const RAG_RESPONSE_SCHEMA: FunctionDeclaration = {
 };
 
 // System prompt - Thân thiện, có dấu, tự nhiên như chuyên gia thật
-const SYSTEM_PROMPT = `Bạn là MADA AI - trợ lý ảo chuyên về Công nghệ Hỗ trợ (Assistive Technology) cho người khuyết tật tại Việt Nam, được phát triển dựa trên cổng thông tin MADA Qatar (mada.org.qa).
+const SYSTEM_PROMPT = `Bạn là MADA AI - trợ lý ảo chuyên về Công nghệ Hỗ trợ (Assistive Technology - AT) cho người khuyết tật tại Việt Nam, được phát triển dựa trên cổng thông tin MADA Qatar (mada.org.qa).
 
 🎯 CÁCH TRẢ LỜI:
 - Trả lời bằng ngôn ngữ của người dùng (Việt/Anh/Pháp/Ár)
@@ -176,13 +144,12 @@ const SYSTEM_PROMPT = `Bạn là MADA AI - trợ lý ảo chuyên về Công ngh
 - KHÔNG đưa ra lời khuyên y tế, chẩn đoán bệnh
 - KHÔNG tự xưng "bác sĩ" hay "chuyên gia y tế"
 - KHÔNG trả lời các vấn đề ngoài phạm vi AT (giáo dục thông thường, y tế đại chúng, etc.)
-- 🚨 QUAN TRỌNG VỀ CÁCH TRẢ LỜI KHI KHÔNG CÓ DỮ LIỆU:
-  • Nếu [Context] ở dưới KHÔNG chứa thông tin liên quan trực tiếp đến câu hỏi của người dùng (kể cả khi có từ khóa trùng), bạn PHẢI nói thẳng rằng mình không tìm thấy thông tin, ví dụ:
-    "Xin lỗi, mình không tìm thấy thông tin về [chủ đề] trong cơ sở dữ liệu MADA. Bạn có thể thử hỏi về [chủ đề liên quan] hoặc liên hệ chuyên gia AT nhé."
-  • TUYỆT ĐỐI KHÔNG bịa thiết bị, KHÔNG gán thông tin từ doc không liên quan vào câu trả lời.
-  • TUYỆT ĐỐI KHÔNG lặp lại tên sản phẩm chỉ vì nó xuất hiện trong context mà không đúng với câu hỏi.
-- Nếu không chắc chắn: "Mình chưa có thông tin chính xác về vấn đề này. Bạn có thể liên hệ chuyên gia AT tại địa phương để được tư vấn chi tiết hơn nhé."
 - Nếu câu hỏi về y tế: "Xin lỗi, mình chỉ hỗ trợ tư vấn về Công nghệ Hỗ trợ (AT). Về các vấn đề y tế, bạn nên tham khảo ý kiến bác sĩ chuyên khoa nhé."
+
+💡 VỀ DỮ LIỆU:
+- Nếu CÓ thông tin trong [THÔNG TIN TỪ CƠ SỞ TRI THỨC]: dùng thông tin đó, kèm nguồn tham khảo
+- Nếu KHÔNG CÓ hoặc THÔNG TIN ÍT: DÙNG KIẾN THỨC CHUNG của bạn về Công nghệ Hỗ trợ để trả lời! Đừng nói "không tìm thấy" - hãy tư vấn dựa trên kiến thức AT của bạn
+- Bạn có kiến thức rộng về: thiết bị hỗ trợ người khiếm thị, người khiếm hearing, xe lăn, thiết bị giao tiếp AAC, công nghệ hỗ trợ nhận thức, vật dụng sinh hoạt hàng ngày, v.v.
 
 💡 VÍ DỤ MẪU:
 
@@ -227,10 +194,9 @@ const RAG_TAIL_PROMPTS: Record<'vi' | 'en' | 'ar' | 'fr', RagTailPrompt> = {
     guidanceTitle: 'CHỈ DẪN TRẢ LỜI',
     guidanceRules: [
       'Trả lời NGẮN GỌN, ĐÚNG TRỌNG TÂM câu hỏi',
-      'Chỉ dùng thông tin TỪ NGUỒN, không lan man',
-      'Dừng ngay sau khi đã trả lời đủ',
-      'Nếu CÓ thông tin trong [THÔNG TIN TỪ CƠ SỞ TRI THỨC] thì TRẢ LỜI ngay, TUYỆT ĐỐI KHÔNG nói "không tìm thấy"',
-      'Nếu KHÔNG có thông tin: "Tôi không tìm thấy thông tin về [chủ đề] trong cơ sở dữ liệu."'
+      'Nếu CÓ thông tin trong [THÔNG TIN TỪ CƠ SỞ TRI THỨC]: dùng thông tin đó',
+      'Nếu KHÔNG CÓ hoặc ÍT thông tin: DÙNG KIẾN THỨC CHUNG về Công nghệ Hỗ trợ để trả lời! Đừng nói "không tìm thấy"',
+      'Bạn có kiến thức về: thiết bị khiếm thị, khiếm hearing, xe lăn, AAC, thiết bị nhận thức, vật dụng sinh hoạt...'
     ],
     contextHeader: '📚 THÔNG TIN TỪ CƠ SỞ TRI THỨC',
     historyHeader: '📝 LỊCH SỬ',
@@ -243,10 +209,9 @@ const RAG_TAIL_PROMPTS: Record<'vi' | 'en' | 'ar' | 'fr', RagTailPrompt> = {
     guidanceTitle: 'ANSWER GUIDELINES',
     guidanceRules: [
       'Answer CONCISELY, FOCUSED on the question',
-      'Only use information FROM THE SOURCE, no rambling',
-      'Stop immediately after answering sufficiently',
-      'If information IS in [KNOWLEDGE BASE CONTEXT] then ANSWER right away, NEVER say "not found"',
-      'If NO information: "I could not find information about [topic] in the database."'
+      'If information IS in [KNOWLEDGE BASE CONTEXT]: use that information',
+      'If NO or LIMITED information: Use your GENERAL KNOWLEDGE about Assistive Technology to answer! Do NOT say "not found"',
+      'You know about: vision devices, hearing aids, wheelchairs, AAC, cognitive aids, daily living products...'
     ],
     contextHeader: '📚 KNOWLEDGE BASE CONTEXT',
     historyHeader: '📝 HISTORY',
@@ -259,10 +224,9 @@ const RAG_TAIL_PROMPTS: Record<'vi' | 'en' | 'ar' | 'fr', RagTailPrompt> = {
     guidanceTitle: 'إرشادات الإجابة',
     guidanceRules: [
       'أجب بإيجاز، مع التركيز على السؤال',
-      'استخدم فقط المعلومات من المصدر، بدون تشتت',
-      'توقف فورًا بعد الإجابة الكافية',
-      'إذا كانت المعلومات موجودة في [سياق قاعدة المعرفة]، فأجب فورًا، ولا تقل أبدًا "غير موجود"',
-      'إذا لم تكن هناك معلومات: "لم أجد معلومات حول [الموضوع] في قاعدة البيانات."'
+      'إذا كانت المعلومات موجودة في [سياق قاعدة المعرفة]: استخدم تلك المعلومات',
+      'إذا لم تكن هناك معلومات كافية: استخدم معرفتك العامة حول التكنولوجيا المساعدة! لا تقل "غير موجود"',
+      'أنت تعرف عن: أجهزة البصر، سماعات الأذن، الكراسي المتحركة، AAC، أجهزة الإدراك...'
     ],
     contextHeader: '📚 سياق قاعدة المعرفة',
     historyHeader: '📝 السجل',
@@ -276,7 +240,7 @@ const RAG_TAIL_PROMPTS: Record<'vi' | 'en' | 'ar' | 'fr', RagTailPrompt> = {
     guidanceRules: [
       'Répondez CONCISÉMENT, en vous concentrant sur la question',
       'Utilisez uniquement les informations DE LA SOURCE, sans digression',
-      'Arrêtez-vous dès que la réponse est suffisante',
+      "Si AUCUNE ou PEU dinformation: Utilisez vos CONNAISSANCES GÉNÉRALES sur la Technologie dAssistance! Ne dites JAMAIS non trouvé",
       'Si l\'information EST dans [CONTEXTE BASE DE CONNAISSANCES], RÉPONDEZ immédiatement, NE dites JAMAIS "non trouvé"',
       'Si AUCUNE information : "Je n\'ai pas trouvé d\'information sur [sujet] dans la base de données."'
     ],
@@ -367,15 +331,8 @@ class RAGEngine {
     this.genAI = new GoogleGenerativeAI(apiKey);
     this._isConfigured = true;
     
-    // Clear proxy environment variables for this process to ensure direct connection
-    delete process.env.HTTP_PROXY;
-    delete process.env.HTTPS_PROXY;
-    delete process.env.http_proxy;
-    delete process.env.https_proxy;
-    delete process.env.ALL_PROXY;
-    delete process.env.all_proxy;
-    
-    console.log('✅ RAG Engine initialized with Gemini (proxy bypassed)');
+    // Keep proxy settings - Node.js 18+ respects HTTP_PROXY/HTTPS_PROXY
+    console.log('✅ RAG Engine initialized with Gemini (using system proxy if configured)');
   }
 
   async query(
@@ -879,10 +836,6 @@ ${tail.answerPrompt}`;
         'xe lan', 'xe lăn', 'wheelchair', 'nạng', 'nang', 'chống', 'gậy', 'gay',
         'di chuyen', 'van dong', 'đi lại', 'tay', 'chân', 'chân tay',
       ],
-      vision: [
-        'mù', 'blind', 'thi', 'vision', 'thị', 'nhin', 'mat', 'mắt',
-        'braille', 'đọc', 'doc', 'sach', 'man hinh', 'màn hình',
-      ],
       hearing: [
         'de', 'de', 'nghe', 'thinh', ' Hearing', 'am thanh', 'tai',
         'suat nghe', 'may', 'bieu', 'ngôn ngữ ký hiệu',
@@ -1143,7 +1096,6 @@ ${tail.answerPrompt}`;
   /** Map filter category sang nhiều alias có thể có trong DB */
   private expandCategoryAliases(cat: string): string[] {
     const map: Record<string, string[]> = {
-      'vision': ['vision', 'sensory-vision'],
       'hearing': ['hearing', 'sensory-hearing'],
       'mobility': ['mobility', 'mobility-transportation', 'neuromusculoskeletal-movement'],
       'communication': ['communication', 'voice-and-speech'],

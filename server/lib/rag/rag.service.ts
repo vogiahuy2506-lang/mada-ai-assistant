@@ -31,7 +31,6 @@ export interface RAGResponse {
 /** Map database category → MadaCategory */
 function mapCategory(cat: string): MadaCategory {
   const mapping: Record<string, MadaCategory> = {
-    vision: 'vision',
     hearing: 'hearing',
     communication: 'communication',
     mobility: 'mobility',

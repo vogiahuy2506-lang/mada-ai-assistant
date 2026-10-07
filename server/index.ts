@@ -91,6 +91,9 @@ import urlImportRoutes from './routes/urlImport';
 import publicRoutes from './routes/public';
 import permissionsRoutes from './routes/permissions';
 import chatRoutes from './routes/chat';
+import notificationsRoutes from './routes/notifications';
+import supportRoutes from './routes/support';
+import widgetRoutes from './routes/widget';
 
 // Chat context (shared state)
 import { setRagInitialized } from './lib/chat-context';
@@ -117,7 +120,7 @@ process.on('uncaughtException', (error: Error) => {
 });
 
 const app = express();
-const PORT = process.env.PORT || 3002;
+const PORT = process.env.PORT || 3003;
 
 // Middleware
 app.use(express.json({ limit: '50mb' })); // Support large files
@@ -543,8 +546,13 @@ app.use('/api/permissions', permissionsRoutes);
 app.use('/api/chat', chatRoutes);
 
 // ============== WIDGET CONFIG ROUTES ==============
-import widgetRoutes from './routes/widget';
 app.use('/api/widget', widgetRoutes);
+
+// ============== NOTIFICATIONS ROUTES ==============
+app.use('/api/notifications', notificationsRoutes);
+
+// ============== SUPPORT TICKETS ROUTES ==============
+app.use('/api/support', supportRoutes);
 app.get('/api/admin/logs', async (req, res) => {
   try {
     const { level, source, limit = '100' } = req.query;
@@ -3613,201 +3621,8 @@ suggestedProducts = ragSources.slice(0, 4).map((src: any, idx: number) => {
 });
 
 // ============== AI FOLLOW-UP QUESTIONS ENDPOINT ==============
-/**
- * Generate AI-powered follow-up questions based on conversation context
- * Uses Gemini to create contextually relevant questions
- */
-app.post('/api/chat/follow-up', async (req, res) => {
-  try {
-    const { userMessage, aiResponse, conversationHistory, language = 'vi', userMode: _userMode = 'endUser' } = req.body;
-
-    if (!userMessage) {
-      return res.status(400).json({ success: false, error: 'userMessage is required' });
-    }
-
-    console.log('💡 Generating follow-up questions for:', userMessage.slice(0, 50));
-
-    // Build context from conversation history (last 5 messages)
-    const historyContext = conversationHistory
-      ?.slice(-10)
-      ?.map((m: { role: string; content: string }) => `${m.role}: ${m.content}`)
-      ?.join('\n') || '';
-
-    // Prompt templates by language
-    const prompts: Record<string, string> = {
-      vi: `Bạn là trợ lý MADA AI chuyên về Công nghệ Hỗ trợ (AT).
-Dựa vào cuộc trò chuyện sau:
----
-Người dùng: ${userMessage}
-MADA AI: ${aiResponse || '(chưa có phản hồi)'}
-${historyContext ? `Lịch sử:\n${historyContext}` : ''}
----
-Hãy đề xuất 3 câu hỏi TIẾP THEO mà người dùng có thể hỏi, liên quan trực tiếp đến câu hỏi ban đầu và câu trả lời.
-QUY TẮC:
-1. Câu hỏi phải CỤ THỂ, liên quan đến nội dung đang thảo luận
-2. Đa dạng: có thể hỏi về giá, cách dùng, so sánh, mua ở đâu, tiêu chuẩn...
-3. Ngắn gọn 10-20 từ
-4. Trả lời JSON theo format: {"questions": ["câu 1", "câu 2", "câu 3"]}
-5. Không hỏi lại những gì đã được trả lời
-6. Ưu tiên câu hỏi thực tế người dùng hay quan tâm
-7. CHỈ trả về JSON, không giải thích gì thêm`,
-      en: `You are MADA AI assistant specializing in Assistive Technology (AT).
-Based on this conversation:
----
-User: ${userMessage}
-MADA AI: ${aiResponse || '(no response yet)'}
-${historyContext ? `History:\n${historyContext}` : ''}
----
-Suggest 3 NEXT questions the user might ask, directly related to the initial question and answer.
-RULES:
-1. Questions must be SPECIFIC and relevant to the discussed topic
-2. Diverse: pricing, usage, comparison, where to buy, standards...
-3. Concise 10-20 words
-4. Respond ONLY in JSON format: {"questions": ["question 1", "question 2", "question 3"]}
-5. Don't repeat questions already answered
-6. Prioritize practical questions users care about
-7. ONLY return JSON, no explanation`,
-      ar: `أنت مساعد MADA AI المتخصص في التكنولوجيا المساعدة (AT).
-بناءً على هذه المحادثة:
----
-المستخدم: ${userMessage}
-MADA AI: ${aiResponse || '(لا توجد إجابة بعد)'}
-${historyContext ? `السجل:\n${historyContext}` : ''}
----
-اقترح 3-4 أسئلة NEXT التي قد يسألها المستخدم، مرتبطة مباشرة بالسؤال الأول والإجابة.
-القواعد:
-1. يجب أن تكون الأسئلة محددة وذات صلة بالموضوع المطروح
-2. متنوعة: الأسعار، الاستخدام، المقارنة، من أين أشتري، المعايير...
-3. موجزة وسهلة الفهم
-4. أجب بتنسيق JSON: {"questions": ["سؤال 1", "سؤال 2", "سؤال 3"]}
-5. لا تكرر الأسئلة التي تمت الإجابة عليها بالفعل
-6. أعط الأولوية للأسئلة العملية`,
-      fr: `Vous êtes l'assistant MADA AI spécialisé dans la Technologie d'Assistance (TA).
-Basé sur cette conversation:
----
-Utilisateur: ${userMessage}
-MADA AI: ${aiResponse || '(pas encore de réponse)'}
-${historyContext ? `Historique:\n${historyContext}` : ''}
----
-Suggérez 3-4 questions SUIVANTES que l'utilisateur pourrait poser, directement liées à la question initiale et à la réponse.
-RÈGLES:
-1. Les questions doivent être SPÉCIFIQUES et pertinentes au sujet discuté
-2. Diversifiées: prix, utilisation, comparaison, où acheter, normes...
-3. Concises et faciles à comprendre
-4. Répondez en format JSON: {"questions": ["question 1", "question 2", "question 3"]}
-5. Ne répétez pas les questions déjà répondues
-6. Priorisez les questions pratiques qui intéressent les utilisateurs`
-    };
-
-    const prompt = prompts[language] || prompts.vi;
-
-    // Check if Gemini is configured
-    if (!process.env.GEMINI_API_KEY && !process.env.GOOGLE_GEMINI_API_KEY) {
-      // Fallback to basic keyword matching if no API key
-      return res.json({
-        success: true,
-        data: {
-          questions: [],
-          source: 'fallback'
-        }
-      });
-    }
-
-    // Call Gemini
-    const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_GEMINI_API_KEY;
-    const model = process.env.GEMINI_MODEL || 'gemini-3.6-flash';
-
-    console.log('🔵 [follow-up] Calling Gemini with model:', model, 'key prefix:', apiKey?.slice(0, 10));
-
-    const geminiResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 2048,
-          }
-        })
-      }
-    );
-
-    if (!geminiResponse.ok) {
-      console.error('❌ Gemini API error:', await geminiResponse.text());
-      return res.json({
-        success: true,
-        data: { questions: [], source: 'api_error' }
-      });
-    }
-
-    const geminiData = await geminiResponse.json();
-    let responseText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    
-    // Remove markdown code blocks if present
-    responseText = responseText.replace(/```json\s*/i, '').replace(/```\s*/g, '').trim();
-    console.log('🔵 [follow-up] Gemini response length:', responseText.length, 'preview:', responseText.slice(0, 200));
-
-    // Parse JSON from response
-    try {
-      // Try to extract JSON first
-      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-      
-      if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0]);
-        const questions = Array.isArray(parsed.questions) ? parsed.questions : [];
-        console.log(`✅ Generated ${questions.length} follow-up questions from JSON`);
-        return res.json({
-          success: true,
-          data: {
-            questions: questions.slice(0, 4),
-            source: 'gemini'
-          }
-        });
-      }
-      
-      // Fallback: parse markdown list format "Q1: ...", "* ...", "- ..."
-      const lines = responseText.split('\n').map((l: any) => l.trim()).filter(Boolean);
-      const questions: string[] = [];
-      
-      for (const line of lines) {
-        // Match patterns like "Q1:", "Q2:", "1.", "2.", "* ", "- ", "• "
-        const match = line.match(/^[*\-\•]?\s*(?:Q?\d+[:\.)]\s*)?(.+)/i);
-        if (match && match[1] && match[1].length > 10) {
-          const q = match[1].replace(/^[a-z]\)\s*/i, '').trim();
-          if (q.length > 10 && !q.startsWith('#')) {
-            questions.push(q);
-          }
-        }
-      }
-      
-      if (questions.length > 0) {
-        console.log(`✅ Generated ${questions.length} follow-up questions from text`);
-        return res.json({
-          success: true,
-          data: {
-            questions: questions.slice(0, 4),
-            source: 'gemini_text'
-          }
-        });
-      }
-    } catch (parseErr) {
-      console.warn('⚠️ Could not parse follow-up response:', parseErr);
-    }
-
-    // Fallback
-    console.log('⚠️ Could not parse any questions, returning empty');
-    return res.json({
-      success: true,
-      data: { questions: [], source: 'parse_error' }
-    });
-
-  } catch (error) {
-    console.error('❌ Follow-up generation error:', error);
-    res.status(500).json({ success: false, error: 'Failed to generate follow-up questions' });
-  }
-});
+// NOTE: /api/chat/follow-up is handled by the chat router in routes/chat.ts
+// (duplicated inline endpoint removed to avoid conflicts)
 
 // ============== SCRAPE ENDPOINT ==============
 
@@ -4633,7 +4448,6 @@ app.post('/api/data/seed', async (_req, res) => {
     res.status(500).json({ success: false, error: 'Internal server error' });
   }
 });
-
 // ============== CONSULTATION ROUTES ==============
 // Lưu trữ consultation requests
 interface ConsultationRequest {
@@ -4644,19 +4458,20 @@ interface ConsultationRequest {
   message: string;
   timestamp: string;
   status: 'pending' | 'reviewed' | 'contacted';
+  attachments?: { name: string; type: string; size: number }[];
 }
 
 const consultationRequests: ConsultationRequest[] = [];
 
 app.post('/api/consultation', async (req, res) => {
   try {
-    const { name, email, phone, message, timestamp } = req.body;
+    const { name, email, phone, message, attachments, timestamp } = req.body;
 
     // Validate
     if (!name || !email || !message) {
       return res.status(400).json({
         success: false,
-        error: 'Vui lòng điền đầy đủ thông tin bắt buộc (tên, email, yêu cầu)',
+        error: 'Please fill in all required fields (name, email, message)',
       });
     }
 
@@ -4665,7 +4480,7 @@ app.post('/api/consultation', async (req, res) => {
     if (!emailRegex.test(email)) {
       return res.status(400).json({
         success: false,
-        error: 'Email không hợp lệ',
+        error: 'Invalid email address',
       });
     }
 
@@ -4678,12 +4493,13 @@ app.post('/api/consultation', async (req, res) => {
       message,
       timestamp: timestamp || new Date().toISOString(),
       status: 'pending',
+      attachments: attachments?.map((a: any) => ({ name: a.name, type: a.type, size: a.size })) || [],
     };
 
     consultationRequests.push(request);
-    logActivity('info', `Yêu cầu tư vấn mới từ ${name} (${email})`, 'Consultation');
+    logActivity('info', `New consultation request from ${name} (${email})`, 'Consultation');
 
-    // Gửi email thông báo (nếu có MAIL config)
+    // Gửi email thông báo bằng tiếng Anh (nếu có MAIL config)
     if (process.env.MAIL_HOST && process.env.MAIL_USERNAME) {
       try {
         const nodemailer = await import('nodemailer');
@@ -4698,39 +4514,156 @@ app.post('/api/consultation', async (req, res) => {
           },
         });
 
+        // Build admin link to view consultation
+        const adminBaseUrl = process.env.ADMIN_URL || process.env.BASE_URL || 'https://mada.example.com';
+        const viewChatLink = `${adminBaseUrl}/admin/consultations`;
+
+        // Build email content in English
+        const formattedDate = new Date(request.timestamp).toLocaleString('en-US', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          timeZoneName: 'short',
+        });
+
+        // Format attachments list
+        const attachmentsList = request.attachments && request.attachments.length > 0
+          ? `<p><strong>Attachments:</strong></p>
+             <ul>
+               ${request.attachments.map((a) => `<li>📎 ${a.name} (${(a.size / 1024).toFixed(1)} KB)</li>`).join('')}
+             </ul>`
+          : '<p><em>No attachments</em></p>';
+
         await transporter.sendMail({
-          from: process.env.MAIL_FROM || 'mada.noreply@digiso.vn',
-          to: process.env.CONSULTATION_EMAIL || 'contact@mada.vn',
-          subject: `[MADA] Yêu cầu tư vấn mới từ ${name}`,
+          from: process.env.MAIL_FROM || 'MADA AI <noreply@mada.org.qa>',
+          to: process.env.CONSULTATION_EMAIL || 'contact@mada.org.qa',
+          subject: `[MADA] New Consultation Request from ${name}`,
           html: `
-            <h2>Yêu cầu tư vấn chuyên gia mới</h2>
-            <p><strong>Họ tên:</strong> ${name}</p>
-            <p><strong>Email:</strong> ${email}</p>
-            <p><strong>Điện thoại:</strong> ${phone || 'Không cung cấp'}</p>
-            <p><strong>Thời gian:</strong> ${new Date(request.timestamp).toLocaleString('vi-VN')}</p>
-            <h3>Nội dung yêu cầu:</h3>
-            <p>${message.replace(/\n/g, '<br>')}</p>
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
+  
+  <!-- Header -->
+  <div style="background: linear-gradient(135deg, #0047ff 0%, #0052cc 100%); padding: 24px; border-radius: 12px 12px 0 0; text-align: center;">
+    <img src="${adminBaseUrl}/mada-logo.png" alt="MADA" style="height: 48px; margin-bottom: 12px;">
+    <h1 style="color: white; margin: 0; font-size: 24px; font-weight: 600;">New Consultation Request</h1>
+    <p style="color: rgba(255,255,255,0.9); margin: 8px 0 0; font-size: 14px;">MADA Center - Assistive Technology Support</p>
+  </div>
+  
+  <!-- Content -->
+  <div style="background: white; padding: 24px; border-radius: 0 0 12px 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+    
+    <!-- Request ID -->
+    <div style="background: #f0f4ff; padding: 12px 16px; border-radius: 8px; margin-bottom: 20px;">
+      <p style="margin: 0; font-size: 12px; color: #666; text-transform: uppercase; letter-spacing: 0.5px;">Request ID</p>
+      <p style="margin: 4px 0 0; font-family: monospace; font-size: 14px; color: #0047ff; font-weight: 600;">${request.id}</p>
+    </div>
+    
+    <!-- Contact Information -->
+    <h2 style="font-size: 16px; color: #333; margin: 0 0 16px; padding-bottom: 8px; border-bottom: 2px solid #0047ff;">📋 Contact Information</h2>
+    
+    <table style="width: 100%; border-collapse: collapse; margin-bottom: 24px;">
+      <tr>
+        <td style="padding: 8px 0; color: #666; width: 120px;">Full Name:</td>
+        <td style="padding: 8px 0; font-weight: 600; color: #333;">${request.name}</td>
+      </tr>
+      <tr>
+        <td style="padding: 8px 0; color: #666;">Email:</td>
+        <td style="padding: 8px 0;">
+          <a href="mailto:${request.email}" style="color: #0047ff; text-decoration: none;">${request.email}</a>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding: 8px 0; color: #666;">Phone:</td>
+        <td style="padding: 8px 0; color: #333;">${request.phone || '<em>Not provided</em>'}</td>
+      </tr>
+      <tr>
+        <td style="padding: 8px 0; color: #666;">Submitted:</td>
+        <td style="padding: 8px 0; color: #333;">${formattedDate}</td>
+      </tr>
+    </table>
+    
+    <!-- Request Details -->
+    <h2 style="font-size: 16px; color: #333; margin: 0 0 16px; padding-bottom: 8px; border-bottom: 2px solid #0047ff;">💬 Request Details</h2>
+    
+    <div style="background: #fafafa; padding: 16px; border-radius: 8px; margin-bottom: 24px;">
+      <p style="margin: 0; color: #333; line-height: 1.6; white-space: pre-wrap;">${request.message.replace(/\n/g, '<br>')}</p>
+    </div>
+    
+    <!-- Attachments -->
+    <h2 style="font-size: 16px; color: #333; margin: 0 0 16px; padding-bottom: 8px; border-bottom: 2px solid #0047ff;">📎 Attachments</h2>
+    
+    <div style="background: #fafafa; padding: 16px; border-radius: 8px; margin-bottom: 24px;">
+      ${attachmentsList}
+    </div>
+    
+    <!-- Action Button -->
+    <div style="text-align: center; margin-top: 24px;">
+      <a href="${viewChatLink}" style="display: inline-block; background: #0047ff; color: white; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px; box-shadow: 0 4px 12px rgba(0,71,255,0.3);">
+        📊 View in Admin Dashboard
+      </a>
+    </div>
+    
+    <p style="text-align: center; color: #999; font-size: 12px; margin-top: 24px;">
+      This is an automated notification from MADA AI Assistant.<br>
+      Please respond to the user within 24-48 hours.
+    </p>
+  </div>
+  
+</body>
+</html>
+          `,
+          text: `
+NEW CONSULTATION REQUEST
+
+Request ID: ${request.id}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Contact Information:
+• Name: ${request.name}
+• Email: ${request.email}
+• Phone: ${request.phone || 'Not provided'}
+• Submitted: ${formattedDate}
+
+Request Details:
+${request.message}
+
+Attachments: ${request.attachments && request.attachments.length > 0 ? request.attachments.map((a) => `• ${a.name}`).join('\n') : 'None'}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+View in Admin Dashboard: ${viewChatLink}
+
+This is an automated notification from MADA AI Assistant.
+Please respond to the user within 24-48 hours.
           `,
         });
 
-        logActivity('success', `Email thông báo đã gửi cho ${process.env.CONSULTATION_EMAIL || 'contact@mada.vn'}`, 'Consultation');
+        logActivity('success', `Email notification sent to ${process.env.CONSULTATION_EMAIL || 'contact@mada.org.qa'}`, 'Consultation');
       } catch (emailError) {
-        logActivity('warn', `Không thể gửi email: ${emailError}`, 'Consultation');
-        // Không fail request vì đã lưu vào database
+        logActivity('warn', `Failed to send email: ${emailError}`, 'Consultation');
       }
+    } else {
+      logActivity('warn', 'Email not configured. Set MAIL_HOST, MAIL_USERNAME, MAIL_PASSWORD to enable notifications.', 'Consultation');
     }
 
     res.json({
       success: true,
       data: {
         id: request.id,
-        message: 'Yêu cầu tư vấn đã được gửi thành công. Chuyên gia sẽ liên hệ trong 24-48 giờ.',
+        message: 'Your consultation request has been submitted successfully. An AT specialist will contact you within 24-48 hours.',
       },
     });
   } catch (error) {
     console.error('Consultation error:', error);
-    logActivity('error', `Lỗi xử lý yêu cầu tư vấn: ${error}`, 'Consultation');
-    res.status(500).json({ success: false, error: 'Có lỗi xảy ra. Vui lòng thử lại.' });
+    logActivity('error', `Error processing consultation: ${error}`, 'Consultation');
+    res.status(500).json({ success: false, error: 'An error occurred. Please try again.' });
   }
 });
 

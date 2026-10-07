@@ -22,7 +22,7 @@ export function PaywallModal() {
   const setPlan = useAuthStore((s) => s.setPlan);
   const resetQuota = useAuthStore((s) => s.resetQuota);
   const language = useLanguageStore((s) => s.language ?? 'vi') as 'vi' | 'en' | 'ar' | 'fr';
-  const { plans, fetchPlans, isLoading } = usePricingPlansStore();
+  const { plans, fetchPlans } = usePricingPlansStore();
 
   const [loadingPlan, setLoadingPlan] = useState<UserPlan | null>(null);
 

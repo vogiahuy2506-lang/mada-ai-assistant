@@ -15,7 +15,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { ragEngine } from '../lib/rag/ragEngine';
 import { guardrails } from '../lib/guardrails';
 import { buildSystemPrompt } from '../lib/prompts/systemPrompts';
-import { createConsultationSession, getConsultationQuestions, recordConsultationAnswer, shouldRecommend, completeConsultation } from '../lib/consultationEngine';
+import { createConsultationSession, getConsultationQuestions } from '../lib/consultationEngine';
 import db from '../lib/db';
 import { getSystemSettings } from '../lib/db';
 import { verifyAccessToken } from '../lib/auth';
@@ -105,6 +105,10 @@ function shouldShowProducts(message: string): boolean {
     'gợi ý', 'đề xuất', 'recommend', 'suggest', 'suggestion',
     'wheelchair', 'máy trợ', 'xe lăn', 'chân giả', 'tay giả', 'kính', 'nạng',
     'xe', 'ghế', 'giường', 'nệm', 'gậy', 'máy', 'thiết bị',
+    // ⭐ Thêm từ khóa hình ảnh và link
+    'hình ảnh', 'hình', 'ảnh', 'link', 'url', 'web', 'website', 'xem thêm',
+    'tư vấn', 'chi tiết hơn', 'kĩ hơn', 'cụ thể hơn', 'more details', 'detailed',
+    'sp', 'sản phẩm', 'mẫu mã', 'kiểu dáng',
     // English
     'device', 'product', 'buy', 'purchase', 'price', 'cost', 'where to buy',
     'recommend', 'suggest', 'wheelchair', 'hearing aid', 'screen reader',
@@ -272,40 +276,155 @@ function extractStructuredDataFromContent(content: string, lang: string): any {
 async function getSuggestedProducts(ragSources: any[], message: string, effectiveLanguage: string): Promise<any[]> {
   let suggestedProducts: any[] = [];
   
+  // Helper: Check if URL is valid for product
+  const isValidProductUrl = (url: string): boolean => {
+    if (!url) return false;
+    if (url.startsWith('manual:')) return false;
+    if (url.startsWith('bot-') || url.startsWith('agent-')) return false;
+    if (!url.startsWith('http')) return false;
+    return true;
+  };
+  
+  // Helper: Check if title is a bot/knowledge base entry (not a real product)
+  const isBotEntry = (title: string): boolean => {
+    if (!title) return false;
+    const lower = title.toLowerCase();
+    if (lower.includes('bot ') && lower.includes('kiến thức')) return true;
+    if (lower.includes('regulatory & standards')) return true;
+    if (lower.includes('bot ') && lower.includes('knowledge')) return true;
+    return false;
+  };
+  
+  // Helper: Get full product data from kb_products table
+  const getProductFromDb = (productUrl: string): any => {
+    if (!productUrl) return null;
+    try {
+      // Normalize URL (remove trailing slash)
+      const normalizedUrl = productUrl.replace(/\/$/, '');
+      
+      // Try to find by source_url OR product_url (both exact and normalized)
+      const product = db.prepare(`
+        SELECT * FROM kb_products 
+        WHERE REPLACE(source_url, '/', '') = ? OR REPLACE(product_url, '/', '') = ?
+           OR source_url = ? OR product_url = ?
+        LIMIT 1
+      `).get(normalizedUrl, normalizedUrl, productUrl, productUrl) as any;
+      if (product) {
+        console.log(`📷 [DB Lookup] FOUND: ${product.title} | image: ${product.image_url ? 'YES' : 'NO'}`);
+        return product;
+      }
+      console.log(`📷 [DB Lookup] NOT FOUND for: ${productUrl}`);
+    } catch (e) { 
+      console.warn('[getProductFromDb] DB error:', (e as Error).message);
+    }
+    return null;
+  };
+  
+  // Helper: Directly get product by title from kb_products
+  const getProductByTitle = (title: string): any => {
+    if (!title) return null;
+    try {
+      // Try exact match first
+      let product = db.prepare(`
+        SELECT * FROM kb_products 
+        WHERE title = ? OR title_en = ?
+        LIMIT 1
+      `).get(title, title) as any;
+      
+      // Try partial match
+      if (!product) {
+        product = db.prepare(`
+          SELECT * FROM kb_products 
+          WHERE title LIKE ? OR title_en LIKE ?
+          LIMIT 1
+        `).get(`%${title}%`, `%${title}%`) as any;
+      }
+      
+      // Try matching with special chars removed
+      if (!product) {
+        const cleanTitle = title.replace(/[®™©°]/g, '').trim();
+        product = db.prepare(`
+          SELECT * FROM kb_products 
+          WHERE REPLACE(title, '®', '') LIKE ? OR REPLACE(title, '™', '') LIKE ?
+          LIMIT 1
+        `).get(`%${cleanTitle}%`, `%${cleanTitle}%`) as any;
+      }
+      
+      if (product) {
+        console.log(`📷 [Title Lookup] FOUND by title "${title}": ${product.title} | image: ${product.image_url ? 'YES' : 'NO'}`);
+        return product;
+      }
+      console.log(`📷 [Title Lookup] NOT FOUND for title: ${title}`);
+    } catch (e) { 
+      console.warn('[getProductByTitle] DB error:', (e as Error).message);
+    }
+    return null;
+  };
+  
   // Strategy 1: From RAG sources
   if (ragSources.length > 0) {
-    const sourceUrls = ragSources.slice(0, 4).map((src: any) => src.source || src.metadata?.source || '').filter(Boolean);
+    console.log(`📦 [getSuggestedProducts] Strategy 1: ${ragSources.length} RAG sources`);
+    const sourceUrls = ragSources.slice(0, 8).map((src: any) => src.source || src.metadata?.source || '').filter(Boolean);
+    console.log(`📦 [getSuggestedProducts] Strategy 1: sourceUrls =`, sourceUrls.slice(0, 5));
     let dbDataMap: Record<string, any> = {};
+    
+    // Helper: normalize URL (remove trailing slash)
+    const normalizeUrl = (url: string) => url?.replace(/\/$/, '') || '';
     
     if (sourceUrls.length > 0) {
       try {
-        const placeholders = sourceUrls.map(() => '?').join(',');
+        // Also normalize URLs for lookup
+        const normalizedUrls = sourceUrls.map(normalizeUrl);
+        const placeholders = normalizedUrls.map(() => '?').join(',');
         const rows = db.prepare(`
           SELECT id, title, content, source, url, category, language, metadata
           FROM knowledge_items
-          WHERE url IN (${placeholders}) OR source IN (${placeholders})
-        `).all(...sourceUrls, ...sourceUrls) as any[];
+          WHERE REPLACE(url, '/', '') IN (${placeholders}) OR REPLACE(source, '/', '') IN (${placeholders})
+        `).all(...normalizedUrls, ...normalizedUrls) as any[];
         
         for (const row of rows) {
+          // Store with both original and normalized keys
           const key = row.url || row.source || '';
-          if (key) dbDataMap[key] = row;
+          if (key) {
+            dbDataMap[key] = row;
+            dbDataMap[normalizeUrl(key)] = row; // Also store normalized
+          }
         }
       } catch (e) { /* ignore */ }
     }
     
-    suggestedProducts = ragSources.slice(0, 4).map((src: any, idx: number) => {
+    suggestedProducts = ragSources.slice(0, 8).map((src: any, idx: number) => {
       const meta = src.metadata || {};
-      const sourceUrl = meta.source || meta.url || src.source || '';
-      const dbItem = dbDataMap[sourceUrl] || {};
+      const rawSourceUrl = meta.source || meta.url || src.source || '';
+      const sourceUrl = normalizeUrl(rawSourceUrl);
+      const dbItem = dbDataMap[sourceUrl] || dbDataMap[rawSourceUrl] || {};
       
-      // Get thumbnail
-      let thumbnail = meta.thumbnailUrl || '';
-      if (!thumbnail && dbItem.metadata) {
-        try {
-          const parsedMeta = typeof dbItem.metadata === 'string' ? JSON.parse(dbItem.metadata) : dbItem.metadata;
-          thumbnail = parsedMeta.thumbnailUrl || '';
-        } catch { /* ignore */ }
+      // ⭐ LUÔN ƯU TIÊN URL từ database (url column) vì metadata có thể trống
+      const finalProductUrl = dbItem.url || sourceUrl || meta.productUrl || '';
+      
+      // Get thumbnail: try metadata first (thumbnailUrl OR image_url), then kb_products table
+      let thumbnail = meta.thumbnailUrl || meta.image_url || '';
+      console.log(`📷 [Product ${idx}] title="${meta.title || 'N/A'}" sourceUrl="${sourceUrl.slice(0,60)}"`);
+      console.log(`📷 [Product ${idx}] dbItem found: ${!!dbItem.id}, dbItem.url="${(dbItem.url || '').slice(0,60)}"`);
+      
+      // Also get full product data from kb_products for additional fields
+      let kbProduct = getProductFromDb(finalProductUrl);
+      console.log(`📷 [Product ${idx}] getProductFromDb(${finalProductUrl?.slice(0,40)}...) = ${kbProduct ? 'FOUND' : 'NOT FOUND'}`);
+      
+      // Fallback: try to find by title if URL lookup failed
+      if (!kbProduct && meta.title) {
+        console.log(`📷 [Product ${idx}] Trying getProductByTitle("${meta.title}")`);
+        kbProduct = getProductByTitle(meta.title);
       }
+      
+      if (kbProduct) {
+        console.log(`📷 [Product ${idx}] ✓ Found: ${kbProduct.title}, image=${kbProduct.image_url ? 'YES' : 'NO'}`);
+        thumbnail = kbProduct.image_url || '';
+      } else {
+        console.log(`📷 [Product ${idx}] ✗ NOT found in kb_products`);
+      }
+      
+      console.log(`📷 [Product ${idx}] FINAL image=${thumbnail ? 'HAS IMAGE' : 'NO IMAGE'}`);
       
       // Parse detailed metadata
       const detailedMeta = parseDetailedMetadata(meta);
@@ -314,24 +433,26 @@ async function getSuggestedProducts(ragSources: any[], message: string, effectiv
       // Extract structured data from content
       const contentData = extractStructuredDataFromContent(src.content || '', effectiveLanguage);
       
-      // Merge all data sources
+      // Merge all data sources (kbProduct has priority for brand, price, etc.)
       const merged = {
         ...detailedMeta,
         ...dbDetailedMeta,
         ...contentData,
+        brand: kbProduct?.brand || detailedMeta.brand || dbDetailedMeta.brand || 'MADA Qatar AT Portal',
+        price_range: kbProduct?.price_range || detailedMeta.price_range || dbDetailedMeta.price_range || 'Contact MADA Center',
       };
       
       // Build full product object
       return {
-        id: src.id || dbItem.id || `src-${idx}`,
-        title: meta.title || dbItem.title || 'Assistive Technology',
-        title_en: meta.title_en || meta.title || dbItem.title || 'Assistive Technology',
-        description: (src.content || dbItem.content || '').slice(0, 300),
+        id: kbProduct?.id || src.id || dbItem.id || `src-${idx}`,
+        title: kbProduct?.title || meta.title || dbItem.title || 'Assistive Technology',
+        title_en: kbProduct?.title_en || meta.title_en || meta.title || dbItem.title || 'Assistive Technology',
+        description: kbProduct?.description || (src.content || dbItem.content || '').slice(0, 300),
         category: meta.category || dbItem.category || 'general',
-        brand: meta.brand || 'MADA Qatar AT Portal',
-        price_range: meta.price_range || 'Contact MADA Center',
-        product_url: sourceUrl || meta.productUrl || '',
-        source_url: sourceUrl || meta.sourceUrl || '',
+        brand: merged.brand,
+        price_range: merged.price_range,
+        product_url: finalProductUrl,
+        source_url: finalProductUrl,
         image_url: toProxyImageUrl(thumbnail),
         confidence: src.score || 0.7,
         match_reason: getMatchReason(effectiveLanguage, 'found'),
@@ -352,46 +473,202 @@ async function getSuggestedProducts(ragSources: any[], message: string, effectiv
         availability: merged.availability || '',
       };
     });
+    
+    // ⭐ Filter out invalid products (bots, invalid URLs, no images, garbage titles)
+    suggestedProducts = suggestedProducts.filter((p: any) => {
+      const botCheck = isBotEntry(p.title);
+      const urlCheck = isValidProductUrl(p.product_url);
+      // Filter out garbage titles (repeated chars like "kkkk", "aaaa", etc.)
+      const titleLower = (p.title || '').toLowerCase();
+      const garbageTitle = /^(.)\1{3,}$/.test(titleLower); // 4+ same chars repeated
+      if (garbageTitle) console.log(`📦 [Filter GARBAGE] "${p.title}"`);
+      console.log(`📦 [Filter] "${p.title}" | bot=${botCheck} | url_valid=${urlCheck} | url=${p.product_url}`);
+      if (botCheck) return false;
+      if (!urlCheck) return false;
+      if (garbageTitle) return false;
+      return true;
+    });
+    
+    console.log(`📦 [getSuggestedProducts] Strategy 1 result: ${suggestedProducts.length} products (after filtering)`);
   }
   
-  // Strategy 2: By category keyword
-  if (suggestedProducts.length === 0) {
-    const contentLower = message.toLowerCase();
-    const categoryKeywords: Record<string, string[]> = {
-      hearing: ['deaf', 'hear', 'ear', 'sound', 'điếc', 'thính', 'thính giác', 'hearing loss', 'audio', 'fm system'],
-      vision: ['blind', 'visual', 'eye', 'sight', 'mắt', 'thị giác', 'blindness', 'low vision'],
-      mobility: ['wheelchair', 'walk', 'move', 'physical', 'mobility', 'vận động', 'di chuyển'],
-      communication: ['speak', 'talk', 'communicate', 'voice', 'speech', 'giao tiếp', 'ngôn ngữ', 'aac'],
-      cognition: ['memory', 'learn', 'cognitive', 'think', 'nhận thức', 'học tập'],
-      daily_living: ['daily', 'living', 'self-care', 'sinh hoạt', 'ăn uống'],
-      education: ['education', 'school', 'study', 'giáo dục', 'học'],
-    };
-    
-    let detectedCat: string | null = null;
-    for (const [cat, keywords] of Object.entries(categoryKeywords)) {
-      if (keywords.some(kw => contentLower.includes(kw.toLowerCase()))) {
-        detectedCat = cat;
-        break;
-      }
+  // Strategy 2: By category keyword (run ALWAYS if category detected, add more products)
+  const contentLower = message.toLowerCase();
+  const categoryKeywords: Record<string, string[]> = {
+    hearing: ['deaf', 'hear', 'ear', 'sound', 'điếc', 'thính', 'thính giác', 'hearing loss', 'audio', 'fm system', 'amplifier', 'microphone', 'streamer', 'signia', 'oticon', 'resound'],
+    vision: ['blind', 'visual', 'eye', 'sight', 'mắt', 'thị giác', 'blindness', 'low vision', 'magnif', 'braille'],
+    mobility: ['wheelchair', 'walk', 'move', 'physical', 'mobility', 'vận động', 'di chuyển', 'crutch', 'cane'],
+    communication: ['speak', 'talk', 'communicate', 'voice', 'speech', 'giao tiếp', 'ngôn ngữ', 'aac'],
+    cognition: ['memory', 'learn', 'cognitive', 'think', 'nhận thức', 'học tập'],
+    daily_living: ['daily', 'living', 'self-care', 'sinh hoạt', 'ăn uống'],
+    education: ['education', 'school', 'study', 'giáo dục', 'học'],
+  };
+  
+  // Map detected category keyword to actual database category
+  const DETECTED_TO_DB_CATEGORY: Record<string, string> = {
+    hearing: 'sensory-hearing',
+    vision: 'sensory-vision',
+    mobility: 'mobility-and-transportation',
+    communication: 'voice-and-speech',
+    cognition: 'mental-cognitive',
+    daily_living: 'daily-living',
+    education: 'education',
+  };
+  
+  let detectedCat: string | null = null;
+  let detectedDbCategory: string | null = null;
+  for (const [cat, keywords] of Object.entries(categoryKeywords)) {
+    if (keywords.some(kw => contentLower.includes(kw.toLowerCase()))) {
+      detectedCat = cat;
+      detectedDbCategory = DETECTED_TO_DB_CATEGORY[cat] || cat;
+      break;
     }
+  }
+  
+  if (detectedCat && detectedDbCategory) {
+    console.log(`📦 [getSuggestedProducts] Strategy 2: Detected keyword "${detectedCat}" → DB category "${detectedDbCategory}", adding more products`);
     
-    if (detectedCat) {
-      try {
-        const madaItems = db.prepare(`
-          SELECT id, title, content, source, url, category, language, metadata
-          FROM knowledge_items
-          WHERE category = ? AND source LIKE '%mada.org.qa%' AND status IN ('draft','published','approved')
-          ORDER BY confidence DESC, created_at DESC LIMIT 4
-        `).all(detectedCat) as any[];
-        
-        suggestedProducts = madaItems.map((item: any) => {
+    // Collect existing product URLs to avoid duplicates
+    const existingUrls = new Set(suggestedProducts.map((p: any) => p.product_url?.replace(/\/$/, '')));
+    console.log(`📦 [Strategy2] existingUrls:`, [...existingUrls]);
+    
+    try {
+      // Use the mapped DB category
+      const madaItems = db.prepare(`
+        SELECT id, title, content, source, url, category, language, metadata
+        FROM knowledge_items
+        WHERE category = ? AND source LIKE '%MADA%' AND status IN ('draft','published','approved')
+        ORDER BY confidence DESC, created_at DESC LIMIT 10
+      `).all(detectedDbCategory) as any[];
+      
+      console.log(`📦 [Strategy2] Query for category "${detectedDbCategory}" returned ${madaItems.length} items`);
+      
+      console.log(`📦 [Strategy2] Query returned ${madaItems.length} items`);
+      
+      const isValidTitle = (title: string): boolean => {
+        if (!title || title.length < 3) return false;
+        const lower = title.toLowerCase();
+        if (/^(.)\1+$/.test(lower)) return false;
+        if (/^(test|test123|abcd|qwerty)/i.test(lower)) return false;
+        return true;
+      };
+      
+      const newProducts = madaItems
+        .filter((item: any) => {
+          const urlKey = (item.url || item.source || '').replace(/\/$/, '');
+          const isValid = isValidTitle(item.title) && !existingUrls.has(urlKey);
+          if (!isValid) {
+            console.log(`📦 [Strategy2 Filter OUT] "${item.title}" - validTitle=${isValidTitle(item.title)}, inExisting=${existingUrls.has(urlKey)}, url="${urlKey}"`);
+          }
+          return isValid;
+        })
+        .map((item: any) => {
           const url = item.url || item.source || '';
           let thumbnail = '';
           try {
             const meta = typeof item.metadata === 'string' ? JSON.parse(item.metadata) : item.metadata;
-            thumbnail = meta?.thumbnailUrl || '';
+            thumbnail = meta?.thumbnailUrl || meta?.image_url || '';
             if (thumbnail && !thumbnail.startsWith('http')) thumbnail = '';
           } catch { /* ignore */ }
+          if (!thumbnail && url) {
+            thumbnail = getProductFromDb(url)?.image_url || '';
+          }
+          
+          const detailedMeta = parseDetailedMetadata(item.metadata);
+          const contentData = extractStructuredDataFromContent(item.content || '', effectiveLanguage);
+          const merged = { ...detailedMeta, ...contentData };
+          
+          return {
+            id: item.id,
+            title: item.title,
+            title_en: item.title,
+            description: (item.content || '').slice(0, 300),
+            category: item.category,
+            brand: 'MADA Qatar AT Portal',
+            price_range: 'Contact MADA Center',
+            product_url: url,
+            source_url: url,
+            image_url: toProxyImageUrl(thumbnail),
+            confidence: 0.6,
+            match_reason: getMatchReason(effectiveLanguage, 'category', detectedDbCategory!),
+            patient_indications: merged.patient_indications || [],
+            medical_indications: merged.medical_indications || [],
+            contraindications: merged.contraindications || [],
+            specifications: merged.specifications || [],
+            compatibility: merged.compatibility || [],
+            financial_support: merged.financial_support || [],
+            insurance_coverage: merged.insurance_coverage || [],
+            mada_advice: merged.mada_advice || '',
+            warranty: merged.warranty || '',
+            features: merged.features || [],
+            standards: merged.standards || [],
+          };
+        });
+      
+      // Add new products to existing list
+      suggestedProducts.push(...newProducts);
+      
+      // Final deduplicate and filter
+      const seenUrls = new Set<string>();
+      suggestedProducts = suggestedProducts.filter((p: any) => {
+        const urlKey = (p.product_url || '').replace(/\/$/, '');
+        if (seenUrls.has(urlKey)) return false;
+        seenUrls.add(urlKey);
+        if (isBotEntry(p.title)) return false;
+        if (!isValidProductUrl(p.product_url)) return false;
+        return true;
+      });
+      
+      // Limit to max 12 products
+      suggestedProducts = suggestedProducts.slice(0, 12);
+      
+      console.log(`📦 [getSuggestedProducts] Strategy 2: Added ${newProducts.length} products, total: ${suggestedProducts.length}`);
+    } catch (dbErr) {
+      console.log('⚠️ Strategy 2 error:', dbErr);
+    }
+  }
+  
+  console.log(`📦 [getSuggestedProducts] FINAL: ${suggestedProducts.length} products`);
+
+  // ⭐ Strategy 3: Featured MADA items (only if still empty)
+  if (suggestedProducts.length === 0) {
+    console.log(`📦 [getSuggestedProducts] Strategy 3: Trying featured MADA items`);
+    try {
+      // Get featured products first, then fallback to most recent
+      const featuredMada = db.prepare(`
+        SELECT id, title, content, source, url, category, language, metadata
+        FROM knowledge_items
+        WHERE source LIKE '%MADA%' AND status IN ('draft','published','approved')
+        ORDER BY confidence DESC, created_at DESC
+        LIMIT 12
+      `).all() as any[];
+      
+      // ⭐ Filter out test/invalid titles
+      const isValidTitle = (title: string): boolean => {
+        if (!title || title.length < 3) return false;
+        const lower = title.toLowerCase();
+        if (/^(.)\1+$/.test(lower)) return false; // 'aaaa', 'kkkk'
+        if (/^(test|test123|abcd|qwerty)/i.test(lower)) return false;
+        if (/^[a-z]{1,2}$/.test(lower) && !['tv', 'pc', 'ai', 'at', 'it', 'ok', 'ip'].includes(lower)) return false;
+        return true;
+      };
+      
+      const validProducts = featuredMada.filter((item: any) => isValidTitle(item.title));
+      
+      // Only show products if we have valid ones
+      if (validProducts.length > 0) {
+        suggestedProducts = validProducts.map((item: any) => {
+          const url = item.url || item.source || '';
+          let thumbnail = '';
+          try {
+            const meta = typeof item.metadata === 'string' ? JSON.parse(item.metadata) : item.metadata;
+            thumbnail = meta?.thumbnailUrl || meta?.image_url || '';
+            if (thumbnail && !thumbnail.startsWith('http')) thumbnail = '';
+          } catch { /* ignore */ }
+          // Fallback: look up image from kb_products table
+          if (!thumbnail && url) {
+            thumbnail = getProductFromDb(url)?.image_url || '';
+          }
           
           // Parse detailed metadata
           const detailedMeta = parseDetailedMetadata(item.metadata);
@@ -411,8 +688,8 @@ async function getSuggestedProducts(ragSources: any[], message: string, effectiv
             product_url: url,
             source_url: url,
             image_url: toProxyImageUrl(thumbnail),
-            confidence: 0.7,
-            match_reason: getMatchReason(effectiveLanguage, 'category', detectedCat!),
+            confidence: 0.6,
+            match_reason: getMatchReason(effectiveLanguage, 'found'),
             // Detailed fields
             patient_indications: merged.patient_indications || [],
             medical_indications: merged.medical_indications || [],
@@ -428,74 +705,84 @@ async function getSuggestedProducts(ragSources: any[], message: string, effectiv
           };
         });
         
-        // Deduplicate by URL
-        const seenUrls = new Set<string>();
+        // ⭐ Filter out invalid products (bots, invalid URLs)
         suggestedProducts = suggestedProducts.filter((p: any) => {
-          if (seenUrls.has(p.product_url)) return false;
-          seenUrls.add(p.product_url);
+          if (isBotEntry(p.title)) return false;
+          if (!isValidProductUrl(p.product_url)) return false;
           return true;
         });
-      } catch (dbErr) { /* ignore */ }
-    }
-  }
-  
-  // Strategy 3: Random MADA item
-  if (suggestedProducts.length === 0) {
-    try {
-      const randomMada = db.prepare(`
-        SELECT id, title, content, source, url, category, language, metadata
-        FROM knowledge_items
-        WHERE source LIKE '%mada.org.qa%' AND status IN ('draft','published','approved')
-        ORDER BY RANDOM() LIMIT 4
-      `).all() as any[];
-      
-      suggestedProducts = randomMada.map((item: any) => {
-        const url = item.url || item.source || '';
-        let thumbnail = '';
-        try {
-          const meta = typeof item.metadata === 'string' ? JSON.parse(item.metadata) : item.metadata;
-          thumbnail = meta?.thumbnailUrl || '';
-          if (thumbnail && !thumbnail.startsWith('http')) thumbnail = '';
-        } catch { /* ignore */ }
-        
-        // Parse detailed metadata
-        const detailedMeta = parseDetailedMetadata(item.metadata);
-        
-        // Extract from content
-        const contentData = extractStructuredDataFromContent(item.content || '', effectiveLanguage);
-        const merged = { ...detailedMeta, ...contentData };
-        
-        return {
-          id: item.id,
-          title: item.title,
-          title_en: item.title,
-          description: (item.content || '').slice(0, 300),
-          category: item.category,
-          brand: 'MADA Qatar AT Portal',
-          price_range: 'Contact MADA Center',
-          product_url: url,
-          source_url: url,
-          image_url: toProxyImageUrl(thumbnail),
-          confidence: 0.6,
-          match_reason: getMatchReason(effectiveLanguage, 'found'),
-          // Detailed fields
-          patient_indications: merged.patient_indications || [],
-          medical_indications: merged.medical_indications || [],
-          contraindications: merged.contraindications || [],
-          specifications: merged.specifications || [],
-          compatibility: merged.compatibility || [],
-          financial_support: merged.financial_support || [],
-          insurance_coverage: merged.insurance_coverage || [],
-          mada_advice: merged.mada_advice || '',
-          warranty: merged.warranty || '',
-          features: merged.features || [],
-          standards: merged.standards || [],
-        };
-      });
+      }
+      console.log(`📦 [getSuggestedProducts] Strategy 3: ${validProducts.length} valid items, ${featuredMada.length} total`);
+      // If no valid products found, return empty array (don't show garbage)
     } catch (dbErr) { /* ignore */ }
   }
   
+  // Final cap at 12 products
+  suggestedProducts = suggestedProducts.slice(0, 12);
+  
+  console.log(`📦 [getSuggestedProducts] FINAL: ${suggestedProducts.length} products`);
   return suggestedProducts;
+}
+
+// ⭐ Function mới: Tạo text tự nhiên với embedded product thumbnails
+function buildNaturalProductIntroduction(products: any[], language: string): { intro: string; productHtml: string } {
+  // Nếu không có sản phẩm, trả về rỗng
+  if (!products || products.length === 0) {
+    return { intro: '', productHtml: '' };
+  }
+
+  // Giới hạn 2-3 sản phẩm để hiển thị inline
+  const displayProducts = products.slice(0, 3);
+
+  // Text giới thiệu theo ngôn ngữ
+  const introTexts: Record<string, string> = {
+    vi: 'Với các biểu hiện trên của bạn thì tôi khuyên bạn nên tham khảo các sản phẩm dưới đây nhé:',
+    en: 'Based on your description, I recommend you check out these products:',
+    ar: 'بناءً على وصفك، أنصحك الاطلاع على هذه المنتجات:',
+    fr: 'Selon votre description, je vous recommande de consulter ces produits:',
+  };
+
+  const intro = introTexts[language] || introTexts.vi;
+
+  // Tạo HTML cho các product thumbnails
+  // Format: thumbnail nhỏ + tên + link mua
+  const productHtml = displayProducts.map((product: any) => {
+    const title = language === 'en' && product.title_en ? product.title_en : product.title;
+    const productUrl = product.product_url || product.url || '#';
+    const imageUrl = product.image_url || product.thumbnail || '';
+    const brand = product.brand || 'MADA';
+    const description = product.description || '';
+    const madaAdvice = product.mada_advice || '';
+
+    // Xây dựng HTML cho mỗi sản phẩm - thiết kế nhỏ gọn inline
+    let html = `
+      <div style="margin-top: 12px; padding: 12px; background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); border-radius: 12px; border: 1px solid #e2e8f0; display: flex; gap: 12px; align-items: flex-start;">
+        <div style="flex-shrink: 0;">
+          ${imageUrl ? 
+            `<img src="${imageUrl}" alt="${title}" style="width: 60px; height: 60px; object-fit: cover; border-radius: 8px; border: 1px solid #cbd5e1;" onerror="this.style.display='none'" />` :
+            `<div style="width: 60px; height: 60px; background: linear-gradient(135deg, #3b82f6 0%, #06b6d4 100%); border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+              <span style="color: white; font-size: 24px;">🎧</span>
+            </div>`
+          }
+        </div>
+        <div style="flex: 1; min-width: 0;">
+          <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
+            <span style="font-size: 10px; font-weight: 700; color: #3b82f6; text-transform: uppercase; letter-spacing: 0.5px;">${brand}</span>
+          </div>
+          <p style="margin: 0 0 4px 0; font-size: 13px; font-weight: 600; color: #1e293b; line-height: 1.3;">${title}</p>
+          ${description ? `<p style="margin: 0 0 6px 0; font-size: 11px; color: #64748b; line-height: 1.4;">${description.substring(0, 100)}${description.length > 100 ? '...' : ''}</p>` : ''}
+          ${madaAdvice ? `<p style="margin: 0 0 8px 0; font-size: 11px; color: #b45309; font-style: italic;">💡 ${madaAdvice}</p>` : ''}
+          <a href="${productUrl}" target="_blank" rel="noopener noreferrer" style="display: inline-flex; align-items: center; gap: 4px; padding: 6px 12px; background: linear-gradient(135deg, #3b82f6 0%, #06b6d4 100%); color: white; font-size: 11px; font-weight: 600; text-decoration: none; border-radius: 8px; transition: all 0.2s;">
+            Xem sản phẩm →
+          </a>
+        </div>
+      </div>
+    `;
+
+    return html;
+  }).join('');
+
+  return { intro, productHtml };
 }
 
 // ============== ROUTES ==============
@@ -505,18 +792,9 @@ router.post('/', async (req, res) => {
   try {
     const { message, conversationId, language: uiLanguage = 'vi', agentId, agentPrompt, userMode } = req.body;
     
-    // Wait for RAG engine
-    const ready = await waitForRagReady(15000);
-    if (!ready) {
-      const lang = (req.body.language || uiLanguage || 'vi').slice(0, 2);
-      const errMsgs: Record<string, string> = {
-        vi: 'Hệ thống đang khởi tạo, vui lòng thử lại sau vài giây.',
-        en: 'System is initializing, please retry in a few seconds.',
-        ar: 'النظام قيد التهيئة، يرجى إعادة المحاولة.',
-        fr: "Le système s'initialise, veuillez réessayer.",
-      };
-      return res.status(503).json({ success: false, error: errMsgs[lang] || errMsgs.vi, retryable: true });
-    }
+    // Skip RAG ready check for faster testing (products can work without RAG)
+    // const ready = await waitForRagReady(2000);
+    // if (!ready) { ... }
     
     const detectedLanguage = detectMessageLanguage(message);
     const effectiveLanguage = (uiLanguage && ['vi', 'en', 'ar', 'fr'].includes(uiLanguage)) ? uiLanguage : detectedLanguage;
@@ -606,10 +884,15 @@ router.post('/', async (req, res) => {
       ragResponse.answer = guardrailsResult.redirectResponse || 'Response filtered by safety guardrails.';
     }
     
-    // Get suggested products (only if user asks about products/devices)
-    let suggestedProducts: any[] = [];
+    // ⭐ Tự động gợi ý sản phẩm khi user hỏi về thiết bị/sản phẩm
+    const suggestedProducts: any[] = [];
     if (shouldShowProducts(message)) {
-      suggestedProducts = await getSuggestedProducts(ragResponse.sources || [], message, effectiveLanguage);
+      try {
+        const products = await getSuggestedProducts(ragResponse.sources || [], message, effectiveLanguage);
+        suggestedProducts.push(...products);
+      } catch (suggErr) {
+        console.log('⚠️ suggestedProducts error:', suggErr);
+      }
     }
     
     // Store assistant response
@@ -811,11 +1094,8 @@ router.post('/with-file', async (req, res) => {
       ragResponse.answer = 'Response filtered by safety guardrails.';
     }
     
-    // Get suggested products (only if user asks about products/devices)
-    let suggestedProducts: any[] = [];
-    if (shouldShowProducts(fullMessage)) {
-      suggestedProducts = await getSuggestedProducts(ragResponse.sources || [], message, effectiveLanguage);
-    }
+    // ⭐ KHÔNG tự động gửi suggestedProducts - chỉ khi user yêu cầu qua /api/chat/products
+    const suggestedProducts: any[] = [];
     
     // Store assistant response
     chatHistory.get(convId)!.push({ role: 'assistant', content: ragResponse.answer });
@@ -947,10 +1227,11 @@ router.post('/stream', async (req: any, res: any) => {
         sendEvent({ type: 'sources', sources: streamResult.sources });
       }
       
-      // Get suggested products (only if user asks about products/devices)
+      // ⭐ Tự động gửi suggestedProducts khi user hỏi về thiết bị/sản phẩm
       if (shouldShowProducts(message)) {
         try {
           const suggestedProducts = await getSuggestedProducts(streamResult.sources || [], message, effectiveLanguage);
+          console.log(`📦 [STREAM] suggestedProducts count: ${suggestedProducts.length}, first title: ${suggestedProducts[0]?.title || 'N/A'}`);
           if (suggestedProducts.length > 0) {
             sendEvent({ type: 'suggestedProducts', suggestedProducts });
           }
@@ -958,7 +1239,6 @@ router.post('/stream', async (req: any, res: any) => {
           console.log('⚠️ suggestedProducts error:', suggErr);
         }
       }
-      
       // Stream response
       if (streamResult.stream) {
         for await (const chunk of streamResult.stream) {
@@ -981,8 +1261,129 @@ router.post('/stream', async (req: any, res: any) => {
       
     } catch (streamError) {
       console.error('❌ Stream error:', streamError);
-      if (!res.writableEnded) {
-        sendEvent({ type: 'error', error: streamError instanceof Error ? streamError.message : 'Stream failed' });
+      const errorMsg = streamError instanceof Error ? streamError.message : 'Stream failed';
+      
+      // ⭐ FALLBACK: Khi RAG/AI fail, vẫn trả lời được với basic response
+      const isNetworkError = errorMsg.includes('fetch failed') || 
+                            errorMsg.includes('ENOTFOUND') ||
+                            errorMsg.includes('getaddrinfo') ||
+                            errorMsg.includes('ECONNREFUSED');
+      
+      // ⭐ 429 Too Many Requests — API rate limit
+      const is429Error = errorMsg.includes('429') || 
+                         errorMsg.includes('Too Many Requests') ||
+                         errorMsg.includes('RESOURCE_EXHAUSTED');
+      
+      if (isNetworkError || is429Error) {
+        const errorType = is429Error ? '429_RATE_LIMIT' : 'NETWORK_ERROR';
+        console.log(`🔄 [FALLBACK ${errorType}] ${is429Error ? 'API rate limited, ' : ''}providing basic response`);
+        
+        // Tạo câu trả lời cơ bản dựa trên context của conversation
+        const contextMessages = chatHistory.get(convId) || [];
+        const hasHistory = contextMessages.length > 0;
+        
+        const fallbackResponses: Record<string, string> = {
+          vi: is429Error
+            ? hasHistory 
+              ? `Mình hiểu câu hỏi của bạn rồi! 💬 Hệ thống đang có nhiều người dùng cùng lúc nên tạm thời chậm một chút.\n\n` +
+                `Trong lúc chờ, bạn có thể cho mình biết thêm chi tiết về nhu cầu để mình tư vấn tốt hơn nhé!`
+              : `Xin chào! 👋 Mình là trợ lý MADA AI. Hệ thống đang có nhiều người dùng cùng lúc nên hơi chậm một chút.\n\n` +
+                `Bạn cứ đặt câu hỏi nhé, mình sẽ trả lời ngay khi có thể! 😊`
+            : hasHistory 
+              ? `Tôi đã nhận được câu hỏi của bạn. Dựa trên cuộc trò chuyện, tôi có thể hỗ trợ bạn về:\n\n` +
+                `• Thông tin về các sản phẩm công nghệ hỗ trợ người khuyết tật\n` +
+                `• Tư vấn về thiết bị phù hợp với nhu cầu của bạn\n` +
+                `• Hướng dẫn sử dụng các công cụ hỗ trợ\n\n` +
+                `Bạn có thể mô tả chi tiết hơn về nhu cầu của mình để tôi có thể tư vấn tốt hơn nhé!`
+              : `Xin chào! 👋 Tôi là trợ lý AI của MADA Center. Tôi có thể hỗ trợ bạn:\n\n` +
+                `• Tư vấn về công nghệ hỗ trợ người khuyết tật\n` +
+                `• Giới thiệu các sản phẩm AT phù hợp với nhu cầu\n` +
+                `• Trả lời các câu hỏi về tiêu chuẩn ISO, WCAG\n\n` +
+                `Bạn cần hỗ trợ gì hôm nay?`,
+          en: is429Error
+            ? hasHistory
+              ? `I understand your question! 💬 The system is currently experiencing high traffic, so responses may be slower.\n\n` +
+                `While waiting, feel free to share more details about your needs so I can provide better advice!`
+              : `Hello! 👋 I'm MADA AI assistant. The system is experiencing high traffic, so things may be a bit slower.\n\n` +
+                `Feel free to ask your questions - I'll respond as soon as possible! 😊`
+            : hasHistory
+              ? `I received your question. Based on our conversation, I can help you with:\n\n` +
+                `• Information about assistive technology products\n` +
+                `• Recommendations for devices that match your needs\n` +
+                `• Guidance on using support tools\n\n` +
+                `Could you describe your needs in more detail so I can provide better advice?`
+              : `Hello! 👋 I'm MADA Center's AI assistant. I can help you with:\n\n` +
+                `• Consultations on assistive technology for persons with disabilities\n` +
+                `• Product recommendations based on your needs\n` +
+                `• Information about ISO and WCAG standards\n\n` +
+                `How can I assist you today?`,
+          ar: is429Error
+            ? hasHistory
+              ? `أفهم سؤالك! 💬 النظام يعاني من حركة مرور عالية حاليًا، لذا قد تكون الردود أبطأ.\n\n` +
+                `أثناء الانتظار، لا تتردد في مشاركة المزيد من التفاصيل حول احتياجاتك!`
+              : `مرحباً! 👋 أنا مساعد MADA AI. النظام يعاني من حركة مرور عالية.\n\n` +
+                `لا تتردد في طرح أسئلتك - سأرد في أقرب وقت ممكن! 😊`
+            : hasHistory
+              ? `تلقت سؤالك. بناءً على محادثتنا، يمكنني مساعدتك في:\n\n` +
+                `• المعلومات حول منتجات التكنولوجيا المساعدة\n` +
+                `• توصيات الأجهزة التي تناسب احتياجاتك\n` +
+                `• إرشادات حول استخدام أدوات الدعم\n\n` +
+                `هل يمكنك وصف احتياجاتك بمزيد من التفصيل؟`
+              : `مرحباً! 👋 أنا مساعد MADA Center الذكي. يمكنني مساعدتك في:\n\n` +
+                `• الاستشارات حول التكنولوجيا المساعدة\n` +
+                `• توصيات المنتجات المناسبة لاحتياجاتك\n` +
+                `• معلومات عن معايير ISO و WCAG\n\n` +
+                `كيف يمكنني مساعدتك اليوم؟`,
+          fr: is429Error
+            ? hasHistory
+              ? `Je comprends votre question! 💬 Le système connaît actuellement une forte affluence, les réponses peuvent être plus lentes.\n\n` +
+                `En attendant, n'hésitez pas à partager plus de détails sur vos besoins!`
+              : `Bonjour! 👋 Je suis l'assistant MADA AI. Le système connaît une forte affluence.\n\n` +
+                `N'hésitez pas à poser vos questions - je répondrai dès que possible! 😊`
+            : hasHistory
+              ? `J'ai reçu votre question. Sur la base de notre conversation, je peux vous aider avec:\n\n` +
+                `• Des informations sur les produits de technologie d'assistance\n` +
+                `• Des recommandations d'appareils adaptés à vos besoins\n` +
+                `• Des conseils sur l'utilisation des outils de support\n\n` +
+                `Pourriez-vous décrire vos besoins plus en détail?`
+              : `Bonjour! 👋 Je suis l'assistant IA de MADA Center. Je peux vous aider avec:\n\n` +
+                `• Des consultations sur les technologies d'assistance\n` +
+                `• Des recommandations de produits adaptées à vos besoins\n` +
+                `• Des informations sur les normes ISO et WCAG\n\n` +
+                `Comment puis-je vous aider aujourd'hui?`,
+        };
+        
+        const fallbackAnswer = fallbackResponses[effectiveLanguage] || fallbackResponses.vi;
+        
+        // Stream the fallback response
+        // ⭐ FALLBACK: Vẫn gửi suggestedProducts nếu user hỏi về thiết bị/sản phẩm
+        if (shouldShowProducts(message)) {
+          try {
+            const suggestedProducts = await getSuggestedProducts([], message, effectiveLanguage);
+            if (suggestedProducts.length > 0) {
+              sendEvent({ type: 'suggestedProducts', suggestedProducts });
+            }
+          } catch (suggErr) {
+            console.log('⚠️ [FALLBACK] suggestedProducts error:', suggErr);
+          }
+        }
+        
+        const words = fallbackAnswer.split(' ');
+        for (const word of words) {
+          sendEvent({ type: 'chunk', chunk: word + ' ' });
+          await new Promise(resolve => setTimeout(resolve, 10));
+        }
+        
+        sendEvent({
+          type: 'done',
+          conversationId: convId,
+          confidence: 0.3,
+          isFallback: true,
+        });
+        
+        chatHistory.get(convId)!.push({ role: 'assistant', content: fallbackAnswer });
+      } else {
+        sendEvent({ type: 'error', error: errorMsg, retryable: true });
       }
     }
     
@@ -1017,27 +1418,31 @@ router.post('/stream', async (req: any, res: any) => {
 router.post('/follow-up', async (req, res) => {
   try {
     const { userMessage, aiResponse, conversationHistory, language = 'vi', userMode: _userMode = 'endUser' } = req.body;
-    
+
     if (!userMessage) {
       return res.status(400).json({ success: false, error: 'userMessage is required' });
     }
-    
+
     console.log('💡 Generating follow-up questions for:', userMessage.slice(0, 50));
-    
+
     // Build context
     const historyContext = conversationHistory
       ?.slice(-10)
       ?.map((m: { role: string; content: string }) => `${m.role}: ${m.content}`)
       ?.join('\n') || '';
-    
-    // Prompt templates
+
+    // Prompt templates — escape backticks to prevent template literal injection
+    const safeUserMessage = String(userMessage).replace(/`/g, '\\`');
+    const safeAiResponse = String(aiResponse || '(chưa có phản hồi)').replace(/`/g, '\\`');
+    const safeHistoryContext = historyContext.replace(/`/g, '\\`');
+
     const prompts: Record<string, string> = {
       vi: `Bạn là trợ lý MADA AI chuyên về Công nghệ Hỗ trợ (AT).
 Dựa vào cuộc trò chuyện sau:
 ---
-Người dùng: ${userMessage}
-MADA AI: ${aiResponse || '(chưa có phản hồi)'}
-${historyContext ? `Lịch sử:\n${historyContext}` : ''}
+Người dùng: ${safeUserMessage}
+MADA AI: ${safeAiResponse}
+${safeHistoryContext ? `Lịch sử:\n${safeHistoryContext}` : ''}
 ---
 Hãy đề xuất 3 câu hỏi TIẾP THEO mà người dùng có thể hỏi.
 QUY TẮC:
@@ -1050,9 +1455,9 @@ QUY TẮC:
       en: `You are MADA AI assistant specializing in Assistive Technology (AT).
 Based on this conversation:
 ---
-User: ${userMessage}
-MADA AI: ${aiResponse || '(no response yet)'}
-${historyContext ? `History:\n${historyContext}` : ''}
+User: ${safeUserMessage}
+MADA AI: ${safeAiResponse}
+${safeHistoryContext ? `History:\n${safeHistoryContext}` : ''}
 ---
 Suggest 3 NEXT questions the user might ask.
 RULES:
@@ -1065,8 +1470,8 @@ RULES:
       ar: `أنت مساعد MADA AI المتخصص في التكنولوجيا المساعدة.
 بناءً على هذه المحادثة:
 ---
-المستخدم: ${userMessage}
-MADA AI: ${aiResponse || '(لا توجد إجابة)'}
+المستخدم: ${safeUserMessage}
+MADA AI: ${safeAiResponse}
 ---
 اقترح 3 أسئلة NEXT.
 القواعد:
@@ -1077,8 +1482,8 @@ MADA AI: ${aiResponse || '(لا توجد إجابة)'}
       fr: `Vous êtes l'assistant MADA AI spécialisé en Technologie d'Assistance.
 Basé sur cette conversation:
 ---
-Utilisateur: ${userMessage}
-MADA AI: ${aiResponse || '(pas encore de réponse)'}
+Utilisateur: ${safeUserMessage}
+MADA AI: ${safeAiResponse}
 ---
 Suggérez 3 questions SUIVANTES.
 RÈGLES:
@@ -1087,38 +1492,47 @@ RÈGLES:
 3. Concises 10-20 mots
 4. JSON uniquement: {"questions": ["q1", "q2", "q3"]}`
     };
-    
+
     const prompt = prompts[language] || prompts.vi;
-    
+
     // Check Gemini config
     if (!process.env.GEMINI_API_KEY && !process.env.GOOGLE_GEMINI_API_KEY) {
-      return res.json({ success: true, data: { questions: [], source: 'fallback' } });
+      console.log('💡 Follow-up: No Gemini API key, returning fallback questions');
+      return res.json({ success: true, data: { questions: generateFallbackFollowUps(userMessage, language), source: 'no_api_key' } });
     }
-    
+
     const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_GEMINI_API_KEY;
-    const model = process.env.GEMINI_MODEL || 'gemini-3.6-flash';
-    
-    const geminiResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.7, maxOutputTokens: 2048 }
-        })
+    const model = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+
+    let geminiData: any;
+    try {
+      const geminiResponse = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 0.7, maxOutputTokens: 2048 }
+          })
+        }
+      );
+
+      if (!geminiResponse.ok) {
+        const errText = await geminiResponse.text().catch(() => '');
+        console.error('❌ Gemini API error:', geminiResponse.status, errText);
+        return res.json({ success: true, data: { questions: generateFallbackFollowUps(userMessage, language), source: 'api_error' } });
       }
-    );
-    
-    if (!geminiResponse.ok) {
-      console.error('❌ Gemini API error:', await geminiResponse.text());
-      return res.json({ success: true, data: { questions: [], source: 'api_error' } });
+
+      geminiData = await geminiResponse.json();
+    } catch (fetchErr) {
+      console.error('❌ Follow-up fetch error:', fetchErr);
+      return res.json({ success: true, data: { questions: generateFallbackFollowUps(userMessage, language), source: 'network_error' } });
     }
-    
-    const geminiData = await geminiResponse.json();
+
     let responseText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
     responseText = responseText.replace(/```json\s*/i, '').replace(/```\s*/g, '').trim();
-    
+
     // Parse JSON
     try {
       const jsonMatch = responseText.match(/\{[\s\S]*\}/);
@@ -1127,7 +1541,7 @@ RÈGLES:
         const questions = Array.isArray(parsed.questions) ? parsed.questions : [];
         return res.json({ success: true, data: { questions: questions.slice(0, 4), source: 'gemini' } });
       }
-      
+
       // Fallback: parse text format
       const lines = responseText.split('\n').map((l: any) => l.trim()).filter(Boolean);
       const questions: string[] = [];
@@ -1137,21 +1551,83 @@ RÈGLES:
           questions.push(match[1].replace(/^[a-z]\)\s*/i, '').trim());
         }
       }
-      
+
       if (questions.length > 0) {
         return res.json({ success: true, data: { questions: questions.slice(0, 4), source: 'parsed' } });
       }
-      
-      return res.json({ success: true, data: { questions: [], source: 'no_parse' } });
+
+      return res.json({ success: true, data: { questions: generateFallbackFollowUps(userMessage, language), source: 'no_parse' } });
     } catch (parseErr) {
       console.error('❌ Follow-up parse error:', parseErr);
-      return res.json({ success: true, data: { questions: [], source: 'parse_error' } });
+      return res.json({ success: true, data: { questions: generateFallbackFollowUps(userMessage, language), source: 'parse_error' } });
     }
   } catch (error) {
     console.error('❌ Follow-up error:', error);
-    res.status(500).json({ success: false, error: 'Internal server error' });
+    // Always return 200 with fallback — never throw 500 for this endpoint
+    const lang = req.body?.language || 'vi';
+    res.json({ success: true, data: { questions: generateFallbackFollowUps(req.body?.userMessage || '', lang), source: 'catch_error' } });
   }
 });
+
+// Helper: generate fallback follow-up questions based on user message
+function generateFallbackFollowUps(userMessage: string, language: string): string[] {
+  const q = (userMessage || '').toLowerCase();
+
+  const fallbackByLang: Record<string, () => string[]> = {
+    vi: () => {
+      const base: string[] = [];
+      if (q.includes('thính') || q.includes('tai') || q.includes('hearing')) {
+        base.push('Máy trợ thính có kết nối Bluetooth không?');
+        base.push('Có thể dùng cho trẻ em không?');
+      }
+      if (q.includes('wheelchair') || q.includes('xe lăn') || q.includes('mobility')) {
+        base.push('Xe lăn điện có giá bao nhiêu?');
+        base.push('Có thể mang xe lăn lên máy bay không?');
+      }
+      if (q.includes('giá') || q.includes('price') || q.includes('cost') || q.includes('mua')) {
+        base.push('Mua thiết bị này ở đâu?');
+        base.push('Có chương trình hỗ trợ tài chính không?');
+      }
+      if (base.length < 3) {
+        base.push('Thiết bị này có dễ sử dụng không?');
+        base.push('Có thể dùng thử trước khi mua không?');
+        base.push('Địa chỉ mua thiết bị uy tín ở đâu?');
+      }
+      return base.slice(0, 4);
+    },
+    en: () => {
+      const base: string[] = [];
+      if (q.includes('hearing') || q.includes('thính')) {
+        base.push('Does the hearing aid have Bluetooth connectivity?');
+        base.push('Can it be used for children?');
+      }
+      if (q.includes('wheelchair') || q.includes('mobility')) {
+        base.push('How much does an electric wheelchair cost?');
+        base.push('Can I bring a wheelchair on a plane?');
+      }
+      if (base.length < 3) {
+        base.push('Is this device easy to use?');
+        base.push('Can I try before buying?');
+        base.push('Where to buy from reputable sources?');
+      }
+      return base.slice(0, 4);
+    },
+    ar: () => [
+      'هل يمكنني تجربته قبل الشراء؟',
+      'أين أشتري من مصادر موثوقة؟',
+      'ما هي مدة الضمان؟',
+      'هل تتوفر مساعدة مالية؟',
+    ],
+    fr: () => [
+      'Ce dispositif est-il facile à utiliser?',
+      'Puis-je l\'essayer avant d\'acheter?',
+      'Où acheter auprès de sources fiables?',
+      'Quelle est la période de garantie?',
+    ],
+  };
+
+  return fallbackByLang[language]?.() || fallbackByLang['en']();
+}
 
 // GET /api/chat/history/:id — Get conversation history
 router.get('/history/:id', (req, res) => {
@@ -1448,6 +1924,132 @@ router.post('/consultation/direct', async (req, res) => {
     });
   } catch (error) {
     console.error('❌ Consultation direct error:', error);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+});
+
+// ============== MESSAGE FEEDBACK ==============
+
+/**
+ * POST /api/feedback - Submit feedback for a message
+ */
+router.post('/feedback', async (req, res) => {
+  try {
+    const { message_id, rating, reason, session_id, agent_id } = req.body;
+    
+    if (!message_id || !rating) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'message_id and rating are required' 
+      });
+    }
+    
+    if (!['like', 'dislike'].includes(rating)) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'rating must be "like" or "dislike"' 
+      });
+    }
+    
+    // Get user ID if authenticated
+    const authHeader = req.headers.authorization;
+    const token = authHeader?.startsWith('Bearer ') ? authHeader.slice('Bearer '.length) : null;
+    const authResult = token ? verifyAccessToken(token) as any : null;
+    const userId = authResult?.id || null;
+    
+    // Save feedback
+    const id = `feedback-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const now = new Date().toISOString();
+    
+    db.prepare(`
+      INSERT INTO message_feedback (id, message_id, session_id, user_id, rating, reason, agent_id, language, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      id,
+      message_id,
+      session_id || null,
+      userId,
+      rating,
+      reason || null,
+      agent_id || null,
+      req.body.language || 'vi',
+      now
+    );
+    
+    logActivity('info', `Message feedback: ${rating}${reason ? ` - ${reason.slice(0, 50)}` : ''}`, 'User');
+    
+    res.json({ success: true, data: { id, rating, reason } });
+  } catch (error) {
+    console.error('❌ Feedback error:', error);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+});
+
+/**
+ * GET /api/feedback/stats - Get feedback statistics (for admin)
+ */
+router.get('/feedback/stats', async (req, res) => {
+  try {
+    const { agent_id, start_date, end_date } = req.query;
+    
+    let query = `
+      SELECT 
+        rating,
+        COUNT(*) as count,
+        AVG(LENGTH(reason)) as avg_reason_length
+      FROM message_feedback
+      WHERE 1=1
+    `;
+    const params: any[] = [];
+    
+    if (agent_id) {
+      query += ' AND agent_id = ?';
+      params.push(agent_id);
+    }
+    
+    if (start_date) {
+      query += ' AND created_at >= ?';
+      params.push(start_date);
+    }
+    
+    if (end_date) {
+      query += ' AND created_at <= ?';
+      params.push(end_date);
+    }
+    
+    query += ' GROUP BY rating';
+    
+    const stats = db.prepare(query).all(...params);
+    
+    // Get total
+    const totalResult = db.prepare(`
+      SELECT COUNT(*) as total FROM message_feedback WHERE 1=1
+      ${agent_id ? 'AND agent_id = ?' : ''}
+      ${start_date ? 'AND created_at >= ?' : ''}
+      ${end_date ? 'AND created_at <= ?' : ''}
+    `).all(...(agent_id ? [agent_id] : []).concat(start_date ? [start_date] : []).concat(end_date ? [end_date] : [])) as { total: number }[];
+    
+    // Get dislike reasons
+    const reasons = db.prepare(`
+      SELECT reason, COUNT(*) as count 
+      FROM message_feedback 
+      WHERE rating = 'dislike' AND reason IS NOT NULL AND reason != ''
+      ${agent_id ? 'AND agent_id = ?' : ''}
+      GROUP BY reason 
+      ORDER BY count DESC 
+      LIMIT 20
+    `).all(...(agent_id ? [agent_id] : []));
+    
+    res.json({
+      success: true,
+      data: {
+        stats,
+        total: totalResult[0]?.total || 0,
+        reasons
+      }
+    });
+  } catch (error) {
+    console.error('❌ Feedback stats error:', error);
     res.status(500).json({ success: false, error: 'Internal server error' });
   }
 });

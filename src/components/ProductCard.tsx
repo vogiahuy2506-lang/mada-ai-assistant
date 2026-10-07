@@ -48,7 +48,6 @@ export function ProductCard({
   matchReason,
   confidence,
   language = 'vi',
-  onViewDetails,
   onRequestConsult,
 }: ProductCardProps) {
   // Helper: kiểm tra URL có hợp lệ (http/https) không
@@ -57,14 +56,6 @@ export function ProductCard({
     return /^https?:\/\//i.test(url.trim());
   };
   const hasValidUrl = isValidUrl(product.product_url) || isValidUrl(product.source_url);
-  
-  const handleViewDetails = () => {
-    if (!hasValidUrl) {
-      onRequestConsult?.();
-      return;
-    }
-    onViewDetails?.();
-  };
 
   // Đảm bảo contrast ratio ≥ 4.5:1 (WCAG 1.4.3)
   const getScoreColor = (score: number) => {

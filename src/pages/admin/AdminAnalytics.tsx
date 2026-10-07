@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { AdminLayout } from './AdminLayout';
 import { adminApi, UserStats, KnowledgeStats } from './adminApi';
 import { getAccessToken } from '@/lib/api';
@@ -214,23 +214,6 @@ function formatUptime(seconds: number) {
   const m = Math.floor((seconds % 3600) / 60);
   const s = Math.floor(seconds % 60);
   return `${h}h ${m}m ${s}s`;
-}
-
-// ============== SHARED CARD COMPONENT ==============
-function StatCard({ label, value, icon, color }: { label: string; value: number | string; icon: React.ReactNode; color: string }) {
-  return (
-    <div className="bg-white rounded-xl border border-slate-300 p-4 shadow-sm">
-      <div className="flex items-center gap-3">
-        <div className={`w-10 h-10 rounded-lg ${color} flex items-center justify-center text-white`}>
-          {icon}
-        </div>
-        <div>
-          <p className="text-2xl font-black text-black">{value}</p>
-          <p className="text-xs text-slate-500 font-medium">{label}</p>
-        </div>
-      </div>
-    </div>
-  );
 }
 
 // ============== CHART COMPONENTS ==============

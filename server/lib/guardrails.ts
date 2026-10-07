@@ -12,6 +12,37 @@
 // MEDICAL GUARDRAIL - Block medical diagnosis requests
 // ============================================================================
 
+// Pattern cho câu hỏi về triệu chứng/bệnh (Dạng: "tôi có bị X không?" - hỏi về bệnh)
+const MEDICAL_SYMPTOM_QUESTION_PATTERNS = [
+  // Tiếng Việt: hỏi về việc "có bị" một bệnh/triệu chứng không
+  /\b(tôi|mình)\s+(?:có\s+)?(?:bị\s+)?(?:phải\s+)?(?:cận|loạn thị|viễn thị|lác|mù|điếc|khiếm thị|khiếm thính)\s+(?:không|kô|hem|hok)\b/iu,
+  /\b(?:tôi|mình)\s+(?:có\s+)?bị\s+(?:bệnh\s+)?(?:gì|cận|loạn|viễn|lác|thị)\b/iu,
+  /\b(?:có\s+)?(?:phải\s+)?(?:bị\s+)?(?:cận|loạn|viễn|lác)\s+(?:không|kô|hem|hok|bệnh\s+gì)\b/iu,
+  /\b(?:có\s+)?(?:phải\s+)?(?:bị\s+)?(?:tự\s+kỷ|autism|down\s+syndrome|adhd)\s+(?:không|kô|hem|hok)\b/iu,
+  /\b(?:có\s+)?(?:phải\s+)?(?:bị\s+)?(?:chóng mặt|hoa mắt|ù tai|đau đầu|mất ngủ)\s+(?:không|kô|hem|hok)\b/iu,
+  /\b(?:tôi|mình)\s+(?:có\s+)?(?:phải\s+)?(?:bị\s+)?(?:bệnh\s+)?(?:gì|paralysis|stroke|stroke)\b/iu,
+  // Tiếng Anh: hỏi "do I have X"
+  /\bdo\s+i\s+have\s+(?:nearsightedness|myopia|farsightedness|hyperopia|astigmatism|blindness|deafness|glaucoma|cataract|alzheimer|dementia|autism|adhd|paralysis)\b/iu,
+  /\bam\s+i\s+(?:blind|deaf|disabled|paralyzed)\b/iu,
+  /\bcan\s+you\s+tell\s+me\s+if\s+i\s+(?:have|am|suffer)\b/iu,
+  // Tiếng Anh: hỏi "what's wrong with me"
+  /\bwhat(?:'s| is)\s+wrong\s+with\s+(?:me|my\s+(?:eyes|ears|body|legs|arms))\b/iu,
+];
+
+// Pattern cho yêu cầu tư vấn AT (Dạng: "tôi bị X, có thiết bị nào?" - đã biết bệnh, hỏi về giải pháp)
+const AT_CONSULTATION_PATTERNS = [
+  // Tiếng Việt: đã xác định bệnh, hỏi về thiết bị
+  /\b(?:vì|tại|vì\s+tôi|tại\s+tôi)\s+(?:tôi|mình)\s+(?:bị\s+)?(?:cận|loạn thị|viễn thị|lác|mù|điếc|khiếm thị|khiếm thính)\b/iu,
+  /\b(?:vì|tại)\s+(?:tôi|mình)\s+(?:bị\s+)?(?:tự\s+kỷ|autism|down\s+syndrome|adhd)\b/iu,
+  /\b(?:vì|tại)\s+(?:bị|bệnh)\s+(?:cận|loạn|viễn|lác|thị|paralysis)\b/iu,
+  /\b(?:cho|tặng|người)\s+(?:bị|có)\s+(?:cận|loạn|viễn|lác|mù|điếc)\b/iu,
+  // Tiếng Anh
+  /\b(?:because\s+)?i\s+(?:have|am|suffer\s+from|was\s+diagnosed\s+with)\s+(?:nearsightedness|myopia|glaucoma|autism|adhd|paralysis)\b/iu,
+  /\bfor\s+someone\s+(?:with|who\s+is|who\s+has)\s+(?:blind|deaf|disabled)\b/iu,
+  /\b(?:I|my)\s+(?:eyes|ears|vision|hearing)\s+(?:is|are)\s+(?:bad|poor|weak|impaired)\b/iu,
+];
+
+// Pattern cho chẩn đoán y khoa rõ ràng
 const MEDICAL_DIAGNOSIS_PATTERNS = [
   // Vietnamese: explicit diagnosis requests
   /\b(chẩn đoán|chẩn đoán giúp|chuẩn đoán giúp|được chẩn đoán là|bị chẩn đoán)\b/iu,
@@ -201,6 +232,83 @@ Je suis **MADA AI Assistant** - expert en **Technologie d'Assistance (AT)**, pas
 Souhaitez-vous que je vous aide à trouver des **solutions de technologie d'assistance** adaptées à vos besoins?`,
 };
 
+// Response cho câu hỏi về triệu chứng (không phải tư vấn AT)
+const SYMPTOM_QUESTION_RESPONSES = {
+  vi: `⚠️ **Câu hỏi về triệu chứng/bệnh lý**
+
+Xin lỗi, tôi không thể trả lời câu hỏi về triệu chứng hay tình trạng sức khỏe của bạn.
+
+**Tôi là ai?**
+Tôi là **MADA AI Assistant** - chuyên về **Công nghệ Hỗ trợ (Assistive Technology - AT)**, không phải bác sĩ hay chuyên gia y tế.
+
+**Tôi có thể giúp gì?**
+- Giới thiệu thiết bị AT phù hợp với tình trạng ĐÃ ĐƯỢC CHẨN ĐOÁN
+- Tư vấn về giải pháp công nghệ hỗ trợ
+- Cung cấp thông tin về tiêu chuẩn WCAG, ISO 9999
+
+**Bạn nên làm gì?**
+Để được chẩn đoán chính xác, bạn nên:
+1. 🏥 Đến bệnh viện hoặc phòng khám chuyên khoa
+2. 👨‍⚕️ Gặp bác sĩ chuyên khoa phù hợp
+3. 📋 Làm các xét nghiệm theo hướng dẫn
+
+**Nếu bạn đã biết tình trạng của mình**, tôi có thể tư vấn về thiết bị AT phù hợp. Ví dụ:
+- "Tôi bị cận, có thiết bị nào hỗ trợ đọc sách không?" ✅
+- "Tôi bị điếc, có thiết bị giao tiếp nào không?" ✅`,
+
+  en: `⚠️ **Question about symptoms/medical condition**
+
+Sorry, I cannot answer questions about your symptoms or health condition.
+
+**Who am I?**
+I am **MADA AI Assistant** - specialized in **Assistive Technology (AT)**, not a doctor or medical professional.
+
+**What can I help with?**
+- Introducing AT devices suitable for your ALREADY DIAGNOSED condition
+- Consulting on assistive technology solutions
+- Providing information about WCAG, ISO 9999 standards
+
+**What should you do?**
+For accurate diagnosis, you should:
+1. 🏥 Visit a hospital or specialized clinic
+2. 👨‍⚕️ Consult with an appropriate specialist
+3. 📋 Take recommended tests
+
+**If you already know your condition**, I can consult on suitable AT devices. For example:
+- "I have nearsightedness, what devices can help me read?" ✅
+- "I'm deaf, what communication devices are available?" ✅`,
+
+  ar: `⚠️ **سؤال عن الأعراض/الحالة الطبية**
+
+عذرًا، لا أستطيع الإجابة على أسئلة حول أعراضك أو حالتك الصحية.
+
+أنا **MADA AI Assistant** - متخصص في **التكنولوجيا المساعدة (AT)**، ولست طبيبًا.
+
+يمكنني المساعدة في:
+- تقديم أجهزة AT المناسبة لحالتك المُشخصة
+- استشارات حول حلول التكنولوجيا المساعدة
+
+**ماذا يجب أن تفعل؟**
+1. 🏥 زيارة مستشفى أو عيادة متخصصة
+2. 👨‍⚕️ استشارة طبيب مختص
+3. 📋 إجراء الفحوصات اللازمة`,
+
+  fr: `⚠️ **Question sur les symptômes/état médical**
+
+Désolé, je ne peux pas répondre aux questions sur vos symptômes ou votre état de santé.
+
+Je suis **MADA AI Assistant** - spécialisé en **Technologie d'Assistance (TA)**, pas un médecin.
+
+Je peux vous aider avec:
+- Présentation d'appareils TA adaptés à votre état diagnostiqué
+- Consultations sur les solutions technologiques
+
+**Que devez-vous faire?**
+1. 🏥 Visiter un hôpital ou une clinique spécialisée
+2. 👨‍⚕️ Consulter un spécialiste
+3. 📋 Effectuer les examens nécessaires`,
+};
+
 const OUT_OF_SCOPE_RESPONSE_VI = `⚠️ **Câu hỏi nằm ngoài phạm vi tư vấn**
 
 Tôi là MADA AI Assistant chuyên về **Công nghệ Hỗ trợ**. Câu hỏi của bạn không thuộc lĩnh vực tôi có thể hỗ trợ.
@@ -255,6 +363,21 @@ export class GuardrailsSystem {
 
   private containsMedicalDiagnosis(query: string): boolean {
     return MEDICAL_DIAGNOSIS_PATTERNS.some(pattern => pattern.test(query));
+  }
+
+  // Check if query is asking about medical symptoms (for redirect)
+  private containsMedicalSymptomQuestion(query: string): boolean {
+    return MEDICAL_SYMPTOM_QUESTION_PATTERNS.some(pattern => pattern.test(query));
+  }
+
+  // Check if query is an AT consultation (already know condition, asking about devices)
+  private isATConsultation(query: string): boolean {
+    return AT_CONSULTATION_PATTERNS.some(pattern => pattern.test(query));
+  }
+
+  // Get response for symptom questions
+  private getSymptomQuestionResponse(language: string): string {
+    return SYMPTOM_QUESTION_RESPONSES[language as keyof typeof SYMPTOM_QUESTION_RESPONSES] || SYMPTOM_QUESTION_RESPONSES['en'];
   }
 
   // ==========================================================================
@@ -344,6 +467,19 @@ export class GuardrailsSystem {
       };
     }
 
+    // Step 2b: Check for medical symptom questions (redirect to medical professional)
+    // Only redirect if it's NOT an AT consultation (i.e., asking "do I have X?" not "I have X, what devices help?")
+    if (this.containsMedicalSymptomQuestion(query) && !this.isATConsultation(query)) {
+      console.warn('⚠️ Guardrails: Medical symptom question detected (not AT consultation)');
+      return {
+        isSafe: false,
+        shouldRedirect: true,
+        redirectResponse: this.getSymptomQuestionResponse(language),
+        detectedPattern: 'medical_symptom_question',
+        suggestedTopic: 'assistive_technology',
+      };
+    }
+
     // Step 3: Check out of scope
     const outOfScope = this.checkOutOfScope(query);
     if (outOfScope) {
@@ -390,6 +526,9 @@ export class GuardrailsSystem {
     // Deduct for medical diagnosis patterns
     if (this.containsMedicalDiagnosis(query)) score -= 50;
 
+    // Deduct for medical symptom questions (not AT consultation)
+    if (this.containsMedicalSymptomQuestion(query) && !this.isATConsultation(query)) score -= 30;
+
     // Deduct for out-of-scope
     if (this.checkOutOfScope(query)) score -= 30;
 
@@ -398,6 +537,9 @@ export class GuardrailsSystem {
 
     // Bonus for AT-related keywords
     if (this.detectATIntent(query)) score += 10;
+
+    // Bonus for AT consultation patterns
+    if (this.isATConsultation(query)) score += 15;
 
     return Math.max(0, Math.min(100, score));
   }

@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react';
 import { AdminLayout } from './AdminLayout';
+import { PromptTemplates } from './PromptTemplates';
 import { adminApi, UserStats, KnowledgeStats } from './adminApi';
-import { useSystemSettingsStore, useAuthStore, useLanguageStore, usePricingPlansStore } from '@/stores';
+import { useSystemSettingsStore, useAuthStore, useLanguageStore } from '@/stores';
 import { translations, Language } from '@/lib/translations';
 import clsx from 'clsx';
 import { systemApi } from '@/lib/api';
-import { CheckCircle, Check, Loader2, AlertCircle, Shield, Settings, Lock, Cloud, CreditCard, Mail, Bug, Sparkles, FileText, Zap, ArrowRight, Image, Video, Music, File, Pencil, Save, X, GripVertical, ArrowUp, ArrowDown } from 'lucide-react';
-import { CheckCircle, Check, Loader2, AlertCircle, Shield, Settings, Lock, Cloud, CreditCard, Mail, Bug, Sparkles, FileText, Zap, ArrowRight, Image, Video, Music, File, Pencil, Save, X, GripVertical, ArrowUp, ArrowDown } from 'lucide-react';
+import { CheckCircle, Check, Loader2, AlertCircle, Shield, Settings, Lock, Cloud, CreditCard, Mail, Bug, Sparkles, FileText, Image, Video, Music, File, Pencil, Save, X, GripVertical, ArrowUp, ArrowDown } from 'lucide-react';
 
-type Tab = 'general' | 'plans' | 'security' | 'ai' | 'integrations' | 'live' | 'system';
+type Tab = 'general' | 'plans' | 'security' | 'ai' | 'integrations' | 'live' | 'system' | 'templates';
 
 export function AdminSettings() {
   const [tab, setTab] = useState<Tab>('general');
@@ -37,7 +37,6 @@ export function AdminSettings() {
     maxFileSizeMB,
     categoryOrder,
     setAnonymousLimit,
-    setDefaultPlanLimit,
     setCategoryOrder,
     loadFromBackend,
     setAllSettings,
@@ -895,58 +894,6 @@ function ToggleRow({ label, desc, value }: { label: string; desc: string; value:
   );
 }
 
-type BorderColor = 'green' | 'red' | 'purple' | 'teal' | 'amber';
-
-const borderColorClasses: Record<BorderColor, string> = {
-  green: 'border-green-500',
-  red: 'border-red-500',
-  purple: 'border-purple-500',
-  teal: 'border-teal-500',
-  amber: 'border-amber-500',
-};
-
-function LimitCard({
-  icon,
-  label,
-  value,
-  borderColor,
-  onToggle,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: boolean;
-  borderColor: BorderColor;
-  onToggle: () => void;
-}) {
-  return (
-    <div className={clsx(
-      'flex items-center justify-between gap-3 p-4 rounded-2xl border-2 bg-white',
-      borderColorClasses[borderColor]
-    )}>
-      <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-surface-variant flex items-center justify-center">
-          {icon}
-        </div>
-        <span className="text-sm font-semibold text-on-surface">{label}</span>
-      </div>
-      <button
-        onClick={onToggle}
-        className={clsx(
-          'relative w-12 h-7 rounded-full transition-colors flex-shrink-0',
-          value ? 'bg-green-500' : 'bg-surface-variant'
-        )}
-      >
-        <span
-          className={clsx(
-            'absolute top-1 w-5 h-5 rounded-full bg-white shadow-sm transition-transform',
-            value ? 'left-[28px]' : 'left-1'
-          )}
-        />
-      </button>
-    </div>
-  );
-}
-
 // ============== PRICING PLANS EDITOR COMPONENT ==============
 
 interface PricingPlanData {
@@ -1097,15 +1044,6 @@ function PricingPlansEditor({ language }: PricingPlansEditorProps) {
       updatePlan(planId, { features_vi: plan.features_vi.filter((_, i) => i !== index) });
     } else {
       updatePlan(planId, { features_en: plan.features_en.filter((_, i) => i !== index) });
-    }
-  };
-
-  const getPlanColor = (planKey: string) => {
-    switch (planKey) {
-      case 'free': return 'gray';
-      case 'pro': return 'primary';
-      case 'enterprise': return 'tertiary';
-      default: return 'gray';
     }
   };
 

@@ -1565,7 +1565,7 @@ router.post('/agents/test', requireAdmin, async (req: Request, res: Response) =>
 
     const start = Date.now();
     // Proxy tới /api/chat nội bộ
-    const chatPort = process.env.PORT || 3002;
+    const chatPort = process.env.PORT || 3003;
     const chatRes = await fetch(`http://127.0.0.1:${chatPort}/api/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -2394,16 +2394,6 @@ router.patch('/pricing-plans/:id', requireAdmin, (req: Request, res: Response) =
     if (!row) {
       return res.status(404).json({ success: false, error: 'Plan not found' });
     }
-
-    const {
-      name_vi, name_en, name_ar, name_fr,
-      price_amount, price_currency,
-      price_note_vi, price_note_en,
-      description_vi, description_en, description_ar, description_fr,
-      features_vi, features_en, features_ar, features_fr,
-      is_active, is_highlighted, sort_order,
-      cta_text_vi, cta_text_en,
-    } = req.body;
 
     const updates: string[] = [];
     const params: any[] = [];

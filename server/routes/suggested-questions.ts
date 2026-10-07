@@ -373,7 +373,7 @@ router.post('/auto-translate', requireAdmin, async (req: Request, res: Response)
 });
 
 // POST /api/admin/suggested-questions/delete-non-vi - Delete all non-Vietnamese questions
-router.delete('/delete-non-vi', requireAdmin, (req: Request, res: Response) => {
+router.delete('/delete-non-vi', requireAdmin, (_req: Request, res: Response) => {
   try {
     const result = db.prepare(`
       DELETE FROM suggested_questions WHERE language != 'vi'

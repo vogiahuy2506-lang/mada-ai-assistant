@@ -431,7 +431,6 @@ export function AdminAgents() {
   globalLanguage = 'vi';
 
   const [agents, setAgents] = useState<Agent[]>([]);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -689,7 +688,6 @@ export function AdminAgents() {
   // ============== DATA LOAD ==============
   const loadAgents = async () => {
     try {
-      setLoading(true);
       setError(null);
       console.log('[AdminAgents] Fetching agents from /api/admin/agents...');
       const res = await adminApi.getAgents();
@@ -702,8 +700,6 @@ export function AdminAgents() {
     } catch (err: any) {
       console.error('[AdminAgents] Load agents error:', err);
       setError(err.message);
-    } finally {
-      setLoading(false);
     }
   };
 

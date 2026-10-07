@@ -1,19 +1,21 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useChatStore, useChatHistoryStore, useLanguageStore, useAuthStore, useAnonQuotaStore, usePaywallModalStore, useAuthModalStore, useAgentStore, useSelectedAgentStore, useSystemSettingsStore, useViewModeStore, useChatSettingsStore } from '@/stores';
 import madaLogo from '@/assets/mada-logo.png';
 import { QuotaIndicator } from '@/components/auth/QuotaIndicator';
 import {
   Send, Plus, User, Mic,
-  Volume2, ChevronDown, Check, Copy,
-  Speaker, BookOpen, Bot as BotIcon, ChevronRight,
+  Volume2, ChevronDown, Check,
+  Bot as BotIcon, ChevronRight,
   FileText, Video, Mic2, ImageIcon, File, X,
   MessageCircle,
   LogOut, Sparkles,
   Search, MessageSquare, Loader2,
-  Settings, Accessibility,
-  Users, Edit2, Globe, ShoppingCart,
-  ShieldCheck,
+  Accessibility,
+  Globe,
+  ThumbsUp, ThumbsDown,
+  AlertCircle, Lightbulb,
 } from 'lucide-react';
 import clsx from 'clsx';
 import ReactMarkdown from 'react-markdown';
@@ -58,8 +60,8 @@ const LANGUAGES: { code: Language; name: string; flag: string }[] = [
 
 // Category Icons
 const CATEGORY_ICONS: Record<ATCategory, string> = {
-  hearing: 'headphones',
   vision: 'visibility',
+  hearing: 'headphones',
   communication: 'record_voice_over',
   cognition: 'psychology',
   mobility: 'accessible_forward',
@@ -68,6 +70,16 @@ const CATEGORY_ICONS: Record<ATCategory, string> = {
 };
 
 const CATEGORY_LABELS: Record<ATCategory, { title: string; titleEn: string; titleAr: string; titleFr: string; desc: string; descEn: string; descAr: string; descFr: string }> = {
+  vision: {
+    title: 'CẢM GIÁC - THỊ GIÁC',
+    titleEn: 'VISION SENSORY',
+    titleAr: 'الحواس - البصر',
+    titleFr: 'SENS - VISION',
+    desc: 'Máy đọc màn hình, phóng to...',
+    descEn: 'Screen readers, magnification...',
+    descAr: 'قارئات الشاشة، التكبير...',
+    descFr: 'Lecteurs d\'écran, loupe...',
+  },
   hearing: { 
     title: 'CẢM GIÁC - THÍNH GIÁC', 
     titleEn: 'HEARING SENSORY', 
@@ -77,16 +89,6 @@ const CATEGORY_LABELS: Record<ATCategory, { title: string; titleEn: string; titl
     descEn: 'Hearing aids, alerting devices...',
     descAr: 'سماعات الأذن، أجهزة التنبيه...',
     descFr: 'Appareils auditifs, dispositifs d\'alerte...',
-  },
-  vision: { 
-    title: 'CẢM GIÁC - THỊ GIÁC', 
-    titleEn: 'VISION SENSORY', 
-    titleAr: 'الحواس - البصر',
-    titleFr: 'SENS - VISION',
-    desc: 'Phần mềm đọc màn hình, chữ nổi...', 
-    descEn: 'Screen readers, braille displays...',
-    descAr: 'قارئات الشاشة، شاشات برايل...',
-    descFr: 'Lecteurs d\'écran, plages braille...',
   },
   communication: { 
     title: 'GIỌNG NÓI VÀ LỜI NÓI', 
@@ -146,7 +148,6 @@ function generateFollowUpQuestions(userQuestion: string, _aiResponse: string, la
   
   // Detect topic keywords
   const isHearing = q.includes('thính') || q.includes('tai') || q.includes('nghe') || q.includes('hearing') || q.includes('máy trợ thính') || q.includes('hearing aid');
-  const isVision = q.includes('mù') || q.includes('thị') || q.includes('nhìn') || q.includes('blind') || q.includes('vision') || q.includes('mắt') || q.includes('braille');
   const isMobility = q.includes('wheelchair') || q.includes('xe lăn') || q.includes('mobility') || q.includes('vận động') || q.includes('di chuyển') || q.includes('prosthetic') || q.includes('chân');
   const isCognition = q.includes('nhận thức') || q.includes('trí nhớ') || q.includes('cognition') || q.includes('memory') || q.includes('mất') || q.includes('注意力') || q.includes('autism') || q.includes('tự kỷ');
   const isCommunication = q.includes('giao tiếp') || q.includes('nói') || q.includes('speech') || q.includes('communication') || q.includes('aac') || q.includes('giọng');
@@ -173,14 +174,7 @@ function generateFollowUpQuestions(userQuestion: string, _aiResponse: string, la
       if (isPrice) base.push('Có loại rẻ hơn không?');
       if (isElderly) base.push('Người già sử dụng có khó không?');
     }
-    
-    // For vision
-    if (isVision) {
-      base.push('Phần mềm đọc màn hình nào tốt nhất?');
-      base.push('Màn hình Braille giá bao nhiêu?');
-      base.push('Có ứng dụng đọc văn bản cho người mù không?');
-      if (isChild) base.push('Trẻ em khiếm thị nên dùng thiết bị gì?');
-    }
+
     
     // For mobility
     if (isMobility) {
@@ -294,10 +288,6 @@ function detectCategoryFromQuery(query: string): string {
   if (/\b(xe lăn|wheelchair|nạng|crutch|gậy|nẹp|chỉnh hình|prosthetic|mobility|vận động|leo cầu thang|stair|cane)\b/i.test(q)) {
     return 'mobility';
   }
-  // Vision - mắt, khiếm thị
-  if (/\b(kính|mắt|khiếm thị|blind|vision|đọc màn hình|screen reader|braille|jaws|nvda|orcam|cctv|magnifier|low vision)\b/i.test(q)) {
-    return 'vision';
-  }
   // Hearing - tai, điếc
   if (/\b(tai|điếc|deaf|hearing|trợ thính|hearing aid|cochlear|fm system|roger|cap|caption|tinnitus)\b/i.test(q)) {
     return 'hearing';
@@ -344,14 +334,11 @@ interface ConsultationFormData {
   name: string;
   email: string;
   phone: string;
-  disabilityType: string;
-  budget: string;
-  priority: string;
-  interestedDevices: string[];
   message: string;
+  attachments?: { name: string; type: string; size: number; base64?: string }[];
 }
 
-// Consultation Modal Component
+// Consultation Modal Component - Simplified: Name, Email, Phone, Description + File attachment
 function ConsultationModal({ 
   isOpen, 
   onClose,
@@ -364,23 +351,151 @@ function ConsultationModal({
   language?: Language;
 }): JSX.Element | null {
   const [formData, setFormData] = useState<ConsultationFormData>({
-    name: '', email: '', phone: '',
-    disabilityType: '', budget: '', priority: '',
-    interestedDevices: [], message: ''
+    name: '', email: '', phone: '', message: '', attachments: []
   });
+  const [selectedFiles, setSelectedFiles] = useState<{ name: string; type: string; size: number; base64?: string; preview?: string }[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   
+  // Translations for form labels
+  const labels = {
+    vi: {
+      title: 'Yêu cầu Tư vấn Chuyên gia',
+      subtitle: 'MADA Center, Doha, Qatar',
+      personalInfo: 'THÔNG TIN CÁ NHÂN',
+      fullName: 'Họ và tên',
+      fullNamePlaceholder: 'Nguyễn Văn A',
+      email: 'Email',
+      emailPlaceholder: 'email@example.com',
+      phone: 'Điện thoại',
+      phonePlaceholder: '+974 1234 5678',
+      description: 'MÔ TẢ NHU CẦU',
+      descriptionPlaceholder: 'Mô tả chi tiết tình trạng và nhu cầu về thiết bị công nghệ hỗ trợ...',
+      attachment: 'Đính kèm tệp',
+      attachmentHint: 'Hình ảnh, tài liệu, video...',
+      submit: 'GỬI YÊU CẦU',
+      cancel: 'Hủy',
+      sending: 'Đang gửi...',
+      errorName: 'Vui lòng nhập họ tên',
+      errorEmail: 'Vui lòng nhập email hợp lệ',
+      errorMessage: 'Vui lòng nhập mô tả nhu cầu',
+    },
+    en: {
+      title: 'AT Expert Consultation Request',
+      subtitle: 'MADA Center, Doha, Qatar',
+      personalInfo: 'PERSONAL INFORMATION',
+      fullName: 'Full Name',
+      fullNamePlaceholder: 'John Smith',
+      email: 'Email',
+      emailPlaceholder: 'email@example.com',
+      phone: 'Phone Number',
+      phonePlaceholder: '+974 1234 5678',
+      description: 'NEEDS DESCRIPTION',
+      descriptionPlaceholder: 'Describe your situation and assistive technology needs in detail...',
+      attachment: 'Attach Files',
+      attachmentHint: 'Images, documents, videos...',
+      submit: 'SUBMIT REQUEST',
+      cancel: 'Cancel',
+      sending: 'Sending...',
+      errorName: 'Please enter your name',
+      errorEmail: 'Please enter a valid email',
+      errorMessage: 'Please describe your needs',
+    },
+    ar: {
+      title: 'طلب استشارة خبير AT',
+      subtitle: 'مركز MADA، الدوحة، قطر',
+      personalInfo: 'المعلومات الشخصية',
+      fullName: 'الاسم الكامل',
+      fullNamePlaceholder: 'أحمد محمد',
+      email: 'البريد الإلكتروني',
+      emailPlaceholder: 'email@example.com',
+      phone: 'رقم الهاتف',
+      phonePlaceholder: '+974 1234 5678',
+      description: 'وصف الاحتياجات',
+      descriptionPlaceholder: 'صف وضعك واحتياجاتك من التكنولوجيا المساعدة بالتفصيل...',
+      attachment: 'إرفاق ملفات',
+      attachmentHint: 'صور، مستندات، فيديوهات...',
+      submit: 'إرسال الطلب',
+      cancel: 'إلغاء',
+      sending: 'جارٍ الإرسال...',
+      errorName: 'الرجاء إدخال الاسم',
+      errorEmail: 'الرجاء إدخال بريد إلكتروني صالح',
+      errorMessage: 'الرجاء وصف احتياجاتك',
+    },
+    fr: {
+      title: 'Demande de consultation AT',
+      subtitle: 'Centre MADA, Doha, Qatar',
+      personalInfo: 'INFORMATIONS PERSONNELLES',
+      fullName: 'Nom complet',
+      fullNamePlaceholder: 'Jean Dupont',
+      email: 'Email',
+      emailPlaceholder: 'email@example.com',
+      phone: 'Téléphone',
+      phonePlaceholder: '+974 1234 5678',
+      description: 'DESCRIPTION DES BESOINS',
+      descriptionPlaceholder: 'Décrivez votre situation et vos besoins en technologie d\'assistance en détail...',
+      attachment: 'Joindre des fichiers',
+      attachmentHint: 'Images, documents, vidéos...',
+      submit: 'ENVOYER LA DEMANDE',
+      cancel: 'Annuler',
+      sending: 'Envoi en cours...',
+      errorName: 'Veuillez entrer votre nom',
+      errorEmail: 'Veuillez entrer un email valide',
+      errorMessage: 'Veuillez décrire vos besoins',
+    },
+  };
+  const l = labels[language] || labels.vi;
+  
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
-    if (!formData.name.trim()) newErrors.name = t('chat.validName', language);
-    if (!formData.email.trim()) newErrors.email = t('chat.validEmail', language);
-    else if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = t('chat.validEmailFormat', language);
-    if (!formData.disabilityType) newErrors.disabilityType = t('chat.validDisability', language);
-    if (!formData.budget) newErrors.budget = t('chat.validBudget', language);
-    if (!formData.message.trim()) newErrors.message = t('chat.validNeeds', language);
+    if (!formData.name.trim()) newErrors.name = l.errorName;
+    if (!formData.email.trim()) newErrors.email = l.errorEmail;
+    else if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = l.errorEmail;
+    if (!formData.message.trim()) newErrors.message = l.errorMessage;
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
+  };
+  
+  // Handle file selection
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+    
+    const MAX_FILES = 3;
+    const MAX_SIZE = 10 * 1024 * 1024; // 10MB per file
+    
+    for (let i = 0; i < Math.min(files.length, MAX_FILES); i++) {
+      const file = files[i];
+      
+      if (file.size > MAX_SIZE) {
+        alert(`${file.name} exceeds 10MB limit`);
+        continue;
+      }
+      
+      // Convert to base64 for sending
+      const reader = new FileReader();
+      const base64Promise = new Promise<string>((resolve) => {
+        reader.onload = () => resolve(reader.result as string);
+      });
+      reader.readAsDataURL(file);
+      const base64 = await base64Promise;
+      
+      setSelectedFiles(prev => [...prev, {
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        base64,
+        preview: file.type.startsWith('image/') ? base64 : undefined,
+      }]);
+    }
+    
+    // Reset input
+    e.target.value = '';
+  };
+  
+  // Remove file
+  const removeFile = (index: number) => {
+    setSelectedFiles(prev => prev.filter((_, i) => i !== index));
   };
   
   const handleSubmit = async (e: React.FormEvent) => {
@@ -394,7 +509,16 @@ function ConsultationModal({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ...formData,
+          name: formData.name,
+          email: formData.email,
+          phone: formData.phone,
+          message: formData.message,
+          attachments: selectedFiles.map(f => ({
+            name: f.name,
+            type: f.type,
+            size: f.size,
+            base64: f.base64,
+          })),
           timestamp: new Date().toISOString(),
         }),
       });
@@ -403,15 +527,17 @@ function ConsultationModal({
       
       if (data.success) {
         onSubmit(formData);
-        setFormData({ name: '', email: '', phone: '', disabilityType: '', budget: '', priority: '', interestedDevices: [], message: '' });
+        setFormData({ name: '', email: '', phone: '', message: '', attachments: [] });
+        setSelectedFiles([]);
         onClose();
       } else {
-        alert(data.error || t('chat.submitError', language));
+        alert(data.error || 'Failed to submit consultation request');
       }
     } catch (error) {
       console.error('Consultation submit error:', error);
       onSubmit(formData);
-      setFormData({ name: '', email: '', phone: '', disabilityType: '', budget: '', priority: '', interestedDevices: [], message: '' });
+      setFormData({ name: '', email: '', phone: '', message: '', attachments: [] });
+      setSelectedFiles([]);
       onClose();
     } finally {
       setIsSubmitting(false);
@@ -424,146 +550,158 @@ function ConsultationModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
       
-      {/* Modal Container - Compact Neubrutalist Style */}
-      <div className="relative bg-white w-full max-w-xl rounded-xl border-2 border-slate-800 shadow-[16px_16px_0px_0px_rgba(0,0,0,0.05)] overflow-hidden animate-modal-in max-h-[85vh] flex flex-col">
+      {/* Modal Container */}
+      <div className="relative bg-white w-full max-w-lg rounded-xl border-2 border-slate-800 shadow-[12px_12px_0px_0px_rgba(0,0,0,0.05)] overflow-hidden animate-modal-in max-h-[90vh] flex flex-col">
         
-        {/* Header - Full MADA Branding với nền trắng */}
-        <div className="bg-white p-4 md:p-6 flex items-start justify-between relative overflow-hidden flex-shrink-0 border-b-2 border-slate-100">
+        {/* Header */}
+        <div className="bg-white p-4 md:p-5 flex items-start justify-between relative overflow-hidden flex-shrink-0 border-b-2 border-slate-100">
           <div className="absolute inset-0 bg-gradient-to-br from-teal-50/50 via-white to-blue-50/50" />
           
           {/* Left: Logo + Branding */}
-          <div className="relative z-10 flex gap-3 md:gap-4 items-center">
-            {/* MADA Logo - Chỉ hiển thị logo PNG */}
-            <div className="flex items-center">
-              <img 
-                src="/mada-logo.png" 
-                alt="MADA" 
-                className="h-14 md:h-16 w-auto object-contain drop-shadow-sm"
-              />
-            </div>
-            
-            {/* Divider */}
-            <div className="hidden md:block w-px h-14 bg-slate-200 self-stretch" />
-            
-            {/* Title */}
+          <div className="relative z-10 flex gap-3 items-center">
+            <img 
+              src="/mada-logo.png" 
+              alt="MADA" 
+              className="h-12 md:h-14 w-auto object-contain drop-shadow-sm"
+            />
+            <div className="w-px h-10 bg-slate-200 hidden md:block" />
             <div>
               <h1 className="text-sm md:text-base font-bold text-slate-800 leading-tight">
-                {language === 'vi' ? 'Yêu cầu Tư vấn Chuyên gia AT' : 
-                 language === 'en' ? 'AT Expert Consultation Request' : 
-                 language === 'ar' ? 'طلب استشارة خبير AT' : 
-                 'Demande de consultation AT'}
+                {l.title}
               </h1>
-              <p className="text-[10px] md:text-xs text-secondary/70 mt-0.5 font-medium">MADA Center, Doha, Qatar</p>
+              <p className="text-[10px] md:text-xs text-secondary/70 mt-0.5 font-medium">{l.subtitle}</p>
             </div>
           </div>
           
-          {/* Right: Close Button */}
+          {/* Close Button */}
           <button 
             onClick={onClose} 
-            className="relative z-10 w-8 h-8 md:w-9 md:h-9 rounded-full border-2 border-slate-200 text-slate-400 hover:bg-secondary hover:border-secondary hover:text-white flex items-center justify-center transition-all"
+            className="relative z-10 w-8 h-8 rounded-full border-2 border-slate-200 text-slate-400 hover:bg-secondary hover:border-secondary hover:text-white flex items-center justify-center transition-all"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Content */}
-        <form onSubmit={handleSubmit} className="p-4 md:p-5 bg-slate-50 space-y-5 overflow-y-auto flex-1">
+        <form onSubmit={handleSubmit} className="p-4 md:p-5 bg-slate-50 space-y-4 overflow-y-auto flex-1">
           
-          {/* Section 1: Thông tin cá nhân */}
-          <section className="space-y-4">
-            <h2 className="text-[10px] font-bold uppercase tracking-wider text-secondary flex items-center gap-1.5 font-mono">
-              <User className="w-3.5 h-3.5" /> {language === 'vi' ? 'THÔNG TIN CÁ NHÂN' : language === 'en' ? 'PERSONAL INFORMATION' : language === 'ar' ? 'المعلومات الشخصية' : 'INFORMATIONS PERSONNELLES'}
+          {/* Section 1: Personal Information */}
+          <section className="space-y-3">
+            <h2 className="text-[10px] font-bold uppercase tracking-wider text-secondary flex items-center gap-1.5">
+              <User className="w-3.5 h-3.5" /> {l.personalInfo}
             </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Họ và tên */}
-              <div className="relative">
-                <label className="absolute -top-2.5 left-3.5 bg-slate-50 px-1.5 text-[10px] font-medium text-slate-500">{language === 'vi' ? 'Họ và tên *' : language === 'en' ? 'Full Name *' : language === 'ar' ? 'الاسم الكامل *' : 'Nom complet *'}</label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => { setFormData({ ...formData, name: e.target.value }); setErrors({ ...errors, name: '' }); }}
-                  className={`w-full h-12 px-5 rounded-full border-2 font-medium transition-colors focus:outline-none text-sm ${errors.name ? 'border-red-400 bg-red-50' : 'border-slate-300 focus:border-secondary'} focus:ring-0`}
-                  placeholder={language === 'vi' ? 'Nguyễn Văn A' : language === 'en' ? 'John Smith' : language === 'ar' ? 'أحمد محمد' : 'Jean Dupont'}
-                />
-                {errors.name && <p className="text-[10px] text-red-500 mt-1 pl-4">{errors.name}</p>}
-              </div>
-              
-              {/* Email */}
-              <div className="relative">
-                <label className="absolute -top-2.5 left-3.5 bg-slate-50 px-1.5 text-[10px] font-medium text-slate-500">{language === 'vi' ? 'Email *' : language === 'en' ? 'Email *' : language === 'ar' ? 'البريد الإلكتروني *' : 'Email *'}</label>
-                <input
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => { setFormData({ ...formData, email: e.target.value }); setErrors({ ...errors, email: '' }); }}
-                  className={`w-full h-12 px-5 rounded-full border-2 font-medium transition-colors focus:outline-none text-sm ${errors.email ? 'border-red-400 bg-red-50' : 'border-slate-300 focus:border-secondary'} focus:ring-0`}
-                  placeholder="email@example.com"
-                />
-                {errors.email && <p className="text-[10px] text-red-500 mt-1 pl-4">{errors.email}</p>}
-              </div>
-              
-              {/* Số điện thoại */}
-              <div className="relative md:col-span-2">
-                <label className="absolute -top-2.5 left-3.5 bg-slate-50 px-1.5 text-[10px] font-medium text-slate-500">{language === 'vi' ? 'Số điện thoại' : language === 'en' ? 'Phone Number' : language === 'ar' ? 'رقم الهاتف' : 'Numéro de téléphone'}</label>
-                <input
-                  type="tel"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  className="w-full h-12 px-5 rounded-full border-2 border-slate-300 font-medium transition-colors focus:outline-none focus:border-secondary focus:ring-0 text-sm"
-                  placeholder="+974 1234 5678"
-                />
-              </div>
+            
+            {/* Full Name */}
+            <div className="relative">
+              <label className="absolute -top-2.5 left-3.5 bg-slate-50 px-1.5 text-[10px] font-medium text-slate-500">{l.fullName} *</label>
+              <input
+                type="text"
+                value={formData.name}
+                onChange={(e) => { setFormData({ ...formData, name: e.target.value }); setErrors({ ...errors, name: '' }); }}
+                className={`w-full h-11 px-4 rounded-full border-2 font-medium transition-colors focus:outline-none text-sm ${errors.name ? 'border-red-400 bg-red-50' : 'border-slate-300 focus:border-secondary'} focus:ring-0`}
+                placeholder={l.fullNamePlaceholder}
+              />
+              {errors.name && <p className="text-[10px] text-red-500 mt-1 pl-4">{errors.name}</p>}
+            </div>
+            
+            {/* Email */}
+            <div className="relative">
+              <label className="absolute -top-2.5 left-3.5 bg-slate-50 px-1.5 text-[10px] font-medium text-slate-500">{l.email} *</label>
+              <input
+                type="email"
+                value={formData.email}
+                onChange={(e) => { setFormData({ ...formData, email: e.target.value }); setErrors({ ...errors, email: '' }); }}
+                className={`w-full h-11 px-4 rounded-full border-2 font-medium transition-colors focus:outline-none text-sm ${errors.email ? 'border-red-400 bg-red-50' : 'border-slate-300 focus:border-secondary'} focus:ring-0`}
+                placeholder={l.emailPlaceholder}
+              />
+              {errors.email && <p className="text-[10px] text-red-500 mt-1 pl-4">{errors.email}</p>}
+            </div>
+            
+            {/* Phone */}
+            <div className="relative">
+              <label className="absolute -top-2.5 left-3.5 bg-slate-50 px-1.5 text-[10px] font-medium text-slate-500">{l.phone}</label>
+              <input
+                type="tel"
+                value={formData.phone}
+                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                className="w-full h-11 px-4 rounded-full border-2 border-slate-300 font-medium transition-colors focus:outline-none focus:border-secondary focus:ring-0 text-sm"
+                placeholder={l.phonePlaceholder}
+              />
             </div>
           </section>
 
-          {/* Section 2: Nhu cầu tư vấn */}
-          <section className="space-y-4">
-            <h2 className="text-[10px] font-bold uppercase tracking-wider text-secondary flex items-center gap-1.5 font-mono">
-              <Settings className="w-3.5 h-3.5" /> {language === 'vi' ? 'NHU CẦU TƯ VẤN' : language === 'en' ? 'CONSULTATION NEEDS' : language === 'ar' ? 'احتياجات الاستشارة' : 'BESOINS DE CONSULTATION'}
-            </h2>
-
-            {/* Mức độ ưu tiên */}
-            <div className="space-y-2">
-              <label className="text-[10px] font-medium text-slate-500 block">{language === 'vi' ? 'Mức độ ưu tiên' : language === 'en' ? 'Priority Level' : language === 'ar' ? 'مستوى الأولوية' : 'Niveau de priorité'}</label>
-              <div className="flex gap-2">
-                {[
-                  { value: 'low', color: 'bg-blue-500', label: language === 'vi' ? 'Thấp' : language === 'en' ? 'Low' : language === 'ar' ? 'منخفض' : 'Faible' },
-                  { value: 'medium', color: 'bg-orange-500', label: language === 'vi' ? 'Trung bình' : language === 'en' ? 'Medium' : language === 'ar' ? 'متوسط' : 'Moyen' },
-                  { value: 'high', color: 'bg-red-500', label: language === 'vi' ? 'Cao' : language === 'en' ? 'High' : language === 'ar' ? 'مرتفع' : 'Élevé' },
-                ].map((item) => (
-                  <label key={item.value} className="cursor-pointer flex-1">
-                    <input
-                      type="radio"
-                      name="priority"
-                      value={item.value}
-                      checked={formData.priority === item.value}
-                      onChange={() => setFormData({ ...formData, priority: item.value })}
-                      className="peer sr-only"
-                    />
-                    <div className="px-2 py-2 rounded-full border-2 border-slate-200 font-medium text-xs flex items-center justify-center gap-1.5 transition-all hover:bg-slate-100 text-center peer-checked:border-slate-800 peer-checked:bg-slate-800 peer-checked:text-white">
-                      <span className={`w-2.5 h-2.5 rounded-full ${item.color}`} />
-                      <span>{item.label}</span>
-                    </div>
-                  </label>
-                ))}
-              </div>
-            </div>
-          </section>
-
-          {/* Section 4: Mô tả */}
+          {/* Section 2: Needs Description */}
           <section className="space-y-2">
-            <h2 className="text-[10px] font-bold uppercase tracking-wider text-secondary flex items-center gap-1.5 font-mono">
-              <MessageCircle className="w-3.5 h-3.5" /> {language === 'vi' ? 'MÔ TẢ NHU CẦU' : language === 'en' ? 'NEEDS DESCRIPTION' : language === 'ar' ? 'وصف الاحتياجات' : 'DESCRIPTION DES BESOINS'}
+            <h2 className="text-[10px] font-bold uppercase tracking-wider text-secondary flex items-center gap-1.5">
+              <MessageCircle className="w-3.5 h-3.5" /> {l.description}
             </h2>
             <div className="relative">
               <textarea
-                rows={3}
+                rows={4}
                 value={formData.message}
                 onChange={(e) => { setFormData({ ...formData, message: e.target.value }); setErrors({ ...errors, message: '' }); }}
                 className={`w-full px-4 py-3 rounded-xl border-2 font-medium transition-colors resize-none focus:outline-none text-sm ${errors.message ? 'border-red-400 bg-red-50' : 'border-slate-300 focus:border-secondary'} focus:ring-0`}
-                placeholder={language === 'vi' ? 'Mô tả chi tiết tình trạng và nhu cầu về thiết bị công nghệ hỗ trợ...' : language === 'en' ? 'Describe your situation and assistive technology needs in detail...' : language === 'ar' ? 'صف وضعك واحتياجاتك من التكنولوجيا المساعدة بالتفصيل...' : 'Décrivez votre situation et vos besoins en technologie d\'assistance en détail...'}
+                placeholder={l.descriptionPlaceholder}
               />
               {errors.message && <p className="text-[10px] text-red-500 mt-1">{errors.message}</p>}
             </div>
+          </section>
+
+          {/* Section 3: File Attachment */}
+          <section className="space-y-2">
+            <h2 className="text-[10px] font-bold uppercase tracking-wider text-secondary flex items-center gap-1.5">
+              <File className="w-3.5 h-3.5" /> {l.attachment}
+            </h2>
+            
+            {/* File Input */}
+            <div className="relative">
+              <input
+                type="file"
+                id="consultation-file"
+                multiple
+                accept="image/*,.pdf,.doc,.docx,.txt,.xlsx,.xls,.csv"
+                onChange={handleFileSelect}
+                className="hidden"
+              />
+              <label
+                htmlFor="consultation-file"
+                className="flex items-center justify-center gap-2 w-full h-12 px-4 rounded-xl border-2 border-dashed border-slate-300 cursor-pointer hover:border-secondary hover:bg-slate-50 transition-colors"
+              >
+                <Plus className="w-4 h-4 text-slate-400" />
+                <span className="text-sm text-slate-500">{l.attachmentHint}</span>
+              </label>
+            </div>
+            
+            {/* Selected Files Preview */}
+            {selectedFiles.length > 0 && (
+              <div className="space-y-2">
+                {selectedFiles.map((file, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-slate-200"
+                  >
+                    {file.preview ? (
+                      <img src={file.preview} alt={file.name} className="w-10 h-10 rounded-lg object-cover" />
+                    ) : (
+                      <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center">
+                        <File className="w-5 h-5 text-slate-400" />
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium text-slate-700 truncate">{file.name}</p>
+                      <p className="text-[10px] text-slate-400">{(file.size / 1024).toFixed(1)} KB</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeFile(index)}
+                      className="p-1 rounded-full hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </section>
         </form>
 
@@ -574,7 +712,7 @@ function ConsultationModal({
             onClick={onClose}
             className="px-6 py-2.5 rounded-full border-2 border-slate-800 font-bold text-xs text-slate-800 bg-white hover:bg-slate-100 transition-colors"
           >
-            {language === 'vi' ? 'Hủy' : language === 'en' ? 'Cancel' : language === 'ar' ? 'إلغاء' : 'Annuler'}
+            {l.cancel}
           </button>
           <button
             type="submit"
@@ -585,18 +723,53 @@ function ConsultationModal({
             {isSubmitting ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
-                {language === 'vi' ? 'Đang gửi...' : language === 'en' ? 'Sending...' : language === 'ar' ? 'جارٍ الإرسال...' : 'Envoi en cours...'}
+                {l.sending}
               </>
             ) : (
               <>
                 <Send className="w-4 h-4" />
-                {language === 'vi' ? 'GỬI YÊU CẦU' : language === 'en' ? 'SUBMIT REQUEST' : language === 'ar' ? 'إرسال الطلب' : 'ENVOYER LA DEMANDE'}
+                {l.submit}
               </>
             )}
           </button>
         </div>
       </div>
     </div>
+  );
+}
+
+// ⭐ Product Image Component - xử lý lỗi ảnh đúng cách (tránh vi phạm Rules of Hooks)
+function ProductImage({ 
+  imageUrl, 
+  alt 
+}: { 
+  imageUrl: string | null | undefined; 
+  alt: string;
+}) {
+  const [hasError, setHasError] = useState(false);
+  
+  const src = getImageUrl(imageUrl);
+  
+  if (!src || hasError) {
+    return (
+      <div className="w-full h-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-white">
+        <Accessibility className="w-10 h-10" />
+      </div>
+    );
+  }
+  
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className="w-full h-full object-cover"
+      loading="lazy"
+      referrerPolicy="no-referrer"
+      onError={() => {
+        console.warn('[ProductImage] Image failed to load:', src);
+        setHasError(true);
+      }}
+    />
   );
 }
 
@@ -615,6 +788,7 @@ export function ChatPage() {
 
   const [inputValue, setInputValue] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [isHistoryCollapsed, setIsHistoryCollapsed] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [showLanguageMenu, setShowLanguageMenu] = useState(false);
   const [showAttachmentMenu, setShowAttachmentMenu] = useState(false);
@@ -690,6 +864,199 @@ export function ChatPage() {
 
   // ⭐ AT Specialist Suggestion State
   const [showATSuggestion, setShowATSuggestion] = useState(false);
+
+  // ⭐ Smart Product Suggestion State - Theo dõi conversation depth và user context
+  const [conversationTurns, setConversationTurns] = useState(0); // Số lượt hỏi-đáp
+  const [userContextCollected, setUserContextCollected] = useState({
+    hasSymptom: false,     // Mô tả triệu chứng/tình trạng
+    hasBudget: false,      // Ngân sách/giá cả
+    hasConstraint: false,  // Ràng buộc (độ tuổi, môi trường...)
+    hasGoal: false,       // Mục tiêu sử dụng
+    hasDeviceType: false,  // Loại thiết bị quan tâm
+    hasDuration: false,    // Thời gian xảy ra
+    hasSeverity: false,    // Mức độ nghiêm trọng
+    hasPreviousTry: false, // Đã thử sản phẩm gì chưa
+  });
+  
+  // ⭐ Tính Maturity Score (0-100) - được giữ lại cho tương lai nếu cần
+  const _getMaturityScore = useCallback(() => {
+    let score = 0;
+    const ctx = userContextCollected;
+    
+    // Triệu chứng: 40 điểm (quan trọng nhất)
+    if (ctx.hasSymptom) score += 40;
+    
+    // Mức độ nghiêm trọng: 15 điểm
+    if (ctx.hasSeverity) score += 15;
+    
+    // Thời gian: 10 điểm
+    if (ctx.hasDuration) score += 10;
+    
+    // Ràng buộc: 10 điểm
+    if (ctx.hasConstraint) score += 10;
+    
+    // Mục tiêu: 10 điểm
+    if (ctx.hasGoal) score += 10;
+    
+    // Loại thiết bị quan tâm: 5 điểm
+    if (ctx.hasDeviceType) score += 5;
+    
+    // Ngân sách: 5 điểm
+    if (ctx.hasBudget) score += 5;
+    
+    // Đã thử sản phẩm: 5 điểm
+    if (ctx.hasPreviousTry) score += 5;
+    
+    return Math.min(score, 100);
+  }, [userContextCollected]);
+  void _getMaturityScore;
+  
+  // ⭐ REQUIRED CONTEXT FIELDS - Bot phải khai thác đủ những thông tin này trước khi đề xuất sản phẩm
+  // ĐÂY LÀ NHỮNG TRƯỜNG BẮT BUỘC - thiếu 1 là KHÔNG show sản phẩm
+  const REQUIRED_CONTEXT_FIELDS = {
+    hasSymptom: 'Mô tả triệu chứng/tình trạng hiện tại',
+    hasSeverity: 'Mức độ nghiêm trọng (nhẹ/vừa/nặng)',
+    hasDuration: 'Thời gian xảy ra vấn đề',
+  };
+  
+  // OPTIONAL - những thông tin bổ sung (có thì tốt, không có vẫn ok)
+  const OPTIONAL_CONTEXT_FIELDS = {
+    hasBudget: 'Ngân sách/chi phí dự kiến',
+    hasConstraint: 'Độ tuổi/môi trường sử dụng',
+    hasGoal: 'Mục tiêu sử dụng thiết bị',
+    hasDeviceType: 'Loại thiết bị quan tâm',
+    hasPreviousTry: 'Đã thử sản phẩm nào trước đó chưa',
+  };
+
+  // ⭐ Kiểm tra có đủ điều kiện gợi ý sản phẩm không
+  // YÊU CẦU: Phải khai thác đủ TẤT CẢ required context (triệu chứng + mức độ + thời gian)
+  // HOẶC conversationTurns >= 5 (backup - để đảm bảo bot đã hỏi nhiều rồi)
+  const isReadyForProductSuggestion = useMemo(() => {
+    // Kiểm tra từng required field
+    const hasRequiredSymptom = userContextCollected.hasSymptom;
+    const hasRequiredSeverity = userContextCollected.hasSeverity;
+    const hasRequiredDuration = userContextCollected.hasDuration;
+    
+    // Đủ 3 required fields → show sản phẩm
+    if (hasRequiredSymptom && hasRequiredSeverity && hasRequiredDuration) {
+      return true;
+    }
+    
+    // Backup: >= 5 lượt hỏi đáp (bot đã hỏi nhiều, giả sử đã khai thác đủ)
+    if (conversationTurns >= 5) {
+      return true;
+    }
+    
+    return false;
+  }, [userContextCollected, conversationTurns]);
+  
+  // ⭐ Lấy danh sách context còn thiếu (để bot hỏi thêm)
+  const getMissingContext = useMemo(() => {
+    const missing: string[] = [];
+    
+    // Ưu tiên theo thứ tự: triệu chứng → mức độ → thời gian → bổ sung
+    if (!userContextCollected.hasSymptom) missing.push('symptom');
+    if (!userContextCollected.hasSeverity) missing.push('severity');
+    if (!userContextCollected.hasDuration) missing.push('duration');
+    if (!userContextCollected.hasBudget) missing.push('budget');
+    if (!userContextCollected.hasConstraint) missing.push('constraint');
+    if (!userContextCollected.hasGoal) missing.push('goal');
+    if (!userContextCollected.hasPreviousTry) missing.push('previousTry');
+    
+    return missing;
+  }, [userContextCollected]);
+  
+  // ⭐ Tạo câu hỏi follow-up dựa trên context còn thiếu
+  // Bot sẽ hỏi TỪNG câu một, không hỏi tất cả cùng lúc
+  const getNextFollowUpQuestion = useCallback((lang: Language): string => {
+    const missing = getMissingContext;
+    if (missing.length === 0) return '';
+    
+    const questionsByLang: Record<Language, Record<string, string[]>> = {
+      vi: {
+        symptom: ['Bạn có thể mô tả rõ hơn về triệu chứng/tình trạng của mình không?', 'Biểu hiện cụ thể như thế nào vậy?', 'Bạn gặp vấn đề này ra sao?'],
+        severity: ['Mức độ ảnh hưởng như thế nào? (nhẹ, vừa, hay nặng)', 'Tình trạng này có nghiêm trọng không?', 'Độ khó khăn ra sao?'],
+        duration: ['Tình trạng này kéo dài bao lâu rồi?', 'Bạn gặp vấn đề này từ khi nào?', 'Đã bao lâu chưa?'],
+        budget: ['Bạn có dự kiến ngân sách bao nhiêu cho thiết bị này?', 'Khoảng giá nào phù hợp với bạn?'],
+        constraint: ['Bạn bao nhiêu tuổi? / Thiết bị dùng ở đâu (nhà, văn phòng, trường học)?'],
+        goal: ['Mục tiêu chính khi sử dụng thiết bị là gì?', 'Bạn muốn đạt được điều gì với thiết bị này?'],
+        previousTry: ['Bạn đã thử sử dụng thiết bị nào chưa?', 'Trước đây có dùng sản phẩm tương tự chưa?'],
+      },
+      en: {
+        symptom: ['Could you describe your symptoms in more detail?', 'What specific symptoms are you experiencing?'],
+        severity: ['How severe is your condition? (mild, moderate, or severe)', 'How much does it affect your daily life?'],
+        duration: ['How long have you been experiencing this?', 'When did this problem start?'],
+        budget: ['Do you have a budget in mind for this device?', 'What price range would work for you?'],
+        constraint: ['How old is the user? / Where will the device be used (home, office, school)?'],
+        goal: ['What is your main goal with this device?', 'What do you want to achieve with this device?'],
+        previousTry: ['Have you tried any similar devices before?', 'Have you used any products for this before?'],
+      },
+      ar: {
+        symptom: ['هل يمكنك وصف أعراضك بمزيد من التفصيل؟', 'ما هي الأعراض المحددة التي تعاني منها؟'],
+        severity: ['ما مدى شدة حالتك؟ (خفيف، متوسط، شديد)', 'ما مدى تأثير ذلك على حياتك اليومية؟'],
+        duration: ['منذ متى وأنت تعاني من هذا؟', 'متى بدأت هذه المشكلة؟'],
+        budget: ['هل لديك ميزانية محددة لهذا الجهاز؟', 'ما نطاق السعر المناسب لك؟'],
+        constraint: ['كم عمر المستخدم؟ / أين سيتم استخدام الجهاز (المنزل، المكتب، المدرسة)؟'],
+        goal: ['ما هو هدفك الرئيسي من هذا الجهاز؟', 'ماذا تريد أن تحقق مع هذا الجهاز؟'],
+        previousTry: ['هل جربت أي أجهزة مماثلة من قبل؟', 'هل استخدمت أي منتجات لهذا من قبل؟'],
+      },
+      fr: {
+        symptom: ['Pouvez-vous décrire vos symptômes plus en détail?', 'Quels symptômes spécifiques ressentez-vous?'],
+        severity: ['Quelle est la gravité de votre état? (léger, modéré ou sévère)', 'Dans quelle mesure cela affecte-t-il votre vie quotidienne?'],
+        duration: ['Depuis combien de temps éprouvez-vous cela?', 'Quand ce problème a-t-il commencé?'],
+        budget: ['Avez-vous un budget en tête pour cet appareil?', 'quelle gamme de prix vous convient?'],
+        constraint: ['Quel âge a l\'utilisateur? / Où l\'appareil sera-t-il utilisé (maison, bureau, école)?'],
+        goal: ['Quel est votre objectif principal avec cet appareil?', 'Que voulez-vous accomplir avec cet appareil?'],
+        previousTry: ['Avez-vous essayé des appareils similaires auparavant?', 'Avez-vous utilisé des produits pour cela auparavant?'],
+      },
+    };
+    
+    const langQuestions = questionsByLang[lang] || questionsByLang.vi;
+    const nextMissing = missing[0]; // Lấy cái đầu tiên trong danh sách thiếu
+    const questions = langQuestions[nextMissing] || langQuestions.symptom;
+    
+    // Random 1 câu hỏi
+    return questions[Math.floor(Math.random() * questions.length)];
+  }, [getMissingContext]);
+  
+  // ⭐ Cập nhật context khi user nhắn tin
+  const updateUserContext = useCallback((message: string) => {
+    const lowerMsg = message.toLowerCase();
+    
+    setUserContextCollected(prev => ({
+      hasSymptom: prev.hasSymptom || 
+        /(bị|mắc|có|vấn đề|triệu chứng|khó khăn|gặp| không thể|audi|hearing|mobility|deaf|disabled|khuyết tật|đau|mỏi|điếc|khiếm thị|khiếm thính)/i.test(lowerMsg),
+      hasBudget: prev.hasBudget || 
+        /(giá|tiền|budget|chi phí|đắt|rẻ|triệu|mua|thanh toán|trả góp|insurance|bảo hiểm)/i.test(lowerMsg),
+      hasConstraint: prev.hasConstraint || 
+        /(tuổi|trẻ|em bé|người già|senior|child|elderly|nhà|office|văn phòng|school|trường|học|outdoor|indoor|môi trường)/i.test(lowerMsg),
+      hasGoal: prev.hasGoal || 
+        /(muốn|cần|học|làm việc|đọc|viết|giao tiếp|đi lại|tự chủ|independent|learn|work|read|communicate|move)/i.test(lowerMsg),
+      hasDeviceType: prev.hasDeviceType || 
+        /(xe lăn|máy|thiết bị|device|wheelchair|hearing aid|screen reader|aac|prosthetic|orthotic|cane|crutch|nạng|kính|loa)/i.test(lowerMsg),
+      hasDuration: prev.hasDuration || 
+        /(lâu|rồi|tháng|năm|từ|khi|bắt đầu|day|mount|year|week|ago|since|how long)/i.test(lowerMsg),
+      hasSeverity: prev.hasSeverity || 
+        /(nặng|vừa|nhẹ|severe|moderate|mild|khó|nghiêm trọng|ảnh hưởng|rất|đỡ|hơn)/i.test(lowerMsg),
+      hasPreviousTry: prev.hasPreviousTry || 
+        /(thử|đã|dùng|use|tried|sử dụng|medicine|thuốc|vitamin|sản phẩm)/i.test(lowerMsg),
+    }));
+  }, []);
+  
+  // ⭐ Reset context khi bắt đầu cuộc trò chuyện mới
+  const resetContextTracking = useCallback(() => {
+    setConversationTurns(0);
+    setUserContextCollected({
+      hasSymptom: false,
+      hasBudget: false,
+      hasConstraint: false,
+      hasGoal: false,
+      hasDeviceType: false,
+      hasDuration: false,
+      hasSeverity: false,
+      hasPreviousTry: false,
+    });
+  }, []);
 
   // ⭐ Function to check if message contains AT keywords
   const checkATKeyword = useCallback((message: string): boolean => {
@@ -812,7 +1179,8 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
   };
 
   // ⭐ Kiểm tra xem có phải "Trò chuyện mới" không (chưa chọn agent cụ thể)
-  const isNewChat = !selectedAgentId && messages.length === 0;
+  const _isNewChat = !selectedAgentId && messages.length === 0;
+  void _isNewChat;
 
   // Chat history from persisted store
   const historyConversations = useChatHistoryStore((s) => s.conversations);
@@ -834,6 +1202,86 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
   const [isFetchingUrl, setIsFetchingUrl] = useState(false);
   const [userHasScrolled, setUserHasScrolled] = useState(false);
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // ⭐ Topic Selector State - Simplified chatbot with dropdown
+  type TopicId = 'total' | ATCategory;
+  const [selectedTopic, setSelectedTopic] = useState<TopicId>('total');
+  const [showTopicDropdown, setShowTopicDropdown] = useState(true);
+
+  // ⭐ Topic labels translated
+  const topicLabels: Record<string, Record<Language, string>> = {
+    total: {
+      vi: 'Tổng hợp',
+      en: 'General',
+      ar: 'عام',
+      fr: 'Général',
+    },
+    hearing: {
+      vi: 'Thính giác',
+      en: 'Hearing',
+      ar: 'السمع',
+      fr: 'Audition',
+    },
+    mobility: {
+      vi: 'Vận động',
+      en: 'Mobility',
+      ar: 'التنقل',
+      fr: 'Mobilité',
+    },
+    cognition: {
+      vi: 'Nhận thức',
+      en: 'Cognition',
+      ar: 'الإدراك',
+      fr: 'Cognition',
+    },
+    communication: {
+      vi: 'Giao tiếp',
+      en: 'Communication',
+      ar: 'التواصل',
+      fr: 'Communication',
+    },
+    daily_living: {
+      vi: 'Sinh hoạt',
+      en: 'Daily Living',
+      ar: 'الحياة اليومية',
+      fr: 'Vie quotidienne',
+    },
+    education: {
+      vi: 'Giáo dục',
+      en: 'Education',
+      ar: 'التعليم',
+      fr: 'Éducation',
+    },
+  };
+
+  // ⭐ Get all available topics (total + categories)
+  const availableTopics = useMemo(() => {
+    const topics: { id: TopicId; label: string; icon: string; color: string }[] = [
+      { id: 'total', label: topicLabels.total[language], icon: 'auto_awesome', color: 'bg-gradient-to-r from-violet-500 to-purple-500' },
+    ];
+    
+    // Add all categories from CATEGORY_INFO
+    const allCats = Object.keys(CATEGORY_INFO) as ATCategory[];
+    const categoryColors: Record<ATCategory, string> = {
+      hearing: 'bg-indigo-500',
+      mobility: 'bg-emerald-500',
+      cognition: 'bg-rose-500',
+      communication: 'bg-amber-500',
+      daily_living: 'bg-purple-500',
+      education: 'bg-teal-500',
+    };
+    
+    allCats.forEach(category => {
+      topics.push({
+        id: category,
+        label: topicLabels[category]?.[language] || topicLabels.total[language],
+        icon: CATEGORY_ICONS[category],
+        color: categoryColors[category],
+      });
+    });
+    
+    return topics;
+  }, [language]);
 
   // Helpers — format date relative + ISO
   const formatRelativeDate = (ts: number): string => {
@@ -1260,6 +1708,10 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
     setStreamingContent('');
     setUserHasScrolled(false); // Reset scroll state when new message is sent
 
+    // ⭐ Tăng số lượt hỏi đáp và cập nhật user context
+    setConversationTurns(prev => prev + 1);
+    updateUserContext(userMessage);
+
     // ⭐ Check AT keyword after user sends message
     if (!isEndUser && checkATKeyword(userMessage)) {
       setShowATSuggestion(true);
@@ -1333,34 +1785,53 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
         });
         
         // Chuẩn bị attachments để gửi lên server (có base64/content)
-        // Ưu tiên content đã parse (từ mammoth/pdf.js) thay vì gửi raw base64
-        if (f.content && !f.content.includes('waiting to parse')) {
-          // Đã có nội dung parse sẵn (từ mammoth/pdf.js frontend) - dùng luôn
+        // Ưu tiên content đã parse sẵn (từ mammoth/pdf.js) - NHƯNG KHÔNG dùng cho images vì cần OCR
+        // Images cần gửi base64 để backend OCR
+        if (f.content && !f.content.includes('waiting to parse') && !f.type.startsWith('image/')) {
+          // Đã có nội dung parse sẵn (từ mammoth/pdf.js frontend) - dùng luôn (trừ images)
           attachmentsForApi.push({
             name: f.name,
             type: f.type,
             content: f.content,
           });
         }
-        // Nếu không có content nhưng có originalFile - gửi base64 để server parse
-        else if (f.originalFile) {
+        // Images: gửi base64 để backend OCR, hoặc nếu có originalFile
+        else if (f.type.startsWith('image/') || f.originalFile) {
           try {
-            const arrayBuffer = await f.originalFile.arrayBuffer();
-            const binary = new Uint8Array(arrayBuffer);
-            let base64 = '';
-            for (let i = 0; i < binary.length; i++) {
-              base64 += String.fromCharCode(binary[i]);
+            // Nếu content là data URL (base64), trích xuất phần base64 thuần
+            let base64Data = f.content;
+            if (base64Data && base64Data.startsWith('data:')) {
+              // Trích xuất phần base64 thuần (bỏ prefix data:...;base64,)
+              base64Data = base64Data.split(',')[1] || base64Data;
+            } else if (f.originalFile) {
+              // Đọc từ originalFile nếu có
+              const arrayBuffer = await f.originalFile.arrayBuffer();
+              const binary = new Uint8Array(arrayBuffer);
+              let base64 = '';
+              for (let i = 0; i < binary.length; i++) {
+                base64 += String.fromCharCode(binary[i]);
+              }
+              base64Data = btoa(base64);
             }
-            base64 = btoa(base64);
             
-            attachmentsForApi.push({
-              name: f.name,
-              type: f.type,
-              base64: base64,
-            });
+            if (base64Data) {
+              attachmentsForApi.push({
+                name: f.name,
+                type: f.type,
+                base64: base64Data,
+              });
+            }
           } catch (e) {
             console.error('Error reading file:', f.name, e);
           }
+        }
+        // Các file khác đã parse sẵn text
+        else if (f.content) {
+          attachmentsForApi.push({
+            name: f.name,
+            type: f.type,
+            content: f.content,
+          });
         }
       }
       
@@ -1461,6 +1932,7 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
         let fullContent = '';
         let sources: any[] = [];
         let confidence = 0.5;
+        let suggestedProducts: any[] = [];
 
         while (true) {
           const { done, value } = await reader.read();
@@ -1480,6 +1952,9 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
                   setStreamingContent(fullContent);
                 } else if (data.type === 'sources') {
                   sources = data.sources || [];
+                } else if (data.type === 'suggestedProducts') {
+                  // ⭐ Nhận sản phẩm gợi ý từ server
+                  suggestedProducts = data.suggestedProducts || [];
                 } else if (data.type === 'done') {
                   confidence = data.confidence || 0.5;
                   if (data.answer) fullContent = data.answer;
@@ -1497,13 +1972,22 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
         apiSuccess = true;
 
         if (fullContent) {
+          // ⭐ THÊM CÂU HỎI FOLLOW-UP KHI CHƯA ĐỦ CONTEXT
+          // Bot sẽ hỏi thêm thông tin trước khi đề xuất sản phẩm
+          let finalContent = fullContent;
+          if (!isReadyForProductSuggestion && getMissingContext.length > 0) {
+            const followUpQuestion = getNextFollowUpQuestion(language);
+            // Thêm câu hỏi follow-up vào cuối message
+            finalContent = `${fullContent}\n\n*${followUpQuestion}*`;
+          }
+          
           addMessage({
             role: 'assistant',
-            content: fullContent,
+            content: finalContent,
             confidence: confidence,
             sources: sources,
             contextUsed: sources.length > 0,
-            // ❌ KHÔNG tự động hiển thị sản phẩm - chỉ khi user bấm nút
+            suggestedProducts: suggestedProducts,
           });
 
           // 💾 Save assistant message vào backend (DB persistence)
@@ -1652,6 +2136,22 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
           suggestedProducts: data.data.suggestedProducts,
         });
 
+        // ⭐ THÊM CÂU HỎI FOLLOW-UP KHI CHƯA ĐỦ CONTEXT (non-streaming mode)
+        if (!isReadyForProductSuggestion && getMissingContext.length > 0) {
+          const followUpQuestion = getNextFollowUpQuestion(language);
+          // Cập nhật message cuối cùng với follow-up question
+          const updatedMessages = useChatStore.getState().messages;
+          if (updatedMessages.length > 0) {
+            const lastMsg = updatedMessages[updatedMessages.length - 1];
+            if (lastMsg.role === 'assistant') {
+              const updatedContent = `${lastMsg.content}\n\n*${followUpQuestion}*`;
+              const newMessages = [...updatedMessages];
+              newMessages[newMessages.length - 1] = { ...lastMsg, content: updatedContent };
+              setMessages(newMessages);
+            }
+          }
+        }
+
         // 💾 Save assistant message vào backend (non-streaming)
         if (currentUser && currentConvId) {
           userHistoryApi.addMessage(currentConvId, {
@@ -1769,6 +2269,9 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
     setInputValue('');
     setStreamingContent('');
     setActiveCategory(null);
+
+    // ⭐ Reset conversation tracking khi bắt đầu cuộc trò chuyện mới
+    resetContextTracking();
 
     if (window.innerWidth < 768) {
       setSidebarOpen(false);
@@ -2156,11 +2659,14 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
     }
   };
 
-  const handleConsultationSubmit = (data: { name: string; email: string; phone: string; message: string }) => {
+  const handleConsultationSubmit = (data: { name: string; email: string; phone: string; message: string; attachments?: { name: string; type: string; size: number }[] }) => {
     console.log('Consultation submitted:', data);
     addMessage({
       role: 'user',
-      content: t('chat.consultSent'),
+      content: language === 'vi' ? 'Tôi đã gửi yêu cầu tư vấn. Cảm ơn bạn!' : 
+               language === 'en' ? 'I have submitted a consultation request. Thank you!' :
+               language === 'ar' ? 'لقد أرسلت طلب استشارة. شكراً لك!' :
+               'J\'ai soumis une demande de consultation. Merci!',
     });
   };
 
@@ -2246,40 +2752,8 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
             </div>
           </div>
 
-        {/* View Mode Toggle đã di chuyển lên Header */}
-
-        {/* View Mode Toggle */}
-        <div className="px-4 mb-3 shrink-0">
-          <div className="bg-slate-100 rounded-xl p-0.5 flex">
-            <button
-              onClick={viewMode === 'end_user' ? undefined : toggleViewMode}
-              className={clsx(
-                'flex-1 flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-xs font-medium transition-all duration-200',
-                viewMode === 'end_user' 
-                  ? 'bg-white text-blue-600 shadow-sm' 
-                  : 'text-slate-500 hover:text-slate-700'
-              )}
-            >
-              <span className="material-symbols-outlined text-sm">person</span>
-              <span>{language === 'vi' ? 'Người dùng' : language === 'en' ? 'End user' : language === 'ar' ? 'المستخدم' : 'Utilisateur'}</span>
-            </button>
-            <button
-              onClick={viewMode === 'at_specialist' ? undefined : toggleViewMode}
-              className={clsx(
-                'flex-1 flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-xs font-medium transition-all duration-200',
-                viewMode === 'at_specialist' 
-                  ? 'bg-white text-violet-600 shadow-sm' 
-                  : 'text-slate-500 hover:text-slate-700'
-              )}
-            >
-              <span className="material-symbols-outlined text-sm">engineering</span>
-              <span>{language === 'vi' ? 'Chuyên gia' : language === 'en' ? 'Specialist' : language === 'ar' ? 'خبير' : 'Spécialiste'}</span>
-            </button>
-          </div>
-        </div>
-
         {/* New Chat Button */}
-        <div className="px-4 mb-4 mt-2 shrink-0">
+        <div className="px-4 mb-3 mt-2 shrink-0">
           <button
             onClick={handleNewChat}
             className="w-full text-white rounded-full py-2.5 px-4 flex items-center justify-center gap-2 font-semibold shadow-md hover:opacity-90 transition-all bg-primary hover:bg-primary/90 text-sm"
@@ -2311,9 +2785,8 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
               const isActive = activeCategory === category;
               const label = CATEGORY_LABELS[category];
 
-              // Material Design 3 colors for categories
               const categoryColors: Record<ATCategory, { bg: string; icon: string; active: string }> = {
-                vision: { bg: 'bg-blue-100', icon: 'text-blue-600', active: 'bg-blue-500 text-white' },
+                vision: { bg: 'bg-violet-100', icon: 'text-violet-600', active: 'bg-violet-500 text-white' },
                 hearing: { bg: 'bg-indigo-100', icon: 'text-indigo-600', active: 'bg-indigo-500 text-white' },
                 mobility: { bg: 'bg-emerald-100', icon: 'text-emerald-600', active: 'bg-emerald-500 text-white' },
                 cognition: { bg: 'bg-rose-100', icon: 'text-rose-500', active: 'bg-rose-500 text-white' },
@@ -2322,7 +2795,7 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
                 education: { bg: 'bg-teal-100', icon: 'text-teal-600', active: 'bg-teal-500 text-white' },
               };
               const colors = categoryColors[category];
-              
+
               return (
                 <button
                   key={category}
@@ -2343,51 +2816,52 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
                           createdAt: Date.now() - 60_000,
                           updatedAt: Date.now(),
                         });
+                      }
+                      window.speechSynthesis?.cancel();
+                      setSpeakingId(null);
+                      clearMessages();
+                      setActiveConversationId(null);
+                      setInputValue('');
+                      setStreamingContent('');
+                      setActiveCategory(category);
                     }
-                    window.speechSynthesis?.cancel();
-                    setSpeakingId(null);
-                    clearMessages();
-                    setActiveConversationId(null);
-                    setInputValue('');
-                    setStreamingContent('');
-                    setActiveCategory(category);
 
                     if (window.innerWidth < 768) {
                       setSidebarOpen(false);
                     }
-                  }
-                }}
-                className={clsx(
-                  'w-full flex items-center gap-3 px-4 py-2.5 transition-colors rounded-xl group',
-                  isActive
-                    ? colors.active
-                    : 'text-slate-500 hover:bg-surface-container-low hover:text-on-background'
-                )}>
-                <div className={clsx(
-                  'w-9 h-9 rounded-lg flex items-center justify-center transition-colors',
-                  isActive ? 'bg-white/20' : colors.bg
-                )}>
-                  <span className={clsx(
-                    'material-symbols-outlined text-lg',
-                    isActive ? 'text-white' : colors.icon
+                  }}
+                  className={clsx(
+                    'w-full flex items-center gap-3 px-4 py-2.5 transition-colors rounded-xl group',
+                    isActive
+                      ? colors.active
+                      : 'text-slate-500 hover:bg-surface-container-low hover:text-on-background'
                   )}>
-                    {CATEGORY_ICONS[category]}
-                  </span>
-                </div>
-                <div className="flex-1 min-w-0 text-left">
-                  <p className="text-xs font-bold uppercase tracking-tight">
-                    {language === 'vi' ? label.title : language === 'en' ? label.titleEn : language === 'ar' ? label.titleAr : label.titleFr}
-                  </p>
-                  <p className={clsx(
-                    'text-[10px] truncate',
-                    isActive ? 'text-white/70' : 'text-on-surface-variant'
+                  <div className={clsx(
+                    'w-9 h-9 rounded-lg flex items-center justify-center transition-colors',
+                    isActive ? 'bg-white/20' : colors.bg
                   )}>
-                    {language === 'vi' ? label.desc : language === 'en' ? label.descEn : language === 'ar' ? label.descAr : label.descFr}
-                  </p>
-                </div>
-              </button>
-            );
-          })}
+                    <span className={clsx(
+                      'material-symbols-outlined text-lg',
+                      isActive ? 'text-white' : colors.icon
+                    )}>
+                      {CATEGORY_ICONS[category]}
+                    </span>
+                  </div>
+                  <div className="flex-1 min-w-0 text-left">
+                    <p className="text-xs font-bold uppercase tracking-tight">
+                      {language === 'vi' ? label.title : language === 'en' ? label.titleEn : language === 'ar' ? label.titleAr : label.titleFr}
+                    </p>
+                    <p className={clsx(
+                      'text-[10px] truncate',
+                      isActive ? 'text-white/70' : 'text-on-surface-variant'
+                    )}>
+                      {language === 'vi' ? label.desc : language === 'en' ? label.descEn : language === 'ar' ? label.descAr : label.descFr}
+                    </p>
+                  </div>
+                </button>
+              );
+            })}
+          </nav>
 
           {/* Sample Questions - Hiển thị khi có category được chọn (CỐ ĐỊNH theo 7 bot) */}
           {activeCategory && SAMPLE_QUESTIONS[activeCategory]?.[viewMode]?.[language]?.length > 0 && (
@@ -2415,7 +2889,7 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
                 ))}
                 {SAMPLE_QUESTIONS[activeCategory][viewMode][language].length > 4 && (
                   <button className="w-full flex items-center justify-center gap-1 px-3 py-1.5 text-xs text-violet-600 hover:text-violet-700 font-medium">
-                    {language === 'vi' ? `Xem thêm ${SAMPLE_QUESTIONS[activeCategory][viewMode][language].length - 4} câu` : 
+                    {language === 'vi' ? `Xem thêm ${SAMPLE_QUESTIONS[activeCategory][viewMode][language].length - 4} câu` :
                      language === 'en' ? `Show ${SAMPLE_QUESTIONS[activeCategory][viewMode][language].length - 4} more` :
                      language === 'ar' ? `عرض ${SAMPLE_QUESTIONS[activeCategory][viewMode][language].length - 4} أخرى` :
                      `Voir ${SAMPLE_QUESTIONS[activeCategory][viewMode][language].length - 4} de plus`}
@@ -2490,79 +2964,93 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
               </button>
             );
           })}
-        </nav>
 
-        {/* Recent Chats Header */}
-        <div className="flex items-center justify-between px-4 mb-3 shrink-0 mt-2">
-            {historyConversations.length > 0 && (
-              <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">
-                {historyConversations.length}
+          {/* Recent Chats Section - Scrollable với 7 con bot (chung scroll) */}
+          <div className="border-t border-slate-100 mt-2">
+            <button 
+              onClick={() => setIsHistoryCollapsed(!isHistoryCollapsed)}
+              className="flex items-center justify-between px-4 mb-2 mt-2 w-full hover:bg-slate-50 rounded-lg transition-colors cursor-pointer"
+            >
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                {language === 'vi' ? 'Lịch sử gần đây' : language === 'en' ? 'Recent History' : language === 'ar' ? 'السجل الأخير' : 'Historique récent'}
               </span>
-            )}
-          </div>
-
-          {/* Search box */}
-          <div className="px-2 mb-3">
-            <div className="relative">
-              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-              <input
-                type="text"
-                value={historySearch}
-                onChange={(e) => setHistorySearchQuery(e.target.value)}
-                placeholder={language === 'vi' ? 'Tìm hội thoại...' : language === 'en' ? 'Search conversations...' : language === 'ar' ? 'البحث في المحادثات...' : 'Rechercher...'}
-                className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 border border-slate-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-300 text-slate-700 placeholder:text-slate-400 transition-colors"
-              />
-            </div>
-          </div>
-
-          <div className="space-y-1 px-1">
-            {historyConversations.length === 0 && (
-              <div className="flex flex-col items-center justify-center text-center px-4 py-8 text-slate-400">
-                <MessageSquare className="w-7 h-7 mb-2 opacity-40" />
-                <p className="text-xs font-medium">{t('chat.noChatsYet')}</p>
-                <p className="text-[10px] mt-1 opacity-70">{t('chat.startToSave')}</p>
+              <div className="flex items-center gap-2">
+                {historyConversations.length > 0 && (
+                  <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">
+                    {historyConversations.length}
+                  </span>
+                )}
+                <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${isHistoryCollapsed ? '-rotate-90' : 'rotate-0'}`} />
               </div>
-            )}
+            </button>
 
-            {filteredConversations().reduce((acc, conv, idx, arr) => {
-              const prevDate = idx > 0 ? formatRelativeDate(arr[idx - 1].updatedAt) : null;
-              const curDate = formatRelativeDate(conv.updatedAt);
-              const showHeader = prevDate !== curDate;
-              acc.push(
-                <div key={conv.id}>
-                  {showHeader && (
-                    <p className="px-3 pt-3 pb-1.5 text-[10px] font-bold text-slate-300 uppercase tracking-widest">
-                      {curDate}
-                    </p>
-                  )}
-                  <button
-                    title={formatFullDateTime(conv.updatedAt)}
-                    onClick={() => handleSelectConversation(conv.id)}
-                    className={clsx(
-                      'w-full flex items-start gap-2.5 px-3 py-2.5 rounded-xl transition-colors text-left group',
-                      conv.id === activeConversationId
-                        ? 'bg-primary/10 text-primary'
-                        : 'hover:bg-slate-50 text-slate-600'
-                    )}
-                  >
-                    <MessageSquare className={clsx('w-4 h-4 mt-0.5 flex-shrink-0', conv.id === activeConversationId ? 'text-primary' : 'text-slate-400 group-hover:text-slate-500')} />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-1">
-                        <p className="text-xs font-semibold truncate">{conv.title}</p>
-                        {conv.category && (
-                          <span className="text-[9px] px-1.5 py-0.5 bg-slate-100 rounded-full text-slate-400 flex-shrink-0">
-                            {CATEGORY_ICONS[conv.category as ATCategory]}
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-[11px] text-slate-400 truncate mt-0.5">{conv.preview}</p>
-                      <p className="text-[10px] text-slate-300 mt-0.5 group-hover:hidden">{formatFullDateTime(conv.updatedAt)}</p>
-                    </div>
-                  </button>
+            {!isHistoryCollapsed && (
+              <>
+              <div className="px-2 mb-2">
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                  <input
+                    type="text"
+                    value={historySearch}
+                    onChange={(e) => setHistorySearchQuery(e.target.value)}
+                    placeholder={language === 'vi' ? 'Tìm hội thoại...' : language === 'en' ? 'Search conversations...' : language === 'ar' ? 'البحث في المحادثات...' : 'Rechercher...'}
+                    className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 border border-slate-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-300 text-slate-700 placeholder:text-slate-400 transition-colors"
+                  />
                 </div>
-              );
-              return acc;
-            }, [] as React.ReactNode[])}
+              </div>
+
+              {/* History list - KHÔNG có max-h để scroll chung với 7 con bot */}
+              <div className="px-1 space-y-1 pb-2">
+              {historyConversations.length === 0 && (
+                <div className="flex flex-col items-center justify-center text-center px-4 py-4 text-slate-400">
+                  <MessageSquare className="w-6 h-6 mb-2 opacity-40" />
+                  <p className="text-xs font-medium">{t('chat.noChatsYet')}</p>
+                  <p className="text-[10px] mt-1 opacity-70">{t('chat.startToSave')}</p>
+                </div>
+              )}
+
+              {filteredConversations().reduce((acc, conv, idx, arr) => {
+                const prevDate = idx > 0 ? formatRelativeDate(arr[idx - 1].updatedAt) : null;
+                const curDate = formatRelativeDate(conv.updatedAt);
+                const showHeader = prevDate !== curDate;
+                acc.push(
+                  <div key={conv.id}>
+                    {showHeader && (
+                      <p className="px-3 pt-2 pb-1.5 text-[10px] font-bold text-slate-300 uppercase tracking-widest">
+                        {curDate}
+                      </p>
+                    )}
+                    <button
+                      title={formatFullDateTime(conv.updatedAt)}
+                      onClick={() => handleSelectConversation(conv.id)}
+                      className={clsx(
+                        'w-full flex items-start gap-2.5 px-3 py-2 rounded-xl transition-colors text-left group',
+                        conv.id === activeConversationId
+                          ? 'bg-primary/10 text-primary'
+                          : 'hover:bg-slate-50 text-slate-600'
+                      )}
+                    >
+                      <MessageSquare className={clsx('w-4 h-4 mt-0.5 flex-shrink-0', conv.id === activeConversationId ? 'text-primary' : 'text-slate-400 group-hover:text-slate-500')} />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-1">
+                          <p className="text-xs font-semibold truncate">{conv.title}</p>
+                          {conv.category && (
+                            <span className="text-[9px] px-1.5 py-0.5 bg-slate-100 rounded-full text-slate-400 flex-shrink-0">
+                              {CATEGORY_ICONS[conv.category as ATCategory]}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-slate-400 truncate mt-0.5">{conv.preview}</p>
+                        <p className="text-[10px] text-slate-300 mt-0.5 group-hover:hidden">{formatFullDateTime(conv.updatedAt)}</p>
+                      </div>
+                    </button>
+                  </div>
+                );
+                return acc;
+              }, [] as React.ReactNode[])}
+            </div>
+            </>
+            )}
           </div>
         </div>
 
@@ -2653,17 +3141,6 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
       {/* ============== MAIN CONTENT ============== */}
       <main className="flex-1 flex flex-col relative overflow-hidden h-full">
         
-        {/* Mobile Sidebar Toggle Button - Chỉ hiển thị trên mobile khi sidebar đóng */}
-        {!sidebarOpen && (
-          <button
-            onClick={() => setSidebarOpen(true)}
-            className="md:hidden fixed top-4 left-4 z-[60] w-10 h-10 bg-white rounded-full shadow-lg border-2 border-slate-200 flex items-center justify-center hover:bg-slate-50 active:scale-95 transition-all"
-            aria-label={language === 'vi' ? 'Mở menu' : language === 'en' ? 'Open menu' : 'فتح القائمة'}
-          >
-            <ChevronRight className="w-5 h-5 text-slate-600 rotate-180" />
-          </button>
-        )}
-
         {/* Top Navigation Bar - Glass Morphism - Unified Style */}
         <header className="hidden md:flex items-center justify-between p-4 bg-white/40 backdrop-blur-md border-b border-white/40 z-20 sticky top-0 h-16">
           {/* Left Section */}
@@ -2851,6 +3328,7 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
                     speakingId={speakingId}
                     onRequestConsultation={() => setShowConsultationModal(true)}
                     language={language}
+                    isReadyForProductSuggestion={isReadyForProductSuggestion}
                   />
                 ))}
 
@@ -3285,41 +3763,6 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
 
                 {/* Right Icons & Send - Material Design 3 Style */}
                 <div className="flex items-center gap-1 pr-1">
-                  {/* AT Specialist Quick Switch Button - Visible in both modes */}
-                  {isEndUser ? (
-                    <div className="relative group/switch">
-                      <button
-                        onClick={toggleViewMode}
-                        className={clsx(
-                          "p-2 rounded-full transition-all bg-violet-100 text-violet-600 hover:bg-violet-200",
-                          showATSuggestion && "ring-2 ring-amber-400 ring-offset-2 animate-pulse"
-                        )}
-                        title={language === 'vi' ? 'Chuyển sang chuyên gia AT' : language === 'en' ? 'Switch to AT Specialist' : language === 'ar' ? 'التبديل إلى خبير AT' : 'Passer au spécialiste AT'}
-                      >
-                        <Accessibility className="w-5 h-5" />
-                      </button>
-                      {/* Custom Tooltip */}
-                      <div className="absolute bottom-full right-0 mb-2 px-3 py-1.5 bg-slate-900 text-white text-xs font-medium rounded-lg whitespace-nowrap opacity-0 invisible group-hover/switch:opacity-100 group-hover/switch:visible transition-all duration-200 translate-y-1 group-hover/switch:translate-y-0 shadow-lg z-50">
-                        {language === 'vi' ? 'Chuyên gia AT' : language === 'en' ? 'AT Specialist' : language === 'ar' ? 'خبير AT' : 'Spécialiste AT'}
-                        <div className="absolute top-full right-4 border-4 border-transparent border-t-slate-900"></div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="relative group/switch">
-                      <button
-                        onClick={toggleViewMode}
-                        className="p-2 rounded-full transition-all bg-violet-100 text-violet-600 hover:bg-violet-200"
-                        title={language === 'vi' ? 'Chuyển về chế độ người dùng' : language === 'en' ? 'Switch to end user mode' : language === 'ar' ? 'التبديل إلى وضع المستخدم' : 'Basculer vers le mode utilisateur'}
-                      >
-                        <Users className="w-5 h-5" />
-                      </button>
-                      {/* Custom Tooltip */}
-                      <div className="absolute bottom-full right-0 mb-2 px-3 py-1.5 bg-slate-900 text-white text-xs font-medium rounded-lg whitespace-nowrap opacity-0 invisible group-hover/switch:opacity-100 group-hover/switch:visible transition-all duration-200 translate-y-1 group-hover/switch:translate-y-0 shadow-lg z-50">
-                        {language === 'vi' ? 'Người dùng cuối' : language === 'en' ? 'End User' : language === 'ar' ? 'المستخدم النهائي' : 'Utilisateur final'}
-                        <div className="absolute top-full right-4 border-4 border-transparent border-t-slate-900"></div>
-                      </div>
-                    </div>
-                  )}
                   {/* Voice Button */}
                   <button
                     onClick={handleVoiceRecord}
@@ -3411,15 +3854,16 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
   );
 }
 
-// Message Bubble Component with Product Cards & Standards
+// Message Bubble Component - SIMPLIFIED UI với Smart Product Suggestions & Feedback
 function MessageBubble({
   message,
-  onCopy,
-  copiedId,
-  onSpeak,
-  speakingId,
+  onCopy: _onCopy,
+  copiedId: _copiedId,
+  onSpeak: _onSpeak,
+  speakingId: _speakingId,
   onRequestConsultation,
-  language = 'vi' as Language
+  language = 'vi' as Language,
+  isReadyForProductSuggestion = false,
 }: {
   message: Message;
   onCopy: (content: string, id: string) => void;
@@ -3428,18 +3872,69 @@ function MessageBubble({
   speakingId: string | null;
   onRequestConsultation: () => void;
   language?: Language;
+  isReadyForProductSuggestion?: boolean;
 }) {
-  const [showSources, setShowSources] = useState(false);
-  const [loadingProducts, setLoadingProducts] = useState(false);
+  const [showSources, _setShowSources] = useState(false);
+  void showSources;
+
+  
+  // ⭐ Feedback state
+  const [feedback, setFeedback] = useState<'like' | 'dislike' | null>(message.feedback || null);
+  const [showDislikeReason, setShowDislikeReason] = useState(false);
+  const [dislikeReason, setDislikeReason] = useState('');
+  const [submittingFeedback, setSubmittingFeedback] = useState(false);
+
+  // ⭐ Lock body scroll when feedback modal is open
+  useEffect(() => {
+    if (showDislikeReason) {
+      document.body.style.overflow = 'hidden';
+      document.body.style.position = 'fixed';
+      document.body.style.width = '100%';
+    } else {
+      document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.width = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.width = '';
+    };
+  }, [showDislikeReason]);
 
   // ⭐ Edit message state from store
-  const { editingMessageId, setEditingMessage, messages, setMessages, setLoading } = useChatStore();
+  const { editingMessageId, setEditingMessage, setMessages, setLoading } = useChatStore();
   const [localEditText, setLocalEditText] = useState('');
   const currentEditingId = editingMessageId;
   
   // Detect category từ nội dung message (có thể dùng cho analytics sau)
   const detectedCategory = detectCategoryFromQuery(message.content);
   void detectedCategory;
+  
+  // ⭐ Submit feedback to backend
+  const submitFeedback = async (rating: 'like' | 'dislike', reason?: string) => {
+    if (submittingFeedback) return;
+    
+    setSubmittingFeedback(true);
+    setFeedback(rating);
+    
+    try {
+      await fetch('/api/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message_id: message.id,
+          rating,
+          reason: reason || undefined,
+          language,
+        }),
+      });
+    } catch (err) {
+      console.error('Failed to submit feedback:', err);
+    } finally {
+      setSubmittingFeedback(false);
+    }
+  };
 
   if (message.role === 'user') {
     const isEditing = currentEditingId === message.id;
@@ -3483,7 +3978,7 @@ function MessageBubble({
             ))}
           </div>
         )}
-        <div className="max-w-[80%] px-4 py-3 bg-[#0047ff] text-white rounded-2xl group-hover/rounded-br-sm relative" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+        <div className="max-w-[85%] px-4 py-3 bg-[#0047ff] text-white rounded-2xl group-hover/rounded-br-sm relative" dir={language === 'ar' ? 'rtl' : 'ltr'}>
           {isEditing ? (
             <div className="space-y-2">
               <textarea
@@ -3509,17 +4004,13 @@ function MessageBubble({
                       const currentMessages = useChatStore.getState().messages;
                       const msgIndex = currentMessages.findIndex(m => m.id === message.id);
                       if (msgIndex !== -1) {
-                        // Keep messages up to and including edited one
                         const updatedMessages = [...currentMessages];
                         updatedMessages[msgIndex] = { ...updatedMessages[msgIndex], content: localEditText.trim() };
-                        // Clear AI responses after edited message
                         setMessages(updatedMessages.slice(0, msgIndex + 1));
                         setLoading(true);
                         setEditingMessage(null);
                         setLocalEditText('');
-                        // Store edited text for resend
                         localStorage.setItem('resendMessage', localEditText.trim());
-                        // Reload page to trigger resend
                         window.location.reload();
                       }
                     }
@@ -3533,30 +4024,6 @@ function MessageBubble({
           ) : (
             <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.content}</p>
           )}
-          {/* Action Buttons - chỉ hiện khi không edit */}
-          {!isEditing && (
-            <div className="absolute -bottom-10 left-0 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-              <button
-                onClick={() => navigator.clipboard.writeText(message.content)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/90 hover:bg-white shadow-md border border-black/10 transition-all text-xs font-bold text-slate-700 hover:text-black"
-                title={language === 'vi' ? 'Sao chép' : language === 'en' ? 'Copy' : language === 'ar' ? 'نسخ' : 'Copier'}
-              >
-                <Copy className="w-3.5 h-3.5" />
-                <span>{language === 'vi' ? 'Sao chép' : language === 'en' ? 'Copy' : language === 'ar' ? 'نسخ' : 'Copier'}</span>
-              </button>
-              <button
-                onClick={() => {
-                  setEditingMessage(message.id, message.content);
-                  setLocalEditText(message.content);
-                }}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/90 hover:bg-white shadow-md border border-black/10 transition-all text-xs font-bold text-slate-700 hover:text-black"
-                title={language === 'vi' ? 'Sửa' : language === 'en' ? 'Edit' : language === 'ar' ? 'تعديل' : 'Modifier'}
-              >
-                <Edit2 className="w-3.5 h-3.5" />
-                <span>{language === 'vi' ? 'Sửa' : language === 'en' ? 'Edit' : language === 'ar' ? 'تعديل' : 'Modifier'}</span>
-              </button>
-            </div>
-          )}
         </div>
       </div>
     );
@@ -3564,647 +4031,291 @@ function MessageBubble({
 
   return (
     <div className="flex items-start gap-3 animate-fade-in group">
-      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#e0e7ff] to-[#c7d2fe] flex items-center justify-center flex-shrink-0 border-2 border-[#191b23]">
-        <BotIcon className="w-5 h-5 text-[#0047ff]" />
+      {/* Avatar - Smaller */}
+      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#e0e7ff] to-[#c7d2fe] flex items-center justify-center flex-shrink-0 border-2 border-[#191b23]">
+        <BotIcon className="w-4 h-4 text-[#0047ff]" />
       </div>
 
       <div className="flex-1 max-w-[85%]">
-        {/* Agent Header */}
-        <div className="text-[10px] text-slate-500 mb-2 uppercase tracking-widest font-medium">
-          [ TRỢ LÝ CNHT MADA // {new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) } ]
-        </div>
-        
+        {/* ⭐ Nội dung câu trả lời AI - Đơn giản */}
         <div className="text-sm text-slate-700 leading-relaxed [&_p]:mb-3 [&_p]:leading-relaxed [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:my-3 [&_ul]:space-y-1.5 [&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:my-3 [&_ol]:space-y-1.5 [&_li]:leading-relaxed [&_li]:mb-1 [&_h3]:text-base [&_h3]:font-bold [&_h3]:mt-4 [&_h3]:mb-2 [&_h2]:text-lg [&_h2]:font-bold [&_h2]:mt-4 [&_h2]:mb-2 [&_strong]:font-bold [&_code]:bg-slate-100 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-xs [&_pre]:bg-slate-100 [&_pre]:p-3 [&_pre]:rounded-lg [&_pre]:overflow-x-auto [&_pre]:my-3 [&_blockquote]:border-l-4 [&_blockquote]:border-slate-300 [&_blockquote]:pl-3 [&_blockquote]:italic [&_blockquote]:text-slate-600 [&_a]:text-blue-500 [&_a]:underline" dir={language === 'ar' ? 'rtl' : 'ltr'}>
           <ReactMarkdown remarkPlugins={[remarkGfm]}>
             {message.content}
           </ReactMarkdown>
         </div>
 
-        {/* Tư vấn Chuyên gia - After each answer */}
-        <div className="mt-4 flex items-center gap-3">
-          <div className="flex items-center gap-2 bg-gradient-to-r from-indigo-50 to-violet-50 border border-indigo-100 px-4 py-2.5 rounded-full">
-            <span className="material-symbols-outlined text-sm text-indigo-500">support_agent</span>
-            <span className="text-xs font-bold text-indigo-700">
-              {language === 'vi' ? 'Tư vấn chuyên gia' : language === 'en' ? 'Expert Consultation' : language === 'ar' ? 'استشارة خبير' : 'Consultation expert'}
-            </span>
-          </div>
-          <button 
-            onClick={onRequestConsultation}
-            className="flex items-center gap-2 bg-[#0047ff] text-white px-5 py-2.5 rounded-full text-xs font-bold hover:bg-[#0037cc] transition-all shadow-sm hover:shadow-md"
-          >
-            <span className="material-symbols-outlined text-sm">contact_phone</span>
-            {language === 'vi' ? 'Tư vấn ngay' : language === 'en' ? 'Consult now' : language === 'ar' ? 'استشارة الآن' : 'Consulter'}
-          </button>
-        </div>
-
-        {/* Smart Product Suggestions - moved to message.suggestedProducts (real MADA data) below */}
-
-        {/* Action buttons - Always on the right side, force LTR */}
-        <div className="mt-3 flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity" dir="ltr">
-          <button
-            onClick={() => onSpeak(message.content, message.id)}
-            className={clsx(
-              'p-1.5 rounded-lg transition-colors',
-              speakingId === message.id
-                ? 'bg-blue-500 text-white'
-                : 'hover:bg-slate-100 text-slate-500'
-            )}
-            title={speakingId === message.id 
-              ? (language === 'vi' ? 'Dừng đọc' : language === 'en' ? 'Stop reading' : language === 'ar' ? 'إيقاف' : 'Arrêter')
-              : (language === 'vi' ? 'Đọc tin nhắn' : language === 'en' ? 'Read message' : language === 'ar' ? 'قراءة' : 'Lire')
-            }
-          >
-            <Speaker className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => onCopy(message.content, message.id)}
-            className={clsx(
-              'p-1.5 rounded-lg transition-colors hover:bg-slate-100',
-              copiedId === message.id ? 'text-green-500' : 'text-slate-500'
-            )}
-            title={copiedId === message.id 
-              ? (language === 'vi' ? 'Đã sao chép!' : language === 'en' ? 'Copied!' : language === 'ar' ? 'تم!' : 'Copié!')
-              : (language === 'vi' ? 'Sao chép' : language === 'en' ? 'Copy' : language === 'ar' ? 'نسخ' : 'Copier')
-            }
-          >
-            {copiedId === message.id ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-          </button>
-          {message.sources && message.sources.length > 0 && (
-            <button
-              onClick={() => setShowSources(!showSources)}
-              className={clsx(
-                'p-1.5 rounded-lg transition-colors',
-                showSources ? 'bg-blue-500 text-white' : 'hover:bg-slate-100 text-slate-500'
-              )}
-              title={language === 'vi' ? 'Xem nguồn tham khảo' : language === 'en' ? 'View sources' : language === 'ar' ? 'عرض المصادر' : 'Voir les sources'}
-            >
-              <BookOpen className="w-4 h-4" />
-            </button>
-          )}
-        </div>
-
-        {/* Sources Panel - Always LTR */}
-        {showSources && message.sources && message.sources.length > 0 && (
-          <div className="mt-3 p-3 bg-slate-50 rounded-xl border border-slate-200" dir="ltr">
-            <div className="flex items-center gap-2 mb-2">
-              <BookOpen className="w-4 h-4 text-blue-500" />
-              <span className="text-xs font-bold text-slate-500 uppercase">{language === 'vi' ? 'Nguồn tham khảo' : language === 'en' ? 'References' : language === 'ar' ? 'المراجع' : 'Références'}</span>
-              {message.contextUsed && (
-                <span className="px-1.5 py-0.5 bg-green-100 text-green-700 text-[10px] rounded">RAG</span>
-              )}
-            </div>
-            <div className="space-y-2 max-h-40 overflow-y-auto">
-              {message.sources.map((source, index) => (
-                <div key={index} className="text-xs">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="px-1.5 py-0.5 bg-blue-500 text-white text-[10px] rounded">{index + 1}</span>
-                    <span className="font-medium text-blue-500 truncate">{source.source}</span>
-                  </div>
-                  <p className="text-slate-500 line-clamp-2 pl-5">{source.content}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Request Products Button - Show only when AI mentions products AND user asked about them */}
-        {!message.suggestedProducts && (() => {
-          const contentLower = message.content.toLowerCase();
-          const productMentions = [
-            'sản phẩm', 'thiết bị', 'máy', 'xe lăn', 'chân giả', 'tay giả',
-            'device', 'product', 'wheelchair', 'hearing aid', 'prosthetic',
-            'orthotic', 'kính', 'nạng', 'gậy', 'walker', 'crutch', 'cane'
-          ];
-          const explicitAsk = [
-            'có thể thấy', 'có thể biết', 'có thể mua', 'có thể dùng',
-            'xem được không', 'mua được không', 'dùng được không',
-            'can i see', 'can i know', 'can i get', 'can i use',
-            'available', 'có bán không', 'bán ở đâu', 'where to buy',
-            'cái nào', 'loại nào', 'which one', 'what device'
-          ];
-          const mentionsProducts = productMentions.some(term => contentLower.includes(term));
+        {/* ⭐ FOOTER: Feedback + Consultation - NHỎ GỌN */}
+        <div className="mt-3 flex items-center justify-between gap-3">
           
-          // Find previous user message
-          const msgIndex = messages.findIndex(m => m.id === message.id);
-          const prevUserMsg = msgIndex > 0 ? messages[msgIndex - 1] : null;
-          const userAskedAbout = prevUserMsg && explicitAsk.some(term => prevUserMsg.content.toLowerCase().includes(term));
-          
-          return (mentionsProducts && userAskedAbout) ? (
-            <div className="mt-3 flex justify-center">
-              <button
-                onClick={async () => {
-                  setLoadingProducts(true);
-                  try {
-                    const response = await fetch('/api/chat/products', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({
-                        message: message.content,
-                        language,
-                      }),
-                    });
-                    const data = await response.json();
-                    if (data.success && data.data.products && data.data.products.length > 0) {
-                      const updatedMessages = messages.map(m =>
-                        m.id === message.id ? { ...m, suggestedProducts: data.data.products } : m
-                      );
-                      setMessages(updatedMessages);
-                    }
-                  } catch (err) {
-                    console.error('Failed to fetch products:', err);
-                  } finally {
-                    setLoadingProducts(false);
-                  }
-                }}
-                disabled={loadingProducts}
-                className="px-4 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold rounded-full border border-emerald-200 flex items-center gap-2 transition-all hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {loadingProducts ? (
+          {/* ⭐ LIKE/DISLIKE Buttons - NHỎ */}
+          <div className="flex items-center gap-1 relative">
+            {feedback ? (
+              <span className="text-xs text-slate-400 flex items-center gap-1">
+                {feedback === 'like' ? (
                   <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    {language === 'vi' ? 'Đang tìm...' : 'Loading...'}
+                    <ThumbsUp className="w-3.5 h-3.5 text-emerald-500 fill-emerald-500" />
+                    <span className="hidden sm:inline">{language === 'vi' ? 'Đã thích' : 'Liked'}</span>
                   </>
                 ) : (
                   <>
-                    <Sparkles className="w-4 h-4" />
-                    {language === 'vi' ? 'Xem sản phẩm phù hợp' : language === 'en' ? 'View suitable products' : 'عرض المنتجات المناسبة'}
+                    <ThumbsDown className="w-3.5 h-3.5 text-red-400 fill-red-400" />
+                    <span className="hidden sm:inline">{language === 'vi' ? 'Đã phản hồi' : 'Feedback sent'}</span>
                   </>
                 )}
-              </button>
-            </div>
-          ) : null;
-        })()}
+              </span>
+            ) : (
+              <>
+                <button
+                  onClick={() => submitFeedback('like')}
+                  disabled={submittingFeedback}
+                  className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-emerald-500 transition-all disabled:opacity-50"
+                  title={language === 'vi' ? 'Hữu ích' : 'Helpful'}
+                >
+                  <ThumbsUp className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => {
+                    setShowDislikeReason(true);
+                  }}
+                  className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-red-400 transition-all"
+                  title={language === 'vi' ? 'Không hữu ích' : 'Not helpful'}
+                >
+                  <ThumbsDown className="w-4 h-4" />
+                </button>
+                {/* ⭐ Nút liên hệ tư vấn viên - NHỎ GỌN */}
+                <button 
+                  onClick={onRequestConsultation}
+                  className="flex items-center gap-1 bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 text-amber-900 px-2 py-1 rounded-full text-[10px] font-semibold transition-all shadow-sm shadow-amber-200 hover:shadow-md hover:shadow-amber-300 active:scale-95"
+                  title={language === 'vi' ? 'Liên hệ tư vấn viên' : 'Contact consultant'}
+                >
+                  <span className="material-symbols-outlined text-[10px]">support_agent</span>
+                  <span>{language === 'vi' ? 'Tư vấn' : 'Consult'}</span>
+                </button>
+              </>
+            )}
+          </div>
+        </div>
 
-        {/* Suggested Products - Enhanced UI/UX with Glassmorphic Design */}
-        {message.suggestedProducts && message.suggestedProducts.length > 0 && (
+
+
+        {/* ⭐ Suggested Products - CHỈ HIỂN THỊ KHI ĐỦ THÔNG TIN (>= 3 lượt hỏi đáp) */}
+        {/* ⭐ Không tự động hiển thị khi server gửi products - phải chờ đủ context */}
+        {isReadyForProductSuggestion && message.suggestedProducts && message.suggestedProducts.length > 0 && (
           <div className="mt-4" dir="ltr" role="region" aria-label="Sản phẩm được giới thiệu">
             
-            {/* Section Header */}
-            <div className="flex items-center gap-2 mb-4">
-              <span className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-200/60 shadow-xs">
-                <Sparkles className="w-4 h-4" aria-hidden="true" />
-              </span>
-              <h2 className="text-sm font-extrabold uppercase tracking-wider text-slate-800">
-                Sản phẩm được giới thiệu
-              </h2>
-              <span className="text-xs bg-emerald-50 text-emerald-700 font-bold px-2.5 py-0.5 rounded-full border border-emerald-200 flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                Đã kiểm duyệt y khoa MADA
-              </span>
-            </div>
+            {/* ⭐ Text giới thiệu TỰ NHIÊN - Như lời chatbot nói */}
+            <p className="text-[13px] text-on-surface-variant leading-relaxed mb-3">
+              {language === 'vi' 
+                ? `Với các biểu hiện trên của bạn thì tôi khuyên bạn nên tham khảo các sản phẩm dưới đây nhé:`
+                : language === 'en'
+                ? `Based on your description, I recommend checking out these products:`
+                : language === 'ar'
+                ? `بناءً على وصفك، أنصحك بالاطلاع على هذه المنتجات:`
+                : `Selon votre description, je vous recommande de consulter ces produits:`}
+            </p>
 
-            {/* AI Analysis Banner */}
-            <div className="bg-gradient-to-r from-teal-900 via-[#005f73] to-[#0038b6] px-5 py-3 text-white flex flex-wrap items-center justify-between gap-3 rounded-t-2xl border border-teal-800/40">
-              <div className="flex items-center gap-2.5 text-xs font-medium">
-                <span className="relative flex h-2.5 w-2.5">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-400"></span>
-                </span>
-                <span className="text-teal-100">Đã phân tích từ <strong className="text-white font-bold underline decoration-emerald-400 decoration-2 underline-offset-2">1.420 thiết bị</strong> trong kho dữ liệu quốc tế ISO 9999</span>
-              </div>
-              <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md px-3 py-1 rounded-full border border-white/20 shadow-inner">
-                <svg className="w-3.5 h-3.5 text-amber-300 fill-amber-300" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path></svg>
-                <span className="text-xs font-black tracking-tight text-white">96%</span>
-                <span className="text-[10px] uppercase font-bold text-teal-100 tracking-wider">AI Matching Score</span>
-              </div>
-            </div>
-
-            {/* Product Cards Grid - Glassmorphic Card */}
-            <div className="bg-white rounded-b-2xl border border-slate-200/90 shadow-soft-card overflow-hidden">
-              <div className="p-6 grid grid-cols-1 gap-5">
-                {message.suggestedProducts.slice(0, 4).map((product: SuggestedProduct, index: number) => {
-                  const matchScore = (product.confidence != null && product.confidence > 0)
-                    ? Math.round(product.confidence * 100)
-                    : 75 + Math.floor(Math.random() * 20);
-                  
-                  return (
-                    <article
-                      key={product.id || index}
-                      className="group bg-gradient-to-b from-slate-50/60 to-white rounded-xl border border-slate-200/80 p-3 hover:shadow-lg hover:border-violet-200 transition-all duration-300"
-                      role="article"
-                      aria-labelledby={`product-title-${product.id}`}
-                    >
-                      {/* MAIN LAYOUT - Compact: Image Left | Info Middle | Score Right */}
-                      <div className="flex gap-3">
-                        
-                        {/* LEFT - Image (Smaller) */}
-                        <div className="w-24 h-24 lg:w-28 lg:h-28 rounded-lg overflow-hidden bg-white border border-slate-100 shadow-sm flex-shrink-0 relative group-hover:shadow-md transition-shadow">
-                          {product.image_url ? (
-                            <img
-                              src={getImageUrl(product.image_url)}
-                              alt={`${product.title} - ${product.category}`}
-                              className="w-full h-full object-cover"
-                              loading="lazy"
-                              referrerPolicy="no-referrer"
-                            />
-                          ) : (
-                            <div className="w-full h-full bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center text-white">
-                              <Accessibility className="w-6 h-6" />
-                            </div>
-                          )}
-                          {/* Badge */}
-                          <div className="absolute top-1 left-1 px-1.5 py-0.5 rounded bg-white/95 text-[8px] font-black uppercase text-teal-900 shadow-sm border border-slate-100">
-                            AT
-                          </div>
-                        </div>
-
-                        {/* MIDDLE - Product Info */}
-                        <div className="flex-1 min-w-0 flex flex-col justify-between">
-                          
-                          {/* Top: Category, Name, Price */}
-                          <div>
-                            {/* Category */}
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="text-[9px] text-slate-500 font-semibold bg-slate-100 px-1.5 py-0.5 rounded">
-                                {product.category}
-                              </span>
-                              {product.brand && (
-                                <span className="px-1.5 py-0.5 rounded-full bg-blue-50 text-[#003ec7] text-[9px] font-bold">
-                                  {product.brand}
-                                </span>
-                              )}
-                            </div>
-
-                            {/* Product Name - Clickable Link */}
-                            {product.product_url && /^https?:\/\//i.test(product.product_url) ? (
-                              <a
-                                href={product.product_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="block"
-                              >
-                                <h3
-                                  id={`product-title-${product.id}`}
-                                  className="text-sm lg:text-base font-bold text-slate-900 leading-tight group-hover:text-violet-700 transition-colors mb-1 underline decoration-violet-300 decoration-2 underline-offset-2 hover:text-violet-600"
-                                >
-                                  {language === 'en' && product.title_en ? product.title_en : product.title}
-                                </h3>
-                              </a>
-                            ) : (
-                              <h3
-                                id={`product-title-${product.id}`}
-                                className="text-sm lg:text-base font-bold text-slate-900 leading-tight group-hover:text-violet-700 transition-colors mb-1"
-                              >
-                                {language === 'en' && product.title_en ? product.title_en : product.title}
-                              </h3>
-                            )}
-
-                            {/* Price */}
-                            {product.price_range && (
-                              <p className="text-base lg:text-lg font-black text-[#005f73] tracking-tight">
-                                {product.price_range}
-                              </p>
-                            )}
-                            
-                            {/* URL Link - Visible */}
-                            {(product.product_url || product.source_url) && (
-                              <div className="flex items-center gap-1 mt-1">
-                                <Globe className="w-3 h-3 text-slate-400" />
-                                <span className="text-[9px] text-slate-400 truncate max-w-[150px]">
-                                  {product.product_url || product.source_url}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                          
-                          {/* Bottom: Buttons */}
-                          <div className="flex flex-wrap gap-2 mt-2">
-                            <button
-                              onClick={() => onRequestConsultation?.()}
-                              className="py-1.5 px-2.5 bg-gradient-to-r from-[#005f73] to-[#004e5f] text-white text-[10px] font-bold rounded-lg hover:opacity-95 transition-all shadow-sm flex items-center justify-center gap-1"
-                            >
-                              <MessageCircle className="w-3 h-3" aria-hidden="true" />
-                              {language === 'vi' ? 'Tư vấn' : 'Consult'}
-                            </button>
-                            
-                            {product.product_url && /^https?:\/\//i.test(product.product_url) && (
-                              <a
-                                href={product.product_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="py-1.5 px-2.5 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white text-[10px] font-bold rounded-lg transition-all shadow-sm flex items-center justify-center gap-1"
-                              >
-                                <ShoppingCart className="w-3 h-3" aria-hidden="true" />
-                                {language === 'vi' ? 'Mua' : 'Buy'}
-                              </a>
-                            )}
-                            
-                            {product.source_url && /^https?:\/\//i.test(product.source_url) && product.source_url !== product.product_url && (
-                              <a
-                                href={product.source_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="py-1.5 px-2.5 bg-gradient-to-r from-violet-500 to-purple-500 hover:from-violet-600 hover:to-purple-600 text-white text-[10px] font-bold rounded-lg transition-all shadow-sm flex items-center justify-center gap-1"
-                              >
-                                <FileText className="w-3 h-3" aria-hidden="true" />
-                                {language === 'vi' ? 'Chi tiết' : 'Details'}
-                              </a>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* RIGHT - Match Score Badge */}
-                        <div
-                          className="flex flex-col items-center justify-start pt-1"
-                          role="meter"
-                          aria-valuenow={matchScore}
-                          aria-valuemin={0}
-                          aria-valuemax={100}
-                        >
-                          <div className={`w-11 h-11 rounded-full ${matchScore >= 85 ? 'bg-gradient-to-br from-emerald-500 to-green-600' : matchScore >= 70 ? 'bg-gradient-to-br from-blue-500 to-indigo-600' : 'bg-gradient-to-br from-amber-500 to-orange-500'} flex items-center justify-center text-white font-bold text-sm shadow-lg ring-3 ring-white`}>
-                            {matchScore}%
-                          </div>
-                          <span className="text-[8px] text-slate-500 mt-0.5 font-semibold uppercase tracking-wide">
-                            Phù hợp
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Features - Horizontal Tags */}
-                      {product.features && product.features.length > 0 && (
-                        <div className="mt-2 pt-2 border-t border-slate-100">
-                          <div className="flex flex-wrap gap-1" role="list">
-                            {product.features.slice(0, 3).map((feature, idx) => (
-                              <span key={idx} className="inline-flex items-center gap-0.5 px-2 py-0.5 bg-emerald-50 text-emerald-700 text-[9px] font-medium rounded border border-emerald-100">
-                                <Check className="w-2.5 h-2.5 text-emerald-600" aria-hidden="true" />
-                                {feature}
-                              </span>
-                            ))}
-                          </div>
+            {/* ⭐ Product Thumbnails - THIẾT KẾ NHỎ GỌN NHƯ HÌNH ẢNH TRONG CHAT */}
+            <div className="flex flex-col gap-2">
+              {message.suggestedProducts.slice(0, 3).map((product: SuggestedProduct, index: number) => {
+                // Thông tin sản phẩm
+                const productTitle = language === 'en' && product.title_en ? product.title_en : product.title;
+                const productLink = product.product_url && /^https?:\/\//i.test(product.product_url) 
+                  ? product.product_url 
+                  : `/products/${product.id}`;
+                const isExternalLink = product.product_url && /^https?:\/\//i.test(product.product_url);
+                const brandDisplay = product.brand || 'MADA';
+                const madaAdvice = product.mada_advice || '';
+                
+                return (
+                  <a
+                    key={product.id || index}
+                    href={productLink}
+                    target={isExternalLink ? '_blank' : '_self'}
+                    rel={isExternalLink ? 'noopener noreferrer' : ''}
+                    className="group flex items-center gap-3 p-2 rounded-xl hover:bg-surface-variant/30 transition-colors border border-transparent hover:border-secondary/20"
+                    style={{ textDecoration: 'none' }}
+                  >
+                    {/* Thumbnail nhỏ - 48x48 */}
+                    <div className="w-12 h-12 rounded-lg overflow-hidden bg-gradient-to-br from-blue-500 to-cyan-500 flex-shrink-0 shadow-sm">
+                      {product.image_url ? (
+                        <img 
+                          src={product.image_url} 
+                          alt={productTitle}
+                          className="w-full h-full object-cover"
+                          loading="lazy"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = 'none';
+                          }}
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <Accessibility className="w-6 h-6 text-white/80" />
                         </div>
                       )}
-
-                      {/* Khuyến nghị - Compact */}
-                      {(product.match_reason || product.patient_indications?.length) && (
-                        <div className="mt-2 pt-2 border-t border-slate-100">
-                          <div className="bg-gradient-to-r from-teal-50/80 to-emerald-50/60 rounded-lg p-2 border border-teal-100/70">
-                            <div className="flex items-center gap-1 mb-1">
-                              <Sparkles className="w-3 h-3 text-teal-600" />
-                              <span className="text-[9px] font-bold text-teal-700 uppercase">
-                                {language === 'vi' ? 'Phù hợp cho' : 'Suitable for'}
-                              </span>
-                            </div>
-                            <p className="text-[10px] text-slate-600 leading-snug">
-                              {product.match_reason || product.patient_indications?.slice(0, 2).join(' • ')}
-                            </p>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Chi tiết sản phẩm - Tabs (Medical Indications, Specs, Insurance) */}
-                      {(product.medical_indications?.length || product.specifications?.length || product.insurance_coverage?.length) && (
-                        <ProductDetailTabs product={product} language={language} />
-                      )}
-                    </article>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// Product Detail Tabs Component - Hiển thị tabs chi tiết sản phẩm
-interface ProductDetailTabsProps {
-  product: SuggestedProduct;
-  language: Language;
-}
-
-const ProductDetailTabs: React.FC<ProductDetailTabsProps> = ({ product, language }) => {
-  const [activeTab, setActiveTab] = useState<'medical' | 'specs' | 'financial'>('medical');
-
-  const tabs = [
-    {
-      id: 'medical' as const,
-      label: language === 'vi' ? 'Chỉ định Y khoa' : language === 'en' ? 'Medical Indications' : language === 'ar' ? 'المؤشرات الطبية' : 'Indications médicales',
-      icon: '🏥',
-      count: (product.medical_indications?.length || 0) + (product.patient_indications?.length || 0),
-    },
-    {
-      id: 'specs' as const,
-      label: language === 'vi' ? 'Thông số & Tương thích' : language === 'en' ? 'Specs & Compatibility' : language === 'ar' ? 'المواصفات والتوافق' : 'Spécifications',
-      icon: '📋',
-      count: (product.specifications?.length || 0) + (product.compatibility?.length || 0),
-    },
-    {
-      id: 'financial' as const,
-      label: language === 'vi' ? 'Hỗ trợ Tài chính' : language === 'en' ? 'Financial Support' : language === 'ar' ? 'الدعم المالي' : 'Support financier',
-      icon: '💰',
-      count: (product.financial_support?.length || 0) + (product.insurance_coverage?.length || 0),
-    },
-  ];
-
-  // Filter tabs with content
-  const visibleTabs = tabs.filter(tab => tab.count > 0);
-
-  if (visibleTabs.length === 0) return null;
-
-  return (
-    <div className="mt-2 pt-2 border-t border-slate-100">
-      {/* Tab Headers */}
-      <div className="flex gap-1 mb-2">
-        {visibleTabs.map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={clsx(
-              'flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-bold transition-all',
-              activeTab === tab.id
-                ? 'bg-gradient-to-r from-violet-500 to-purple-500 text-white shadow-sm'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-            )}
-          >
-            <span>{tab.icon}</span>
-            <span className="hidden sm:inline">{tab.label}</span>
-            <span className="sm:hidden">{tab.id === 'medical' ? 'Y khoa' : tab.id === 'specs' ? 'Thông số' : 'Tài chính'}</span>
-            {tab.count > 0 && (
-              <span className={clsx(
-                'ml-0.5 px-1 rounded-full text-[8px] font-black',
-                activeTab === tab.id ? 'bg-white/20 text-white' : 'bg-violet-100 text-violet-700'
-              )}>
-                {tab.count}
-              </span>
-            )}
-          </button>
-        ))}
-      </div>
-
-      {/* Tab Content */}
-      <div className="bg-gradient-to-br from-slate-50/80 to-white rounded-lg p-2 border border-slate-200/60">
-        {activeTab === 'medical' && (
-          <div className="space-y-2">
-            {/* Medical Indications */}
-            {(product.medical_indications?.length || product.patient_indications?.length) && (
-              <div>
-                <h4 className="text-[9px] font-bold text-slate-700 uppercase mb-1 flex items-center gap-1">
-                  <span className="text-emerald-500">✓</span>
-                  {language === 'vi' ? 'Chỉ định Y khoa & Bệnh nhân' : language === 'en' ? 'Medical & Patient Indications' : 'المؤشرات الطبية'}
-                </h4>
-                <div className="flex flex-wrap gap-1">
-                  {[...(product.medical_indications || []), ...(product.patient_indications || [])].slice(0, 6).map((indication, idx) => (
-                    <span key={idx} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-emerald-50 text-emerald-700 text-[9px] font-medium rounded border border-emerald-100">
-                      <Check className="w-2.5 h-2.5 text-emerald-600" />
-                      {indication}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Contraindications */}
-            {product.contraindications?.length && (
-              <div>
-                <h4 className="text-[9px] font-bold text-red-600 uppercase mb-1 flex items-center gap-1">
-                  <span className="text-red-500">✗</span>
-                  {language === 'vi' ? 'Chống chỉ định' : language === 'en' ? 'Contraindications' : 'موانع الاستعمال'}
-                </h4>
-                <div className="flex flex-wrap gap-1">
-                  {product.contraindications.slice(0, 4).map((item, idx) => (
-                    <span key={idx} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-red-50 text-red-700 text-[9px] font-medium rounded border border-red-100">
-                      {item}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* MADA Advice */}
-            {product.mada_advice && (
-              <div className="bg-gradient-to-r from-teal-50/60 to-emerald-50/40 rounded p-2 border border-teal-100/60">
-                <h4 className="text-[9px] font-bold text-teal-700 uppercase mb-1 flex items-center gap-1">
-                  <Sparkles className="w-3 h-3 text-teal-600" />
-                  {language === 'vi' ? 'Lời khuyên từ MADA' : language === 'en' ? 'MADA Expert Advice' : 'نصيحة MADA'}
-                </h4>
-                <p className="text-[10px] text-slate-600 leading-relaxed">{product.mada_advice}</p>
-              </div>
-            )}
-          </div>
-        )}
-
-        {activeTab === 'specs' && (
-          <div className="space-y-2">
-            {/* Specifications */}
-            {product.specifications?.length && (
-              <div>
-                <h4 className="text-[9px] font-bold text-slate-700 uppercase mb-1 flex items-center gap-1">
-                  <span className="text-blue-500">📋</span>
-                  {language === 'vi' ? 'Thông số kỹ thuật' : language === 'en' ? 'Technical Specifications' : 'المواصفات الفنية'}
-                </h4>
-                <div className="grid grid-cols-2 gap-1">
-                  {product.specifications.slice(0, 6).map((spec: any, idx) => (
-                    <div key={idx} className="flex items-start gap-1">
-                      <span className="text-[9px] text-slate-500 font-medium min-w-[50px]">
-                        {typeof spec === 'string' ? '' : spec.label || 'Thông số'}:
-                      </span>
-                      <span className="text-[9px] text-slate-700 font-semibold">
-                        {typeof spec === 'string' ? spec : spec.value}
-                      </span>
                     </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Compatibility */}
-            {product.compatibility?.length && (
-              <div>
-                <h4 className="text-[9px] font-bold text-slate-700 uppercase mb-1 flex items-center gap-1">
-                  <span className="text-violet-500">🔗</span>
-                  {language === 'vi' ? 'Tương thích với' : language === 'en' ? 'Compatible with' : 'متوافق مع'}
-                </h4>
-                <div className="flex flex-wrap gap-1">
-                  {product.compatibility.slice(0, 4).map((item, idx) => (
-                    <span key={idx} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-violet-50 text-violet-700 text-[9px] font-medium rounded border border-violet-100">
-                      {item}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Standards */}
-            {product.standards?.length && (
-              <div>
-                <h4 className="text-[9px] font-bold text-slate-700 uppercase mb-1 flex items-center gap-1">
-                  <span className="text-amber-500">🏅</span>
-                  {language === 'vi' ? 'Tiêu chuẩn' : language === 'en' ? 'Standards' : 'المعايير'}
-                </h4>
-                <div className="flex flex-wrap gap-1">
-                  {product.standards.slice(0, 4).map((item, idx) => (
-                    <span key={idx} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-amber-50 text-amber-700 text-[9px] font-medium rounded border border-amber-100">
-                      <ShieldCheck className="w-2.5 h-2.5 text-amber-600" />
-                      {item}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Warranty */}
-            {product.warranty && (
-              <div className="flex items-center gap-1 text-[9px] text-slate-600">
-                <ShieldCheck className="w-3 h-3 text-emerald-500" />
-                <span className="font-medium">{language === 'vi' ? 'Bảo hành:' : language === 'en' ? 'Warranty:' : 'الضمان:'} </span>
-                <span className="font-semibold">{product.warranty}</span>
-              </div>
-            )}
-          </div>
-        )}
-
-        {activeTab === 'financial' && (
-          <div className="space-y-2">
-            {/* Financial Support */}
-            {product.financial_support?.length && (
-              <div>
-                <h4 className="text-[9px] font-bold text-slate-700 uppercase mb-1 flex items-center gap-1">
-                  <span className="text-emerald-500">💰</span>
-                  {language === 'vi' ? 'Hỗ trợ tài chính' : language === 'en' ? 'Financial Support' : 'الدعم المالي'}
-                </h4>
-                <div className="flex flex-wrap gap-1">
-                  {product.financial_support.slice(0, 4).map((item, idx) => (
-                    <span key={idx} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-emerald-50 text-emerald-700 text-[9px] font-medium rounded border border-emerald-100">
-                      <Check className="w-2.5 h-2.5 text-emerald-600" />
-                      {item}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Insurance Coverage */}
-            {product.insurance_coverage?.length && (
-              <div>
-                <h4 className="text-[9px] font-bold text-slate-700 uppercase mb-1 flex items-center gap-1">
-                  <span className="text-blue-500">🏥</span>
-                  {language === 'vi' ? 'Bảo hiểm chi trả' : language === 'en' ? 'Insurance Coverage' : 'تغطية التأمين'}
-                </h4>
-                <div className="flex flex-wrap gap-1">
-                  {product.insurance_coverage.slice(0, 4).map((item, idx) => (
-                    <span key={idx} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-blue-50 text-blue-700 text-[9px] font-medium rounded border border-blue-100">
-                      <Check className="w-2.5 h-2.5 text-blue-600" />
-                      {item}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Availability */}
-            {product.availability && (
-              <div className="flex items-center gap-1 text-[9px] text-slate-600">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                <span className="font-medium">{language === 'vi' ? 'Tình trạng:' : language === 'en' ? 'Availability:' : 'التوفر:'} </span>
-                <span className="font-semibold">{product.availability}</span>
-              </div>
-            )}
+                    
+                    {/* Info */}
+                    <div className="flex-1 min-w-0">
+                      {/* Tên sản phẩm - 1 dòng */}
+                      <p className="text-[12px] font-semibold text-on-surface line-clamp-1 group-hover:text-secondary transition-colors">
+                        {productTitle}
+                      </p>
+                      
+                      {/* Mô tả ngắn + brand - 1 dòng */}
+                      <p className="text-[10px] text-on-surface-variant/70 line-clamp-1">
+                        {brandDisplay}
+                        {madaAdvice && ` • ${madaAdvice.substring(0, 50)}${madaAdvice.length > 50 ? '...' : ''}`}
+                      </p>
+                    </div>
+                    
+                    {/* Icon mũi tên */}
+                    <div className="w-6 h-6 rounded-full bg-secondary/10 group-hover:bg-secondary/20 flex items-center justify-center flex-shrink-0 transition-colors">
+                      <ChevronRight className="w-3.5 h-3.5 text-secondary" />
+                    </div>
+                  </a>
+                );
+              })}
+            </div>
+            
+            {/* ⭐ Nút Tư vấn - NHỎ GỌN ở dưới cùng */}
+            <div className="mt-4 flex justify-start">
+              <button
+                onClick={onRequestConsultation}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 text-amber-900 text-[11px] font-semibold rounded-full shadow-sm hover:shadow-md transition-all active:scale-95"
+              >
+                <span className="material-symbols-outlined text-[12px]">support_agent</span>
+                <span>{language === 'vi' ? 'Tư vấn thêm' : language === 'en' ? 'More advice' : 'استشارة'}</span>
+              </button>
+            </div>
           </div>
         )}
       </div>
+
+      {/* ⭐ DISLIKE MODAL - Using Portal for true fixed positioning */}
+      {showDislikeReason && createPortal(
+        <div 
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/30 backdrop-blur-sm animate-fade-in"
+          style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowDislikeReason(false);
+            }
+          }}
+        >
+          <div className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-xl mx-4 animate-slide-up overflow-hidden">
+            {/* Header với Logo MADA */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white">
+              <div className="flex items-center gap-2">
+                {/* Logo MADA */}
+                <img 
+                  src="/mada-logo-v2.png" 
+                  alt="MADA" 
+                  className="h-8 w-auto object-contain"
+                />
+                <div className="flex flex-col">
+                  <h3 className="text-sm font-semibold text-slate-800">
+                    {language === 'vi' ? 'Phản hồi' : 'Feedback'}
+                  </h3>
+                  <p className="text-[9px] text-slate-500">MADA AI</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowDislikeReason(false)}
+                className="p-2 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* ⭐ Hiển thị câu trả lời gốc của chatbot */}
+            <div className="px-4 py-3 border-b border-slate-100 bg-gradient-to-b from-violet-50/30 to-slate-50">
+              <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide mb-2 flex items-center gap-2">
+                <div className="w-5 h-5 rounded-full bg-violet-100 flex items-center justify-center">
+                  <BotIcon className="w-3 h-3 text-violet-600" />
+                </div>
+                {language === 'vi' ? 'Câu trả lời được phản hồi:' : language === 'en' ? 'Response being replied to:' : language === 'ar' ? 'الرد المراد التعليق عليه:' : 'Réponse à laquelle vous répondez:'}
+              </div>
+              <div className="text-xs text-slate-700 leading-relaxed max-h-40 overflow-y-auto bg-white rounded-lg p-3 border border-slate-200/50 [&_p]:mb-1 [&_p]:leading-relaxed [&_strong]:font-semibold [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:list-decimal [&_ol]:pl-4 [&_a]:text-blue-500 [&_a]:underline [&_li]:my-0.5 [&_h1]:text-sm [&_h2]:text-sm [&_h3]:text-xs [&_h4]:text-xs [&_h5]:text-xs [&_h6]:text-xs">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  {message.content.length > 600 
+                    ? message.content.slice(0, 600) + '...' 
+                    : message.content}
+                </ReactMarkdown>
+              </div>
+            </div>
+            
+            {/* Quick Reaction Buttons */}
+            <div className="px-4 pt-4 pb-2">
+              <p className="text-[10px] font-medium text-slate-600 mb-2">
+                {language === 'vi' ? 'Đánh giá nhanh:' : language === 'en' ? 'Quick feedback:' : 'Retour rapide:'}
+              </p>
+              <div className="flex flex-wrap gap-2 justify-center">
+                <button
+                  onClick={() => setDislikeReason(language === 'vi' ? 'Hữu ích' : 'Helpful')}
+                  className="px-2 py-1 text-[10px] rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 transition-colors flex items-center gap-1 font-medium"
+                >
+                  <ThumbsUp className="w-3 h-3" />
+                  <span>{language === 'vi' ? 'Hữu ích' : 'Helpful'}</span>
+                </button>
+                <button
+                  onClick={() => setDislikeReason(language === 'vi' ? 'Chưa chính xác' : 'Not accurate')}
+                  className="px-2 py-1 text-[10px] rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 transition-colors flex items-center gap-1 font-medium"
+                >
+                  <AlertCircle className="w-3 h-3" />
+                  <span>{language === 'vi' ? 'Chưa chính xác' : 'Not accurate'}</span>
+                </button>
+                <button
+                  onClick={() => setDislikeReason(language === 'vi' ? 'Cần thêm chi tiết' : 'Need more detail')}
+                  className="px-2 py-1 text-[10px] rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 transition-colors flex items-center gap-1 font-medium"
+                >
+                  <Lightbulb className="w-3 h-3" />
+                  <span>{language === 'vi' ? 'Cần thêm chi tiết' : 'Need more detail'}</span>
+                </button>
+              </div>
+            </div>
+            
+            {/* Text Area */}
+            <div className="px-4 pb-4">
+              <textarea
+                value={dislikeReason}
+                onChange={(e) => setDislikeReason(e.target.value)}
+                placeholder={language === 'vi' 
+                  ? 'Nhập phản hồi chi tiết của bạn...' 
+                  : 'Enter your detailed feedback...'}
+                className="w-full p-3 text-xs border border-slate-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-300 transition-all bg-slate-50/70"
+                rows={3}
+                autoFocus
+              />
+              
+              {/* Action Buttons */}
+              <div className="flex justify-end gap-2 mt-3">
+                <button
+                  onClick={() => {
+                    setShowDislikeReason(false);
+                    setDislikeReason('');
+                  }}
+                  className="px-4 py-2 text-xs text-slate-600 hover:bg-slate-100 rounded-lg transition-colors font-medium"
+                >
+                  {language === 'vi' ? 'Hủy' : 'Cancel'}
+                </button>
+                <button
+                  onClick={() => {
+                    submitFeedback('dislike', dislikeReason);
+                    setShowDislikeReason(false);
+                    setDislikeReason('');
+                  }}
+                  className="px-4 py-2 text-xs bg-gradient-to-r from-violet-600 to-violet-700 text-white hover:from-violet-700 hover:to-violet-800 rounded-lg transition-all font-medium shadow-md shadow-violet-200"
+                >
+                  {language === 'vi' ? 'Gửi phản hồi' : 'Send Feedback'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
-};
+}
 
 export default ChatPage;

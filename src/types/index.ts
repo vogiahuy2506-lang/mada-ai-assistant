@@ -21,7 +21,7 @@ export interface User {
 
 // Assistive Technology Categories (ISO 9999)
 export type ATCategory = 
-  | 'vision'           // Thiết bị nhìn
+  | 'vision'           // Thiết bị thị giác
   | 'hearing'          // Thiết bị nghe
   | 'mobility'         // Thiết bị vận động
   | 'cognition'        // Thiết bị nhận thức
@@ -233,54 +233,54 @@ export const SAMPLE_QUESTIONS: Record<ATCategory, Record<ViewMode, Record<Langua
   vision: {
     end_user: {
       vi: [
-        'Phần mềm đọc màn hình nào tốt nhất cho người khiếm thị?',
-        'Kính lúp điện tử có giá bao nhiêu?',
-        'Làm thế nào để người khiếm thị sử dụng máy tính?',
-        'Thiết bị đọc chữ nổi Braille giá bao nhiêu?',
+        'Máy đọc màn hình nào tốt nhất cho người Việt?',
+        'Làm sao để sử dụng phóng to trên điện thoại?',
+        'Có ứng dụng nào đọc chữ trên đồ vật không?',
+        'Tôi bị glaucoma có dùng được thiết bị gì?',
       ],
       en: [
-        'What are the best screen readers for visually impaired people?',
-        'How much does an electronic magnifier cost?',
-        'How can visually impaired people use computers?',
-        'How much does a Braille display cost?',
+        'What is the best screen reader for Vietnamese users?',
+        'How to use magnification on my phone?',
+        'Are there apps that read text on objects?',
+        'I have glaucoma, what devices can help?',
       ],
       ar: [
-        'ما هي أفضل برامج قراءة الشاشة للأشخاص ذوي الإعاقة البصرية؟',
-        'كم تكلفة المكبر الإلكتروني؟',
-        'كيف يمكن للأشخاص ذوي الإعاقة البصرية استخدام أجهزة الكمبيوتر؟',
-        'كم تكلفة شاشة برايل؟',
+        'ما هو أفضل قارئ شاشة للمستخدمين الفيتناميين؟',
+        'كيفية استخدام التكبير على هاتفي؟',
+        'هل توجد تطبيقات تقرأ النص على الأشياء؟',
+        'أعاني من الجلوكوما، ما هي الأجهزة التي يمكن أن تساعد؟',
       ],
       fr: [
-        'Quels sont les meilleurs lecteurs d\'écran pour les personnes malvoyantes?',
-        'Combien coûte un grossisseur électronique?',
-        'Comment les personnes malvoyantes peuvent-elles utiliser les ordinateurs?',
-        'Combien coûte un afficheur Braille?',
+        'Quel est le meilleur lecteur d\'écran pour les utilisateurs vietnamiens?',
+        'Comment utiliser la loupe sur mon téléphone?',
+        'Existe-t-il des applications qui lisent le texte sur les objets?',
+        'J\'ai un glaucome, quels appareils peuvent m\'aider?',
       ],
     },
     at_specialist: {
       vi: [
-        'So sánh JAWS vs NVDA về độ tương thích WCAG 2.1 Level AAA',
-        'Tiêu chuẩn ISO 9999:24.09 cho thiết bị hỗ trợ thị giác?',
-        'Phân tích độ phóng đại tối ưu cho CCTV Magnifier theo WHO guidelines',
-        'Hướng dẫn cấu hình OrCam MyEye theo EN 1332-20',
+        'So sánh JAWS vs NVDA - ưu nhược điểm?',
+        'Tiêu chuẩn WCAG 2.2 yêu cầu gì cho hỗ trợ thị giác?',
+        'Thiết bị hỗ trợ cho người mù màu?',
+        'Hướng dẫn cài đặt VoiceOver trên macOS?',
       ],
       en: [
-        'Compare JAWS vs NVDA for WCAG 2.1 Level AAA compliance',
-        'ISO 9999:24.09 standard for visual assistive devices?',
-        'Optimal magnification analysis for CCTV Magnifier per WHO guidelines',
-        'OrCam MyEye configuration guide per EN 1332-20',
+        'JAWS vs NVDA comparison - pros and cons?',
+        'What does WCAG 2.2 require for vision support?',
+        'Assistive devices for color blind users?',
+        'VoiceOver setup guide on macOS?',
       ],
       ar: [
-        'مقارنة JAWS مقابل NVDA للتوافق مع WCAG 2.1 المستوى AAA',
-        'معيار ISO 9999:24.09 لأجهزة المساعدة البصرية',
-        'تحليل التكبير الأمثل لمكبر CCTV وفق إرشادات منظمة الصحة العالمية',
-        'دليل تكوين OrCam MyEye وفق EN 1332-20',
+        'مقارنة JAWS مقابل NVDA - المزايا والعيوب؟',
+        'ماذا يتطلب WCAG 2.2 لدعم البصر؟',
+        'الأجهزة المساعدة للمستخدمين المكفوفين عن الألوان؟',
+        'دليل إعداد VoiceOver على macOS؟',
       ],
       fr: [
-        'Comparer JAWS vs NVDA pour la conformité WCAG 2.1 Niveau AAA',
-        'Norme ISO 9999:24.09 pour les appareils d\'assistance visuelle?',
-        'Analyse du grossissement optimal pour CCTV Magnifier selon les directives OMS',
-        'Guide de configuration OrCam MyEye selon EN 1332-20',
+        'Comparaison JAWS vs NVDA - avantages et inconvénients?',
+        'Que demande WCAG 2.2 pour le support visuel?',
+        'Appareils d\'assistance pour les daltoniens?',
+        'Guide de configuration VoiceOver sur macOS?',
       ],
     },
   },
@@ -626,20 +626,20 @@ export const CATEGORY_INFO: Record<ATCategory, {
   greetingAr: string;
   greetingFr: string;
 }> = {
-  vision: { 
-    name: 'Cảm giác – Thị giác', 
-    nameVi: 'Cảm giác – Thị giác', 
-    nameEn: 'Vision', 
-    nameAr: 'الحواس - البصر',
-    nameFr: 'Sens – Vision',
-    icon: 'visibility', 
-    color: 'text-violet-600',
-    bgColor: 'bg-violet-50 dark:bg-violet-900/30',
-    borderColor: 'border-violet-500',
-    greeting: 'Xin chào! Tôi là **Trợ lý AI** chuyên khoa **Thị giác** (Bot 2 – Sensory Vision). Tôi có thể hỗ trợ bạn về **phần mềm đọc màn hình** (NVDA, JAWS), **kính lúp điện tử** (Ruby HD), **chữ nổi Braille** và **OrCam MyEye** theo tiêu chuẩn ISO 22.03.06, 22.06.12; WCAG 2.2.',
-    greetingEn: 'Hello! I am **Bot 2 – Sensory Vision**. I help with **screen readers** (NVDA, JAWS), **electronic magnifiers** (Ruby HD), **Braille displays**, and **OrCam MyEye**. Standards: ISO 22.03.06, 22.06.12; WCAG 2.2; ISO 9241-171.',
-    greetingAr: 'مرحباً! أنا **بوت 2 - الحواس - البصر**. أساعدك في **قارئات الشاشة** و**المكبرات الإلكترونية** و**شاشات برايل** وفق معايير ISO 22.03.06 و WCAG 2.2.',
-    greetingFr: 'Bonjour ! Je suis **Bot 2 – Sens – Vision**. J\'aide avec les **lecteurs d\'écran** (NVDA, JAWS), les **loupes électroniques** (Ruby HD), les **plages Braille** et **OrCam MyEye**. Normes : ISO 22.03.06, WCAG 2.2.',
+  vision: {
+    name: 'Cảm giác – Thị giác',
+    nameVi: 'Cảm giác – Thị giác',
+    nameEn: 'Vision',
+    nameAr: 'البصر',
+    nameFr: 'Vision',
+    icon: 'visibility',
+    color: 'text-purple-600',
+    bgColor: 'bg-purple-50 dark:bg-purple-900/30',
+    borderColor: 'border-purple-500',
+    greeting: 'Xin chào! Tôi là **Trợ lý AI** chuyên khoa **Thị giác** (Bot 2 – Sensory Vision). Tôi hỗ trợ về **máy đọc màn hình** (JAWS, NVDA, VoiceOver), **phóng to**, **chuyển text thành giọng nói**, và tiêu chuẩn **WCAG 2.2**, **ISO 9241-171**.',
+    greetingEn: 'Hello! I am **Bot 2 – Sensory Vision**. I help with **screen readers** (JAWS, NVDA, VoiceOver), **magnification**, **text-to-speech**, and standards **WCAG 2.2**, **ISO 9241-171**.',
+    greetingAr: 'مرحباً! أنا **بوت 2 - الحواس - البصر**. أساعدك في قارئات الشاشة والتكبير وفق معايير WCAG 2.2.',
+    greetingFr: 'Bonjour ! Je suis **Bot 2 – Sens – Vision**. J\'aide avec les **lecteurs d\'écran** (JAWS, NVDA), la **loupe** et les normes **WCAG 2.2**.',
   },
   hearing: { 
     name: 'Cảm giác – Thính giác', 
@@ -739,10 +739,13 @@ export const AT_SPECIALIST_KEYWORDS: Record<ATCategory, {
   complex: string[];      // Từ chuyên môn - trigger nhanh hơn
 }> = {
   vision: {
-    simple: ['mù', 'khiếm thị', 'blindness', 'blind', 'visual impairment', 'visual disability',
-             'chữ nổi', 'braille', 'đọc màn hình', 'screen reader', 'lúp', 'magnifier'],
-    complex: ['phần mềm đọc màn hình', 'kính lúp điện tử', 'braille display', 'braille notetaker',
-              'zoomtext', 'jaws', 'nvda', 'orcam', 'aira', 'be my eyes', 'optelec']
+    simple: ['mù', 'blind', 'khiếm thị', 'thị giác', 'vision', 'mắt', 'eye',
+             'đọc chữ', 'đọc sách', 'nhìn', 'see', 'blindness', 'low vision',
+             'visual impairment', 'glaucoma', 'cataract', 'macular degeneration'],
+    complex: ['screen reader', 'JAWS', 'NVDA', 'VoiceOver', 'máy đọc màn hình',
+              'magnification', 'phóng to', 'loupe', 'text-to-speech', 'Braille',
+              'Braille embosser', 'tactile', 'xúc giác', 'color blind', 'mù màu',
+              'orientation mobility', 'di chuyển cho người mù', 'WCAG', 'ISO 9241-171']
   },
   hearing: {
     simple: ['điếc', 'khiếm thính', 'deaf', 'hearing loss', 'deafness', 'người điếc',

@@ -3,7 +3,7 @@
  * WCAG 2.2 AA compliant
  */
 import { useState, useEffect } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { Search, Filter, X, Package, ArrowRight } from 'lucide-react';
 import { PublicLayout } from '@/components/PublicLayout';
 import { useLanguageStore } from '@/stores';
@@ -23,6 +23,7 @@ interface Product {
   price_range: string;
   image_url: string;
   product_url: string;
+  source_url: string;
   iso_codes: string[];
   wcag_level: string;
   who_gate_area: string;
@@ -364,44 +365,41 @@ export function ProductsPage() {
 
 function ProductCardItem({ product, language, viewText }: { product: Product; language: string; viewText: string }) {
   const ti = language === 'en' && product.title_en ? product.title_en : product.title;
-  return (
-    <article
-      className="bg-white border-2 border-outline rounded-2xl overflow-hidden hover:border-primary hover:shadow-lg transition-all"
-      role="listitem"
-    >
-      <Link
-        to={`/products/${product.id}`}
-        className="block focus:outline-none focus:ring-2 focus:ring-primary"
-        aria-label={`${viewText}: ${ti}`}
-      >
-        <div className="aspect-square bg-slate-50 flex items-center justify-center overflow-hidden">
-          {product.image_url ? (
-            <img
-              src={product.image_url}
-              alt={ti}
-              loading="lazy"
-              referrerPolicy="no-referrer"
-              className="w-full h-full object-contain p-3"
-              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
-            />
-          ) : (
-            <Package className="w-16 h-16 text-slate-300" aria-hidden="true" />
-          )}
-        </div>
-        <div className="p-4">
-          <h3 className="text-sm font-bold line-clamp-2 mb-1 leading-tight">{ti}</h3>
-          {product.brand && (
-            <p className="text-xs text-slate-600 mb-2">{product.brand}</p>
-          )}
-          {product.iso_codes && product.iso_codes.length > 0 && (
-            <div className="flex flex-wrap gap-1 mb-2">
-              {product.iso_codes.slice(0, 3).map((code, i) => (
-                <span key={i} className="px-1.5 py-0.5 bg-blue-50 text-blue-700 text-[10px] font-bold rounded">
-                  {code}
-                </span>
-              ))}
-            </div>
-          )}
+  // ⭐ Link đến URL gốc của sản phẩm (MADA/at.mada.org.qa) thay vì trang nội bộ
+  const productLink = product.product_url && /^https?:\/\//i.test(product.product_url)
+    ? product.product_url
+    : (product.source_url && /^https?:\/\//i.test(product.source_url) ? product.source_url : null);
+  
+  const cardContent = (
+    <>
+      <div className="aspect-square bg-slate-50 flex items-center justify-center overflow-hidden">
+        {product.image_url ? (
+          <img
+            src={product.image_url}
+            alt={ti}
+            loading="lazy"
+            referrerPolicy="no-referrer"
+            className="w-full h-full object-contain p-3"
+            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+          />
+        ) : (
+          <Package className="w-16 h-16 text-slate-300" aria-hidden="true" />
+        )}
+      </div>
+      <div className="p-4">
+        <h3 className="text-sm font-bold line-clamp-2 mb-1 leading-tight">{ti}</h3>
+        {product.brand && (
+          <p className="text-xs text-slate-600 mb-2">{product.brand}</p>
+        )}
+        {product.iso_codes && product.iso_codes.length > 0 && (
+          <div className="flex flex-wrap gap-1 mb-2">
+            {product.iso_codes.slice(0, 3).map((code, i) => (
+              <span key={i} className="px-1.5 py-0.5 bg-blue-50 text-blue-700 text-[10px] font-bold rounded">
+                {code}
+              </span>
+            ))}
+          </div>
+        )}
           {product.price_range && (
             <p className="text-sm font-bold text-primary mt-2">{formatPrice(product.price_range)}</p>
           )}
@@ -409,7 +407,37 @@ function ProductCardItem({ product, language, viewText }: { product: Product; la
             {viewText} <ArrowRight className="w-3 h-3" aria-hidden="true" />
           </span>
         </div>
-      </Link>
+      </>
+  );
+  
+  // Wrapper: dùng anchor cho external link, div cho không có link
+  if (productLink) {
+    return (
+      <article
+        className="bg-white border-2 border-outline rounded-2xl overflow-hidden hover:border-primary hover:shadow-lg transition-all"
+        role="listitem"
+      >
+        <a
+          href={productLink}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block focus:outline-none focus:ring-2 focus:ring-primary"
+          aria-label={`${viewText}: ${ti}`}
+        >
+          {cardContent}
+        </a>
+      </article>
+    );
+  }
+  
+  return (
+    <article
+      className="bg-white border-2 border-outline rounded-2xl overflow-hidden hover:border-primary hover:shadow-lg transition-all"
+      role="listitem"
+    >
+      <div className="block">
+        {cardContent}
+      </div>
     </article>
   );
 }

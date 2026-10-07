@@ -25,6 +25,9 @@ const PROXY_REQUIRED_HOSTS = [
 
 const ALLOWED_HOSTS = [
   ...PROXY_REQUIRED_HOSTS,
+  // Google Cloud Storage
+  'storage.googleapis.com',
+  'storage.cloud.google.com',
   // Shop VN không cần proxy (CDN public)
   'cdn.tgdd.vn',
   'cdn.cellphones.com.vn',

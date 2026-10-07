@@ -1,10 +1,8 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { AdminLayout } from './AdminLayout';
 import { PromptsEditor } from './PromptsEditor';
 import { ChatCustomization } from './ChatCustomization';
 import { useAuthStore, useLanguageStore, usePromptStore } from '@/stores';
-import clsx from 'clsx';
 import { Sparkles, MessageSquare, Settings, FileText } from 'lucide-react';
 
 const t = (key: string, lang: string): string => {
@@ -81,7 +79,6 @@ export function AdminPrompts() {
   const language = useLanguageStore((s) => s.language ?? 'vi');
   const user = useAuthStore((s) => s.user);
   const userRole = user?.role || 'admin';
-  const navigate = useNavigate();
   const prompts = usePromptStore((s) => s.prompts);
 
   const [showPromptsEditor, setShowPromptsEditor] = useState(false);

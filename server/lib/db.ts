@@ -253,6 +253,26 @@ try {
   }
 }
 
+// ============== MESSAGE FEEDBACK SCHEMA ==============
+db.exec(`
+  CREATE TABLE IF NOT EXISTS message_feedback (
+    id TEXT PRIMARY KEY,
+    message_id TEXT NOT NULL,
+    session_id TEXT,
+    user_id TEXT,
+    rating TEXT NOT NULL CHECK (rating IN ('like', 'dislike')),
+    reason TEXT,
+    agent_id TEXT,
+    language TEXT DEFAULT 'vi',
+    created_at TEXT NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_feedback_message ON message_feedback(message_id);
+  CREATE INDEX IF NOT EXISTS idx_feedback_rating ON message_feedback(rating);
+  CREATE INDEX IF NOT EXISTS idx_feedback_created ON message_feedback(created_at);
+  CREATE INDEX IF NOT EXISTS idx_feedback_agent ON message_feedback(agent_id);
+`);
+
 // ============== KNOWLEDGE ITEMS TRANSLATION MIGRATION ==============
 try {
   const kiCols = db.prepare("PRAGMA table_info(knowledge_items)").all() as any[];
@@ -1498,6 +1518,83 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_messages_conv ON chat_messages(conversation_id);
   CREATE INDEX IF NOT EXISTS idx_messages_created ON chat_messages(created_at);
   CREATE INDEX IF NOT EXISTS idx_favorites_user ON user_favorites(user_id);
+`);
+
+// ============== ADMIN NOTIFICATIONS SCHEMA ==============
+// Thông báo cho admin về các sự kiện hệ thống
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS admin_notifications (
+    id TEXT PRIMARY KEY,
+    type TEXT NOT NULL CHECK (type IN ('info', 'warning', 'error', 'success', 'system')),
+    title TEXT NOT NULL,
+    message TEXT NOT NULL,
+    link TEXT,
+    link_label TEXT,
+    is_read INTEGER NOT NULL DEFAULT 0,
+    read_at TEXT,
+    read_by TEXT,
+    priority TEXT NOT NULL DEFAULT 'normal' CHECK (priority IN ('low', 'normal', 'high', 'urgent')),
+    category TEXT NOT NULL DEFAULT 'general' CHECK (category IN ('general', 'user', 'product', 'system', 'security', 'performance', 'support')),
+    metadata TEXT,
+    created_by TEXT,
+    created_at TEXT NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_notif_is_read ON admin_notifications(is_read);
+  CREATE INDEX IF NOT EXISTS idx_notif_priority ON admin_notifications(priority);
+  CREATE INDEX IF NOT EXISTS idx_notif_category ON admin_notifications(category);
+  CREATE INDEX IF NOT EXISTS idx_notif_created ON admin_notifications(created_at DESC);
+`);
+
+// ============== SUPPORT TICKETS SCHEMA ==============
+// Hệ thống ticket hỗ trợ người dùng
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS support_tickets (
+    id TEXT PRIMARY KEY,
+    ticket_number TEXT UNIQUE NOT NULL,
+    user_id TEXT,
+    user_email TEXT NOT NULL,
+    user_name TEXT NOT NULL,
+    subject TEXT NOT NULL,
+    description TEXT NOT NULL,
+    category TEXT NOT NULL DEFAULT 'general' CHECK (category IN ('general', 'technical', 'billing', 'feature', 'bug', 'feedback')),
+    priority TEXT NOT NULL DEFAULT 'normal' CHECK (priority IN ('low', 'normal', 'high', 'urgent')),
+    status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'in_progress', 'resolved', 'closed', 'spam')),
+    assigned_to TEXT,
+    assigned_at TEXT,
+    resolved_at TEXT,
+    closed_at TEXT,
+    rating INTEGER,
+    rating_comment TEXT,
+    ip_address TEXT,
+    user_agent TEXT,
+    metadata TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS support_ticket_replies (
+    id TEXT PRIMARY KEY,
+    ticket_id TEXT NOT NULL,
+    user_id TEXT,
+    is_admin_reply INTEGER NOT NULL DEFAULT 0,
+    message TEXT NOT NULL,
+    attachments TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY (ticket_id) REFERENCES support_tickets(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_ticket_status ON support_tickets(status);
+  CREATE INDEX IF NOT EXISTS idx_ticket_priority ON support_tickets(priority);
+  CREATE INDEX IF NOT EXISTS idx_ticket_user ON support_tickets(user_id);
+  CREATE INDEX IF NOT EXISTS idx_ticket_number ON support_tickets(ticket_number);
+  CREATE INDEX IF NOT EXISTS idx_ticket_created ON support_tickets(created_at DESC);
+  CREATE INDEX IF NOT EXISTS idx_reply_ticket ON support_ticket_replies(ticket_id);
 `);
 
 console.log('✅ Schema created');

@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore, useLanguageStore } from '@/stores';
 import clsx from 'clsx';
 import madaLogo from '@/assets/mada-logo.png';
-import { Menu, X, ChevronLeft } from 'lucide-react';
+import { Menu, X } from 'lucide-react';
 
 // Admin Layout translations - Vietnamese, English, Arabic, French
 const tL = (key: string): string => {
@@ -21,10 +21,16 @@ const tL = (key: string): string => {
       'admin.layout.navAgents': 'AI Agents',
       'admin.layout.navSuggestedQuestions': 'Câu hỏi gợi ý',
       'admin.layout.navSystemPrompts': 'System Prompts',
-      'admin.layout.navConsultations': 'Tư vấn',
+      'admin.layout.navConsultations': 'Hỗ trợ',
+      'admin.layout.navFeedback': 'Phản hồi',
       'admin.layout.navFileUpload': 'Quản lý file',
       'admin.layout.navSettings': 'Cài đặt',
       'admin.layout.navPermissions': 'Phân quyền',
+      'admin.layout.navSupport': 'Hỗ trợ',
+      'admin.layout.navNotifications': 'Thông báo',
+      // Notifications page
+      'notifications.title': 'Thông báo',
+      'notifications.subtitle': 'Quản lý thông báo hệ thống',
       // Labels
       'admin.layout.superAdminOnly': 'Chỉ Super Admin',
       'admin.layout.admin': 'Quản trị',
@@ -71,10 +77,16 @@ const tL = (key: string): string => {
       'admin.layout.navAgents': 'AI Agents',
       'admin.layout.navSuggestedQuestions': 'Suggested Questions',
       'admin.layout.navSystemPrompts': 'System Prompts',
-      'admin.layout.navConsultations': 'Consultations',
+      'admin.layout.navConsultations': 'Support',
+      'admin.layout.navFeedback': 'Feedback',
       'admin.layout.navFileUpload': 'File Management',
       'admin.layout.navSettings': 'Settings',
       'admin.layout.navPermissions': 'Permissions',
+      'admin.layout.navSupport': 'Support',
+      'admin.layout.navNotifications': 'Notifications',
+      // Notifications page
+      'notifications.title': 'Notifications',
+      'notifications.subtitle': 'System notifications management',
       // Labels
       'admin.layout.superAdminOnly': 'Super Admin only',
       'admin.layout.admin': 'Admin',
@@ -121,10 +133,16 @@ const tL = (key: string): string => {
       'admin.layout.navAgents': 'وكلاء الذكاء الاصطناعي',
       'admin.layout.navSuggestedQuestions': 'الأسئلة المقترحة',
       'admin.layout.navSystemPrompts': 'طلبات النظام',
-      'admin.layout.navConsultations': 'الاستشارات',
+      'admin.layout.navConsultations': 'الدعم',
+      'admin.layout.navFeedback': 'التعليقات',
       'admin.layout.navFileUpload': 'إدارة الملفات',
       'admin.layout.navSettings': 'الإعدادات',
       'admin.layout.navPermissions': 'الصلاحيات',
+      'admin.layout.navSupport': 'الدعم',
+      'admin.layout.navNotifications': 'الإشعارات',
+      // Notifications page
+      'notifications.title': 'الإشعارات',
+      'notifications.subtitle': 'إدارة إشعارات النظام',
       // Labels
       'admin.layout.superAdminOnly': 'مدير رئيسي فقط',
       'admin.layout.admin': 'مدير',
@@ -171,10 +189,16 @@ const tL = (key: string): string => {
       'admin.layout.navAgents': 'Agents IA',
       'admin.layout.navSuggestedQuestions': 'Questions suggérées',
       'admin.layout.navSystemPrompts': 'Prompts système',
-      'admin.layout.navConsultations': 'Consultations',
+      'admin.layout.navConsultations': 'Support',
+      'admin.layout.navFeedback': 'Commentaires',
       'admin.layout.navFileUpload': 'Gestion des fichiers',
       'admin.layout.navSettings': 'Paramètres',
       'admin.layout.navPermissions': 'Permissions',
+      'admin.layout.navSupport': 'Support',
+      'admin.layout.navNotifications': 'Notifications',
+      // Notifications page
+      'notifications.title': 'Notifications',
+      'notifications.subtitle': 'Gestion des notifications système',
       // Labels
       'admin.layout.superAdminOnly': 'Super Admin uniquement',
       'admin.layout.admin': 'Admin',
@@ -232,6 +256,7 @@ const NAV_ITEMS: NavItem[] = [
   // Gộp Câu hỏi gợi ý vào AI Agents tab → xoá khỏi sidebar
   { labelKey: 'admin.layout.navSystemPrompts', href: '/admin/prompts', icon: 'edit_note' },
   { labelKey: 'admin.layout.navConsultations', href: '/admin/consultations', icon: 'support_agent' },
+  { labelKey: 'admin.layout.navNotifications', href: '/admin/notifications', icon: 'notifications' },
   { labelKey: 'admin.layout.navFileUpload', href: '/admin/file-management', icon: 'upload_file', superAdminOnly: true },
   { labelKey: 'admin.layout.navSettings', href: '/admin/settings', icon: 'settings_suggest', superAdminOnly: true },
   { labelKey: 'admin.layout.navPermissions', href: '/admin/permissions', icon: 'admin_panel_settings', superAdminOnly: true },
@@ -407,6 +432,20 @@ export function AdminLayout({
             )}
           </div>
           <div className="flex items-center gap-3">
+            {/* Notification Bell */}
+            <Link
+              to="/admin/notifications"
+              className={clsx(
+                'relative flex items-center gap-2 px-3 py-1.5 rounded-xl text-sm font-medium transition-all',
+                location.pathname === '/admin/notifications'
+                  ? 'bg-primary/10 text-primary'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              )}
+            >
+              <span className="material-symbols-outlined text-[18px]">notifications</span>
+              <span className="hidden lg:inline">{tL('notifications.title')}</span>
+            </Link>
+
             <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-primary/5 border border-primary/20">
               <span className="material-symbols-outlined text-[18px] text-primary">account_circle</span>
               <span className="font-label-sm font-semibold text-primary">{user?.email || user?.name || tL('admin.layout.admin')}</span>

@@ -947,4 +947,270 @@ export const adminApi = {
       body: JSON.stringify(data),
     });
   },
+
+  // ============== NOTIFICATIONS ==============
+  async getNotifications(params?: {
+    limit?: number;
+    offset?: number;
+    is_read?: boolean;
+    category?: string;
+    priority?: string;
+    type?: string;
+  }) {
+    const p = new URLSearchParams();
+    if (params?.limit) p.set('limit', String(params.limit));
+    if (params?.offset) p.set('offset', String(params.offset));
+    if (params?.is_read !== undefined) p.set('is_read', String(params.is_read));
+    if (params?.category) p.set('category', params.category);
+    if (params?.priority) p.set('priority', params.priority);
+    if (params?.type) p.set('type', params.type);
+    const qs = p.toString();
+    return request<{
+      notifications: Array<{
+        id: string;
+        type: string;
+        title: string;
+        message: string;
+        link?: string;
+        link_label?: string;
+        is_read: boolean;
+        isRead: boolean;
+        priority: string;
+        category: string;
+        metadata?: any;
+        created_by?: string;
+        createdAt: string;
+        readAt?: string;
+      }>;
+      total: number;
+      unreadCount: number;
+    }>(`/notifications${qs ? `?${qs}` : ''}`);
+  },
+
+  async getUnreadNotifications() {
+    return request<{
+      unreadCount: number;
+      recentUnread: Array<{
+        id: string;
+        type: string;
+        title: string;
+        message: string;
+        link?: string;
+        priority: string;
+        category: string;
+        created_at: string;
+      }>;
+    }>('/notifications/unread');
+  },
+
+  async getNotificationStats() {
+    return request<{
+      total: number;
+      unread: number;
+      urgent: number;
+      high: number;
+      byCategory: Array<{ category: string; count: number }>;
+      byType: Array<{ type: string; count: number }>;
+    }>('/notifications/stats');
+  },
+
+  async markNotificationRead(id: string) {
+    return request<{ success: boolean }>(`/notifications/${id}/read`, { method: 'PATCH' });
+  },
+
+  async markAllNotificationsRead() {
+    return request<{ success: boolean; message: string }>('/notifications/read-all', { method: 'PATCH' });
+  },
+
+  async deleteNotification(id: string) {
+    return request<{ success: boolean }>(`/notifications/${id}`, { method: 'DELETE' });
+  },
+
+  async clearAllReadNotifications() {
+    return request<{ success: boolean; message: string }>('/notifications/clear-all', { method: 'DELETE' });
+  },
+
+  async createNotification(data: {
+    type: 'info' | 'warning' | 'error' | 'success' | 'system';
+    title: string;
+    message: string;
+    link?: string;
+    linkLabel?: string;
+    priority?: 'low' | 'normal' | 'high' | 'urgent';
+    category?: 'general' | 'user' | 'product' | 'system' | 'security' | 'performance' | 'support';
+    metadata?: Record<string, any>;
+  }) {
+    return request<{ id: string }>('/notifications', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  // ============== SUPPORT TICKETS ==============
+  async getSupportTickets(params?: {
+    limit?: number;
+    offset?: number;
+    status?: string;
+    priority?: string;
+    category?: string;
+    search?: string;
+    assigned_to?: string;
+    sort_by?: string;
+    sort_order?: string;
+  }) {
+    const p = new URLSearchParams();
+    if (params?.limit) p.set('limit', String(params.limit));
+    if (params?.offset) p.set('offset', String(params.offset));
+    if (params?.status) p.set('status', params.status);
+    if (params?.priority) p.set('priority', params.priority);
+    if (params?.category) p.set('category', params.category);
+    if (params?.search) p.set('search', params.search);
+    if (params?.assigned_to) p.set('assigned_to', params.assigned_to);
+    if (params?.sort_by) p.set('sort_by', params.sort_by);
+    if (params?.sort_order) p.set('sort_order', params.sort_order);
+    const qs = p.toString();
+    return request<{
+      tickets: Array<{
+        id: string;
+        ticket_number: string;
+        user_id?: string;
+        user_email: string;
+        user_name: string;
+        subject: string;
+        description: string;
+        category: string;
+        priority: string;
+        status: string;
+        assigned_to?: string;
+        assigned_to_name?: string;
+        reply_count: number;
+        created_at: string;
+        updated_at: string;
+      }>;
+      total: number;
+      stats: {
+        open: number;
+        in_progress: number;
+        resolved: number;
+        closed: number;
+        urgent: number;
+      };
+    }>(`/support${qs ? `?${qs}` : ''}`);
+  },
+
+  async getSupportTicket(id: string) {
+    return request<{
+      ticket: {
+        id: string;
+        ticket_number: string;
+        user_id?: string;
+        user_email: string;
+        user_name: string;
+        subject: string;
+        description: string;
+        category: string;
+        priority: string;
+        status: string;
+        assigned_to?: string;
+        assigned_to_name?: string;
+        assigned_to_email?: string;
+        rating?: number;
+        rating_comment?: string;
+        created_at: string;
+        updated_at: string;
+        createdAt: string;
+        updatedAt: string;
+        assignedAt?: string;
+        resolvedAt?: string;
+        closedAt?: string;
+      };
+      replies: Array<{
+        id: string;
+        ticket_id: string;
+        user_id?: string;
+        is_admin_reply: boolean;
+        message: string;
+        attachments?: any[];
+        user_name?: string;
+        user_email?: string;
+        created_at: string;
+        createdAt: string;
+      }>;
+    }>(`/support/${id}`);
+  },
+
+  async createSupportTicket(data: {
+    user_email: string;
+    user_name: string;
+    subject: string;
+    description: string;
+    category?: 'general' | 'technical' | 'billing' | 'feature' | 'bug' | 'feedback';
+    priority?: 'low' | 'normal' | 'high' | 'urgent';
+  }) {
+    return request<{ id: string; ticketNumber: string }>('/support', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async updateSupportTicket(id: string, data: {
+    status?: string;
+    priority?: string;
+    category?: string;
+    assigned_to?: string;
+  }) {
+    return request<any>(`/support/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async replyToSupportTicket(id: string, data: {
+    message: string;
+    attachments?: any[];
+  }) {
+    return request<{
+      id: string;
+      message: string;
+      isAdminReply: boolean;
+      createdAt: string;
+    }>(`/support/${id}/reply`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async deleteSupportTicket(id: string) {
+    return request<{ success: boolean }>(`/support/${id}`, { method: 'DELETE' });
+  },
+
+  async rateSupportTicket(id: string, rating: number, comment?: string) {
+    return request<{ success: boolean }>(`/support/${id}/rate`, {
+      method: 'POST',
+      body: JSON.stringify({ rating, comment }),
+    });
+  },
+
+  async getSupportAdmins() {
+    return request<Array<{
+      id: string;
+      email: string;
+      name: string;
+      avatar?: string;
+      role: string;
+    }>>('/support/admins/list');
+  },
+
+  async getSupportStats() {
+    return request<{
+      total: number;
+      open: number;
+      inProgress: number;
+      resolved: number;
+      closed: number;
+      avgResponseTimeMinutes?: number;
+      byCategory: Array<{ category: string; count: number }>;
+      byPriority: Array<{ priority: string; count: number }>;
+    }>('/support/stats/overview');
+  },
 };

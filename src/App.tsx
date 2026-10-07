@@ -24,13 +24,15 @@ const AdminConsultations = lazy(() => import('@/pages/admin/AdminConsultations')
 const AdminProducts = lazy(() => import('@/pages/admin/AdminProducts'));
 const AdminScraper = lazy(() => import('@/pages/admin/AdminScraper'));
 const AdminSuggestedQuestions = lazy(() => import('@/pages/admin/AdminSuggestedQuestions'));
+const AdminFeedback = lazy(() => import('@/pages/admin/AdminFeedback'));
 const AdminPermissions = lazy(() => import('@/pages/admin/Permissions'));
+const AdminNotifications = lazy(() => import('@/pages/admin/AdminNotifications'));
+const AdminSupport = lazy(() => import('@/pages/admin/AdminSupport'));
 const FileManagement = lazy(() => import('@/pages/admin/FileManagement'));
 const WidgetCustomization = lazy(() => import('@/pages/admin/WidgetCustomization'));
 const DataManagerPage = lazy(() => import('@/pages/DataManagerPage'));
 const ProfilePage = lazy(() => import('@/pages/ProfilePage'));
 const ProductsPage = lazy(() => import('@/pages/ProductsPage'));
-const ProductDetailPage = lazy(() => import('@/pages/ProductDetailPage'));
 const CategoryPage = lazy(() => import('@/pages/CategoryPage'));
 
 // Translation helper hook for App component
@@ -110,7 +112,6 @@ function App() {
 
           {/* Public Product Routes */}
           <Route path="/products" element={<ProductsPage />} />
-          <Route path="/products/:id" element={<ProductDetailPage />} />
           <Route path="/category/:slug" element={<CategoryPage />} />
 
           {/* Data Manager Routes */}
@@ -146,6 +147,14 @@ function App() {
             element={
               <RoleGuard requiredRole="admin">
                 <AdminReports />
+              </RoleGuard>
+            }
+          />
+          <Route
+            path="/admin/feedback"
+            element={
+              <RoleGuard requiredRole="admin">
+                <AdminFeedback />
               </RoleGuard>
             }
           />
@@ -230,6 +239,22 @@ function App() {
             element={
               <RoleGuard requiredRole="admin">
                 <WidgetCustomization />
+              </RoleGuard>
+            }
+          />
+          <Route
+            path="/admin/notifications"
+            element={
+              <RoleGuard requiredRole="admin">
+                <AdminNotifications />
+              </RoleGuard>
+            }
+          />
+          <Route
+            path="/admin/support"
+            element={
+              <RoleGuard requiredRole="admin">
+                <AdminSupport />
               </RoleGuard>
             }
           />

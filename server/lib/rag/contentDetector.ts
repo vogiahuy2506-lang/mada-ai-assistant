@@ -2,21 +2,9 @@
 
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-// ============ PROXY BYPASS ============
-async function callGeminiNoProxy(apiKey: string, modelName: string, prompt: string, tools?: any): Promise<any> {
+// ============ PROXY-AWARE FETCH ============
+async function callGeminiWithProxy(apiKey: string, modelName: string, prompt: string, tools?: any): Promise<any> {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
-  
-  // Clear proxy env vars for this call
-  const savedEnv: Record<string, string | undefined> = {
-    HTTP_PROXY: process.env.HTTP_PROXY,
-    HTTPS_PROXY: process.env.HTTPS_PROXY,
-    http_proxy: process.env.http_proxy,
-    https_proxy: process.env.https_proxy,
-  };
-  delete process.env.HTTP_PROXY;
-  delete process.env.HTTPS_PROXY;
-  delete process.env.http_proxy;
-  delete process.env.https_proxy;
   
   try {
     const body: any = {
@@ -37,9 +25,7 @@ async function callGeminiNoProxy(apiKey: string, modelName: string, prompt: stri
     
     return response.json();
   } finally {
-    for (const [key, val] of Object.entries(savedEnv)) {
-      if (val !== undefined) process.env[key] = val;
-    }
+    // No cleanup needed - using system proxy
   }
 }
 
@@ -156,7 +142,7 @@ class ContentDetector {
       let parsed: any = null;
 
       try {
-        const result = await callGeminiNoProxy(this.apiKey, 'gemini-2.5-flash', prompt, [{ functionDeclarations: [CONTENT_DETECTION_SCHEMA] }]);
+        const result = await callGeminiWithProxy(this.apiKey, 'gemini-2.5-flash', prompt, [{ functionDeclarations: [CONTENT_DETECTION_SCHEMA] }]);
         
         // Parse the response
         const parts = result?.candidates?.[0]?.content?.parts || [];
@@ -171,7 +157,7 @@ class ContentDetector {
 
       // Fallback: parse text if schema didn't work
       if (!parsed) {
-        const result = await callGeminiNoProxy(this.apiKey, 'gemini-2.5-flash', prompt, undefined);
+        const result = await callGeminiWithProxy(this.apiKey, 'gemini-2.5-flash', prompt, undefined);
         const parts = result?.candidates?.[0]?.content?.parts || [];
         const textParts = parts.filter((p: any) => p.text);
         const text = textParts.map((p: any) => p.text).join('\n');
@@ -245,9 +231,7 @@ class ContentDetector {
 
     // Detect WHO GATE category
     let whoGateCategory: string | undefined;
-    if (contentLower.includes('khiếm thị') || contentLower.includes('blind') || contentLower.includes('mù') || contentLower.includes('braille')) {
-      whoGateCategory = 'vision';
-    } else if (contentLower.includes('khiếm thính') || contentLower.includes('deaf') || contentLower.includes('điếc') || contentLower.includes('hearing')) {
+    if (contentLower.includes('khiếm thính') || contentLower.includes('deaf') || contentLower.includes('điếc') || contentLower.includes('hearing')) {
       whoGateCategory = 'hearing';
     } else if (contentLower.includes('vận động') || contentLower.includes('wheelchair') || contentLower.includes('xe lăn') || contentLower.includes('mobility')) {
       whoGateCategory = 'mobility';
@@ -285,7 +269,6 @@ class ContentDetector {
         .slice(0, 5);
 
       const categories: string[] = [];
-      if (query.includes('blind') || query.includes('mù') || query.includes('đọc')) categories.push('vision');
       if (query.includes('hear') || query.includes('nghe') || query.includes('điếc')) categories.push('hearing');
       if (query.includes('wheelchair') || query.includes('xe') || query.includes('đi')) categories.push('mobility');
 

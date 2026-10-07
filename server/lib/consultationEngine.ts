@@ -409,11 +409,7 @@ function getFollowUpQuestions(category: string | null, message: string, language
     }
   }
   
-  if (category && categoryQuestions[category]) {
-    return categoryQuestions[category][lang] || categoryQuestions[category].vi;
-  }
-  
-  // Generic questions as fallback
+  // First, check templates
   const genericQuestions: Record<string, string[]> = {
     vi: [
       '🤔 Bạn có thể cho mình biết thêm chi tiết về nhu cầu của bạn không?',

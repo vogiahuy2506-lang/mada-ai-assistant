@@ -4,7 +4,6 @@
  */
 
 export type ATCategory =
-  | 'vision'         // Thị giác — Khiếm thị, low vision
   | 'hearing'        // Thính giác — Khiếm thính, điếc
   | 'mobility'       // Vận động — Xe lăn, nạng, khung đi
   | 'cognition'      // Nhận thức — Trí nhớ, học tập, tự kỷ
@@ -15,7 +14,6 @@ export type ATCategory =
   | 'general';       // Tổng quát / chưa phân loại
 
 export const AT_CATEGORIES: Record<ATCategory, { vi: string; en: string; icon: string }> = {
-  vision: { vi: 'Hỗ trợ Thị giác', en: 'Vision', icon: '👁️' },
   hearing: { vi: 'Hỗ trợ Thính giác', en: 'Hearing', icon: '👂' },
   mobility: { vi: 'Hỗ trợ Vận động', en: 'Mobility', icon: '🦽' },
   cognition: { vi: 'Hỗ trợ Nhận thức', en: 'Cognition', icon: '🧠' },
@@ -160,13 +158,6 @@ export const WHO_GATE_CATEGORIES: Record<string, { apl: boolean; area: string }>
  * Mỗi category có danh sách keywords (tiếng Việt + English) với trọng số
  */
 const KEYWORD_RULES: Record<ATCategory, { keywords: string[]; weight: number }[]> = {
-  vision: [
-    { keywords: ['khiếm thị', 'mù lòa', 'blind', 'low vision', 'thị lực', 'mắt'], weight: 5 },
-    { keywords: ['braille', 'screen reader', 'đọc màn hình', 'jaws', 'nvda', 'voiceover'], weight: 5 },
-    { keywords: ['kính lúp', 'magnifier', 'phóng to', 'zoomtext', 'cảm biến', 'orcam', 'envision'], weight: 4 },
-    { keywords: ['màn hình braille', 'braille display', 'focus blue', 'brailliant'], weight: 5 },
-    { keywords: ['chữ nổi', 'tactile', 'sách nói', 'audiobook', 'daisy'], weight: 3 },
-  ],
   hearing: [
     { keywords: ['khiếm thính', 'điếc', 'deaf', 'hearing loss', 'thính giác', 'tai'], weight: 5 },
     { keywords: ['máy trợ thính', 'hearing aid', 'bte', 'ite', 'cic', 'cochlear', 'ốc tai điện tử'], weight: 5 },

@@ -10,7 +10,7 @@
  *   // Returns { en: '...', ar: '...', fr: '...' }
  */
 
-// ============ PROXY BYPASS ============
+// ============ PROXY-AWARE ============
 
 // Retry helper for 429 Too Many Requests
 async function fetchWithRetry(
@@ -41,20 +41,8 @@ async function fetchWithRetry(
   throw new Error('fetchWithRetry: unreachable');
 }
 
-async function callGeminiNoProxy(apiKey: string, modelName: string, prompt: string): Promise<any> {
+async function callGeminiWithProxy(apiKey: string, modelName: string, prompt: string): Promise<any> {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
-
-  // Clear proxy env vars for this call
-  const savedEnv: Record<string, string | undefined> = {
-    HTTP_PROXY: process.env.HTTP_PROXY,
-    HTTPS_PROXY: process.env.HTTPS_PROXY,
-    http_proxy: process.env.http_proxy,
-    https_proxy: process.env.https_proxy,
-  };
-  delete process.env.HTTP_PROXY;
-  delete process.env.HTTPS_PROXY;
-  delete process.env.http_proxy;
-  delete process.env.https_proxy;
 
   try {
     const response = await fetchWithRetry(
@@ -75,9 +63,7 @@ async function callGeminiNoProxy(apiKey: string, modelName: string, prompt: stri
 
     return response.json();
   } finally {
-    for (const [key, val] of Object.entries(savedEnv)) {
-      if (val !== undefined) process.env[key] = val;
-    }
+    // No cleanup needed - using system proxy
   }
 }
 
@@ -190,7 +176,7 @@ ${truncated}`;
 
   try {
     // Call Gemini directly (bypasses proxy)
-    const result = await callGeminiNoProxy(apiKey, 'gemini-2.5-flash', prompt);
+    const result = await callGeminiWithProxy(apiKey, 'gemini-2.5-flash', prompt);
     const parts = result?.candidates?.[0]?.content?.parts || [];
     const textParts = parts.filter((p: any) => p.text);
     const translatedText = textParts.map((p: any) => p.text).join('\n').trim();
@@ -249,7 +235,7 @@ Keep technical terms, HTML tags, and URLs intact. Return ONLY the translation, n
 
 TEXT: ${truncated}`;
 
-      const res = await callGeminiNoProxy(apiKey, 'gemini-2.5-flash', prompt);
+      const res = await callGeminiWithProxy(apiKey, 'gemini-2.5-flash', prompt);
       const parts = res?.candidates?.[0]?.content?.parts || [];
       const translated = parts.map((p: any) => p.text).join('').trim();
       

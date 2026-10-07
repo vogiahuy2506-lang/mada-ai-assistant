@@ -383,19 +383,21 @@ export function AdminOverview() {
         </div>
       </section>
 
-      {/* KB Filter + Per-Bot Breakdown */}
+      {/* KB Filter + Per-Bot Breakdown - REDESIGNED */}
       <section className="relative bg-gradient-to-br from-white/80 to-white/40 backdrop-blur-xl rounded-3xl border-3 border-black p-8 md:p-12 shadow-[12px_12px_0px_0px_#000] mb-12">
         <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
           <div>
             <h3 className="text-2xl font-black text-on-surface">{tO('admin.overview.kbByBot')}</h3>
             <p className="text-sm text-on-surface-variant">{tO('admin.overview.filterByBots')}</p>
           </div>
-          <div className="flex items-center gap-2">
+          {/* Bot ID Filter - Styled Dropdown */}
+          <div className="flex items-center gap-3 bg-white rounded-xl border-2 border-slate-200 px-4 py-2 shadow-sm">
+            <span className="material-symbols-outlined text-primary text-lg">filter_list</span>
             <label className="text-xs font-bold text-gray-500 uppercase">{tO('admin.overview.botId')}:</label>
             <select
               value={filterBotId}
               onChange={(e) => setFilterBotId(e.target.value)}
-              className="h-10 px-3 rounded-lg border border-slate-300 font-label-md bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+              className="h-8 px-2 rounded-lg border border-slate-300 font-label-md bg-transparent text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 cursor-pointer"
             >
               <option value="">{tO('admin.overview.allBots')}</option>
               <option value="bot-hearing">{getBotName('bot-hearing')}</option>
@@ -408,22 +410,79 @@ export function AdminOverview() {
             </select>
           </div>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+
+        {/* Bot Cards Grid - Redesigned */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-4">
           {kbStats?.perBot && kbStats.perBot.length > 0 ? (
-            kbStats.perBot.map((row: any) => (
-              <button
-                key={row.botId}
-                onClick={() => setFilterBotId(filterBotId === row.botId ? '' : row.botId)}
-                className={`text-left p-3 rounded-xl border border-slate-300 transition-all hover:-translate-y-0.5 hover:shadow-sm ${filterBotId === row.botId ? 'bg-primary text-white' : 'bg-white'}`}
-              >
-                <div className="text-[10px] font-bold uppercase opacity-70">{row.botId.replace('bot-', '')}</div>
-                <div className="text-2xl font-black mt-1">{row.count}</div>
-                <div className="text-[10px] mt-1 opacity-60">{tO('admin.overview.documents')}</div>
-              </button>
-            ))
+            kbStats.perBot.map((row: any) => {
+              const isActive = filterBotId === row.botId;
+              const botName = getBotName(row.botId);
+              const isFiltered = filterBotId && !isActive;
+              
+              // Map bot ID to icons and colors
+              const botConfig: Record<string, { icon: string; color: string; gradient: string }> = {
+                'bot-hearing': { icon: 'hearing', color: 'text-cyan-600', gradient: 'from-cyan-500 to-blue-600' },
+                'bot-vision': { icon: 'visibility', color: 'text-purple-600', gradient: 'from-purple-500 to-pink-600' },
+                'bot-speech': { icon: 'record_voice_over', color: 'text-amber-600', gradient: 'from-amber-500 to-orange-600' },
+                'bot-cognitive': { icon: 'psychology', color: 'text-rose-600', gradient: 'from-rose-500 to-red-600' },
+                'bot-neuro': { icon: 'neurology', color: 'text-indigo-600', gradient: 'from-indigo-500 to-purple-600' },
+                'bot-mobility': { icon: 'accessible_forward', color: 'text-emerald-600', gradient: 'from-emerald-500 to-teal-600' },
+                'bot-regulatory': { icon: 'policy', color: 'text-blue-600', gradient: 'from-blue-500 to-cyan-600' },
+              };
+              const config = botConfig[row.botId] || { icon: 'smart_toy', color: 'text-gray-600', gradient: 'from-gray-500 to-slate-600' };
+              
+              return (
+                <button
+                  key={row.botId}
+                  onClick={() => setFilterBotId(isActive ? '' : row.botId)}
+                  className={`
+                    relative flex flex-col items-center justify-center p-4 rounded-2xl border-2 transition-all duration-200
+                    ${isActive 
+                      ? `bg-gradient-to-br ${config.gradient} text-white border-transparent shadow-lg scale-105` 
+                      : isFiltered
+                        ? 'bg-gray-100 text-gray-400 border-gray-200 opacity-50'
+                        : 'bg-white text-gray-700 border-gray-200 hover:border-primary/40 hover:shadow-md hover:-translate-y-0.5'
+                    }
+                  `}
+                >
+                  {/* Icon Circle */}
+                  <div className={`
+                    w-14 h-14 rounded-full flex items-center justify-center mb-3 shadow-sm
+                    ${isActive ? 'bg-white/20' : 'bg-gray-100'}
+                  `}>
+                    <span className={`material-symbols-outlined text-2xl ${isActive ? 'text-white' : config.color}`}>
+                      {config.icon}
+                    </span>
+                  </div>
+                  
+                  {/* Bot Name */}
+                  <span className={`text-xs font-bold uppercase tracking-wide mb-1 ${isActive ? 'text-white/90' : 'text-gray-500'}`}>
+                    {botName.replace('Bot ', '')}
+                  </span>
+                  
+                  {/* Document Count */}
+                  <span className={`text-3xl font-black ${isActive ? 'text-white' : 'text-gray-900'}`}>
+                    {row.count}
+                  </span>
+                  
+                  {/* Documents Label */}
+                  <span className={`text-[10px] mt-1 ${isActive ? 'text-white/70' : 'text-gray-400'}`}>
+                    {tO('admin.overview.documents')}
+                  </span>
+                  
+                  {/* Active Indicator */}
+                  {isActive && (
+                    <div className="absolute -top-1 -right-1 w-5 h-5 bg-white rounded-full flex items-center justify-center shadow">
+                      <span className="material-symbols-outlined text-emerald-500 text-sm">check</span>
+                    </div>
+                  )}
+                </button>
+              );
+            })
           ) : (
-            <div className="col-span-7 text-sm text-on-surface-variant text-center py-8">
-              {tO('admin.overview.noKbData')}
+            <div className="col-span-7 flex flex-col items-center justify-center py-12 text-gray-400">
+              <span className="material-symbols-outlined text-6xl mb-3">folder_open</span>
+              <p className="text-sm">{tO('admin.overview.noKbData')}</p>
             </div>
           )}
         </div>

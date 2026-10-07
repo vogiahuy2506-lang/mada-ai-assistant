@@ -64,6 +64,15 @@ const tL = (key: string): string => {
       // File Management translations
       'admin.topBar.fileManagement': 'Quản Lý Upload File',
       'admin.topBar.fileManagementSub': 'Cấu hình tính năng upload file và giới hạn cho người dùng',
+      // Feedback page
+      'admin.topBar.feedback': 'Phản hồi Chatbot',
+      'admin.topBar.feedbackSub': 'Thống kê đánh giá của người dùng về các câu trả lời của chatbot',
+      // Notifications page
+      'admin.topBar.notifications': 'Thông báo',
+      'admin.topBar.notificationsSub': 'Quản lý thông báo hệ thống',
+      // Support page
+      'admin.topBar.support': 'Hỗ trợ',
+      'admin.topBar.supportSub': 'Quản lý ticket hỗ trợ người dùng',
     },
     en: {
       // Navigation
@@ -120,6 +129,15 @@ const tL = (key: string): string => {
       // File Management translations
       'admin.topBar.fileManagement': 'Upload File Management',
       'admin.topBar.fileManagementSub': 'Configure file upload features and limits for users',
+      // Feedback page
+      'admin.topBar.feedback': 'Chatbot Feedback',
+      'admin.topBar.feedbackSub': 'Statistics of user feedback on chatbot responses',
+      // Notifications page
+      'admin.topBar.notifications': 'Notifications',
+      'admin.topBar.notificationsSub': 'Manage system notifications',
+      // Support page
+      'admin.topBar.support': 'Support',
+      'admin.topBar.supportSub': 'Manage user support tickets',
     },
     ar: {
       // Navigation
@@ -176,6 +194,15 @@ const tL = (key: string): string => {
       // File Management translations
       'admin.topBar.fileManagement': 'إدارة تحميل الملفات',
       'admin.topBar.fileManagementSub': 'تكوين ميزات تحميل الملفات وحدودها للمستخدمين',
+      // Feedback page
+      'admin.topBar.feedback': 'تعليقات الشات بوت',
+      'admin.topBar.feedbackSub': 'إحصائيات تعليقات المستخدمين على ردود الشات بوت',
+      // Notifications page
+      'admin.topBar.notifications': 'الإشعارات',
+      'admin.topBar.notificationsSub': 'إدارة إشعارات النظام',
+      // Support page
+      'admin.topBar.support': 'الدعم',
+      'admin.topBar.supportSub': 'إدارة تذاكر دعم المستخدمين',
     },
     fr: {
       // Navigation
@@ -232,6 +259,15 @@ const tL = (key: string): string => {
       // File Management translations
       'admin.topBar.fileManagement': 'Gestion des fichiers',
       'admin.topBar.fileManagementSub': 'Configurer les fonctionnalités de téléchargement et les limites pour les utilisateurs',
+      // Feedback page
+      'admin.topBar.feedback': 'Commentaires du Chatbot',
+      'admin.topBar.feedbackSub': 'Statistiques des commentaires des utilisateurs sur les réponses du chatbot',
+      // Notifications page
+      'admin.topBar.notifications': 'Notifications',
+      'admin.topBar.notificationsSub': 'Gérer les notifications système',
+      // Support page
+      'admin.topBar.support': 'Support',
+      'admin.topBar.supportSub': 'Gérer les tickets de support utilisateurs',
     },
   };
   return translations[lang]?.[key] || translations['vi'][key] || key;

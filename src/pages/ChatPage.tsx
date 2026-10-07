@@ -4098,9 +4098,9 @@ function MessageBubble({
 
 
 
-        {/* ⭐ Suggested Products - CHỈ HIỂN THỊ KHI ĐỦ THÔNG TIN (>= 3 lượt hỏi đáp) */}
-        {/* ⭐ Không tự động hiển thị khi server gửi products - phải chờ đủ context */}
-        {isReadyForProductSuggestion && message.suggestedProducts && message.suggestedProducts.length > 0 && (
+        {/* ⭐ Suggested Products - Hiển thị khi server gửi sản phẩm */}
+        {/* ⭐ LUÔN hiển thị khi có sản phẩm - không chờ đủ context */}
+        {message.suggestedProducts && message.suggestedProducts.length > 0 && (
           <div className="mt-4" dir="ltr" role="region" aria-label="Sản phẩm được giới thiệu">
             
             {/* ⭐ Text giới thiệu TỰ NHIÊN - Như lời chatbot nói */}
@@ -4114,8 +4114,8 @@ function MessageBubble({
                 : `Selon votre description, je vous recommande de consulter ces produits:`}
             </p>
 
-            {/* ⭐ Product Thumbnails - THIẾT KẾ NHỎ GỌN NHƯ HÌNH ẢNH TRONG CHAT */}
-            <div className="flex flex-col gap-2">
+            {/* ⭐ Product Cards Grid - HIỂN THỊ CARD LỚN VỚI HÌNH ẢNH ĐẸP */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {message.suggestedProducts.slice(0, 3).map((product: SuggestedProduct, index: number) => {
                 // Thông tin sản phẩm
                 const productTitle = language === 'en' && product.title_en ? product.title_en : product.title;
@@ -4126,51 +4126,72 @@ function MessageBubble({
                 const brandDisplay = product.brand || 'MADA';
                 const madaAdvice = product.mada_advice || '';
                 
+                // Xác định màu gradient dựa trên category
+                const categoryLower = (product.category || '').toLowerCase();
+                let gradientClass = 'from-blue-500 to-cyan-500';
+                if (categoryLower.includes('hearing') || categoryLower.includes('thính')) {
+                  gradientClass = 'from-cyan-500 to-blue-600';
+                } else if (categoryLower.includes('vision') || categoryLower.includes('thị')) {
+                  gradientClass = 'from-purple-500 to-pink-500';
+                } else if (categoryLower.includes('mobility') || categoryLower.includes('vận')) {
+                  gradientClass = 'from-emerald-500 to-teal-500';
+                } else if (categoryLower.includes('cognition') || categoryLower.includes('nhận')) {
+                  gradientClass = 'from-amber-500 to-orange-500';
+                }
+                
                 return (
                   <a
                     key={product.id || index}
                     href={productLink}
                     target={isExternalLink ? '_blank' : '_self'}
                     rel={isExternalLink ? 'noopener noreferrer' : ''}
-                    className="group flex items-center gap-3 p-2 rounded-xl hover:bg-surface-variant/30 transition-colors border border-transparent hover:border-secondary/20"
+                    className="group block bg-white rounded-xl border border-slate-200 overflow-hidden hover:border-secondary/40 hover:shadow-lg hover:shadow-secondary/10 transition-all duration-200 hover:-translate-y-0.5"
                     style={{ textDecoration: 'none' }}
                   >
-                    {/* Thumbnail nhỏ - 48x48 */}
-                    <div className="w-12 h-12 rounded-lg overflow-hidden bg-gradient-to-br from-blue-500 to-cyan-500 flex-shrink-0 shadow-sm">
+                    {/* Hình ảnh sản phẩm - LỚN VÀ NỔI BẬT */}
+                    <div className={`relative h-32 bg-gradient-to-br ${gradientClass} overflow-hidden`}>
                       {product.image_url ? (
                         <img 
                           src={product.image_url} 
                           alt={productTitle}
-                          className="w-full h-full object-cover"
+                          className="w-full h-full object-cover object-center"
                           loading="lazy"
                           onError={(e) => {
-                            (e.target as HTMLImageElement).style.display = 'none';
+                            const target = e.target as HTMLImageElement;
+                            target.style.display = 'none';
                           }}
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">
-                          <Accessibility className="w-6 h-6 text-white/80" />
+                          <Accessibility className="w-12 h-12 text-white/80" />
                         </div>
                       )}
+                      
+                      {/* Badge brand */}
+                      <div className="absolute top-2 left-2 px-2 py-0.5 bg-white/90 backdrop-blur-sm rounded-full">
+                        <span className="text-[10px] font-semibold text-slate-700">{brandDisplay}</span>
+                      </div>
                     </div>
                     
                     {/* Info */}
-                    <div className="flex-1 min-w-0">
-                      {/* Tên sản phẩm - 1 dòng */}
-                      <p className="text-[12px] font-semibold text-on-surface line-clamp-1 group-hover:text-secondary transition-colors">
+                    <div className="p-3">
+                      {/* Tên sản phẩm */}
+                      <p className="text-[13px] font-semibold text-slate-800 line-clamp-2 group-hover:text-secondary transition-colors leading-tight">
                         {productTitle}
                       </p>
                       
-                      {/* Mô tả ngắn + brand - 1 dòng */}
-                      <p className="text-[10px] text-on-surface-variant/70 line-clamp-1">
-                        {brandDisplay}
-                        {madaAdvice && ` • ${madaAdvice.substring(0, 50)}${madaAdvice.length > 50 ? '...' : ''}`}
-                      </p>
-                    </div>
-                    
-                    {/* Icon mũi tên */}
-                    <div className="w-6 h-6 rounded-full bg-secondary/10 group-hover:bg-secondary/20 flex items-center justify-center flex-shrink-0 transition-colors">
-                      <ChevronRight className="w-3.5 h-3.5 text-secondary" />
+                      {/* Mô tả ngắn */}
+                      {madaAdvice && (
+                        <p className="text-[11px] text-slate-500 line-clamp-1 mt-1">
+                          {madaAdvice.substring(0, 60)}{madaAdvice.length > 60 ? '...' : ''}
+                        </p>
+                      )}
+                      
+                      {/* Nút xem chi tiết */}
+                      <div className="mt-2 flex items-center gap-1 text-[11px] font-medium text-secondary">
+                        <span>{language === 'vi' ? 'Xem chi tiết' : language === 'en' ? 'View details' : 'عرض التفاصيل'}</span>
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </div>
                     </div>
                   </a>
                 );

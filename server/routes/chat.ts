@@ -97,25 +97,30 @@ function shouldShowProducts(message: string): boolean {
     return true;
   }
   
-  // Product-related keywords
+  // Product-related keywords - MỞ RỘNG để bắt nhiều trường hợp hơn
   const productKeywords = [
-    // Vietnamese
+    // Vietnamese - sản phẩm/thiết bị
     'sản phẩm', 'thiết bị', 'máy', 'mua', 'bán', 'shop', 'cửa hàng',
     'ở đâu', 'mua ở đâu', 'nơi bán', 'giá bao nhiêu', 'giá là bao nhiêu',
     'gợi ý', 'đề xuất', 'recommend', 'suggest', 'suggestion',
     'wheelchair', 'máy trợ', 'xe lăn', 'chân giả', 'tay giả', 'kính', 'nạng',
     'xe', 'ghế', 'giường', 'nệm', 'gậy', 'máy', 'thiết bị',
-    // ⭐ Thêm từ khóa hình ảnh và link
-    'hình ảnh', 'hình', 'ảnh', 'link', 'url', 'web', 'website', 'xem thêm',
+    // ⭐ HÌNH ẢNH - THÊM ĐỂ BẮT "xem hình", "hình ảnh sp"
+    'hình ảnh', 'hình', 'ảnh', 'coi hình', 'xem hình', 'pic', 'image', 'photo',
+    'link', 'url', 'web', 'website', 'xem thêm',
     'tư vấn', 'chi tiết hơn', 'kĩ hơn', 'cụ thể hơn', 'more details', 'detailed',
     'sp', 'sản phẩm', 'mẫu mã', 'kiểu dáng',
+    // ⭐ THÊM các từ khóa về thiết bị cụ thể của MADA
+    'inspiration', 'victor reader', 'orcam', 'jaws', 'nvda', 'zoomtext',
+    'braille', 'brailler', 'tactile', 'tời', 'caption', 'fm system', 'roger',
+    'prosthetic', 'orthotic', 'orthopedic', 'crutch', 'cane', 'walker', 'stair',
     // English
     'device', 'product', 'buy', 'purchase', 'price', 'cost', 'where to buy',
     'recommend', 'suggest', 'wheelchair', 'hearing aid', 'screen reader',
     'aac', 'prosthetic', 'orthotic', 'orthopedic', 'crutch', 'cane', 'walker',
     'braille', 'magnifier', 'amplifier', 'communication device',
     'assistive', 'assistive technology', 'at device', 'disability equipment',
-    'specifications', 'features', 'models', 'brands',
+    'specifications', 'features', 'models', 'brands', 'pictures', 'images',
     // Arabic
     'منتج', 'جهاز', 'شراء', 'سعر', 'ينصح', 'يقت', 'كرسي متحرك', 'سماعة',
     // French
@@ -1228,7 +1233,9 @@ router.post('/stream', async (req: any, res: any) => {
       }
       
       // ⭐ Tự động gửi suggestedProducts khi user hỏi về thiết bị/sản phẩm
-      if (shouldShowProducts(message)) {
+      const shouldShow = shouldShowProducts(message);
+      console.log(`🔍 [STREAM] shouldShowProducts check: ${shouldShow} for message: "${message.substring(0, 80)}..."`);
+      if (shouldShow) {
         try {
           const suggestedProducts = await getSuggestedProducts(streamResult.sources || [], message, effectiveLanguage);
           console.log(`📦 [STREAM] suggestedProducts count: ${suggestedProducts.length}, first title: ${suggestedProducts[0]?.title || 'N/A'}`);

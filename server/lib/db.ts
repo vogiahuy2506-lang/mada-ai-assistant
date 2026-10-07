@@ -1435,7 +1435,7 @@ function seedSystemSettings() {
 
   const now = new Date().toISOString();
   const stmt = db.prepare(`
-    INSERT OR IGNORE INTO system_settings (key, value, type, description, updated_at)
+    INSERT OR REPLACE INTO system_settings (key, value, type, description, updated_at)
     VALUES (?, ?, ?, ?, ?)
   `);
   for (const s of defaults) {
@@ -1443,7 +1443,36 @@ function seedSystemSettings() {
   }
   console.log(`🌱 Seeded ${defaults.length} system settings`);
 }
-seedSystemSettings();
+
+// ⭐ MIGRATION: Update existing settings with correct values
+// This runs every startup to ensure data consistency
+function migrateSystemSettings() {
+  const now = new Date().toISOString();
+  
+  // Update suggested_prompts if it's malformed or missing
+  const suggestedPrompts = [
+    { text: 'Phân tích văn bản dài', textEn: 'Analyze long documents', desc: 'Tóm tắt nội dung chính và các điểm quan trọng từ tài liệu của bạn', descEn: 'Summarize main content and key points from your documents', icon: 'description' },
+    { text: 'Kiểm tra khả năng tiếp cận', textEn: 'Accessibility check', desc: 'Đánh giá mức độ phù hợp WCAG cho website hoặc tài liệu', descEn: 'Evaluate WCAG compliance for websites or documents', icon: 'accessibility' },
+    { text: 'Dịch thuật chuyên ngành', textEn: 'Professional translation', desc: 'Dịch thuật ngữ y khoa, công nghệ hỗ trợ với độ chính xác cao', descEn: 'Translate medical terms, assistive technology with high accuracy', icon: 'translate' },
+    { text: 'Gợi ý giải pháp hỗ trợ', textEn: 'Suggest support solutions', desc: 'Tìm kiếm các thiết bị, phần mềm phù hợp với từng dạng khuyết tật', descEn: 'Find devices and software suitable for each type of disability', icon: 'lightbulb' },
+  ];
+  
+  const updateStmt = db.prepare(`
+    UPDATE system_settings 
+    SET value = ?, type = 'json', updated_at = ?
+    WHERE key = 'suggested_prompts'
+  `);
+  
+  try {
+    updateStmt.run(JSON.stringify(suggestedPrompts), now);
+    console.log('✅ Migrated suggested_prompts to correct values');
+  } catch (e) {
+    console.warn('⚠️ Migration failed for suggested_prompts:', e);
+  }
+}
+
+// Run migration on startup
+migrateSystemSettings();
 
 // ============== CHAT METRICS SCHEMA ==============
 

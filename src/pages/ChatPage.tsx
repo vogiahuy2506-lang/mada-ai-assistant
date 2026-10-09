@@ -2916,6 +2916,39 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
               </div>
             </div>
           )}
+
+          {/* ⭐ Thông tin bổ trợ - HIỂN THỊ CHUNG CHO TẤT CẢ CÁC BOT */}
+          {activeCategory && activeCategory !== 'education' && SAMPLE_QUESTIONS['education']?.[viewMode]?.[language]?.length > 0 && (
+            <div className="mt-3 pt-3 border-t border-indigo-100 shrink-0">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-600 px-4 mb-2 flex items-center gap-1">
+                <span className="material-symbols-outlined text-sm">info</span>
+                {language === 'vi' ? 'Thông tin bổ trợ' : language === 'en' ? 'Supplementary Information' : language === 'ar' ? 'معلومات إضافية' : 'Informations supplémentaires'}
+              </p>
+              <div className="space-y-1 px-2">
+                {SAMPLE_QUESTIONS['education'][viewMode][language].slice(0, 4).map((question, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => {
+                      // Switch to education category first, then send question
+                      setActiveCategory('education');
+                      setTimeout(() => handleSelectSampleQuestion(question), 50);
+                    }}
+                    className={clsx(
+                      'w-full flex items-start gap-2 px-3 py-2 rounded-lg text-left',
+                      'text-xs text-slate-500 hover:bg-indigo-50 hover:text-indigo-700',
+                      'transition-colors duration-200 group'
+                    )}
+                  >
+                    <span className="text-indigo-400 group-hover:text-indigo-500 mt-0.5 flex-shrink-0">
+                      +
+                    </span>
+                    <span className="line-clamp-2 leading-relaxed">{question}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Custom Agents (không thuộc 7 category cố định) */}
           {agents.filter(a => a.isActive && !a.madaCategory).map((agent) => {
             const isActive = selectedAgentId === agent.id;
@@ -3051,11 +3084,6 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-1">
                           <p className="text-xs font-semibold truncate">{conv.title}</p>
-                          {conv.category && (
-                            <span className="text-[9px] px-1.5 py-0.5 bg-slate-100 rounded-full text-slate-400 flex-shrink-0">
-                              {CATEGORY_ICONS[conv.category as ATCategory]}
-                            </span>
-                          )}
                         </div>
                         <p className="text-[11px] text-slate-400 truncate mt-0.5">{conv.preview}</p>
                         <p className="text-[10px] text-slate-300 mt-0.5 group-hover:hidden">{formatFullDateTime(conv.updatedAt)}</p>
@@ -3281,12 +3309,15 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
                         className="group bg-white border border-outline-variant rounded-2xl p-4 text-left hover:shadow-lg hover:border-primary/30 transition-all duration-200"
                       >
                         <div className="flex items-start gap-3">
-                          <div className="w-10 h-10 rounded-xl bg-primary-fixed flex items-center justify-center shrink-0 group-hover:bg-primary-fixed-dim transition-colors">
-                            <span className="material-symbols-outlined text-primary text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>
-                              {typeof item === 'string' ? (activeCategory ? CATEGORY_ICONS[activeCategory] : (index === 0 ? 'search' : index === 1 ? 'visibility' : index === 2 ? 'hearing' : 'rule')) : item.icon}
-                            </span>
-                          </div>
-                          <div className="flex-1 min-w-0">
+                          {/* Icon chỉ hiện khi KHÔNG có category đang chọn */}
+                          {!activeCategory && (
+                            <div className="w-10 h-10 rounded-xl bg-primary-fixed flex items-center justify-center shrink-0 group-hover:bg-primary-fixed-dim transition-colors">
+                              <span className="material-symbols-outlined text-primary text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>
+                                {typeof item === 'string' ? (index === 0 ? 'search' : index === 1 ? 'smart_toy' : index === 2 ? 'support_agent' : 'bolt') : item.icon}
+                              </span>
+                            </div>
+                          )}
+                          <div className={clsx('flex-1 min-w-0', !activeCategory && '')}>
                             <p className="text-sm font-semibold text-on-background mb-1 line-clamp-1">
                               {typeof item === 'string' ? item : item.text}
                             </p>

@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useChatStore, useChatHistoryStore, useLanguageStore, useAuthStore, useAnonQuotaStore, usePaywallModalStore, useAuthModalStore, useAgentStore, useSelectedAgentStore, useSystemSettingsStore, useViewModeStore, useChatSettingsStore } from '@/stores';
 import madaLogo from '@/assets/mada-logo.png';
@@ -8,7 +7,7 @@ import { DislikeFeedbackForm } from '@/components/DislikeFeedbackForm';
 import {
   Send, Plus, User, Mic,
   Volume2, ChevronDown, Check,
-  Bot as BotIcon, ChevronRight, ArrowLeft,
+  Bot as BotIcon, ChevronRight,
   FileText, Video, Mic2, ImageIcon, File, X,
   MessageCircle,
   LogOut, Sparkles,
@@ -147,6 +146,7 @@ function generateFollowUpQuestions(userQuestion: string, _aiResponse: string, la
   const q = userQuestion.toLowerCase();
   
   // Detect topic keywords
+  const isVision = q.includes('thị') || q.includes('mù') || q.includes('blind') || q.includes('vision') || q.includes('nhìn') || q.includes('mắt') || q.includes('scree') || q.includes('braille');
   const isHearing = q.includes('thính') || q.includes('tai') || q.includes('nghe') || q.includes('hearing') || q.includes('máy trợ thính') || q.includes('hearing aid');
   const isMobility = q.includes('wheelchair') || q.includes('xe lăn') || q.includes('mobility') || q.includes('vận động') || q.includes('di chuyển') || q.includes('prosthetic') || q.includes('chân');
   const isCognition = q.includes('nhận thức') || q.includes('trí nhớ') || q.includes('cognition') || q.includes('memory') || q.includes('mất') || q.includes('注意力') || q.includes('autism') || q.includes('tự kỷ');
@@ -739,6 +739,7 @@ function ConsultationModal({
 }
 
 // ⭐ Product Image Component - xử lý lỗi ảnh đúng cách (tránh vi phạm Rules of Hooks)
+// (reserved for future product image feature)
 function ProductImage({ 
   imageUrl, 
   alt 
@@ -746,11 +747,11 @@ function ProductImage({
   imageUrl: string | null | undefined; 
   alt: string;
 }) {
-  const [hasError, setHasError] = useState(false);
+  const [useHasError, setUseHasError] = useState(false);
   
   const src = getImageUrl(imageUrl);
   
-  if (!src || hasError) {
+  if (!src || useHasError) {
     return (
       <div className="w-full h-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-white">
         <Accessibility className="w-10 h-10" />
@@ -767,7 +768,7 @@ function ProductImage({
       referrerPolicy="no-referrer"
       onError={() => {
         console.warn('[ProductImage] Image failed to load:', src);
-        setHasError(true);
+        setUseHasError(true);
       }}
     />
   );
@@ -778,7 +779,7 @@ function ProductImage({
 export function ChatPage() {
   const navigate = useNavigate();
   const { language, setLanguage } = useLanguageStore();
-  const { messages, addMessage, clearMessages, isLoading, setLoading } = useChatStore();
+  const { messages, addMessage, clearMessages, isLoading, setLoading, setMessages } = useChatStore();
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
   const authModal = useAuthModalStore();
@@ -949,17 +950,13 @@ export function ChatPage() {
     return Math.min(score, 100);
   }, [userContextCollected]);
   void _getMaturityScore;
-  
-  // ⭐ REQUIRED CONTEXT FIELDS - Bot phải khai thác đủ những thông tin này trước khi đề xuất sản phẩm
-  // ĐÂY LÀ NHỮNG TRƯỜNG BẮT BUỘC - thiếu 1 là KHÔNG show sản phẩm
-  const REQUIRED_CONTEXT_FIELDS = {
+  const _REQUIRED_CONTEXT_FIELDS = {
     hasSymptom: 'Mô tả triệu chứng/tình trạng hiện tại',
     hasSeverity: 'Mức độ nghiêm trọng (nhẹ/vừa/nặng)',
     hasDuration: 'Thời gian xảy ra vấn đề',
   };
   
-  // OPTIONAL - những thông tin bổ sung (có thì tốt, không có vẫn ok)
-  const OPTIONAL_CONTEXT_FIELDS = {
+  const _OPTIONAL_CONTEXT_FIELDS = {
     hasBudget: 'Ngân sách/chi phí dự kiến',
     hasConstraint: 'Độ tuổi/môi trường sử dụng',
     hasGoal: 'Mục tiêu sử dụng thiết bị',
@@ -1242,10 +1239,9 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
   const [userHasScrolled, setUserHasScrolled] = useState(false);
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // ⭐ Topic Selector State - Simplified chatbot with dropdown
   type TopicId = 'total' | ATCategory;
-  const [selectedTopic, setSelectedTopic] = useState<TopicId>('total');
-  const [showTopicDropdown, setShowTopicDropdown] = useState(true);
+  const [_selectedTopic, _setSelectedTopic] = useState<TopicId>('total');
+  const [_showTopicDropdown, _setShowTopicDropdown] = useState(true);
 
   // ⭐ Topic labels translated
   const topicLabels: Record<string, Record<Language, string>> = {
@@ -1293,8 +1289,7 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
     },
   };
 
-  // ⭐ Get all available topics (total + categories)
-  const availableTopics = useMemo(() => {
+  const _availableTopics = useMemo(() => {
     const topics: { id: TopicId; label: string; icon: string; color: string }[] = [
       { id: 'total', label: topicLabels.total[language], icon: 'auto_awesome', color: 'bg-gradient-to-r from-violet-500 to-purple-500' },
     ];
@@ -1302,6 +1297,7 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
     // Add all categories from CATEGORY_INFO
     const allCats = Object.keys(CATEGORY_INFO) as ATCategory[];
     const categoryColors: Record<ATCategory, string> = {
+      vision: 'bg-violet-500',
       hearing: 'bg-indigo-500',
       mobility: 'bg-emerald-500',
       cognition: 'bg-rose-500',
@@ -3972,7 +3968,7 @@ function MessageBubble({
   // ⭐ Feedback state
   const [feedback, setFeedback] = useState<'like' | 'dislike' | null>(message.feedback || null);
   const [showDislikeReason, setShowDislikeReason] = useState(false);
-  const [dislikeReason, setDislikeReason] = useState('');
+  const [_dislikeReason, _setDislikeReason] = useState('');
   const [submittingFeedback, setSubmittingFeedback] = useState(false);
 
   // ⭐ Lock body scroll when feedback modal is open

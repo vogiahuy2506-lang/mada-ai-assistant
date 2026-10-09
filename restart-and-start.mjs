@@ -5,7 +5,7 @@ console.log('Step 1: Killing all node processes related to server...');
 try {
   execSync('lsof -ti :3002 | xargs kill -9 2>/dev/null', { stdio: 'ignore' });
   console.log('Killed processes on port 3002');
-} catch (e) {
+} catch {
   console.log('Port kill failed');
 }
 

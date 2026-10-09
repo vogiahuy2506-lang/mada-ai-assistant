@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, ThumbsDown, Check, AlertCircle, MessageSquare, ChevronDown } from 'lucide-react';
 import clsx from 'clsx';
@@ -79,7 +79,8 @@ function getQuestionText(question: FeedbackQuestion, lang: Language): string {
     ar: 'text_ar',
     fr: 'text_fr',
   };
-  return question[langMap[lang]] || question.text_vi;
+  const text = question[langMap[lang]];
+  return typeof text === 'string' ? text : question.text_vi;
 }
 
 // Translations for the form
@@ -138,7 +139,6 @@ export function DislikeFeedbackForm({
   isOpen,
   onClose,
   onSubmit,
-  messageContent,
   language = 'vi',
 }: DislikeFeedbackFormProps) {
   const [questions, setQuestions] = useState<FeedbackQuestion[]>(DEFAULT_FEEDBACK_QUESTIONS);

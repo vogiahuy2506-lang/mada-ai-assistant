@@ -4,7 +4,7 @@
  */
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Search, Filter, X, Package, ArrowRight, ShoppingCart, User } from 'lucide-react';
+import { Search, Filter, X, Package, ShoppingCart, User } from 'lucide-react';
 import { PublicLayout } from '@/components/PublicLayout';
 import { useLanguageStore } from '@/stores';
 import { formatPrice } from '@/lib/formatPrice';

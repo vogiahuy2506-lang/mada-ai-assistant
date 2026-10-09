@@ -11,7 +11,7 @@
  */
 
 import React from 'react';
-import { ExternalLink, Check, Star, MapPin, ShoppingCart, User } from 'lucide-react';
+import { Check, Star, MapPin, ShoppingCart, User } from 'lucide-react';
 import { getImageUrl } from '@/lib/imageProxy';
 import { t } from '@/lib/translations';
 
@@ -37,7 +37,6 @@ interface ProductCardProps {
   matchScore?: number; // 0-100
   matchReason?: string;
   confidence?: number; // 82-99
-  language?: 'vi' | 'en' | 'ar' | 'fr';
   onViewDetails?: () => void;
   onRequestConsult?: () => void;
 }
@@ -47,7 +46,6 @@ export function ProductCard({
   matchScore,
   matchReason,
   confidence,
-  language = 'vi',
   onRequestConsult,
 }: ProductCardProps) {
   // Helper: kiểm tra URL có hợp lệ (http/https) không

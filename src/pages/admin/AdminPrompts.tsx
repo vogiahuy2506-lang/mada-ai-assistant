@@ -6,12 +6,12 @@ import { broadcastAgentChange, broadcastQuestionsChange } from '@/lib/agentBroad
 import { MADA_BOTS } from '@/lib/madaBots';
 import clsx from 'clsx';
 import {
-  Bot, Save, Plus, Trash2, Upload, Link as LinkIcon,
+  Bot, Plus, Trash2,
   MessageSquare, Sparkles, Image as ImageIcon, FileText,
-  Loader2, Check, X, ChevronRight, RefreshCw, ExternalLink,
-  UserPlus, GripVertical, ArrowUp, ArrowDown, Settings,
+  Loader2, Check, X, ChevronRight, ExternalLink,
+  GripVertical, Settings,
   ChevronDown, Bell, Play, History, CloudUpload,
-  SlidersHorizontal, Database, Comments, Wand2, ArrowLeft
+  SlidersHorizontal, Database, Wand2, ArrowLeft
 } from 'lucide-react';
 
 // ============== TYPES ==============
@@ -22,16 +22,16 @@ interface Agent {
   name: string;
   description?: string;
   avatar?: string;
-  avatar_url?: string;
+  avatar_url?: string | null;
   system_prompt?: string;
   capabilities?: string | string[];
   is_active: boolean | number;
   sort_order: number;
   created_at?: string;
   updated_at?: string;
-  knowledge_url?: string;
-  product_urls?: string;
-  bot_id?: string;
+  knowledge_url?: string | null;
+  product_urls?: string | null;
+  bot_id?: string | null;
   crawl_follow_links?: boolean;
   crawl_max_depth?: number;
   crawl_max_pages?: number;
@@ -833,7 +833,9 @@ export function AdminPrompts() {
       if (res.ok) {
         setQuestions(questions.filter(q => q.id !== questionId));
         // Broadcast to ChatPage to refresh questions
-        broadcastQuestionsChange(selectedAgent.id, (selectedAgent as any).mada_category || 'general');
+        if (selectedAgent) {
+          broadcastQuestionsChange(selectedAgent.id, (selectedAgent as any).mada_category || 'general');
+        }
       }
     } catch (err) {
       console.error('Failed to delete question:', err);
@@ -1276,11 +1278,11 @@ export function AdminPrompts() {
                 <p className="text-xs text-slate-400">Không tìm thấy Agent</p>
               </div>
             ) : (
-              filteredAgents.map((agent, index) => {
+              filteredAgents.map((agent) => {
                 const isSelected = selectedAgent?.id === agent.id;
                 const isDragging = draggedId === agent.id;
                 const isDragOver = dragOverId === agent.id;
-                const emoji = getBotEmoji(agent.bot_id, agent.name);
+                const emoji = getBotEmoji(agent.bot_id ?? undefined, agent.name);
 
                 return (
                   <div
@@ -1434,9 +1436,9 @@ export function AdminPrompts() {
                     <div className="flex items-center gap-4">
                       <AgentAvatar
                         name={formData.name}
-                        avatarUrl={formData.avatar_url}
+                        avatarUrl={formData.avatar_url ?? undefined}
                         avatar={selectedAgent.avatar}
-                        botId={selectedAgent.bot_id}
+                        botId={selectedAgent.bot_id ?? undefined}
                         size="lg"
                       />
                       <div>
@@ -1511,9 +1513,9 @@ export function AdminPrompts() {
                     <div className="flex items-center gap-3.5">
                       <AgentAvatar
                         name={formData.name}
-                        avatarUrl={formData.avatar_url}
+                        avatarUrl={formData.avatar_url ?? undefined}
                         avatar={selectedAgent.avatar}
-                        botId={selectedAgent.bot_id}
+                        botId={selectedAgent.bot_id ?? undefined}
                         size="md"
                       />
                       <div>

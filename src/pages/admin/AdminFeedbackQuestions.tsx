@@ -10,7 +10,6 @@ import {
   Check,
   X,
   AlertCircle,
-  GripVertical,
   Loader2,
   ToggleLeft,
   ToggleRight,

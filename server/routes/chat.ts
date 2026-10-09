@@ -79,7 +79,7 @@ const PRODUCT_REQUEST_RESPONSES: Record<string, string> = {
 };
 
 // ⭐ Get products by category (for product request)
-async function getProductsByCategory(madaCategory: string | null, language: string, limit: number = 6): Promise<any[]> {
+async function getProductsByCategory(madaCategory: string | null, _language: string, limit: number = 6): Promise<any[]> {
   let products: any[] = [];
   
   try {
@@ -844,70 +844,6 @@ async function getSuggestedProducts(ragSources: any[], message: string, effectiv
   return suggestedProducts;
 }
 
-// ⭐ Function mới: Tạo text tự nhiên với embedded product thumbnails
-function buildNaturalProductIntroduction(products: any[], language: string): { intro: string; productHtml: string } {
-  // Nếu không có sản phẩm, trả về rỗng
-  if (!products || products.length === 0) {
-    return { intro: '', productHtml: '' };
-  }
-
-  // Giới hạn 2-3 sản phẩm để hiển thị inline
-  const displayProducts = products.slice(0, 3);
-
-  // Text giới thiệu theo ngôn ngữ
-  const introTexts: Record<string, string> = {
-    vi: 'Với các biểu hiện trên của bạn thì tôi khuyên bạn nên tham khảo các sản phẩm dưới đây nhé:',
-    en: 'Based on your description, I recommend you check out these products:',
-    ar: 'بناءً على وصفك، أنصحك الاطلاع على هذه المنتجات:',
-    fr: 'Selon votre description, je vous recommande de consulter ces produits:',
-  };
-
-  const intro = introTexts[language] || introTexts.vi;
-
-  // Tạo HTML cho các product thumbnails
-  // Format: thumbnail nhỏ + tên + link mua
-  const productHtml = displayProducts.map((product: any) => {
-    const title = language === 'en' && product.title_en ? product.title_en : product.title;
-    const productUrl = product.product_url || product.url || '#';
-    const imageUrl = product.image_url || product.thumbnail || '';
-    const brand = product.brand || 'MADA';
-    const description = product.description || '';
-    const madaAdvice = product.mada_advice || '';
-
-    // Xây dựng HTML cho mỗi sản phẩm - thiết kế nhỏ gọn inline
-    let html = `
-      <div style="margin-top: 12px; padding: 12px; background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); border-radius: 12px; border: 1px solid #e2e8f0; display: flex; gap: 12px; align-items: flex-start;">
-        <div style="flex-shrink: 0;">
-          ${imageUrl ? 
-            `<img src="${imageUrl}" alt="${title}" style="width: 60px; height: 60px; object-fit: cover; border-radius: 8px; border: 1px solid #cbd5e1;" onerror="this.style.display='none'" />` :
-            `<div style="width: 60px; height: 60px; background: linear-gradient(135deg, #3b82f6 0%, #06b6d4 100%); border-radius: 8px; display: flex; align-items: center; justify-content: center;">
-              <span style="color: white; font-size: 24px;">🎧</span>
-            </div>`
-          }
-        </div>
-        <div style="flex: 1; min-width: 0;">
-          <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
-            <span style="font-size: 10px; font-weight: 700; color: #3b82f6; text-transform: uppercase; letter-spacing: 0.5px;">${brand}</span>
-          </div>
-          <p style="margin: 0 0 4px 0; font-size: 13px; font-weight: 600; color: #1e293b; line-height: 1.3;">${title}</p>
-          ${description ? `<p style="margin: 0 0 6px 0; font-size: 11px; color: #64748b; line-height: 1.4;">${description.substring(0, 100)}${description.length > 100 ? '...' : ''}</p>` : ''}
-          ${madaAdvice ? `<p style="margin: 0 0 8px 0; font-size: 11px; color: #b45309; font-style: italic;">💡 ${madaAdvice}</p>` : ''}
-          <a href="${productUrl}" target="_blank" rel="noopener noreferrer" style="display: inline-flex; align-items: center; gap: 4px; padding: 6px 12px; background: linear-gradient(135deg, #3b82f6 0%, #06b6d4 100%); color: white; font-size: 11px; font-weight: 600; text-decoration: none; border-radius: 8px; transition: all 0.2s;">
-            Xem sản phẩm →
-          </a>
-        </div>
-      </div>
-    `;
-
-    return html;
-  }).join('');
-
-  return { intro, productHtml };
-}
-
-// ============== ROUTES ==============
-
-// POST /api/chat — Basic chat with RAG
 router.post('/', async (req, res) => {
   try {
     const { message, conversationId, language: uiLanguage = 'vi', agentId, agentPrompt, userMode } = req.body;
@@ -2158,7 +2094,7 @@ router.post('/consultation/direct', async (req, res) => {
  */
 router.post('/feedback', async (req, res) => {
   try {
-    const { message_id, rating, reason, session_id, agent_id, selectedReasons, details, saveToDashboard } = req.body;
+    const { message_id, rating, reason, session_id, agent_id, selectedReasons, details } = req.body;
     
     if (!message_id || !rating) {
       return res.status(400).json({ 

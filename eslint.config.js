@@ -24,6 +24,8 @@ export default tseslint.config(
       'simple-scrape.ts',
       '**/exec -l /bin/zsh/**',
       '*.spec.ts',
+      '*.cjs',
+      '*.mjs',
     ],
   },
 

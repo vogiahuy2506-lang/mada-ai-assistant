@@ -11,12 +11,12 @@
  */
 import React, { useState, useEffect, useCallback } from 'react';
 import { AdminLayout } from './AdminLayout';
-import { adminApi, UserStats } from './adminApi';
+import { adminApi } from './adminApi';
 import { getAccessToken } from '@/lib/api';
 import { useAuthStore, useLanguageStore } from '@/stores';
 import { translations, Language } from '@/lib/translations';
 import clsx from 'clsx';
-import { RefreshCw, Download as FileDownload, Search, Filter, X, MessageSquare, Star, Check, ShieldCheck, Loader2 } from 'lucide-react';
+import { RefreshCw, Download as FileDownload, Search, X, MessageSquare, Star, Check, ShieldCheck, Loader2 } from 'lucide-react';
 
 // ============== SHARED TRANSLATION ==============
 function useReportsTranslation() {
@@ -287,91 +287,9 @@ interface ModuleStats {
   dislikes: number;
 }
 
-// Sample data
-const SAMPLE_MODULE_STATS: ModuleStats[] = [
-  { name: 'Thị giác', icon: 'visibility', satisfaction: 96.4, totalResponses: 14120, likes: 13611, dislikes: 509 },
-  { name: 'Thính giác', icon: 'hearing', satisfaction: 95.1, totalResponses: 11430, likes: 10870, dislikes: 560 },
-  { name: 'Hỗ trợ Nhận thức', icon: 'psychology', satisfaction: 92.8, totalResponses: 8290, likes: 7693, dislikes: 597 },
-  { name: 'Vận động Tinh tế', icon: 'front_hand', satisfaction: 91.6, totalResponses: 6140, likes: 5624, dislikes: 516 },
-  { name: 'Di chuyển & K.gian', icon: 'accessible_forward', satisfaction: 93.9, totalResponses: 4180, likes: 3925, dislikes: 255 },
-  { name: 'Học tập Hòa nhập', icon: 'school', satisfaction: 94.7, totalResponses: 2850, likes: 2699, dislikes: 151 },
-  { name: 'Lời nói & AAC', icon: 'record_voice_over', satisfaction: 88.5, totalResponses: 1240, likes: 1098, dislikes: 142 },
-];
 
-const SAMPLE_FEEDBACK: FeedbackItem[] = [
-  {
-    id: '#MADA-94812',
-    time: '10:42 SA',
-    date: 'Hôm nay, 24/11',
-    module: 'Thính giác',
-    moduleIcon: 'hearing',
-    question: 'Máy trợ thính Phonak Audeo Lumity có tính năng khử nhiễu gió ngoài trời không?',
-    userType: 'Người dùng cao tuổi',
-    rating: 'dislike',
-    reason: 'Chưa chính xác',
-    feedback: 'AI bảo dòng L30 có AutoSense 5.0 khử gió hoàn toàn là sai, dòng này chỉ cắt giảm tiếng ồn cơ bản. Tôi suýt mua nhầm.',
-    status: 'pending',
-    chatTranscript: {
-      user: 'Máy trợ thính Phonak Audeo Lumity có tính năng khử nhiễu gió ngoài trời không? Tôi hay tập thể dục buổi sáng ven hồ thì nên mua model nào?',
-      ai: 'Chào bác, dòng máy trợ thính Phonak Audéo Lumity được trang bị công nghệ nhận diện môi trường AutoSense OS 5.0. Bác hoàn toàn có thể chọn phiên bản Lumity L30 (mức cơ bản), máy đã tích hợp tính năng Speech in Wind giúp lọc sạch hoàn toàn tiếng rít gió. Bác có muốn kết nối với trung tâm trợ thính gần nhất để đo thính lực đồ miễn phí không?',
-      userFeedback: 'AI bảo dòng L30 có Speech in Wind là sai nghiêm trọng! Tính năng này chỉ có trên dòng cao cấp L70 và L90.',
-    }
-  },
-  {
-    id: '#MADA-94788',
-    time: '09:18 SA',
-    date: 'Hôm nay, 24/11',
-    module: 'Thị giác',
-    moduleIcon: 'visibility',
-    question: 'Hướng dẫn thiết lập phím tắt đọc màn hình NVDA đọc văn bản song ngữ Việt - Anh',
-    userType: 'Sinh viên khiếm thị',
-    rating: 'like',
-    reason: 'Rất hữu ích',
-    feedback: 'Hướng dẫn chi tiết từng tổ hợp phím NVDA+Ctrl+V chuyển đổi voice profile rất mạch lạc, áp dụng được ngay.',
-    status: 'fine-tuned',
-  },
-  {
-    id: '#MADA-94692',
-    time: '08:50 SA',
-    date: 'Hôm nay, 24/11',
-    module: 'Vận động Tinh tế',
-    moduleIcon: 'front_hand',
-    question: 'Tìm chuột máy tính điều khiển bằng mắt hoặc cằm cho người liệt tứ chi sau tai nạn',
-    userType: 'Thân nhân người bệnh',
-    rating: 'dislike',
-    reason: 'Gợi ý sản phẩm chưa khớp',
-    feedback: 'MADA gợi ý chuột bi xoay thông thường (Trackball). Người bệnh không dùng được tay thì làm sao xoay bi? Cần thiết bị Tobii Dynavox.',
-    status: 'resolved',
-  },
-  {
-    id: '#MADA-94520',
-    time: '22:15 CH',
-    date: 'Hôm qua, 23/11',
-    module: 'Hỗ trợ Nhận thức',
-    moduleIcon: 'psychology',
-    question: 'Lịch biểu trực quan dành cho trẻ tự kỷ 6 tuổi bắt đầu vào lớp hòa nhập',
-    userType: 'Phụ huynh can thiệp sớm',
-    rating: 'dislike',
-    reason: 'Chưa đủ thông tin',
-    feedback: 'Lời khuyên chung chung. Cần biểu mẫu hình ảnh PECS cụ thể có thể tải về in ra ngay cho cháu.',
-    status: 'pending',
-  },
-  {
-    id: '#MADA-94411',
-    time: '18:40 CH',
-    date: 'Hôm qua, 23/11',
-    module: 'Học tập Hòa nhập',
-    moduleIcon: 'school',
-    question: 'Chính sách hỗ trợ chi phí mua trang thiết bị học tập trợ năng theo luật NKT 2024',
-    userType: 'Giáo viên đặc biệt',
-    rating: 'like',
-    reason: 'Trích dẫn chính xác',
-    feedback: 'Trích đúng điều 28 và nghị định liên quan, kèm địa chỉ nộp hồ sơ tại Sở LĐ-TB&XH địa phương.',
-    status: 'fine-tuned',
-  },
-];
 
-function getStatusBadge(status: FeedbackItem['status'], lang: string) {
+function getStatusBadge(status: FeedbackItem['status']) {
   const statusConfig = {
     pending: { bg: 'bg-surface-container-high', text: 'text-on-surface-variant', label: 'Chờ chuyên gia', pulse: true },
     'fine-tuned': { bg: 'bg-tertiary/20', text: 'text-tertiary', label: 'Đã nạp fine-tune', pulse: false },
@@ -400,7 +318,6 @@ function AnalyticsTab() {
   const [includeRLHF, setIncludeRLHF] = useState(true);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<{ modules: ModuleStats[]; totals: { totalResponses: number; likes: number; dislikes: number; satisfaction: number } }>({ modules: [], totals: { totalResponses: 0, likes: 0, dislikes: 0, satisfaction: 0 } });
-  const { t, language } = useReportsTranslation();
 
   // Module display name mapping
   const moduleDisplayMap: Record<string, string> = {
@@ -1020,7 +937,7 @@ function AnalyticsTab() {
                     </div>
                   </td>
                   <td className="py-4 px-4 whitespace-nowrap">
-                    {getStatusBadge(item.status, language)}
+                    {getStatusBadge(item.status)}
                   </td>
                   <td className="py-4 px-6 text-right whitespace-nowrap">
                     <div className="flex items-center justify-end gap-1.5">
@@ -1211,7 +1128,7 @@ function AnalyticsTab() {
 
 // ============== MAIN AdminReports PAGE ==============
 export function AdminReports() {
-  const { t, language } = useReportsTranslation();
+  const { t } = useReportsTranslation();
   const [tab, setTab] = useState<'audit' | 'analytics'>('analytics');
 
   return (

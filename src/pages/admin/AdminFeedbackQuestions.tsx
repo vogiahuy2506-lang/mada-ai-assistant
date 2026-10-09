@@ -182,21 +182,39 @@ export default function AdminFeedbackQuestions() {
 
   const fetchQuestions = async () => {
     setLoading(true);
+    setError('');
     try {
       const token = getAccessToken();
+      if (!token) {
+        setError('Vui lòng đăng nhập để xem trang này');
+        setLoading(false);
+        return;
+      }
+      
       const res = await fetch('/api/chat/feedback/all-questions', {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        headers: { Authorization: `Bearer ${token}` },
       });
 
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success && data.data) {
-          setQuestions(data.data);
-        }
+      if (res.status === 401 || res.status === 403) {
+        setError('Bạn không có quyền truy cập trang này');
+        setLoading(false);
+        return;
+      }
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || `Lỗi ${res.status}`);
+      }
+
+      const data = await res.json();
+      if (data.success && Array.isArray(data.data)) {
+        setQuestions(data.data);
+      } else {
+        throw new Error(data.error || 'Dữ liệu không hợp lệ');
       }
     } catch (err) {
       console.error('Failed to fetch questions:', err);
-      setError(t('error'));
+      setError(err instanceof Error ? err.message : t('error'));
     } finally {
       setLoading(false);
     }

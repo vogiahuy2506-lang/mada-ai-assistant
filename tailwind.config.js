@@ -5,7 +5,27 @@ export default {
   theme: {
     extend: {
       colors: {
-        // MADA Brand Colors
+        // MADA Brand Colors - New Modern Design
+        brand: {
+          50: '#ecfdf7',
+          100: '#d0f9ee',
+          200: '#a5f2df',
+          300: '#6de4cc',
+          400: '#34ccb4',
+          500: '#14ad97',
+          600: '#0b8b7b',
+          700: '#026773', /* Main Brand Primary */
+          800: '#07525c',
+          900: '#09444d',
+          950: '#02282e',
+        },
+        accent: {
+          coral: '#F97316',
+          amber: '#F59E0B',
+          indigo: '#6366F1',
+          emerald: '#10B981',
+        },
+        // Legacy colors for compatibility
         'on-error': '#ffffff',
         'on-error-container': '#93000a',
         secondary: '#006572',
@@ -52,7 +72,7 @@ export default {
         'surface-container-high': '#e6e7f2',
         'surface-dim': '#d8d9e3',
         'on-secondary-fixed': '#001a1c',
-        primary: '#006572',
+        primary: '#026773',
       },
       borderRadius: {
         DEFAULT: '1rem',
@@ -71,8 +91,8 @@ export default {
         'container-max': '1280px',
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
-        mono: ['JetBrains Mono', 'monospace'],
+        sans: ['Inter', '"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
+        mono: ['JetBrains Mono', 'ui-monospace', 'monospace'],
         'body-lg': ['Inter'],
         'body-md': ['Inter'],
         'display-lg': ['Manrope'],
@@ -89,6 +109,12 @@ export default {
         'body-md': ['16px', { lineHeight: '24px', fontWeight: '400' }],
         'label-md': ['14px', { lineHeight: '20px', letterSpacing: '0.01em', fontWeight: '600' }],
         'label-sm': ['12px', { lineHeight: '16px', letterSpacing: '0.04em', fontWeight: '500' }],
+      },
+      boxShadow: {
+        'subtle': '0 1px 3px 0 rgba(0, 0, 0, 0.04), 0 1px 2px -1px rgba(0, 0, 0, 0.02)',
+        'card': '0 4px 16px -2px rgba(15, 23, 42, 0.04), 0 2px 6px -2px rgba(15, 23, 42, 0.03)',
+        'elevated': '0 14px 34px -8px rgba(2, 103, 115, 0.12), 0 6px 12px -4px rgba(2, 103, 115, 0.06)',
+        'glass': '0 8px 32px 0 rgba(2, 103, 115, 0.08)',
       },
       animation: {
         'float': 'float 8s ease-in-out infinite',

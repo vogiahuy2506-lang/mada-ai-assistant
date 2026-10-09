@@ -2,13 +2,12 @@ import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useChatStore, useChatHistoryStore, useLanguageStore, useAuthStore, useAnonQuotaStore, usePaywallModalStore, useAuthModalStore, useAgentStore, useSelectedAgentStore, useSystemSettingsStore, useViewModeStore, useChatSettingsStore } from '@/stores';
-import madaLogo from '@/assets/mada-logo.png';
 import { QuotaIndicator } from '@/components/auth/QuotaIndicator';
 import { DislikeFeedbackForm } from '@/components/DislikeFeedbackForm';
 import {
   Send, Plus, User, Mic,
   Volume2, ChevronDown, Check,
-  Bot as BotIcon, ChevronRight,
+  Bot as BotIcon, ChevronRight, ArrowLeft,
   FileText, Video, Mic2, ImageIcon, File, X,
   MessageCircle,
   LogOut, Sparkles,
@@ -832,15 +831,50 @@ export function ChatPage() {
     return () => window.removeEventListener('focus', onFocus);
   }, [loadAgents]);
 
+  // ⭐ Fetch custom questions from API on mount
+  useEffect(() => {
+    const categories: ATCategory[] = ['vision', 'hearing', 'mobility', 'cognition', 'communication', 'daily_living', 'education'];
+    categories.forEach(cat => {
+      fetch(`/api/admin/suggested-questions?category=${cat}&view_mode=end_user&language=${language}&is_active=true`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.success && data.data) {
+            const questions = data.data.map((q: any) => q.question).slice(0, 4);
+            setCustomQuestions(prev => ({ ...prev, [cat]: questions }));
+          }
+        })
+        .catch(err => console.error('[ChatPage] Failed to fetch custom questions:', err));
+    });
+  }, [language]);
+
   // ⭐ Lắng nghe broadcast từ AdminAgents - cập nhật agents ngay khi admin thêm/sửa/xóa bot
   useEffect(() => {
     const cleanup = onAgentChange((event) => {
       console.log('[ChatPage] 📡 Received agent change broadcast:', event.type, event);
+      
       // Reload agents ngay lập tức khi có thay đổi từ Admin
       loadAgents();
+      
+      // ⭐ Nếu là thay đổi questions, fetch lại questions từ API
+      if (event.type === 'questions-changed') {
+        const categories: ATCategory[] = ['vision', 'hearing', 'mobility', 'cognition', 'communication', 'daily_living', 'education'];
+        const catsToFetch = event.category ? [event.category as ATCategory] : categories;
+        
+        catsToFetch.forEach(cat => {
+          fetch(`/api/admin/suggested-questions?category=${cat}&view_mode=end_user&language=${language}&is_active=true`)
+            .then(res => res.json())
+            .then(data => {
+              if (data.success && data.data) {
+                const questions = data.data.map((q: any) => q.question).slice(0, 4);
+                setCustomQuestions(prev => ({ ...prev, [cat]: questions }));
+              }
+            })
+            .catch(err => console.error('[ChatPage] Failed to fetch custom questions:', err));
+        });
+      }
     });
     return cleanup;
-  }, [loadAgents]);
+  }, [loadAgents, language]);
 
   // Load chat settings from backend on mount
   useEffect(() => {
@@ -862,6 +896,9 @@ export function ChatPage() {
    
   const [_suggestedFollowUps, setSuggestedFollowUps] = useState<string[]>([]);
   const [isDragging, setIsDragging] = useState(false);
+
+  // ⭐ Custom Questions from API (AdminPrompts synced)
+  const [customQuestions, setCustomQuestions] = useState<Record<string, string[]>>({});
 
   // ⭐ AT Specialist Suggestion State
   const [showATSuggestion, setShowATSuggestion] = useState(false);
@@ -2739,10 +2776,6 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
               >
                 <ChevronRight className="w-4 h-4 text-slate-600" />
               </button>
-              {/* Logo */}
-              <div className={clsx(sidebarOpen ? 'flex-1 flex justify-center' : 'hidden')}>
-                <img src={madaLogo} alt="MADA" className="h-14" />
-              </div>
               {/* Spacer for alignment when close button is hidden on desktop */}
               <div className="hidden md:block w-8" />
             </div>
@@ -2880,73 +2913,97 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
             </nav>
           )}
 
-          {/* Sample Questions - Hiển thị khi có category được chọn (CỐ ĐỊNH theo 7 bot) */}
-          {activeCategory && SAMPLE_QUESTIONS[activeCategory]?.[viewMode]?.[language]?.length > 0 && (
-            <div className="mt-4 pt-4 border-t border-slate-100 shrink-0">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-violet-600 px-4 mb-2 flex items-center gap-1">
-                <span className="material-symbols-outlined text-sm">lightbulb</span>
-                {t('chat.suggestedQuestions')}
-              </p>
-              <div className="space-y-1 px-2">
-                {SAMPLE_QUESTIONS[activeCategory][viewMode][language].slice(0, 4).map((question, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => handleSelectSampleQuestion(question)}
-                    className={clsx(
-                      'w-full flex items-start gap-2 px-3 py-2 rounded-lg text-left',
-                      'text-xs text-slate-600 hover:bg-violet-50 hover:text-violet-700',
-                      'transition-colors duration-200 group'
+          {/* Sample Questions - Hiển thị khi có category được chọn (Ưu tiên custom questions từ Admin, fallback sang SAMPLE_QUESTIONS) */}
+          {activeCategory && (
+            (() => {
+              // Ưu tiên custom questions từ API, fallback sang SAMPLE_QUESTIONS
+              const customQ = customQuestions[activeCategory];
+              const defaultQ = SAMPLE_QUESTIONS[activeCategory]?.[viewMode]?.[language];
+              const questions = customQ?.length > 0 ? customQ : (defaultQ || []);
+              
+              if (questions.length === 0) return null;
+              
+              return (
+                <div className="mt-4 pt-4 border-t border-slate-100 shrink-0">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-violet-600 px-4 mb-2 flex items-center gap-1">
+                    <span className="material-symbols-outlined text-sm">lightbulb</span>
+                    {t('chat.suggestedQuestions')}
+                    {customQ?.length > 0 && (
+                      <span className="ml-1 px-1.5 py-0.5 bg-violet-100 text-violet-600 text-[9px] rounded-full">Admin</span>
                     )}
-                  >
-                    <span className="text-violet-400 group-hover:text-violet-500 mt-0.5 flex-shrink-0">
-                      •
-                    </span>
-                    <span className="line-clamp-2 leading-relaxed">{question}</span>
-                  </button>
-                ))}
-                {SAMPLE_QUESTIONS[activeCategory][viewMode][language].length > 4 && (
-                  <button className="w-full flex items-center justify-center gap-1 px-3 py-1.5 text-xs text-violet-600 hover:text-violet-700 font-medium">
-                    {language === 'vi' ? `Xem thêm ${SAMPLE_QUESTIONS[activeCategory][viewMode][language].length - 4} câu` :
-                     language === 'en' ? `Show ${SAMPLE_QUESTIONS[activeCategory][viewMode][language].length - 4} more` :
-                     language === 'ar' ? `عرض ${SAMPLE_QUESTIONS[activeCategory][viewMode][language].length - 4} أخرى` :
-                     `Voir ${SAMPLE_QUESTIONS[activeCategory][viewMode][language].length - 4} de plus`}
-                    <span className="material-symbols-outlined text-sm">expand_more</span>
-                  </button>
-                )}
-              </div>
-            </div>
+                  </p>
+                  <div className="space-y-1 px-2">
+                    {questions.slice(0, 4).map((question, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => handleSelectSampleQuestion(question)}
+                        className={clsx(
+                          'w-full flex items-start gap-2 px-3 py-2 rounded-lg text-left',
+                          'text-xs text-slate-600 hover:bg-violet-50 hover:text-violet-700',
+                          'transition-colors duration-200 group'
+                        )}
+                      >
+                        <span className="text-violet-400 group-hover:text-violet-500 mt-0.5 flex-shrink-0">
+                          •
+                        </span>
+                        <span className="line-clamp-2 leading-relaxed">{question}</span>
+                      </button>
+                    ))}
+                    {questions.length > 4 && (
+                      <button className="w-full flex items-center justify-center gap-1 px-3 py-1.5 text-xs text-violet-600 hover:text-violet-700 font-medium">
+                        {language === 'vi' ? `Xem thêm ${questions.length - 4} câu` :
+                         language === 'en' ? `Show ${questions.length - 4} more` :
+                         language === 'ar' ? `عرض ${questions.length - 4} أخرى` :
+                         `Voir ${questions.length - 4} de plus`}
+                        <span className="material-symbols-outlined text-sm">expand_more</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })()
           )}
 
-          {/* ⭐ Thông tin bổ trợ - HIỂN THỊ CHUNG CHO TẤT CẢ CÁC BOT */}
-          {activeCategory && activeCategory !== 'education' && SAMPLE_QUESTIONS['education']?.[viewMode]?.[language]?.length > 0 && (
-            <div className="mt-3 pt-3 border-t border-indigo-100 shrink-0">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-600 px-4 mb-2 flex items-center gap-1">
-                <span className="material-symbols-outlined text-sm">info</span>
-                {language === 'vi' ? 'Thông tin bổ trợ' : language === 'en' ? 'Supplementary Information' : language === 'ar' ? 'معلومات إضافية' : 'Informations supplémentaires'}
-              </p>
-              <div className="space-y-1 px-2">
-                {SAMPLE_QUESTIONS['education'][viewMode][language].slice(0, 4).map((question, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => {
-                      // Switch to education category first, then send question
-                      setActiveCategory('education');
-                      setTimeout(() => handleSelectSampleQuestion(question), 50);
-                    }}
-                    className={clsx(
-                      'w-full flex items-start gap-2 px-3 py-2 rounded-lg text-left',
-                      'text-xs text-slate-500 hover:bg-indigo-50 hover:text-indigo-700',
-                      'transition-colors duration-200 group'
-                    )}
-                  >
-                    <span className="text-indigo-400 group-hover:text-indigo-500 mt-0.5 flex-shrink-0">
-                      +
-                    </span>
-                    <span className="line-clamp-2 leading-relaxed">{question}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
+          {/* ⭐ Thông tin bổ trợ - HIỂN THỊ CHUNG CHO TẤT CẢ CÁC BOT (Ưu tiên custom questions từ Admin) */}
+          {activeCategory && activeCategory !== 'education' && (
+            (() => {
+              const customQ = customQuestions['education'];
+              const defaultQ = SAMPLE_QUESTIONS['education']?.[viewMode]?.[language];
+              const questions = customQ?.length > 0 ? customQ : (defaultQ || []);
+              
+              if (questions.length === 0) return null;
+              
+              return (
+                <div className="mt-3 pt-3 border-t border-indigo-100 shrink-0">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-600 px-4 mb-2 flex items-center gap-1">
+                    <span className="material-symbols-outlined text-sm">info</span>
+                    {language === 'vi' ? 'Thông tin bổ trợ' : language === 'en' ? 'Supplementary Information' : language === 'ar' ? 'معلومات إضافية' : 'Informations supplémentaires'}
+                  </p>
+                  <div className="space-y-1 px-2">
+                    {questions.slice(0, 4).map((question, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => {
+                          // Switch to education category first, then send question
+                          setActiveCategory('education');
+                          setTimeout(() => handleSelectSampleQuestion(question), 50);
+                        }}
+                        className={clsx(
+                          'w-full flex items-start gap-2 px-3 py-2 rounded-lg text-left',
+                          'text-xs text-slate-500 hover:bg-indigo-50 hover:text-indigo-700',
+                          'transition-colors duration-200 group'
+                        )}
+                      >
+                        <span className="text-indigo-400 group-hover:text-indigo-500 mt-0.5 flex-shrink-0">
+                          +
+                        </span>
+                        <span className="line-clamp-2 leading-relaxed">{question}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()
           )}
 
           {/* Custom Agents (không thuộc 7 category cố định) */}
@@ -3264,11 +3321,6 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
                 
                 {/* Welcome Section */}
                 <div className="text-center mb-10 max-w-2xl mx-auto">
-                  {/* Welcome Logo */}
-                  <div className="mb-6">
-                    <img src={madaLogo} alt="MADA" className="w-32 h-auto mx-auto" />
-                  </div>
-
                   {/* Welcome Typography */}
                   <h2 className="text-2xl font-bold text-on-background mb-2">
                     {greeting[language] || greeting.vi}

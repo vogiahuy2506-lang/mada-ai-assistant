@@ -6,14 +6,14 @@
 
 @layer base {
   html {
-    font-family: 'Inter', sans-serif;
+    font-family: 'Inter', 'Plus Jakarta Sans', system-ui, sans-serif;
     /* Improve mobile viewport */
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
   }
 
   body {
-    @apply bg-background text-on-background min-h-screen;
+    @apply bg-slate-50 text-slate-800 antialiased min-h-screen font-sans;
     /* Prevent horizontal scroll on mobile */
     overflow-x: hidden;
   }
@@ -34,9 +34,9 @@
 
 @layer components {
   .glass-card {
-    background: rgba(255, 255, 255, 0.7);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
     border: 1px solid rgba(255, 255, 255, 0.3);
   }
 
@@ -44,6 +44,12 @@
     background: rgba(255, 255, 255, 0.15);
     backdrop-filter: blur(40px);
     -webkit-backdrop-filter: blur(40px);
+  }
+  
+  .glass-pill {
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
   }
   
   .neo-brutalist-shadow {
@@ -113,34 +119,80 @@
   .animate-fade-in {
     animation: fadeIn 0.3s ease-out forwards;
   }
+  
+  /* Brand gradient text */
+  .text-brand-gradient {
+    background: linear-gradient(135deg, #026773 0%, #14ad97 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  
+  /* Agent card hover effect */
+  .agent-card {
+    @apply transition-all duration-200;
+  }
+  .agent-card:hover {
+    @apply shadow-card border-brand-300;
+    transform: translateY(-1px);
+  }
+  
+  /* Status pill styles */
+  .status-pill {
+    @apply text-[10px] font-medium px-2 py-0.5 rounded-md flex items-center gap-1;
+  }
+  .status-pill-active {
+    @apply bg-emerald-50 text-emerald-700 border border-emerald-200/80;
+  }
+  .status-pill-inactive {
+    @apply bg-slate-100 text-slate-500 border border-slate-200;
+  }
+  
+  /* Modern input style */
+  .input-modern {
+    @apply w-full px-4 py-2.5 text-sm bg-slate-50/80 border border-slate-200 rounded-xl text-slate-700 placeholder-slate-400;
+    @apply focus:bg-white focus:ring-2 focus:ring-brand-700/20 focus:border-brand-700 transition;
+  }
+  
+  /* Button styles */
+  .btn-brand {
+    @apply inline-flex items-center gap-1.5 px-4 py-2 bg-brand-700 hover:bg-brand-800 text-white rounded-xl text-xs font-semibold shadow-sm transition;
+  }
+  .btn-brand-outline {
+    @apply inline-flex items-center gap-1.5 px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-xs font-semibold shadow-xs transition;
+  }
+  .btn-brand-ghost {
+    @apply inline-flex items-center gap-1.5 px-3 py-1.5 text-slate-600 hover:text-slate-900 hover:bg-slate-50 rounded-xl text-xs font-medium transition;
+  }
 }
 
-/* Scrollbar styling */
+/* Scrollbar styling - Modern thin style */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 5px;
+  height: 5px;
 }
 
 ::-webkit-scrollbar-track {
-  @apply bg-surface-container;
+  background: #f8fafc;
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply bg-outline rounded-full;
+  background: #cbd5e1;
+  border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  @apply bg-outline-variant;
+  background: #94a3b8;
 }
 
 /* Custom focus for accessibility */
 *:focus-visible {
-  @apply outline-none ring-2 ring-primary ring-offset-2;
+  @apply outline-none ring-2 ring-brand-700 ring-offset-2;
 }
 
 /* Selection */
 ::selection {
-  @apply bg-primary/30 text-on-background;
+  @apply bg-brand-100 text-brand-900;
 }
 
 /* Smooth scroll */
@@ -148,7 +200,7 @@ html {
   scroll-behavior: smooth;
 }
 
-/* ⭐ AT Suggestion Animation */
+/* AT Suggestion Animation */
 @keyframes fadeIn {
   from {
     opacity: 0;

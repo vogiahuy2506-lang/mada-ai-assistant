@@ -317,9 +317,21 @@ export function AdminAnalytics() {
           adminApi.getChatMetrics(range),
         ]);
         if (cancelled) return;
-        if (us.success && us.data) setUserStats(us.data);
-        if (an.success && an.data) setAnalytics(an.data as ApiAnalytics);
-        if (cm.success && cm.data) setChatMetrics(cm.data as ChatMetrics);
+        
+        // Validate and set user stats
+        if (us.success && us.data && typeof us.data.total === 'number') {
+          setUserStats(us.data);
+        }
+        
+        // Validate and set analytics
+        if (an.success && an.data && an.data.kb && an.data.logs && an.data.server) {
+          setAnalytics(an.data as ApiAnalytics);
+        }
+        
+        // Validate and set chat metrics
+        if (cm.success && cm.data && typeof cm.data.totalChats === 'number') {
+          setChatMetrics(cm.data as ChatMetrics);
+        }
       } catch (err: unknown) {
         if (cancelled) return;
         if (err instanceof Error && err.name === 'AbortError') {
@@ -340,11 +352,28 @@ export function AdminAnalytics() {
   const logs = analytics?.logs;
   const srv = analytics?.server;
 
+  // Safe default values
+  const safeKb = {
+    totalDocuments: kb?.totalDocuments ?? 0,
+    totalCategories: kb?.totalCategories ?? 0,
+    totalSize: kb?.totalSize ?? 0,
+  };
+  const safeLogs = {
+    total: logs?.total ?? 0,
+    byLevel: logs?.byLevel ?? {},
+  };
+  const safeSrv = srv ? {
+    uptime: srv.uptime ?? 0,
+    memory: srv.memory ?? { rss: 0, heapUsed: 0 },
+    nodeVersion: srv.nodeVersion ?? 'Unknown',
+    platform: srv.platform ?? 'Unknown',
+  } : null;
+
   const logLevelBars = [
-    { level: 'logInfo', count: logs?.byLevel.info || 0, color: 'bg-indigo-500' },
-    { level: 'logSuccess', count: logs?.byLevel.success || 0, color: 'bg-emerald-500' },
-    { level: 'logWarn', count: logs?.byLevel.warn || 0, color: 'bg-amber-500' },
-    { level: 'logError', count: logs?.byLevel.error || 0, color: 'bg-red-500' },
+    { level: 'logInfo', count: safeLogs.byLevel.info || 0, color: 'bg-indigo-500' },
+    { level: 'logSuccess', count: safeLogs.byLevel.success || 0, color: 'bg-emerald-500' },
+    { level: 'logWarn', count: safeLogs.byLevel.warn || 0, color: 'bg-amber-500' },
+    { level: 'logError', count: safeLogs.byLevel.error || 0, color: 'bg-red-500' },
   ];
   const maxLog = Math.max(...logLevelBars.map(l => l.count), 1);
 
@@ -405,7 +434,7 @@ export function AdminAnalytics() {
           </div>
           <div>
             <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">{t('totalUsers')}</p>
-            <h3 className="text-xl font-black text-on-surface">{userStats?.total ?? '—'}</h3>
+            <h3 className="text-xl font-black text-on-surface">{(userStats?.total ?? 0).toLocaleString()}</h3>
           </div>
         </div>
         <div className="relative bg-gradient-to-br from-violet-500/10 to-purple-500/10 backdrop-blur-xl rounded-2xl p-4 border-[3px] border-black flex items-center gap-3 shadow-[6px_6px_0px_0px_#000] transform rotate-[0.3deg] hover:rotate-0 transition-all">
@@ -414,7 +443,7 @@ export function AdminAnalytics() {
           </div>
           <div>
             <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">{t('totalChats')}</p>
-            <h3 className="text-xl font-black text-on-surface">{chatMetrics?.totalChats?.toLocaleString() ?? '—'}</h3>
+            <h3 className="text-xl font-black text-on-surface">{(chatMetrics?.totalChats ?? 0).toLocaleString()}</h3>
           </div>
         </div>
         <div className="relative bg-gradient-to-br from-teal-500/10 to-emerald-500/10 backdrop-blur-xl rounded-2xl p-4 border-[3px] border-black flex items-center gap-3 shadow-[6px_6px_0px_0px_#000] transform rotate-[-0.3deg] hover:rotate-0 transition-all">
@@ -423,7 +452,7 @@ export function AdminAnalytics() {
           </div>
           <div>
             <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">{t('kbDocuments')}</p>
-            <h3 className="text-xl font-black text-on-surface">{kb?.totalDocuments ?? '—'}</h3>
+            <h3 className="text-xl font-black text-on-surface">{safeKb.totalDocuments.toLocaleString()}</h3>
           </div>
         </div>
         <div className="relative bg-gradient-to-br from-red-500/10 to-orange-500/10 backdrop-blur-xl rounded-2xl p-4 border-[3px] border-black flex items-center gap-3 shadow-[6px_6px_0px_0px_#000] transform rotate-[0.3deg] hover:rotate-0 transition-all">
@@ -432,7 +461,7 @@ export function AdminAnalytics() {
           </div>
           <div>
             <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">{t('logEvents')}</p>
-            <h3 className="text-xl font-black text-on-surface">{logs?.total ?? '—'}</h3>
+            <h3 className="text-xl font-black text-on-surface">{safeLogs.total.toLocaleString()}</h3>
           </div>
         </div>
       </div>
@@ -539,16 +568,16 @@ export function AdminAnalytics() {
             <h3 className="text-sm font-black text-slate-800">{t('serverHealth')}</h3>
           </div>
           <p className="text-xs text-slate-500 mb-3">{t('serverHealthSub')}</p>
-          {loading || !srv ? (
+          {loading || !safeSrv ? (
             <p className="text-xs text-slate-400">{t('loading')}</p>
           ) : (
             <div className="space-y-2">
               {[
-                { label: t('nodeVersion'), value: srv.nodeVersion },
-                { label: t('platform'), value: srv.platform },
-                { label: t('uptime'), value: formatUptime(srv.uptime) },
-                { label: t('memoryRss'), value: `${bytesToMB(srv.memory.rss)} MB` },
-                { label: t('heapUsed'), value: `${bytesToMB(srv.memory.heapUsed)} MB` },
+                { label: t('nodeVersion'), value: safeSrv.nodeVersion },
+                { label: t('platform'), value: safeSrv.platform },
+                { label: t('uptime'), value: formatUptime(safeSrv.uptime) },
+                { label: t('memoryRss'), value: `${bytesToMB(safeSrv.memory.rss)} MB` },
+                { label: t('heapUsed'), value: `${bytesToMB(safeSrv.memory.heapUsed)} MB` },
               ].map(item => (
                 <div key={item.label} className="flex justify-between items-center p-2.5 bg-slate-50 rounded-lg border border-slate-200">
                   <span className="text-xs font-medium text-slate-600">{item.label}</span>

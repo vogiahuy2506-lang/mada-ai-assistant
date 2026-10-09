@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useChatStore, useChatHistoryStore, useLanguageStore, useAuthStore, useAnonQuotaStore, usePaywallModalStore, useAuthModalStore, useAgentStore, useSelectedAgentStore, useSystemSettingsStore, useViewModeStore, useChatSettingsStore } from '@/stores';
+import madaLogo from '@/assets/mada-logo.png';
 import { QuotaIndicator } from '@/components/auth/QuotaIndicator';
 import { DislikeFeedbackForm } from '@/components/DislikeFeedbackForm';
 import {
@@ -2776,6 +2777,10 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
               >
                 <ChevronRight className="w-4 h-4 text-slate-600" />
               </button>
+              {/* Logo */}
+              <div className={clsx(sidebarOpen ? 'flex-1 flex justify-center' : 'hidden')}>
+                <img src={madaLogo} alt="MADA" className="h-14" />
+              </div>
               {/* Spacer for alignment when close button is hidden on desktop */}
               <div className="hidden md:block w-8" />
             </div>

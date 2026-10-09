@@ -4,7 +4,7 @@
  */
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Search, Filter, X, Package, ArrowRight } from 'lucide-react';
+import { Search, Filter, X, Package, ArrowRight, ShoppingCart, User } from 'lucide-react';
 import { PublicLayout } from '@/components/PublicLayout';
 import { useLanguageStore } from '@/stores';
 import { formatPrice } from '@/lib/formatPrice';
@@ -43,6 +43,15 @@ interface Facets {
   categories: Array<{ category: string; count: number }>;
 }
 
+interface ConsultationFormData {
+  name: string;
+  email: string;
+  phone: string;
+  message: string;
+  productId?: string;
+  productName?: string;
+}
+
 const API = '/api/public';
 const PAGE_SIZE = 24;
 
@@ -62,6 +71,11 @@ export function ProductsPage() {
   const [sortBy, setSortBy] = useState(searchParams.get('sort') || 'created_at');
   const [sortOrder, setSortOrder] = useState(searchParams.get('order') || 'DESC');
   const [page, setPage] = useState(1);
+  const [showConsultModal, setShowConsultModal] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<{ id: string; title: string } | null>(null);
+  const [consultForm, setConsultForm] = useState<ConsultationFormData>({ name: '', email: '', phone: '', message: '' });
+  const [consultSubmitting, setConsultSubmitting] = useState(false);
+  const [consultSuccess, setConsultSuccess] = useState(false);
 
   // Categories
   useEffect(() => {
@@ -329,7 +343,16 @@ export function ProductsPage() {
             <>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5" role="list">
                 {products.map((p) => (
-                  <ProductCardItem key={p.id} product={p} language={language} viewText={viewText} />
+                  <ProductCardItem 
+                    key={p.id} 
+                    product={p} 
+                    language={language} 
+                    viewText={viewText}
+                    onRequestConsult={(product) => {
+                      setSelectedProduct(product);
+                      setShowConsultModal(true);
+                    }}
+                  />
                 ))}
               </div>
 
@@ -358,12 +381,188 @@ export function ProductsPage() {
             </>
           )}
         </section>
+
+        {/* ⭐ Consultation Modal */}
+        {showConsultModal && (
+          <div 
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+            onClick={() => setShowConsultModal(false)}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="consult-modal-title"
+          >
+            <div 
+              className="bg-white rounded-2xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="p-6 border-b border-slate-100">
+                <div className="flex items-center justify-between">
+                  <h2 id="consult-modal-title" className="text-xl font-bold text-slate-900">
+                    {language === 'vi' ? 'Yêu cầu Tư vấn Chuyên gia' : language === 'en' ? 'Expert Consultation Request' : 'طلب استشارة خبير'}
+                  </h2>
+                  <button
+                    onClick={() => setShowConsultModal(false)}
+                    className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                    aria-label="Đóng"
+                  >
+                    <X className="w-5 h-5 text-slate-500" />
+                  </button>
+                </div>
+                {selectedProduct && (
+                  <p className="mt-2 text-sm text-slate-600">
+                    {language === 'vi' ? 'Sản phẩm: ' : language === 'en' ? 'Product: ' : 'المنتج: '}
+                    <span className="font-semibold text-[#006D77]">{selectedProduct.title}</span>
+                  </p>
+                )}
+              </div>
+
+              {/* Form */}
+              {consultSuccess ? (
+                <div className="p-8 text-center">
+                  <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <svg className="w-8 h-8 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                  <h3 className="text-lg font-bold text-slate-900 mb-2">
+                    {language === 'vi' ? 'Yêu cầu đã được gửi!' : language === 'en' ? 'Request submitted!' : 'تم إرسال الطلب!'}
+                  </h3>
+                  <p className="text-slate-600 mb-4">
+                    {language === 'vi' ? 'Chúng tôi sẽ liên hệ với bạn trong thời gian sớm nhất.' : language === 'en' ? 'We will contact you as soon as possible.' : 'سنتواصل معك في أقرب وقت ممكن.'}
+                  </p>
+                  <button
+                    onClick={() => {
+                      setShowConsultModal(false);
+                      setConsultSuccess(false);
+                      setConsultForm({ name: '', email: '', phone: '', message: '' });
+                    }}
+                    className="px-6 py-2 bg-[#006D77] text-white rounded-lg font-semibold hover:bg-[#005A63] transition-colors"
+                  >
+                    {language === 'vi' ? 'Đóng' : language === 'en' ? 'Close' : 'إغلاق'}
+                  </button>
+                </div>
+              ) : (
+                <form 
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    if (!consultForm.name || !consultForm.email || !consultForm.message) {
+                      alert(language === 'vi' ? 'Vui lòng điền đầy đủ thông tin bắt buộc' : 'Please fill in all required fields');
+                      return;
+                    }
+                    setConsultSubmitting(true);
+                    try {
+                      const res = await fetch('/api/consultation', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          name: consultForm.name,
+                          email: consultForm.email,
+                          phone: consultForm.phone,
+                          message: selectedProduct 
+                            ? `${language === 'vi' ? 'Sản phẩm quan tâm: ' : language === 'en' ? 'Interested product: ' : 'المنتج المهتم: '}${selectedProduct.title}\n\n${consultForm.message}`
+                            : consultForm.message
+                        })
+                      });
+                      if (res.ok) {
+                        setConsultSuccess(true);
+                      } else {
+                        throw new Error('Failed to submit');
+                      }
+                    } catch (err) {
+                      console.error('Consultation submit error:', err);
+                      alert(language === 'vi' ? 'Có lỗi xảy ra. Vui lòng thử lại.' : 'An error occurred. Please try again.');
+                    } finally {
+                      setConsultSubmitting(false);
+                    }
+                  }}
+                  className="p-6 space-y-4"
+                >
+                  {/* Name */}
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1">
+                      {language === 'vi' ? 'Họ và tên *' : language === 'en' ? 'Full Name *' : 'الاسم الكامل *'}
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={consultForm.name}
+                      onChange={(e) => setConsultForm({ ...consultForm, name: e.target.value })}
+                      className="w-full px-4 py-2.5 border-2 border-slate-200 rounded-lg focus:border-[#006D77] focus:outline-none transition-colors"
+                      placeholder={language === 'vi' ? 'Nguyễn Văn A' : 'John Smith'}
+                    />
+                  </div>
+
+                  {/* Email */}
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1">
+                      {language === 'vi' ? 'Email *' : language === 'en' ? 'Email *' : 'البريد الإلكتروني *'}
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      value={consultForm.email}
+                      onChange={(e) => setConsultForm({ ...consultForm, email: e.target.value })}
+                      className="w-full px-4 py-2.5 border-2 border-slate-200 rounded-lg focus:border-[#006D77] focus:outline-none transition-colors"
+                      placeholder="email@example.com"
+                    />
+                  </div>
+
+                  {/* Phone */}
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1">
+                      {language === 'vi' ? 'Điện thoại' : language === 'en' ? 'Phone' : 'الهاتف'}
+                    </label>
+                    <input
+                      type="tel"
+                      value={consultForm.phone}
+                      onChange={(e) => setConsultForm({ ...consultForm, phone: e.target.value })}
+                      className="w-full px-4 py-2.5 border-2 border-slate-200 rounded-lg focus:border-[#006D77] focus:outline-none transition-colors"
+                      placeholder="+974 1234 5678"
+                    />
+                  </div>
+
+                  {/* Message */}
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1">
+                      {language === 'vi' ? 'Mô tả nhu cầu *' : language === 'en' ? 'Needs Description *' : 'وصف الاحتياجات *'}
+                    </label>
+                    <textarea
+                      required
+                      rows={4}
+                      value={consultForm.message}
+                      onChange={(e) => setConsultForm({ ...consultForm, message: e.target.value })}
+                      className="w-full px-4 py-2.5 border-2 border-slate-200 rounded-lg focus:border-[#006D77] focus:outline-none transition-colors resize-none"
+                      placeholder={language === 'vi' ? 'Mô tả chi tiết tình trạng và nhu cầu về thiết bị công nghệ hỗ trợ...' : 'Describe your situation and assistive technology needs in detail...'}
+                    />
+                  </div>
+
+                  {/* Submit Button */}
+                  <button
+                    type="submit"
+                    disabled={consultSubmitting}
+                    className="w-full py-3 px-4 bg-gradient-to-r from-[#006D77] to-[#0A9396] text-white font-bold rounded-lg hover:from-[#005A63] hover:to-[#087E8B] transition-all disabled:opacity-50"
+                  >
+                    {consultSubmitting 
+                      ? (language === 'vi' ? 'Đang gửi...' : 'Sending...')
+                      : (language === 'vi' ? 'GỬI YÊU CẦU' : language === 'en' ? 'SUBMIT REQUEST' : 'إرسال الطلب')}
+                  </button>
+                </form>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </PublicLayout>
   );
 }
 
-function ProductCardItem({ product, language, viewText }: { product: Product; language: string; viewText: string }) {
+function ProductCardItem({ product, language, viewText, onRequestConsult }: { 
+  product: Product; 
+  language: string; 
+  viewText: string;
+  onRequestConsult?: (product: { id: string; title: string }) => void;
+}) {
   const ti = language === 'en' && product.title_en ? product.title_en : product.title;
   // ⭐ Link đến URL gốc của sản phẩm (MADA/at.mada.org.qa) thay vì trang nội bộ
   const productLink = product.product_url && /^https?:\/\//i.test(product.product_url)
@@ -400,14 +599,49 @@ function ProductCardItem({ product, language, viewText }: { product: Product; la
             ))}
           </div>
         )}
-          {product.price_range && (
-            <p className="text-sm font-bold text-primary mt-2">{formatPrice(product.price_range)}</p>
+        {product.price_range && (
+          <p className="text-sm font-bold text-primary mt-2">{formatPrice(product.price_range)}</p>
+        )}
+        
+        {/* ⭐ 2 Buttons như thiết kế */}
+        <div className="mt-3 flex flex-col gap-2">
+          {/* Nút chính: Xem chi tiết & Mua sản phẩm */}
+          {productLink ? (
+            <a
+              href={productLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-2 px-3 py-2.5 bg-gradient-to-r from-[#006D77] to-[#0A9396] hover:from-[#005A63] hover:to-[#087E8B] text-white text-xs font-semibold rounded-lg shadow-sm hover:shadow-md transition-all duration-200 active:scale-[0.98]"
+            >
+              <ShoppingCart className="w-4 h-4" aria-hidden="true" />
+              <span>{language === 'vi' ? 'Xem chi tiết & Mua sản phẩm' : language === 'en' ? 'View Details & Buy' : 'عرض التفاصيل والشراء'}</span>
+            </a>
+          ) : (
+            <a
+              href={`/products/${product.id}`}
+              className="flex items-center justify-center gap-2 px-3 py-2.5 bg-gradient-to-r from-[#006D77] to-[#0A9396] hover:from-[#005A63] hover:to-[#087E8B] text-white text-xs font-semibold rounded-lg shadow-sm hover:shadow-md transition-all duration-200 active:scale-[0.98]"
+            >
+              <ShoppingCart className="w-4 h-4" aria-hidden="true" />
+              <span>{language === 'vi' ? 'Xem chi tiết & Mua sản phẩm' : language === 'en' ? 'View Details & Buy' : 'عرض التفاصيل والشراء'}</span>
+            </a>
           )}
-          <span className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-primary">
-            {viewText} <ArrowRight className="w-3 h-3" aria-hidden="true" />
-          </span>
+          
+          {/* Nút phụ: Liên hệ tư vấn viên chuyên khoa */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onRequestConsult?.({ id: product.id, title: ti });
+            }}
+            className="flex items-center justify-center gap-2 px-3 py-2 bg-white border-2 border-[#83C5BE]/50 hover:border-[#83C5BE] text-[#006D77] text-xs font-semibold rounded-lg transition-all duration-200 hover:bg-[#EDF6F9] active:scale-[0.98]"
+          >
+            <User className="w-4 h-4 text-[#006D77]" aria-hidden="true" />
+            <span>{language === 'vi' ? 'Liên hệ tư vấn viên chuyên khoa' : language === 'en' ? 'Contact Specialist Advisor' : 'تواصل مع مستشار متخصص'}</span>
+          </button>
         </div>
-      </>
+      </div>
+    </>
   );
   
   // Wrapper: dùng anchor cho external link, div cho không có link

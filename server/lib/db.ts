@@ -273,6 +273,48 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_feedback_agent ON message_feedback(agent_id);
 `);
 
+// ============== FEEDBACK QUESTIONS SCHEMA ==============
+db.exec(`
+  CREATE TABLE IF NOT EXISTS feedback_questions (
+    id TEXT PRIMARY KEY,
+    question_key TEXT UNIQUE NOT NULL,
+    text_vi TEXT NOT NULL,
+    text_en TEXT NOT NULL DEFAULT '',
+    text_ar TEXT NOT NULL DEFAULT '',
+    text_fr TEXT NOT NULL DEFAULT '',
+    icon TEXT NOT NULL DEFAULT 'alert-circle',
+    is_active INTEGER NOT NULL DEFAULT 1,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_feedback_questions_active ON feedback_questions(is_active);
+  CREATE INDEX IF NOT EXISTS idx_feedback_questions_order ON feedback_questions(sort_order);
+`);
+
+// ============== SEED DEFAULT FEEDBACK QUESTIONS ==============
+const existingQuestions = db.prepare('SELECT COUNT(*) as count FROM feedback_questions').get() as { count: number };
+if (existingQuestions.count === 0) {
+  const now = new Date().toISOString();
+  const defaultQuestions = [
+    { id: 'fq-1', question_key: 'inaccurate', text_vi: 'Nội dung chưa chính xác hoặc thiếu dẫn chứng', text_en: 'Content is inaccurate or lacks evidence', text_ar: 'المحتوى غير دقيق أو يفتقر إلى أدلة', text_fr: 'Le contenu est inexact ou manque de preuves', icon: 'alert-circle', sort_order: 1 },
+    { id: 'fq-2', question_key: 'not_focused', text_vi: 'Chưa giải quyết đúng trọng tâm vấn đề', text_en: 'Does not address the main issue', text_ar: 'لا يعالج المشكلة الرئيسية', text_fr: 'Ne traite pas le problème principal', icon: 'target', sort_order: 2 },
+    { id: 'fq-3', question_key: 'too_complex', text_vi: 'Trả lời quá dài dòng hoặc từ ngữ chuyên môn khó hiểu', text_en: 'Response is too verbose or uses complex jargon', text_ar: 'الرد طويل جداً أو يستخدم مصطلحات معقدة', text_fr: 'La réponse est trop longue ou utilise un jargon complexe', icon: 'message-square', sort_order: 3 },
+    { id: 'fq-4', question_key: 'other', text_vi: 'Khác (Vui lòng ghi rõ bên dưới)', text_en: 'Other (Please specify below)', text_ar: 'أخرى (يرجى التحديد أدناه)', text_fr: 'Autre (Veuillez préciser ci-dessous)', icon: 'plus-circle', sort_order: 4 },
+  ];
+
+  const insertStmt = db.prepare(`
+    INSERT INTO feedback_questions (id, question_key, text_vi, text_en, text_ar, text_fr, icon, is_active, sort_order, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)
+  `);
+
+  for (const q of defaultQuestions) {
+    insertStmt.run(q.id, q.question_key, q.text_vi, q.text_en, q.text_ar, q.text_fr, q.icon, q.sort_order, now, now);
+  }
+  console.log('✅ Seeded default feedback questions');
+}
+
 // ============== KNOWLEDGE ITEMS TRANSLATION MIGRATION ==============
 try {
   const kiCols = db.prepare("PRAGMA table_info(knowledge_items)").all() as any[];

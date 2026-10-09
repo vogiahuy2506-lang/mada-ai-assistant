@@ -11,7 +11,7 @@
  */
 
 import React from 'react';
-import { ExternalLink, Check, Star, MapPin, ShoppingCart } from 'lucide-react';
+import { ExternalLink, Check, Star, MapPin, ShoppingCart, User } from 'lucide-react';
 import { getImageUrl } from '@/lib/imageProxy';
 import { t } from '@/lib/translations';
 
@@ -254,36 +254,34 @@ export function ProductCard({
           {/* Spacer */}
           <div className="flex-1"></div>
 
-          {/* Actions */}
+          {/* Actions - 2 buttons as requested */}
           <div className="flex flex-col sm:flex-row gap-3 mt-4">
-            {/* View Details Button */}
-            {(product.product_url || product.source_url) && (
-              <a
-                href={product.product_url || product.source_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex-1 flex items-center justify-center gap-2 py-3 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold rounded-xl transition-all group/link"
-                onClick={(e) => {
-                  if (!hasValidUrl) {
-                    e.preventDefault();
-                    onRequestConsult?.();
-                  }
-                }}
-              >
-                <ExternalLink className="w-4 h-4 text-violet-600 group-hover/link:translate-x-0.5 transition-transform" aria-hidden="true" />
-                Xem chi tiết
-                <span className="material-symbols-outlined text-base ml-1 opacity-60">open_in_new</span>
-              </a>
-            )}
-
-            {/* Consult Button */}
-            <button
-              onClick={onRequestConsult}
-              className="flex-1 py-3 px-4 bg-gradient-to-r from-violet-600 to-indigo-600 text-white text-sm font-bold rounded-xl hover:from-violet-700 hover:to-indigo-700 transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-violet-500"
-              aria-label={`Tư vấn về ${product.name}`}
+            {/* Button 1: Dark teal - Xem chi tiết & Mua sản phẩm */}
+            <a
+              href={product.product_url || product.source_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => {
+                if (!hasValidUrl) {
+                  e.preventDefault();
+                  onRequestConsult?.();
+                }
+              }}
+              className="flex-1 flex items-center justify-center gap-2 py-3 px-4 bg-gradient-to-r from-[#006D77] to-[#0A9396] text-white text-sm font-bold rounded-xl hover:from-[#005f69] hover:to-[#088290] transition-all shadow-md hover:shadow-lg"
+              aria-label="Xem chi tiết và mua sản phẩm"
             >
               <ShoppingCart className="w-4 h-4" aria-hidden="true" />
-              {t('productCard.consult', language)}
+              Xem chi tiết & Mua sản phẩm
+            </a>
+
+            {/* Button 2: White with teal border - Liên hệ tư vấn viên chuyên khoa */}
+            <button
+              onClick={onRequestConsult}
+              className="flex-1 py-3 px-4 bg-white text-[#006D77] text-sm font-bold rounded-xl border-2 border-[#83C5BE] hover:bg-[#83C5BE]/10 transition-all flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#83C5BE]"
+              aria-label="Liên hệ tư vấn viên chuyên khoa"
+            >
+              <User className="w-4 h-4 text-[#006D77]" aria-hidden="true" />
+              Liên hệ tư vấn viên chuyên khoa
             </button>
           </div>
         </div>

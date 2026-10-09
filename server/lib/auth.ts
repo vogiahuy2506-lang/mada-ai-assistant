@@ -200,5 +200,13 @@ export function validateLogin(email: string, password: string): string | null {
   return null;
 }
 
+// Pre-configured admin middleware
+export const requireAdmin = (req: Request, res: Response, next: NextFunction) => {
+  authenticate(req, res, (err?: any) => {
+    if (err) return;
+    requireRole('admin', 'super_admin')(req, res, next);
+  });
+};
+
 export { toPublicUser };
 export type { PublicUser };

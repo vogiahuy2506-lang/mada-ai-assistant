@@ -25,6 +25,7 @@ const AdminProducts = lazy(() => import('@/pages/admin/AdminProducts'));
 const AdminScraper = lazy(() => import('@/pages/admin/AdminScraper'));
 const AdminSuggestedQuestions = lazy(() => import('@/pages/admin/AdminSuggestedQuestions'));
 const AdminFeedback = lazy(() => import('@/pages/admin/AdminFeedback'));
+const AdminFeedbackQuestions = lazy(() => import('@/pages/admin/AdminFeedbackQuestions'));
 const AdminPermissions = lazy(() => import('@/pages/admin/Permissions'));
 const AdminNotifications = lazy(() => import('@/pages/admin/AdminNotifications'));
 const AdminSupport = lazy(() => import('@/pages/admin/AdminSupport'));
@@ -155,6 +156,14 @@ function App() {
             element={
               <RoleGuard requiredRole="admin">
                 <AdminFeedback />
+              </RoleGuard>
+            }
+          />
+          <Route
+            path="/admin/feedback-questions"
+            element={
+              <RoleGuard requiredRole="admin">
+                <AdminFeedbackQuestions />
               </RoleGuard>
             }
           />

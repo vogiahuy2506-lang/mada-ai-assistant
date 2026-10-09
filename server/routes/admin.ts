@@ -2449,4 +2449,255 @@ router.patch('/pricing-plans/:id', requireAdmin, (req: Request, res: Response) =
   }
 });
 
+// ============== FEEDBACK STATISTICS API ==============
+
+// GET /api/admin/feedback/stats - Get aggregated feedback statistics by module
+router.get('/feedback/stats', ...requireAdmin, async (_req: Request, res: Response) => {
+  try {
+    // Get stats grouped by agent_id (which represents different modules/categories)
+    const stats = db.prepare(`
+      SELECT 
+        mf.agent_id as module,
+        COUNT(*) as totalResponses,
+        SUM(CASE WHEN mf.rating = 'like' THEN 1 ELSE 0 END) as likes,
+        SUM(CASE WHEN mf.rating = 'dislike' THEN 1 ELSE 0 END) as dislikes,
+        ROUND(SUM(CASE WHEN mf.rating = 'like' THEN 1 ELSE 0 END) * 100.0 / NULLIF(COUNT(*), 0), 1) as satisfaction
+      FROM message_feedback mf
+      GROUP BY mf.agent_id
+      ORDER BY totalResponses DESC
+    `).all() as any[];
+
+    // Map agent_id to module names and icons
+    const moduleMap: Record<string, { name: string; icon: string }> = {
+      'vision': { name: 'Thị giác', icon: 'visibility' },
+      'hearing': { name: 'Thính giác', icon: 'hearing' },
+      'mobility': { name: 'Vận động', icon: 'accessible_forward' },
+      'communication': { name: 'Giao tiếp', icon: 'record_voice_over' },
+      'cognition': { name: 'Nhận thức', icon: 'psychology' },
+      'daily_living': { name: 'Sinh hoạt', icon: 'daily_living' },
+      'education': { name: 'Giáo dục', icon: 'school' },
+      'general': { name: 'Tổng quát', icon: 'smart_toy' },
+    };
+
+    const moduleStats = stats.map(s => {
+      const mapped = moduleMap[s.module || 'general'] || { name: 'Khác', icon: 'smart_toy' };
+      return {
+        name: mapped.name,
+        icon: mapped.icon,
+        satisfaction: s.satisfaction || 0,
+        totalResponses: s.totalResponses || 0,
+        likes: s.likes || 0,
+        dislikes: s.dislikes || 0,
+      };
+    });
+
+    // Get overall totals
+    const totals = db.prepare(`
+      SELECT 
+        COUNT(*) as totalResponses,
+        SUM(CASE WHEN rating = 'like' THEN 1 ELSE 0 END) as likes,
+        SUM(CASE WHEN rating = 'dislike' THEN 1 ELSE 0 END) as dislikes
+      FROM message_feedback
+    `).get() as any;
+
+    res.json({
+      success: true,
+      data: {
+        modules: moduleStats,
+        totals: {
+          totalResponses: totals.totalResponses || 0,
+          likes: totals.likes || 0,
+          dislikes: totals.dislikes || 0,
+          satisfaction: totals.totalResponses > 0 
+            ? Math.round((totals.likes / totals.totalResponses) * 1000) / 10 
+            : 0,
+        }
+      }
+    });
+  } catch (error: any) {
+    console.error('[/api/admin/feedback/stats]', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// GET /api/admin/feedback - Get feedback list with pagination and filters
+router.get('/feedback', ...requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 20;
+    const offset = (page - 1) * limit;
+    const search = (req.query.search as string) || '';
+    const rating = req.query.rating as string;
+    const module = req.query.module as string;
+    const status = req.query.status as string;
+
+    let whereClause = '1=1';
+    const params: any[] = [];
+
+    if (search) {
+      whereClause += ' AND (mf.id LIKE ? OR mf.reason LIKE ?)';
+      params.push(`%${search}%`, `%${search}%`);
+    }
+
+    if (rating) {
+      whereClause += ' AND mf.rating = ?';
+      params.push(rating);
+    }
+
+    if (module) {
+      whereClause += ' AND mf.agent_id = ?';
+      params.push(module);
+    }
+
+    // Status filter for pending expert review (dislikes that haven't been reviewed)
+    if (status === 'pending') {
+      whereClause += ' AND mf.rating = ? AND mf.reason IS NOT NULL';
+      params.push('dislike');
+    }
+
+    // Get total count
+    const countResult = db.prepare(`
+      SELECT COUNT(*) as total FROM message_feedback mf WHERE ${whereClause}
+    `).get(...params) as any;
+
+    // Get paginated results with message content
+    const feedback = db.prepare(`
+      SELECT 
+        mf.id,
+        mf.message_id,
+        mf.session_id,
+        mf.user_id,
+        mf.rating,
+        mf.reason,
+        mf.agent_id as module,
+        mf.language,
+        mf.created_at,
+        u.name as user_name,
+        u.email as user_email,
+        cm.content as message_content
+      FROM message_feedback mf
+      LEFT JOIN users u ON mf.user_id = u.id
+      LEFT JOIN chat_messages cm ON mf.message_id = cm.id
+      WHERE ${whereClause}
+      ORDER BY mf.created_at DESC
+      LIMIT ? OFFSET ?
+    `).all(...params, limit, offset) as any[];
+
+    // Map to frontend format
+    const items = feedback.map(f => {
+      // Module display name mapping
+      const moduleMap: Record<string, string> = {
+        'vision': 'Thị giác',
+        'hearing': 'Thính giác',
+        'mobility': 'Vận động',
+        'communication': 'Giao tiếp',
+        'cognition': 'Nhận thức',
+        'daily_living': 'Sinh hoạt',
+        'education': 'Giáo dục',
+        'general': 'Tổng quát',
+      };
+      return {
+        id: f.id,
+        messageId: f.message_id,
+        sessionId: f.session_id,
+        userId: f.user_id,
+        userName: f.user_name || 'Khách',
+        userEmail: f.user_email || '',
+        rating: f.rating,
+        reason: f.reason || '',
+        module: f.module || 'general',
+        moduleDisplay: moduleMap[f.module || 'general'] || 'Khác',
+        question: f.message_content || f.reason || 'Không có nội dung',
+        language: f.language || 'vi',
+        createdAt: f.created_at,
+        status: f.reason ? 'pending' : 'reviewed',
+      };
+    });
+
+    res.json({
+      success: true,
+      data: {
+        items,
+        pagination: {
+          page,
+          limit,
+          total: countResult.total,
+          totalPages: Math.ceil(countResult.total / limit),
+        }
+      }
+    });
+  } catch (error: any) {
+    console.error('[/api/admin/feedback]', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// GET /api/admin/feedback/:id - Get single feedback item
+router.get('/feedback/:id', ...requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const feedback = db.prepare(`
+      SELECT 
+        mf.*,
+        u.name as user_name,
+        u.email as user_email,
+        cm.content as message_content
+      FROM message_feedback mf
+      LEFT JOIN users u ON mf.user_id = u.id
+      LEFT JOIN chat_messages cm ON mf.message_id = cm.id
+      WHERE mf.id = ?
+    `).get(req.params.id) as any;
+
+    if (!feedback) {
+      return res.status(404).json({ success: false, error: 'Feedback not found' });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        id: feedback.id,
+        messageId: feedback.message_id,
+        messageContent: feedback.message_content,
+        sessionId: feedback.session_id,
+        userId: feedback.user_id,
+        userName: feedback.user_name || 'Khách',
+        userEmail: feedback.user_email || '',
+        rating: feedback.rating,
+        reason: feedback.reason || '',
+        module: feedback.agent_id || 'general',
+        language: feedback.language || 'vi',
+        createdAt: feedback.created_at,
+      }
+    });
+  } catch (error: any) {
+    console.error('[/api/admin/feedback/:id]', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// PATCH /api/admin/feedback/:id - Update feedback status (mark as reviewed)
+router.patch('/feedback/:id', ...requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { status } = req.body;
+    
+    // Currently only updating status, could extend to add notes, etc.
+    if (status) {
+      // For now, we just log the status change
+      // In future, could add a status column to message_feedback table
+      console.log(`Feedback ${req.params.id} status updated to: ${status}`);
+    }
+
+    logSystemEvent(
+      'info', 'feedback', 'Cập nhật trạng thái phản hồi',
+      { id: req.params.id, status },
+      (req as any).user?.id,
+      req.ip,
+      req.headers['user-agent']
+    );
+
+    res.json({ success: true, data: { id: req.params.id } });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 export default router;

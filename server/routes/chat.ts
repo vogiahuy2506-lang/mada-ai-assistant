@@ -18,7 +18,7 @@ import { buildSystemPrompt } from '../lib/prompts/systemPrompts';
 import { createConsultationSession, getConsultationQuestions } from '../lib/consultationEngine';
 import db from '../lib/db';
 import { getSystemSettings } from '../lib/db';
-import { verifyAccessToken } from '../lib/auth';
+import { verifyAccessToken, requireAdmin } from '../lib/auth';
 import { getFileUploadQuota, trackFileUpload } from '../lib/db';
 import { chatHistory, waitForRagReady } from '../lib/chat-context';
 import { logActivity } from '../index';
@@ -58,6 +58,121 @@ const AGENT_TO_MADA: Record<string, { botId: string; madaCategory: string }> = {
   'bot-mobility':   { botId: 'bot-mobility',   madaCategory: 'mobility-and-transportation' },
   'bot-regulatory': { botId: 'bot-regulatory', madaCategory: 'regulatory-standards' },
 };
+
+// ⭐ Product Request Category Mapping
+const MADA_CATEGORY_TO_DB: Record<string, string> = {
+  'sensory-hearing': 'sensory-hearing',
+  'sensory-vision': 'sensory-vision',
+  'voice-and-speech': 'voice-and-speech',
+  'mental-cognitive': 'mental-cognitive',
+  'neuromusculoskeletal-movement': 'neuromusculoskeletal-movement',
+  'mobility-and-transportation': 'mobility-and-transportation',
+  'regulatory-standards': 'regulatory-standards',
+};
+
+// ⭐ Product request response templates
+const PRODUCT_REQUEST_RESPONSES: Record<string, string> = {
+  vi: 'Dựa trên nhu cầu của bạn, đây là các sản phẩm công nghệ hỗ trợ tôi gợi ý:',
+  en: 'Based on your needs, here are the assistive technology products I recommend:',
+  ar: 'بناءً على احتياجاتك، إليك منتجات تقنية المساعدة التي أوصي بها:',
+  fr: "Basé sur vos besoins, voici les produits de technologie d'assistance que je recommande:",
+};
+
+// ⭐ Get products by category (for product request)
+async function getProductsByCategory(madaCategory: string | null, language: string, limit: number = 6): Promise<any[]> {
+  let products: any[] = [];
+  
+  try {
+    let query: string;
+    let params: any[];
+    
+    if (madaCategory && MADA_CATEGORY_TO_DB[madaCategory]) {
+      // Lấy products theo category cụ thể
+      const dbCategory = MADA_CATEGORY_TO_DB[madaCategory];
+      query = `
+        SELECT p.*, ki.category as ki_category, ki.confidence
+        FROM kb_products p
+        LEFT JOIN knowledge_items ki ON p.source_url = ki.url OR p.product_url = ki.url
+        WHERE ki.category = ? AND ki.status IN ('draft', 'published', 'approved')
+        ORDER BY ki.confidence DESC, p.created_at DESC
+        LIMIT ?
+      `;
+      params = [dbCategory, limit];
+      console.log(`📦 [ProductRequest] Fetching products for category: ${dbCategory}`);
+    } else {
+      // Lấy tất cả products (bot tổng)
+      query = `
+        SELECT p.*, ki.category as ki_category, ki.confidence
+        FROM kb_products p
+        LEFT JOIN knowledge_items ki ON p.source_url = ki.url OR p.product_url = ki.url
+        WHERE ki.status IN ('draft', 'published', 'approved')
+        ORDER BY ki.confidence DESC, p.created_at DESC
+        LIMIT ?
+      `;
+      params = [limit];
+      console.log(`📦 [ProductRequest] Fetching all products (no category filter)`);
+    }
+    
+    const rows = db.prepare(query).all(...params) as any[];
+    console.log(`📦 [ProductRequest] Found ${rows.length} products`);
+    
+    // Map to suggestedProducts format
+    products = rows.map((row: any) => {
+      // Determine category color for gradient
+      const categoryLower = (row.category || row.ki_category || '').toLowerCase();
+      let categoryColor = 'from-blue-500 to-cyan-500';
+      if (categoryLower.includes('hearing') || categoryLower.includes('thính')) {
+        categoryColor = 'from-cyan-500 to-blue-600';
+      } else if (categoryLower.includes('vision') || categoryLower.includes('thị')) {
+        categoryColor = 'from-purple-500 to-pink-500';
+      } else if (categoryLower.includes('mobility') || categoryLower.includes('vận')) {
+        categoryColor = 'from-emerald-500 to-teal-500';
+      } else if (categoryLower.includes('cognitive') || categoryLower.includes('nhận')) {
+        categoryColor = 'from-amber-500 to-orange-500';
+      }
+      
+      return {
+        id: row.id || row.product_id,
+        title: row.title,
+        title_en: row.title_en || row.title,
+        description: row.description || '',
+        category: row.category || row.ki_category || 'general',
+        brand: row.brand || 'MADA Qatar AT Portal',
+        price_range: row.price_range || 'Liên hệ MADA Center',
+        product_url: row.product_url || row.source_url || '',
+        source_url: row.source_url || '',
+        image_url: toProxyImageUrl(row.image_url || ''),
+        confidence: row.confidence || 0.7,
+        mada_advice: row.mada_advice || '',
+        warranty: row.warranty || '',
+        features: (() => {
+          try {
+            // Check if already an array, try to parse if string
+            if (Array.isArray(row.features)) return row.features;
+            if (typeof row.features === 'string') return JSON.parse(row.features);
+            return [];
+          } catch {
+            return [];
+          }
+        })(),
+        categoryColor, // For UI gradient
+      };
+    });
+    
+    // Filter out invalid products
+    products = products.filter((p: any) => {
+      const hasTitle = p.title && p.title.length > 2;
+      const hasUrl = p.product_url && p.product_url.startsWith('http');
+      return hasTitle && hasUrl;
+    });
+    
+    console.log(`📦 [ProductRequest] Returning ${products.length} valid products`);
+  } catch (err) {
+    console.error('❌ [ProductRequest] Error:', err);
+  }
+  
+  return products;
+}
 
 // Multi-language match reason
 const MATCH_REASON_I18N: Record<string, { found: string; category: (cat: string) => string }> = {
@@ -829,6 +944,43 @@ router.post('/', async (req, res) => {
       });
     }
     
+    // ⭐ Handle MADA_PRODUCT_REQUEST - Trả về sản phẩm theo category của bot
+    const isProductRequest = message.includes('[MADA_PRODUCT_REQUEST]');
+    if (isProductRequest) {
+      console.log(`📦 [MADA_PRODUCT_REQUEST] Detected in non-stream! agentId: ${agentId}`);
+      
+      // Get category from agent mapping
+      const madaMapping = agentId ? AGENT_TO_MADA[agentId] : null;
+      const madaCategory = madaMapping?.madaCategory || null;
+      
+      // Fetch products
+      const products = await getProductsByCategory(madaCategory, effectiveLanguage, 6);
+      
+      // Get response template
+      const responseText = PRODUCT_REQUEST_RESPONSES[effectiveLanguage] || PRODUCT_REQUEST_RESPONSES.vi;
+      
+      // Store conversation
+      const productConvId = conversationId || uuidv4();
+      if (!chatHistory.has(productConvId)) {
+        chatHistory.set(productConvId, []);
+      }
+      chatHistory.get(productConvId)!.push({ role: 'user', content: message });
+      chatHistory.get(productConvId)!.push({ role: 'assistant', content: responseText });
+      
+      return res.json({
+        success: true,
+        data: {
+          answer: responseText,
+          confidence: 0.9,
+          sources: [],
+          contextUsed: false,
+          conversationId: productConvId,
+          detectedLanguage: effectiveLanguage,
+          suggestedProducts: products,
+        },
+      });
+    }
+    
     // Store in history
     const convId = conversationId || uuidv4();
     if (!chatHistory.has(convId)) {
@@ -1171,6 +1323,48 @@ router.post('/stream', async (req: any, res: any) => {
     const guardrailsResult = guardrails.analyzeQuery(message, effectiveLanguage);
     if (guardrailsResult.shouldRedirect) {
       sendEvent({ type: 'done', answer: guardrailsResult.redirectResponse, sources: [] });
+      return res.end();
+    }
+    
+    // ⭐ Handle MADA_PRODUCT_REQUEST - Trả về sản phẩm theo category của bot
+    const isProductRequest = message.includes('[MADA_PRODUCT_REQUEST]');
+    if (isProductRequest) {
+      // Get agent mapping for category
+      const madaMapping = agentId ? AGENT_TO_MADA[agentId] : null;
+      const madaCategory = madaMapping?.madaCategory || null;
+      
+      console.log(`📦 [MADA_PRODUCT_REQUEST] Detected! agentId: ${agentId}, madaCategory: ${madaCategory || 'all'}`);
+      
+      // Fetch products
+      const products = await getProductsByCategory(madaCategory, effectiveLanguage, 6);
+      
+      // Get response template
+      const responseText = PRODUCT_REQUEST_RESPONSES[effectiveLanguage] || PRODUCT_REQUEST_RESPONSES.vi;
+      
+      // Store conversation first
+      const productConvId = conversationId || uuidv4();
+      if (!chatHistory.has(productConvId)) {
+        chatHistory.set(productConvId, []);
+      }
+      chatHistory.get(productConvId)!.push({ role: 'user', content: message });
+      
+      // Send response
+      sendEvent({ type: 'chunk', chunk: responseText });
+      
+      // Send products
+      if (products.length > 0) {
+        sendEvent({ type: 'suggestedProducts', suggestedProducts: products });
+      }
+      
+      // Complete
+      sendEvent({
+        type: 'done',
+        conversationId: productConvId,
+        confidence: 0.9,
+      });
+      
+      chatHistory.get(productConvId)!.push({ role: 'assistant', content: responseText });
+      
       return res.end();
     }
     
@@ -1724,13 +1918,35 @@ router.post('/evaluate', async (req, res) => {
 // POST /api/chat/products — Get products on-demand
 router.post('/products', async (req, res) => {
   try {
-    const { message, language = 'vi' } = req.body;
+    const { message, language = 'vi', agentId } = req.body;
+    
+    const effectiveLanguage = ['vi', 'en', 'ar', 'fr'].includes(language) ? language : 'vi';
+    
+    // ⭐ Handle MADA_PRODUCT_REQUEST
+    const isProductRequest = message?.includes('[MADA_PRODUCT_REQUEST]');
+    if (isProductRequest) {
+      console.log(`📦 [Products API] MADA_PRODUCT_REQUEST detected! agentId: ${agentId}`);
+      
+      // Get category from agent mapping
+      const madaMapping = agentId ? AGENT_TO_MADA[agentId] : null;
+      const madaCategory = madaMapping?.madaCategory || null;
+      
+      // Fetch products
+      const products = await getProductsByCategory(madaCategory, effectiveLanguage, 6);
+      
+      return res.json({
+        success: true,
+        data: {
+          products,
+          count: products.length,
+          reason: 'product_request',
+        },
+      });
+    }
     
     if (!message) {
       return res.status(400).json({ success: false, error: 'Message is required' });
     }
-    
-    const effectiveLanguage = ['vi', 'en', 'ar', 'fr'].includes(language) ? language : 'vi';
     
     // Check if message is asking for products
     if (!shouldShowProducts(message)) {
@@ -1942,7 +2158,7 @@ router.post('/consultation/direct', async (req, res) => {
  */
 router.post('/feedback', async (req, res) => {
   try {
-    const { message_id, rating, reason, session_id, agent_id } = req.body;
+    const { message_id, rating, reason, session_id, agent_id, selectedReasons, details, saveToDashboard } = req.body;
     
     if (!message_id || !rating) {
       return res.status(400).json({ 
@@ -1964,6 +2180,17 @@ router.post('/feedback', async (req, res) => {
     const authResult = token ? verifyAccessToken(token) as any : null;
     const userId = authResult?.id || null;
     
+    // Build reason from selectedReasons + details
+    let fullReason = reason || '';
+    if (selectedReasons && Array.isArray(selectedReasons) && selectedReasons.length > 0) {
+      fullReason = selectedReasons.join(' | ');
+      if (details && details.trim()) {
+        fullReason += `\n\nChi tiết: ${details.trim()}`;
+      }
+    } else if (details && details.trim() && !fullReason) {
+      fullReason = details.trim();
+    }
+    
     // Save feedback
     const id = `feedback-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const now = new Date().toISOString();
@@ -1977,17 +2204,189 @@ router.post('/feedback', async (req, res) => {
       session_id || null,
       userId,
       rating,
-      reason || null,
+      fullReason || null,
       agent_id || null,
       req.body.language || 'vi',
       now
     );
     
-    logActivity('info', `Message feedback: ${rating}${reason ? ` - ${reason.slice(0, 50)}` : ''}`, 'User');
+    logActivity('info', `Message feedback: ${rating}${fullReason ? ` - ${fullReason.slice(0, 100)}` : ''}`, 'User');
     
-    res.json({ success: true, data: { id, rating, reason } });
+    res.json({ success: true, data: { id, rating, reason: fullReason } });
   } catch (error) {
     console.error('❌ Feedback error:', error);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+});
+
+/**
+ * GET /api/feedback/questions - Get feedback questions for the dislike form
+ */
+router.get('/feedback/questions', async (_req, res) => {
+  try {
+    const questions = db.prepare(`
+      SELECT 
+        id,
+        question_key as id,
+        text_vi,
+        text_en,
+        text_ar,
+        text_fr,
+        icon,
+        is_active as isActive,
+        sort_order as sortOrder
+      FROM feedback_questions
+      WHERE is_active = 1
+      ORDER BY sort_order ASC
+    `).all();
+    
+    res.json({ success: true, data: questions });
+  } catch (error) {
+    console.error('❌ Get feedback questions error:', error);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+});
+
+/**
+ * GET /api/feedback/all-questions - Get all feedback questions (including inactive) for admin
+ */
+router.get('/feedback/all-questions', requireAdmin, async (_req, res) => {
+  try {
+    const questions = db.prepare(`
+      SELECT 
+        id,
+        question_key as id,
+        text_vi,
+        text_en,
+        text_ar,
+        text_fr,
+        icon,
+        is_active as isActive,
+        sort_order as sortOrder,
+        created_at as createdAt,
+        updated_at as updatedAt
+      FROM feedback_questions
+      ORDER BY sort_order ASC
+    `).all();
+    
+    res.json({ success: true, data: questions });
+  } catch (error) {
+    console.error('❌ Get all feedback questions error:', error);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+});
+
+/**
+ * POST /api/feedback/questions - Create a new feedback question
+ */
+router.post('/feedback/questions', requireAdmin, async (req, res) => {
+  try {
+    const { text_vi, text_en, text_ar, text_fr, icon, sort_order } = req.body;
+    
+    if (!text_vi) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'text_vi is required' 
+      });
+    }
+    
+    const id = `fq-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const questionKey = text_vi.toLowerCase().replace(/[^a-z0-9]+/g, '_').slice(0, 50);
+    const now = new Date().toISOString();
+    
+    db.prepare(`
+      INSERT INTO feedback_questions (id, question_key, text_vi, text_en, text_ar, text_fr, icon, is_active, sort_order, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)
+    `).run(
+      id,
+      questionKey,
+      text_vi,
+      text_en || '',
+      text_ar || '',
+      text_fr || '',
+      icon || 'alert-circle',
+      sort_order || 99,
+      now,
+      now
+    );
+    
+    logActivity('info', `Created feedback question: ${text_vi.slice(0, 50)}`, 'Admin');
+    
+    res.json({ success: true, data: { id, question_key: questionKey } });
+  } catch (error) {
+    console.error('❌ Create feedback question error:', error);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+});
+
+/**
+ * PUT /api/feedback/questions/:id - Update a feedback question
+ */
+router.put('/feedback/questions/:id', requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { text_vi, text_en, text_ar, text_fr, icon, is_active, sort_order } = req.body;
+    
+    // Check if question exists
+    const existing = db.prepare('SELECT id FROM feedback_questions WHERE id = ?').get(id);
+    if (!existing) {
+      return res.status(404).json({ success: false, error: 'Question not found' });
+    }
+    
+    const now = new Date().toISOString();
+    
+    db.prepare(`
+      UPDATE feedback_questions 
+      SET text_vi = COALESCE(?, text_vi),
+          text_en = COALESCE(?, text_en),
+          text_ar = COALESCE(?, text_ar),
+          text_fr = COALESCE(?, text_fr),
+          icon = COALESCE(?, icon),
+          is_active = COALESCE(?, is_active),
+          sort_order = COALESCE(?, sort_order),
+          updated_at = ?
+      WHERE id = ?
+    `).run(
+      text_vi,
+      text_en,
+      text_ar,
+      text_fr,
+      icon,
+      is_active !== undefined ? (is_active ? 1 : 0) : null,
+      sort_order,
+      now,
+      id
+    );
+    
+    logActivity('info', `Updated feedback question: ${id}`, 'Admin');
+    
+    res.json({ success: true, data: { id } });
+  } catch (error) {
+    console.error('❌ Update feedback question error:', error);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+});
+
+/**
+ * DELETE /api/feedback/questions/:id - Delete a feedback question
+ */
+router.delete('/feedback/questions/:id', requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Check if question exists
+    const existing = db.prepare('SELECT id, text_vi FROM feedback_questions WHERE id = ?').get(id) as any;
+    if (!existing) {
+      return res.status(404).json({ success: false, error: 'Question not found' });
+    }
+    
+    db.prepare('DELETE FROM feedback_questions WHERE id = ?').run(id);
+    
+    logActivity('info', `Deleted feedback question: ${existing.text_vi}`, 'Admin');
+    
+    res.json({ success: true });
+  } catch (error) {
+    console.error('❌ Delete feedback question error:', error);
     res.status(500).json({ success: false, error: 'Internal server error' });
   }
 });

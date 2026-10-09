@@ -28,6 +28,7 @@ const tL = (key: string): string => {
       'admin.layout.navPermissions': 'Phân quyền',
       'admin.layout.navSupport': 'Hỗ trợ',
       'admin.layout.navNotifications': 'Thông báo',
+      'admin.layout.navFeedbackQuestions': 'Câu hỏi phản hồi',
       // Notifications page
       'notifications.title': 'Thông báo',
       'notifications.subtitle': 'Quản lý thông báo hệ thống',
@@ -93,6 +94,7 @@ const tL = (key: string): string => {
       'admin.layout.navPermissions': 'Permissions',
       'admin.layout.navSupport': 'Support',
       'admin.layout.navNotifications': 'Notifications',
+      'admin.layout.navFeedbackQuestions': 'Feedback Questions',
       // Notifications page
       'notifications.title': 'Notifications',
       'notifications.subtitle': 'System notifications management',
@@ -158,6 +160,7 @@ const tL = (key: string): string => {
       'admin.layout.navPermissions': 'الصلاحيات',
       'admin.layout.navSupport': 'الدعم',
       'admin.layout.navNotifications': 'الإشعارات',
+      'admin.layout.navFeedbackQuestions': 'أسئلة التعليقات',
       // Notifications page
       'notifications.title': 'الإشعارات',
       'notifications.subtitle': 'إدارة إشعارات النظام',
@@ -223,6 +226,7 @@ const tL = (key: string): string => {
       'admin.layout.navPermissions': 'Permissions',
       'admin.layout.navSupport': 'Support',
       'admin.layout.navNotifications': 'Notifications',
+      'admin.layout.navFeedbackQuestions': 'Questions de feedback',
       // Notifications page
       'notifications.title': 'Notifications',
       'notifications.subtitle': 'Gestion des notifications système',
@@ -293,6 +297,7 @@ const NAV_ITEMS: NavItem[] = [
   { labelKey: 'admin.layout.navSystemPrompts', href: '/admin/prompts', icon: 'edit_note' },
   { labelKey: 'admin.layout.navConsultations', href: '/admin/consultations', icon: 'support_agent' },
   { labelKey: 'admin.layout.navNotifications', href: '/admin/notifications', icon: 'notifications' },
+  { labelKey: 'admin.layout.navFeedbackQuestions', href: '/admin/feedback-questions', icon: 'thumb_down' },
   { labelKey: 'admin.layout.navFileUpload', href: '/admin/file-management', icon: 'upload_file', superAdminOnly: true },
   { labelKey: 'admin.layout.navSettings', href: '/admin/settings', icon: 'settings_suggest', superAdminOnly: true },
   { labelKey: 'admin.layout.navPermissions', href: '/admin/permissions', icon: 'admin_panel_settings', superAdminOnly: true },

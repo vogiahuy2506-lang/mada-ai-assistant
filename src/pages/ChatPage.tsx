@@ -2775,8 +2775,28 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
         {/* All Scrollable Content */}
         <div className="flex-1 min-h-0 overflow-y-auto">
           
-          {/* ⭐ Category Navigation */}
-          <nav className="space-y-1 px-3 pb-3">
+          {/* ⭐ Collapsible Bot Section Header */}
+          <div 
+            className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-surface-container-low transition-colors border-b border-slate-100"
+            onClick={() => setIsBotsCollapsed(!isBotsCollapsed)}
+          >
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-primary text-lg">smart_toy</span>
+              <span className="text-sm font-bold text-on-surface">
+                {language === 'vi' ? '7 Chuyên Gia AT' : language === 'en' ? '7 AT Specialists' : language === 'ar' ? '7 متخصصين AT' : '7 Spécialistes AT'}
+              </span>
+            </div>
+            <span className={clsx(
+              'material-symbols-outlined text-on-surface-variant transition-transform duration-200',
+              isBotsCollapsed ? 'rotate-90' : '-rotate-90'
+            )}>
+              expand_more
+            </span>
+          </div>
+
+          {/* ⭐ Category Navigation - Collapsible */}
+          {!isBotsCollapsed && (
+            <nav className="space-y-1 px-3 py-2">
               {sortedCategories.map((category) => {
                 const isActive = activeCategory === category;
                 const label = CATEGORY_LABELS[category];
@@ -2858,6 +2878,7 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
               );
             })}
             </nav>
+          )}
 
           {/* Sample Questions - Hiển thị khi có category được chọn (CỐ ĐỊNH theo 7 bot) */}
           {activeCategory && SAMPLE_QUESTIONS[activeCategory]?.[viewMode]?.[language]?.length > 0 && (

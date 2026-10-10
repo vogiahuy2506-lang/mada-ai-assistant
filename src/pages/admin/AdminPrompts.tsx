@@ -4,6 +4,7 @@ import { getAccessToken } from '@/lib/api';
 import { useLanguageStore } from '@/stores';
 import { broadcastAgentChange, broadcastQuestionsChange } from '@/lib/agentBroadcast';
 import { MADA_BOTS } from '@/lib/madaBots';
+import { Toast, ToastType } from '@/components/ui/Toast';
 import clsx from 'clsx';
 import {
   Bot, Plus, Trash2,
@@ -503,6 +504,9 @@ export function AdminPrompts() {
   const [filterTab, setFilterTab] = useState<'all' | 'running' | 'training'>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Toast notification state
+  const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
+
   // Form state
   const [formData, setFormData] = useState({
     name: '',
@@ -564,13 +568,44 @@ export function AdminPrompts() {
 
   const saveAgentOrder = async (reorderedAgents: Agent[]) => {
     const token = getAccessToken();
-    if (!token) return;
+    if (!token) {
+      const errorMsg = language === 'vi' ? 'Vui lòng đăng nhập lại!' : 
+                      language === 'ar' ? 'الرجاء تسجيل الدخول مرة أخرى!' :
+                      language === 'fr' ? 'Veuillez vous reconnecter!' : 'Please login again!';
+      setToast({ message: errorMsg, type: 'error' });
+      return;
+    }
+    
+    // Validate agents array
+    if (!Array.isArray(reorderedAgents) || reorderedAgents.length === 0) {
+      console.error('[saveAgentOrder] Invalid agents array:', reorderedAgents);
+      const errorMsg = language === 'vi' ? 'Dữ liệu không hợp lệ!' : 
+                      language === 'ar' ? 'بيانات غير صالحة!' :
+                      language === 'fr' ? 'Données invalides!' : 'Invalid data!';
+      setToast({ message: errorMsg, type: 'error' });
+      return;
+    }
+    
+    // Validate each agent has id
+    const invalidAgent = reorderedAgents.find(a => !a.id);
+    if (invalidAgent) {
+      console.error('[saveAgentOrder] Agent without id:', invalidAgent);
+      const errorMsg = language === 'vi' ? 'Có agent không hợp lệ!' : 
+                      language === 'ar' ? 'هناك وكيل غير صالح!' :
+                      language === 'fr' ? 'Agent invalide!' : 'Invalid agent!';
+      setToast({ message: errorMsg, type: 'error' });
+      return;
+    }
+    
     try {
       const updates = reorderedAgents.map((agent, index) => ({
         id: agent.id,
         sort_order: index + 1,
       }));
-      await fetch('/api/admin/agents/reorder', {
+      
+      console.log('[saveAgentOrder] Sending reorder request:', JSON.stringify({ agents: updates }));
+      
+      const res = await fetch('/api/admin/agents/reorder', {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -578,12 +613,55 @@ export function AdminPrompts() {
         },
         body: JSON.stringify({ agents: updates }),
       });
-      broadcastAgentChange({
-        type: 'agent-reordered',
-        agentIds: reorderedAgents.map(a => a.id),
-      });
+      
+      console.log('[saveAgentOrder] Response status:', res.status);
+      
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error('[saveAgentOrder] API error:', res.status, errorText);
+        
+        const errorMsg = language === 'vi' ? `Lỗi ${res.status}: Không thể sắp xếp lại thứ tự!` : 
+                        language === 'ar' ? `خطأ ${res.status}: لا يمكن إعادة الترتيب!` :
+                        language === 'fr' ? `Erreur ${res.status}: Impossible de réorganiser!` : `Error ${res.status}: Could not reorder!`;
+        setToast({ message: errorMsg, type: 'error' });
+        return;
+      }
+      
+      const data = await res.json();
+      console.log('[saveAgentOrder] Response:', data);
+      
+      if (data.success) {
+        // Update agents in local state with new sort_order
+        const updatedAgents = reorderedAgents.map((agent, index) => ({
+          ...agent,
+          sort_order: index + 1,
+        }));
+        setAgents(updatedAgents);
+        
+        // Broadcast to ChatPage
+        broadcastAgentChange({
+          type: 'agent-reordered',
+          agentIds: reorderedAgents.map(a => a.id),
+        });
+        
+        // Show success toast
+        const successMsg = language === 'vi' ? 'Đã sắp xếp lại thứ tự!' : 
+                          language === 'ar' ? 'تمت إعادة الترتيب!' :
+                          language === 'fr' ? 'Réorganisé!' : 'Reordered!';
+        setToast({ message: successMsg, type: 'success' });
+      } else {
+        console.error('[saveAgentOrder] API returned success: false:', data.error);
+        const errorMsg = language === 'vi' ? `Lỗi: ${data.error || 'Không thể sắp xếp lại!'}` : 
+                        language === 'ar' ? `خطأ: ${data.error || 'لا يمكن إعادة الترتيب!'}` :
+                        language === 'fr' ? `Erreur: ${data.error || 'Impossible de réorganiser!'}` : `Error: ${data.error || 'Could not reorder!'}`;
+        setToast({ message: errorMsg, type: 'error' });
+      }
     } catch (err) {
       console.error('Failed to save agent order:', err);
+      const errorMsg = language === 'vi' ? 'Lỗi kết nối! Không thể sắp xếp lại.' : 
+                      language === 'ar' ? 'خطأ في الاتصال! لا يمكن إعادة الترتيب.' :
+                      language === 'fr' ? 'Erreur de connexion! Impossible de réorganiser.' : 'Connection error! Could not reorder.';
+      setToast({ message: errorMsg, type: 'error' });
     }
   };
 
@@ -676,18 +754,15 @@ export function AdminPrompts() {
     setLoading(true);
     setError('');
     try {
-      const token = getAccessToken();
-      if (!token) {
-        setError('Vui lòng đăng nhập');
-        setLoading(false);
-        return;
-      }
       const res = await adminApi.getAgents();
       if (res.success && res.data) {
         setAgents(res.data);
         if (res.data.length > 0 && !selectedAgent) {
           selectAgent(res.data[0]);
         }
+      } else {
+        const errMsg = res && 'error' in res ? (res as any).error : t('error');
+        setError(errMsg);
       }
     } catch (err) {
       console.error('Failed to fetch agents:', err);
@@ -771,11 +846,26 @@ export function AdminPrompts() {
           setAgents(prev => prev.map(a =>
             a.id === selectedAgent.id ? { ...a, ...formData } : a
           ));
+          // Show success toast
+          const savedMsg = language === 'vi' ? 'Đã lưu thành công!' : 
+                          language === 'ar' ? 'تم الحفظ بنجاح!' :
+                          language === 'fr' ? 'Enregistré avec succès!' : 'Saved successfully!';
+          setToast({ message: savedMsg, type: 'success' });
         } else {
           setError(data.error || t('error'));
+          // Show error toast
+          const errorMsg = language === 'vi' ? 'Lưu thất bại!' : 
+                          language === 'ar' ? 'فشل الحفظ!' :
+                          language === 'fr' ? 'Échec de l\'enregistrement!' : 'Save failed!';
+          setToast({ message: errorMsg, type: 'error' });
         }
       } else {
         setError(`Lỗi ${res.status}`);
+        // Show error toast
+        const errorMsg = language === 'vi' ? `Lỗi ${res.status}: Không thể lưu!` : 
+                        language === 'ar' ? `خطأ ${res.status}: لا يمكن الحفظ!` :
+                        language === 'fr' ? `Erreur ${res.status}: Impossible d'enregistrer!` : `Error ${res.status}: Could not save!`;
+        setToast({ message: errorMsg, type: 'error' });
       }
     } catch (err) {
       console.error('Failed to save agent:', err);
@@ -810,16 +900,27 @@ export function AdminPrompts() {
           setNewQuestion('');
           // Broadcast to ChatPage to refresh questions
           broadcastQuestionsChange(selectedAgent.id, (selectedAgent as any).mada_category || 'general');
+          // Show success toast
+          const successMsg = language === 'vi' ? 'Đã thêm câu hỏi!' : 
+                            language === 'ar' ? 'تمت إضافة السؤال!' :
+                            language === 'fr' ? 'Question ajoutée!' : 'Question added!';
+          setToast({ message: successMsg, type: 'success' });
         }
       } else {
         // Log error for debugging
         const errorData = await res.json();
         console.error('Failed to add question:', errorData);
-        alert(`Lỗi: ${errorData.error || 'Không thể thêm câu hỏi'}`);
+        const errorMsg = language === 'vi' ? 'Không thể thêm câu hỏi' : 
+                        language === 'ar' ? 'لا يمكن إضافة السؤال!' :
+                        language === 'fr' ? 'Impossible d\'ajouter la question!' : 'Could not add question!';
+        setToast({ message: errorMsg, type: 'error' });
       }
     } catch (err) {
       console.error('Failed to add question:', err);
-      alert('Lỗi kết nối. Vui lòng thử lại.');
+      const errorMsg = language === 'vi' ? 'Lỗi kết nối!' : 
+                      language === 'ar' ? 'خطأ في الاتصال!' :
+                      language === 'fr' ? 'Erreur de connexion!' : 'Connection error!';
+      setToast({ message: errorMsg, type: 'error' });
     }
   };
 
@@ -836,9 +937,23 @@ export function AdminPrompts() {
         if (selectedAgent) {
           broadcastQuestionsChange(selectedAgent.id, (selectedAgent as any).mada_category || 'general');
         }
+        // Show success toast
+        const successMsg = language === 'vi' ? 'Đã xóa câu hỏi!' : 
+                          language === 'ar' ? 'تم حذف السؤال!' :
+                          language === 'fr' ? 'Question supprimée!' : 'Question deleted!';
+        setToast({ message: successMsg, type: 'success' });
+      } else {
+        const errorMsg = language === 'vi' ? 'Không thể xóa câu hỏi' : 
+                        language === 'ar' ? 'لا يمكن حذف السؤال!' :
+                        language === 'fr' ? 'Impossible de supprimer la question!' : 'Could not delete question!';
+        setToast({ message: errorMsg, type: 'error' });
       }
     } catch (err) {
       console.error('Failed to delete question:', err);
+      const errorMsg = language === 'vi' ? 'Lỗi kết nối!' : 
+                      language === 'ar' ? 'خطأ في الاتصال!' :
+                      language === 'fr' ? 'Erreur de connexion!' : 'Connection error!';
+      setToast({ message: errorMsg, type: 'error' });
     }
   };
 
@@ -1003,12 +1118,27 @@ export function AdminPrompts() {
           setFormData(prev => ({ ...prev, is_active: true }));
           setAgents(prev => prev.map(a => a.id === selectedAgent.id ? { ...a, ...formData, is_active: true } : a));
           setShowPublishConfirm(false);
+          // Show success toast
+          const publishMsg = language === 'vi' ? 'Đã xuất bản thành công!' : 
+                            language === 'ar' ? 'تم النشر بنجاح!' :
+                            language === 'fr' ? 'Publié avec succès!' : 'Published successfully!';
+          setToast({ message: publishMsg, type: 'success' });
         }
       } else {
         setError(`Lỗi ${res.status}`);
+        // Show error toast
+        const errorMsg = language === 'vi' ? `Lỗi ${res.status}: Không thể xuất bản!` : 
+                        language === 'ar' ? `خطأ ${res.status}: لا يمكن النشر!` :
+                        language === 'fr' ? `Erreur ${res.status}: Impossible de publier!` : `Error ${res.status}: Could not publish!`;
+        setToast({ message: errorMsg, type: 'error' });
       }
     } catch {
       setError(t('publishFailed'));
+      // Show error toast
+      const errorMsg = language === 'vi' ? 'Xuất bản thất bại!' : 
+                      language === 'ar' ? 'فشل النشر!' :
+                      language === 'fr' ? 'Échec de la publication!' : 'Publish failed!';
+      setToast({ message: errorMsg, type: 'error' });
     } finally {
       setPublishLoading(false);
     }
@@ -2152,6 +2282,15 @@ export function AdminPrompts() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* ===== TOAST NOTIFICATION ===== */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
       )}
     </div>
   );

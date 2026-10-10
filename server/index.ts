@@ -4947,7 +4947,8 @@ app.post('/api/kb/scrape-with-suggest', async (req, res) => {
 });
 
 // Serve frontend static files (production)
-const clientDistPath = path.join(__dirname, 'client');
+// Frontend is built to dist/client, not server/client
+const clientDistPath = path.join(__dirname, '..', 'dist', 'client');
 const assetsPath = path.join(clientDistPath, 'assets');
 if (fs.existsSync(clientDistPath)) {
   console.log(`📁 Static files root: ${clientDistPath}`);

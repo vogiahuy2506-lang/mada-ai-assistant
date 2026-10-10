@@ -295,30 +295,20 @@ export const adminApi = {
 
   // ============== AGENTS ==============
   async getAgents() {
-    return request<Array<{
-      id: string;
-      name: string;
-      description: string;
-      avatar: string;
-      system_prompt: string;
-      capabilities: string[];
-      is_active: number;
-      isActive: boolean;
-      created_by: string;
-      mada_category: string | null;
-      bot_id: string | null;
-      avatar_url: string | null;
-      knowledge_url: string | null;
-      product_url: string | null;
-      prompt_id: string | null;
-      promptId: string | null;
-      last_crawl_at: string | null;
-      last_crawl_status: string | null;
-      last_crawl_count: number;
-      sort_order: number;
-      created_at: string;
-      updated_at: string;
-    }>>('/admin/agents');
+    // NOTE: GET /admin/agents does NOT require authentication on the server side.
+    // We bypass token validation so expired tokens don't block reading the agent list.
+    try {
+      const res = await fetchWithTimeout('/api/admin/agents', {
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) return { success: false, data: [] as any[], error: json.error || res.statusText };
+      return { success: true, data: json.data || json as any[], error: undefined };
+    } catch (err: any) {
+      if (err?.name === 'AbortError') return { success: false, data: [] as any[], error: 'Request timed out' };
+      if (err?.message === 'Failed to fetch' || err instanceof TypeError) return { success: false, data: [] as any[], error: 'Network error' };
+      return { success: false, data: [] as any[], error: err?.message || 'Unknown error' };
+    }
   },
   async createAgent(data: any) {
     return request<any>('/admin/agents', { method: 'POST', body: JSON.stringify(data) });

@@ -25,6 +25,7 @@ import { userHistoryApi, fileQuotaApi, getAccessToken, type FileUploadQuota } fr
 import { getImageUrl } from '@/lib/imageProxy';
 import { onAgentChange } from '@/lib/agentBroadcast';
 import { onSettingsChange } from '@/lib/settingsBroadcast';
+import { MADA_BOTS } from '@/lib/madaBots';
 
 // Attachment options - use getAttachmentOptions(language) inside component
 function getAttachmentOptions(lang: Language) {
@@ -48,6 +49,18 @@ function getAttachmentOptions(lang: Language) {
 // Sample questions translated by language - Sử dụng SAMPLE_QUESTIONS từ types
 function getSampleQuestionsByLang(category: ATCategory, lang: Language): string[] {
   return SAMPLE_QUESTIONS[category]?.end_user?.[lang] || SAMPLE_QUESTIONS[category]?.end_user?.vi || [];
+}
+
+// Helper function to get agent display name based on language
+// If the agent matches a MADA bot, use nameVi for Vietnamese, nameEn for English, etc.
+function getAgentDisplayName(agentId: string, agentName: string, lang: Language): string {
+  const madaBot = MADA_BOTS.find(b => b.id === agentId);
+  if (madaBot) {
+    if (lang === 'vi') return madaBot.nameVi;
+    // For en/ar/fr, use English name (no translation available)
+    return madaBot.name;
+  }
+  return agentName;
 }
 
 const LANGUAGES: { code: Language; name: string; flag: string }[] = [
@@ -1194,7 +1207,7 @@ export function ChatPage() {
       const caps = agent.capabilities?.length
         ? `[Chuyên môn: ${agent.capabilities.join(', ')}]`
         : '';
-      return `[BOT ${idx + 1}: ${agent.name}]${caps ? ' ' + caps : ''}
+      return `[BOT ${idx + 1}: ${getAgentDisplayName(agent.id, agent.name, language)}]${caps ? ' ' + caps : ''}
 Mô tả: ${agent.description || 'Chuyên gia hỗ trợ'}
 System Prompt: ${agent.systemPrompt || 'Bạn là một trợ lý hữu ích.'}`;
     });
@@ -2809,19 +2822,19 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
         {/* All Scrollable Content */}
         <div className="flex-1 min-h-0 overflow-y-auto">
           
-          {/* ⭐ Collapsible Bot Section Header */}
+          {/* ⭐ Collapsible Bot Section Header - Compact Pill Style */}
           <div 
-            className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-surface-container-low transition-colors border-b border-slate-100"
+            className="flex items-center justify-between mx-3 my-2 px-3 py-2 rounded-xl cursor-pointer bg-slate-100/80 hover:bg-slate-200/80 transition-all border border-slate-200/60 group"
             onClick={() => setIsBotsCollapsed(!isBotsCollapsed)}
           >
-            <div className="flex items-center gap-2">
-              <span className="material-symbols-outlined text-primary text-lg">smart_toy</span>
-              <span className="text-sm font-bold text-on-surface">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="material-symbols-outlined text-primary text-base flex-shrink-0 group-hover:scale-110 transition-transform">smart_toy</span>
+              <span className="text-xs font-bold text-slate-700 truncate">
                 {language === 'vi' ? '7 Chuyên Gia AT' : language === 'en' ? '7 AT Specialists' : language === 'ar' ? '7 متخصصين AT' : '7 Spécialistes AT'}
               </span>
             </div>
             <span className={clsx(
-              'material-symbols-outlined text-on-surface-variant transition-transform duration-200',
+              'material-symbols-outlined text-slate-400 text-sm flex-shrink-0 transition-transform duration-200',
               isBotsCollapsed ? 'rotate-90' : '-rotate-90'
             )}>
               expand_more
@@ -2830,7 +2843,7 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
 
           {/* ⭐ Category Navigation - Collapsible */}
           {!isBotsCollapsed && (
-            <nav className="space-y-1 px-3 py-2">
+            <nav className="space-y-0.5 px-2.5 py-1.5">
               {sortedCategories.map((category) => {
                 const isActive = activeCategory === category;
                 const label = CATEGORY_LABELS[category];
@@ -2881,29 +2894,29 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
                     }
                   }}
                   className={clsx(
-                    'w-full flex items-center gap-3 px-4 py-2.5 transition-colors rounded-xl group',
+                    'w-full flex items-center gap-2.5 px-2.5 py-2 transition-colors rounded-lg group',
                     isActive
                       ? colors.active
-                      : 'text-slate-500 hover:bg-surface-container-low hover:text-on-background'
+                      : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800'
                   )}>
                   <div className={clsx(
-                    'w-9 h-9 rounded-lg flex items-center justify-center transition-colors',
+                    'w-7 h-7 rounded-lg flex items-center justify-center transition-colors flex-shrink-0',
                     isActive ? 'bg-white/20' : colors.bg
                   )}>
                     <span className={clsx(
-                      'material-symbols-outlined text-lg',
+                      'material-symbols-outlined text-sm',
                       isActive ? 'text-white' : colors.icon
                     )}>
                       {CATEGORY_ICONS[category]}
                     </span>
                   </div>
                   <div className="flex-1 min-w-0 text-left">
-                    <p className="text-xs font-bold uppercase tracking-tight">
+                    <p className="text-[11px] font-bold uppercase tracking-tight leading-tight">
                       {language === 'vi' ? label.title : language === 'en' ? label.titleEn : language === 'ar' ? label.titleAr : label.titleFr}
                     </p>
                     <p className={clsx(
-                      'text-[10px] truncate',
-                      isActive ? 'text-white/70' : 'text-on-surface-variant'
+                      'text-[10px] truncate mt-0.5',
+                      isActive ? 'text-white/70' : 'text-slate-400'
                     )}>
                       {language === 'vi' ? label.desc : language === 'en' ? label.descEn : language === 'ar' ? label.descAr : label.descFr}
                     </p>
@@ -2925,29 +2938,29 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
               if (questions.length === 0) return null;
               
               return (
-                <div className="mt-4 pt-4 border-t border-slate-100 shrink-0">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-violet-600 px-4 mb-2 flex items-center gap-1">
-                    <span className="material-symbols-outlined text-sm">lightbulb</span>
+                <div className="mt-3 pt-3 border-t border-slate-100 shrink-0">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-violet-600 px-3 mb-1.5 flex items-center gap-1">
+                    <span className="material-symbols-outlined text-xs">lightbulb</span>
                     {t('chat.suggestedQuestions')}
                     {customQ?.length > 0 && (
                       <span className="ml-1 px-1.5 py-0.5 bg-violet-100 text-violet-600 text-[9px] rounded-full">Admin</span>
                     )}
                   </p>
-                  <div className="space-y-1 px-2">
+                  <div className="space-y-0.5 px-2 pb-1">
                     {questions.slice(0, 4).map((question, idx) => (
                       <button
                         key={idx}
                         onClick={() => handleSelectSampleQuestion(question)}
                         className={clsx(
-                          'w-full flex items-start gap-2 px-3 py-2 rounded-lg text-left',
-                          'text-xs text-slate-600 hover:bg-violet-50 hover:text-violet-700',
-                          'transition-colors duration-200 group'
+                          'w-full flex items-start gap-2 px-2.5 py-1.5 rounded-lg text-left',
+                          'text-[11px] text-slate-600 hover:bg-violet-50 hover:text-violet-700',
+                          'transition-colors duration-150 group'
                         )}
                       >
-                        <span className="text-violet-400 group-hover:text-violet-500 mt-0.5 flex-shrink-0">
+                        <span className="text-violet-400 group-hover:text-violet-500 mt-0 flex-shrink-0 text-sm leading-none">
                           •
                         </span>
-                        <span className="line-clamp-2 leading-relaxed">{question}</span>
+                        <span className="line-clamp-2 leading-snug">{question}</span>
                       </button>
                     ))}
                     {questions.length > 4 && (
@@ -3060,7 +3073,7 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
                 </div>
                 <div className="flex-1 min-w-0 text-left">
                   <p className="text-sm font-bold uppercase tracking-tight">
-                    {agent.name}
+                    {getAgentDisplayName(agent.id, agent.name, language)}
                   </p>
                   <p className={clsx(
                     'text-xs truncate',
@@ -3074,17 +3087,17 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
           })}
 
           {/* Recent Chats Section - Scrollable với 7 con bot (chung scroll) */}
-          <div className="border-t border-slate-100 mt-2">
+          <div className="border-t border-slate-200/80 mt-2">
             <button 
               onClick={() => setIsHistoryCollapsed(!isHistoryCollapsed)}
-              className="flex items-center justify-between px-4 mb-2 mt-2 w-full hover:bg-slate-50 rounded-lg transition-colors cursor-pointer"
+              className="flex items-center justify-between mx-3 my-2 px-3 py-2 w-full hover:bg-slate-100/80 rounded-xl transition-all cursor-pointer"
             >
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                 {t('chat.recentHistory')}
               </span>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
                 {historyConversations.length > 0 && (
-                  <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">
+                  <span className="text-[9px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-full">
                     {historyConversations.length}
                   </span>
                 )}
@@ -3132,19 +3145,19 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
                       title={formatFullDateTime(conv.updatedAt)}
                       onClick={() => handleSelectConversation(conv.id)}
                       className={clsx(
-                        'w-full flex items-start gap-2.5 px-3 py-2 rounded-xl transition-colors text-left group',
+                        'w-full flex items-start gap-2 px-2.5 py-1.5 rounded-lg transition-colors text-left group',
                         conv.id === activeConversationId
                           ? 'bg-primary/10 text-primary'
                           : 'hover:bg-slate-50 text-slate-600'
                       )}
                     >
-                      <MessageSquare className={clsx('w-4 h-4 mt-0.5 flex-shrink-0', conv.id === activeConversationId ? 'text-primary' : 'text-slate-400 group-hover:text-slate-500')} />
+                      <MessageSquare className={clsx('w-3.5 h-3.5 mt-0.5 flex-shrink-0', conv.id === activeConversationId ? 'text-primary' : 'text-slate-400 group-hover:text-slate-500')} />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-1">
-                          <p className="text-xs font-semibold truncate">{conv.title}</p>
+                          <p className="text-[11px] font-semibold truncate">{conv.title}</p>
                         </div>
-                        <p className="text-[11px] text-slate-400 truncate mt-0.5">{conv.preview}</p>
-                        <p className="text-[10px] text-slate-300 mt-0.5 group-hover:hidden">{formatFullDateTime(conv.updatedAt)}</p>
+                        <p className="text-[10px] text-slate-400 truncate mt-0.5">{conv.preview}</p>
+                        <p className="text-[9px] text-slate-300 mt-0.5 group-hover:hidden">{formatFullDateTime(conv.updatedAt)}</p>
                       </div>
                     </button>
                   </div>

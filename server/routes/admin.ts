@@ -603,6 +603,45 @@ router.post('/agents', requireAdmin, (req: Request, res: Response) => {
   }
 });
 
+// PATCH /api/admin/agents/reorder — Batch update sort_order for all agents
+// NOTE: This route MUST come BEFORE /agents/:id to ensure "reorder" is not treated as an agent ID
+router.patch('/agents/reorder', requireAdmin, (req: Request, res: Response) => {
+  try {
+    const { agents } = req.body as { agents: { id: string; sort_order: number }[] };
+
+    if (!Array.isArray(agents) || agents.length === 0) {
+      return res.status(400).json({ success: false, error: 'agents array is required' });
+    }
+
+    const now = new Date().toISOString();
+    const updateStmt = db.prepare(`
+      UPDATE admin_agents SET sort_order = ?, updated_at = ? WHERE id = ?
+    `);
+
+    const updateMany = db.transaction((items: typeof agents) => {
+      for (const item of items) {
+        updateStmt.run(item.sort_order, now, item.id);
+      }
+    });
+
+    updateMany(agents);
+
+    // Log the reorder action
+    logSystemEvent(
+      'info', 'agents', 'Sắp xếp lại thứ tự Agent',
+      { agentIds: agents.map(a => a.id), newOrder: agents.map(a => a.sort_order) },
+      (req as any).user?.id,
+      req.ip,
+      req.headers['user-agent']
+    );
+
+    res.json({ success: true, message: 'Agents reordered successfully' });
+  } catch (error: any) {
+    console.error('[PATCH /admin/agents/reorder] error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // PATCH /api/admin/agents/:id
 router.patch('/agents/:id', requireAdmin, (req: Request, res: Response) => {
   try {
@@ -666,44 +705,6 @@ router.patch('/agents/:id', requireAdmin, (req: Request, res: Response) => {
       req.headers['user-agent']
     );
   } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// PATCH /api/admin/agents/reorder — Batch update sort_order for all agents
-router.patch('/agents/reorder', requireAdmin, (req: Request, res: Response) => {
-  try {
-    const { agents } = req.body as { agents: { id: string; sort_order: number }[] };
-
-    if (!Array.isArray(agents) || agents.length === 0) {
-      return res.status(400).json({ success: false, error: 'agents array is required' });
-    }
-
-    const now = new Date().toISOString();
-    const updateStmt = db.prepare(`
-      UPDATE admin_agents SET sort_order = ?, updated_at = ? WHERE id = ?
-    `);
-
-    const updateMany = db.transaction((items: typeof agents) => {
-      for (const item of items) {
-        updateStmt.run(item.sort_order, now, item.id);
-      }
-    });
-
-    updateMany(agents);
-
-    // Log the reorder action
-    logSystemEvent(
-      'info', 'agents', 'Sắp xếp lại thứ tự Agent',
-      { agentIds: agents.map(a => a.id), newOrder: agents.map(a => a.sort_order) },
-      (req as any).user?.id,
-      req.ip,
-      req.headers['user-agent']
-    );
-
-    res.json({ success: true, message: 'Agents reordered successfully' });
-  } catch (error: any) {
-    console.error('[PATCH /admin/agents/reorder] error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });

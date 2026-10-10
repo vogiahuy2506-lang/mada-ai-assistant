@@ -703,8 +703,8 @@ export function AdminAgents() {
       setError(null);
       console.log('[AdminAgents] Fetching agents from /api/admin/agents...');
       const res = await adminApi.getAgents();
-      console.log('[AdminAgents] Agents response:', res.success ? `${res.data?.length} agents` : res.error);
-      if (res.success && res.data) {
+      console.log('[AdminAgents] Agents response:', res.success ? `${res.data.length} agents` : res.error);
+      if (res.success) {
         setAgents(res.data as unknown as Agent[]);
       } else {
         setError(res.error || 'Failed to load agents');

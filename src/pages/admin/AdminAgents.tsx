@@ -2661,7 +2661,7 @@ export function AdminAgents() {
                         />
                         <span className="text-2xl">{bot.avatar}</span>
                         <div className="flex-1 min-w-0">
-                          <div className="font-bold text-sm text-on-surface truncate">{bot.name}</div>
+                          <div className="font-bold text-sm text-on-surface truncate">{language === 'vi' ? bot.nameVi : bot.name}</div>
                         </div>
                         {exists && (
                           <span className="absolute -top-1 -right-1 text-[10px] font-bold bg-slate-200 text-slate-500 px-2 py-0.5 rounded">
@@ -2743,9 +2743,9 @@ export function AdminAgents() {
 
                                 {/* Bot Info */}
                                 <div className="flex-1 min-w-0">
-                                  <h4 className="font-bold text-base text-slate-800 truncate mb-1">{bot.name}</h4>
+                                  <h4 className="font-bold text-base text-slate-800 truncate mb-1">{language === 'vi' ? bot.nameVi : bot.name}</h4>
                                   <p className="text-sm text-slate-500 line-clamp-2 leading-relaxed">
-                                    {bot.description || 'Không có mô tả'}
+                                    {language === 'vi' ? bot.descriptionVi : bot.description || 'Không có mô tả'}
                                   </p>
                                 </div>
                               </div>

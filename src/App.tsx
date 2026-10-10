@@ -27,7 +27,6 @@ const AdminSuggestedQuestions = lazy(() => import('@/pages/admin/AdminSuggestedQ
 const AdminFeedback = lazy(() => import('@/pages/admin/AdminFeedback'));
 const AdminFeedbackQuestions = lazy(() => import('@/pages/admin/AdminFeedbackQuestions'));
 const AdminPermissions = lazy(() => import('@/pages/admin/Permissions'));
-const AdminNotifications = lazy(() => import('@/pages/admin/AdminNotifications'));
 const AdminSupport = lazy(() => import('@/pages/admin/AdminSupport'));
 const FileManagement = lazy(() => import('@/pages/admin/FileManagement'));
 const WidgetCustomization = lazy(() => import('@/pages/admin/WidgetCustomization'));
@@ -248,14 +247,6 @@ function App() {
             element={
               <RoleGuard requiredRole="admin">
                 <WidgetCustomization />
-              </RoleGuard>
-            }
-          />
-          <Route
-            path="/admin/notifications"
-            element={
-              <RoleGuard requiredRole="admin">
-                <AdminNotifications />
               </RoleGuard>
             }
           />

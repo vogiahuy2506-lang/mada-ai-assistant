@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { adminApi } from './adminApi';
-import { getAccessToken } from '@/lib/api';
-import { useLanguageStore } from '@/stores';
+import { getAccessToken, systemApi } from '@/lib/api';
+import { useLanguageStore, useSystemSettingsStore } from '@/stores';
 import { broadcastAgentChange, broadcastQuestionsChange } from '@/lib/agentBroadcast';
 import { MADA_BOTS } from '@/lib/madaBots';
 import { Toast, ToastType } from '@/components/ui/Toast';
@@ -12,7 +12,8 @@ import {
   Loader2, Check, X, ChevronRight, ExternalLink,
   GripVertical, Settings,
   ChevronDown, Bell, Play, History, CloudUpload,
-  SlidersHorizontal, Database, Wand2, ArrowLeft
+  SlidersHorizontal, Database, Wand2, ArrowLeft,
+  ArrowUp, ArrowDown, Save
 } from 'lucide-react';
 
 // ============== TYPES ==============
@@ -112,9 +113,9 @@ const translations: Record<Language, Record<string, string>> = {
     // Workspace
     workspace: 'Không gian huấn luyện',
     agentCode: 'Mã hiệu',
-    versionHistory: 'Lịch sử phiên bản',
-    testThisSandbox: 'Test Sandbox này',
-    publishAgent: 'Xuất bản Agent',
+    versionHistory: 'Lịch sử',
+    testThisSandbox: 'Test',
+    publishAgent: 'Xuất bản',
     // Hero card
     operationalStatus: 'Trạng thái tiếp nhận',
     readyToServe: 'Sẵn sàng phục vụ',
@@ -192,6 +193,21 @@ const translations: Record<Language, Record<string, string>> = {
     creating: 'Đang tạo...',
     publishing: 'Đang xuất bản...',
     optimizing: 'Đang tối ưu...',
+    // Agent actions
+    editAgent: 'Chỉnh sửa',
+    deleteAgent: 'Xóa',
+    duplicateAgent: 'Sao chép',
+    confirmDeleteTitle: 'Xóa Agent?',
+    confirmDeleteDesc: 'Hành động này không thể hoàn tác. Agent sẽ bị xóa vĩnh viễn.',
+    deleteSuccess: 'Đã xóa Agent thành công!',
+    deleteFailed: 'Xóa Agent thất bại!',
+    duplicateSuccess: 'Đã sao chép Agent thành công!',
+    duplicateFailed: 'Sao chép Agent thất bại!',
+    editAgentName: 'Tên Agent',
+    editAgentDescription: 'Mô tả',
+    editAgentTitle: 'Chỉnh sửa Agent',
+    savingChanges: 'Đang lưu thay đổi...',
+    cannotDeleteMadaBot: 'Không thể xóa Agent mặc định của hệ thống.',
   },
   en: {
     title: 'AI Studio',
@@ -290,6 +306,21 @@ const translations: Record<Language, Record<string, string>> = {
     creating: 'Creating...',
     publishing: 'Publishing...',
     optimizing: 'Optimizing...',
+    // Agent actions
+    editAgent: 'Edit',
+    deleteAgent: 'Delete',
+    duplicateAgent: 'Duplicate',
+    confirmDeleteTitle: 'Delete Agent?',
+    confirmDeleteDesc: 'This action cannot be undone. The Agent will be permanently deleted.',
+    deleteSuccess: 'Agent deleted successfully!',
+    deleteFailed: 'Failed to delete Agent!',
+    duplicateSuccess: 'Agent duplicated successfully!',
+    duplicateFailed: 'Failed to duplicate Agent!',
+    editAgentName: 'Agent Name',
+    editAgentDescription: 'Description',
+    editAgentTitle: 'Edit Agent',
+    savingChanges: 'Saving changes...',
+    cannotDeleteMadaBot: 'Cannot delete default system Agent.',
   },
   ar: {
     title: 'AI Studio',
@@ -388,6 +419,21 @@ const translations: Record<Language, Record<string, string>> = {
     creating: 'جارٍ الإنشاء...',
     publishing: 'جارٍ النشر...',
     optimizing: 'جارٍ التحسين...',
+    // Agent actions
+    editAgent: 'تحرير',
+    deleteAgent: 'حذف',
+    duplicateAgent: 'نسخ',
+    confirmDeleteTitle: 'حذف الوكيل؟',
+    confirmDeleteDesc: 'لا يمكن التراجع عن هذا الإجراء. سيتم حذف الوكيل نهائياً.',
+    deleteSuccess: 'تم حذف الوكيل بنجاح!',
+    deleteFailed: 'فشل حذف الوكيل!',
+    duplicateSuccess: 'تم نسخ الوكيل بنجاح!',
+    duplicateFailed: 'فشل نسخ الوكيل!',
+    editAgentName: 'اسم الوكيل',
+    editAgentDescription: 'الوصف',
+    editAgentTitle: 'تحرير الوكيل',
+    savingChanges: 'جارٍ حفظ التغييرات...',
+    cannotDeleteMadaBot: 'لا يمكن حذف وكيل النظام الافتراضي.',
   },
   fr: {
     title: 'AI Studio',
@@ -486,13 +532,41 @@ const translations: Record<Language, Record<string, string>> = {
     creating: 'Création...',
     publishing: 'Publication...',
     optimizing: 'Optimisation...',
+    // Agent actions
+    editAgent: 'Modifier',
+    deleteAgent: 'Supprimer',
+    duplicateAgent: 'Dupliquer',
+    confirmDeleteTitle: "Supprimer l'agent?",
+    confirmDeleteDesc: "Cette action est irréversible. L'agent sera définitivement supprimé.",
+    deleteSuccess: 'Agent supprimé avec succès!',
+    deleteFailed: "Échec de la suppression de l'agent!",
+    duplicateSuccess: 'Agent dupliqué avec succès!',
+    duplicateFailed: "Échec de la duplication de l'agent!",
+    editAgentName: "Nom de l'agent",
+    editAgentDescription: 'Description',
+    editAgentTitle: "Modifier l'agent",
+    savingChanges: 'Enregistrement des modifications...',
+    cannotDeleteMadaBot: "Impossible de supprimer l'agent système par défaut.",
   },
 };
 
 // ============== MAIN COMPONENT ==============
 export function AdminPrompts() {
   const language = useLanguageStore((s) => s.language ?? 'vi') as Language;
+  const { setLanguage } = useLanguageStore();
   const t = (key: string) => translations[language]?.[key] || translations.vi[key] || key;
+
+  // Helper to get localized agent/bot name
+  const getLocalizedAgentName = (agent: Agent): string => {
+    if (!agent.bot_id) return agent.name;
+    const bot = MADA_BOTS.find(b => b.id === agent.bot_id);
+    if (!bot) return agent.name;
+    // Use localized name based on language
+    if (language === 'vi') return bot.nameVi || bot.name;
+    if (language === 'ar') return bot.nameAr || bot.name;
+    if (language === 'fr') return bot.nameFr || bot.name;
+    return bot.name; // English default
+  };
 
   // State
   const [agents, setAgents] = useState<Agent[]>([]);
@@ -506,6 +580,22 @@ export function AdminPrompts() {
 
   // Toast notification state
   const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
+
+  // Language dropdown state
+  const [showLangDropdown, setShowLangDropdown] = useState(false);
+
+  // Close language dropdown when clicking outside
+  useEffect(() => {
+    if (!showLangDropdown) return;
+    const handleClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('.lang-dropdown-container')) {
+        setShowLangDropdown(false);
+      }
+    };
+    document.addEventListener('click', handleClick);
+    return () => document.removeEventListener('click', handleClick);
+  }, [showLangDropdown]);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -532,6 +622,10 @@ export function AdminPrompts() {
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
 
+  // Sort Modal state
+  const [showSortModal, setShowSortModal] = useState(false);
+  const [sortAgents, setSortAgents] = useState<Agent[]>([]);
+
   // Resizable Sidebar state
   const [sidebarWidth, setSidebarWidth] = useState(330);
   const [isResizing, setIsResizing] = useState(false);
@@ -546,7 +640,7 @@ export function AdminPrompts() {
   const [versionHistory, setVersionHistory] = useState<{ id: string; version: string; date: string; changes: string; author: string }[]>([]);
 
   const [showAddNewAgent, setShowAddNewAgent] = useState(false);
-  const [newAgentForm, setNewAgentForm] = useState({ name: '', description: '', iso_code: '' });
+  const [newAgentForm, setNewAgentForm] = useState({ name: '', description: '', iso_code: '', system_prompt: '' });
   const [addAgentLoading, setAddAgentLoading] = useState(false);
 
   const [showPublishConfirm, setShowPublishConfirm] = useState(false);
@@ -557,6 +651,17 @@ export function AdminPrompts() {
   const [aiOptimizeResult, setAiOptimizeResult] = useState('');
 
   const [avatarUploading, setAvatarUploading] = useState(false);
+
+  // Edit Agent Modal state
+  const [showEditAgent, setShowEditAgent] = useState(false);
+  const [editingAgent, setEditingAgent] = useState<Agent | null>(null);
+  const [editAgentForm, setEditAgentForm] = useState({ name: '', description: '', iso_code: '', system_prompt: '' });
+  const [editAgentLoading, setEditAgentLoading] = useState(false);
+
+  // Delete Agent Modal state
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deletingAgent, setDeletingAgent] = useState<Agent | null>(null);
+  const [deleteAgentLoading, setDeleteAgentLoading] = useState(false);
 
   // Reorder agents
   const moveAgent = (fromIndex: number, toIndex: number) => {
@@ -706,6 +811,52 @@ export function AdminPrompts() {
     saveAgentOrder(reordered);
   };
 
+  // Di chuyển agent lên 1 bậc
+  const moveAgentUp = async (agentId: string) => {
+    const index = filteredAgents.findIndex(a => a.id === agentId);
+    if (index <= 0) return; // Đã ở đầu danh sách
+    
+    const reordered = [...filteredAgents];
+    const temp = reordered[index];
+    reordered[index] = reordered[index - 1];
+    reordered[index - 1] = temp;
+    
+    // Cập nhật state tạm thời
+    setAgents(prev => {
+      const updated = prev.map((a, i) => {
+        const newIndex = reordered.findIndex(r => r.id === a.id);
+        return { ...a, sort_order: newIndex + 1 };
+      });
+      return updated;
+    });
+    
+    // Lưu xuống server
+    await saveAgentOrder(reordered.map((a, i) => ({ ...a, sort_order: i + 1 })));
+  };
+
+  // Di chuyển agent xuống 1 bậc
+  const moveAgentDown = async (agentId: string) => {
+    const index = filteredAgents.findIndex(a => a.id === agentId);
+    if (index < 0 || index >= filteredAgents.length - 1) return; // Đã ở cuối danh sách
+    
+    const reordered = [...filteredAgents];
+    const temp = reordered[index];
+    reordered[index] = reordered[index + 1];
+    reordered[index + 1] = temp;
+    
+    // Cập nhật state tạm thời
+    setAgents(prev => {
+      const updated = prev.map((a, i) => {
+        const newIndex = reordered.findIndex(r => r.id === a.id);
+        return { ...a, sort_order: newIndex + 1 };
+      });
+      return updated;
+    });
+    
+    // Lưu xuống server
+    await saveAgentOrder(reordered.map((a, i) => ({ ...a, sort_order: i + 1 })));
+  };
+
   const handleDragEnd = () => {
     setDraggedId(null);
     setDragOverId(null);
@@ -774,9 +925,30 @@ export function AdminPrompts() {
 
   const selectAgent = (agent: Agent) => {
     setSelectedAgent(agent);
+    // Use localized name and description for MADA bots
+    const madaBot = agent.bot_id ? MADA_BOTS.find(b => b.id === agent.bot_id) : null;
+    let localizedName = agent.name;
+    let localizedDesc = agent.description || '';
+    
+    if (madaBot) {
+      if (language === 'vi') {
+        localizedName = madaBot.nameVi || madaBot.name;
+        localizedDesc = madaBot.descriptionVi || madaBot.description;
+      } else if (language === 'ar') {
+        localizedName = madaBot.nameAr || madaBot.name;
+        localizedDesc = madaBot.descriptionAr || madaBot.description;
+      } else if (language === 'fr') {
+        localizedName = madaBot.nameFr || madaBot.name;
+        localizedDesc = madaBot.descriptionFr || madaBot.description;
+      } else {
+        localizedName = madaBot.name;
+        localizedDesc = madaBot.description;
+      }
+    }
+    
     setFormData({
-      name: agent.name || '',
-      description: agent.description || '',
+      name: localizedName || '',
+      description: localizedDesc || '',
       avatar_url: agent.avatar_url || agent.avatar || '',
       system_prompt: agent.system_prompt || '',
       knowledge_url: agent.knowledge_url || '',
@@ -1058,6 +1230,10 @@ export function AdminPrompts() {
       setError(t('enterAgentName'));
       return;
     }
+    if (!newAgentForm.system_prompt.trim()) {
+      setError('Vui lòng nhập System Prompt.');
+      return;
+    }
     setAddAgentLoading(true);
     setError('');
     try {
@@ -1072,6 +1248,7 @@ export function AdminPrompts() {
           name: newAgentForm.name,
           description: newAgentForm.description,
           iso_code: newAgentForm.iso_code,
+          system_prompt: newAgentForm.system_prompt || '',
           is_active: false,
         }),
       });
@@ -1081,7 +1258,7 @@ export function AdminPrompts() {
           setAgents(prev => [...prev, data.data]);
           selectAgent(data.data);
           setShowAddNewAgent(false);
-          setNewAgentForm({ name: '', description: '', iso_code: '' });
+          setNewAgentForm({ name: '', description: '', iso_code: '', system_prompt: '' });
         } else {
           setError(data.error || t('creatingFailed'));
         }
@@ -1144,6 +1321,232 @@ export function AdminPrompts() {
     }
   };
 
+  // ========== EDIT AGENT HANDLER ==========
+  const handleOpenEditAgent = (agent: Agent, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent selecting the agent
+    setEditingAgent(agent);
+    setEditAgentForm({
+      name: agent.name || '',
+      description: agent.description || '',
+      iso_code: agent.iso_code || '',
+      system_prompt: agent.system_prompt || '',
+    });
+    setShowEditAgent(true);
+  };
+
+  const handleSaveEditAgent = async () => {
+    if (!editingAgent || !editAgentForm.name.trim()) {
+      setError(t('enterAgentName'));
+      return;
+    }
+    setEditAgentLoading(true);
+    setError('');
+    try {
+      const token = getAccessToken();
+      const res = await fetch(`/api/admin/agents/${editingAgent.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          name: editAgentForm.name,
+          description: editAgentForm.description,
+          iso_code: editAgentForm.iso_code,
+          system_prompt: editAgentForm.system_prompt,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          // Update agents list
+          setAgents(prev => prev.map(a => 
+            a.id === editingAgent.id ? { ...a, ...editAgentForm } : a
+          ));
+          // Update selected agent if editing the selected one
+          if (selectedAgent?.id === editingAgent.id) {
+            selectAgent({ ...selectedAgent, ...editAgentForm });
+            setFormData(prev => ({ ...prev, ...editAgentForm }));
+          }
+          setShowEditAgent(false);
+          setEditingAgent(null);
+          // Show success toast
+          const successMsg = language === 'vi' ? 'Đã lưu thay đổi!' : 
+                            language === 'ar' ? 'تم حفظ التغييرات!' :
+                            language === 'fr' ? 'Modifications enregistrées!' : 'Changes saved!';
+          setToast({ message: successMsg, type: 'success' });
+        } else {
+          setError(data.error || t('error'));
+        }
+      } else {
+        setError(`Lỗi ${res.status}`);
+      }
+    } catch {
+      setError(t('error'));
+    } finally {
+      setEditAgentLoading(false);
+    }
+  };
+
+  // ========== DELETE AGENT HANDLER ==========
+  const handleOpenDeleteConfirm = (agent: Agent, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent selecting the agent
+    setDeletingAgent(agent);
+    setShowDeleteConfirm(true);
+  };
+
+  const handleDeleteAgent = async () => {
+    if (!deletingAgent) return;
+    setDeleteAgentLoading(true);
+    try {
+      const token = getAccessToken();
+      const res = await fetch(`/api/admin/agents/${deletingAgent.id}`, {
+        method: 'DELETE',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          // Remove from agents list
+          setAgents(prev => prev.filter(a => a.id !== deletingAgent.id));
+          // If deleted agent was selected, select the first agent
+          if (selectedAgent?.id === deletingAgent.id) {
+            const remainingAgents = agents.filter(a => a.id !== deletingAgent.id);
+            if (remainingAgents.length > 0) {
+              selectAgent(remainingAgents[0]);
+            } else {
+              setSelectedAgent(null);
+            }
+          }
+          setShowDeleteConfirm(false);
+          setDeletingAgent(null);
+          // Show success toast
+          const successMsg = t('deleteSuccess');
+          setToast({ message: successMsg, type: 'success' });
+        } else {
+          const errorMsg = t('deleteFailed');
+          setToast({ message: errorMsg, type: 'error' });
+        }
+      } else {
+        const errorMsg = t('deleteFailed');
+        setToast({ message: errorMsg, type: 'error' });
+      }
+    } catch {
+      const errorMsg = t('deleteFailed');
+      setToast({ message: errorMsg, type: 'error' });
+    } finally {
+      setDeleteAgentLoading(false);
+    }
+  };
+
+  // ========== DUPLICATE AGENT HANDLER ==========
+  const handleDuplicateAgent = async (agent: Agent, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent selecting the agent
+    try {
+      const token = getAccessToken();
+      const res = await fetch('/api/admin/agents', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          name: `${agent.name} (Copy)`,
+          description: agent.description || '',
+          iso_code: agent.iso_code || '',
+          system_prompt: agent.system_prompt || '',
+          is_active: false,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          // Add new agent to list
+          setAgents(prev => [...prev, data.data]);
+          // Select the new agent
+          selectAgent(data.data);
+          // Show success toast
+          const successMsg = t('duplicateSuccess');
+          setToast({ message: successMsg, type: 'success' });
+        } else {
+          const errorMsg = t('duplicateFailed');
+          setToast({ message: errorMsg, type: 'error' });
+        }
+      } else {
+        const errorMsg = t('duplicateFailed');
+        setToast({ message: errorMsg, type: 'error' });
+      }
+    } catch {
+      const errorMsg = t('duplicateFailed');
+      setToast({ message: errorMsg, type: 'error' });
+    }
+  };
+
+  // ========== SORT MODAL HANDLERS ==========
+  const openSortModal = () => {
+    // Copy agents để sắp xếp
+    setSortAgents([...agents].sort((a, b) => a.sort_order - b.sort_order));
+    setShowSortModal(true);
+  };
+
+  const handleSortDragStart = (e: React.DragEvent, agentId: string) => {
+    setDraggedId(agentId);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleSortDragOver = (e: React.DragEvent, agentId: string) => {
+    e.preventDefault();
+    if (agentId !== draggedId) {
+      setDragOverId(agentId);
+    }
+  };
+
+  const handleSortDrop = (e: React.DragEvent, targetId: string) => {
+    e.preventDefault();
+    if (!draggedId || draggedId === targetId) {
+      setDraggedId(null);
+      setDragOverId(null);
+      return;
+    }
+    const fromIndex = sortAgents.findIndex(a => a.id === draggedId);
+    const toIndex = sortAgents.findIndex(a => a.id === targetId);
+    if (fromIndex === -1 || toIndex === -1) {
+      setDraggedId(null);
+      setDragOverId(null);
+      return;
+    }
+    const reordered = [...sortAgents];
+    const [moved] = reordered.splice(fromIndex, 1);
+    reordered.splice(toIndex, 0, moved);
+    setSortAgents(reordered);
+    setDraggedId(null);
+    setDragOverId(null);
+  };
+
+  const handleSortDragEnd = () => {
+    setDraggedId(null);
+    setDragOverId(null);
+  };
+
+  const saveSortOrder = async () => {
+    await saveAgentOrder(sortAgents.map((a, i) => ({ ...a, sort_order: i + 1 })));
+    setShowSortModal(false);
+  };
+
+  const moveSortUp = (index: number) => {
+    if (index <= 0) return;
+    const reordered = [...sortAgents];
+    [reordered[index - 1], reordered[index]] = [reordered[index], reordered[index - 1]];
+    setSortAgents(reordered);
+  };
+
+  const moveSortDown = (index: number) => {
+    if (index >= sortAgents.length - 1) return;
+    const reordered = [...sortAgents];
+    [reordered[index], reordered[index + 1]] = [reordered[index + 1], reordered[index]];
+    setSortAgents(reordered);
+  };
+
   // AI Optimize handler
   const handleAiOptimize = async () => {
     if (!formData.system_prompt.trim()) {
@@ -1199,8 +1602,10 @@ export function AdminPrompts() {
 
   // Filter agents
   const filteredAgents = agents.filter(agent => {
+    const localizedName = getLocalizedAgentName(agent);
     const matchesSearch = !searchQuery ||
       agent.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      localizedName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (agent.iso_code || '').toLowerCase().includes(searchQuery.toLowerCase());
     
     if (filterTab === 'all') return matchesSearch;
@@ -1235,7 +1640,7 @@ export function AdminPrompts() {
               <ChevronRight className="text-[10px] text-slate-300 w-3 h-3" />
               <span className="font-semibold text-brand-800 bg-brand-50/90 text-brand-700 px-2 py-0.5 rounded-md border border-brand-200/50 flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-brand-600"></span>
-                {selectedAgent?.name || 'Bot 2: Sensory – Vision'}
+                {selectedAgent ? getLocalizedAgentName(selectedAgent) : 'Bot Thị giác'}
               </span>
             </nav>
 
@@ -1253,7 +1658,7 @@ export function AdminPrompts() {
           </div>
 
           {/* Quick Actions & User */}
-          <div className="flex items-center gap-2.5 sm:gap-3">
+          <div className="flex items-center gap-2.5 sm:gap-3 -ml-2 pr-1">
             {/* Test Sandbox */}
             <button
               onClick={() => selectedAgent ? setShowTestSandbox(true) : setError(t('selectAgentError'))}
@@ -1270,11 +1675,60 @@ export function AdminPrompts() {
             </button>
 
             {/* Language */}
-            <button className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-100 border border-slate-200 rounded-xl transition-colors shadow-xs">
-              <span className="text-sm">🇻🇳</span>
-              <span className="hidden lg:inline font-mono">VI</span>
-              <ChevronDown className="w-3 h-3 text-slate-400" />
-            </button>
+            <div className="relative lang-dropdown-container z-[60]">
+              <button
+                onClick={() => setShowLangDropdown(!showLangDropdown)}
+                className="flex items-center gap-1.5 pl-2.5 pr-2 py-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-emerald-50 border border-emerald-300 hover:border-emerald-400 rounded-xl transition-all shadow-sm hover:shadow-md"
+              >
+                <span className="text-sm">
+                  {language === 'vi' ? '🇻🇳' : language === 'en' ? '🇺🇸' : language === 'ar' ? '🇸🇦' : '🇫🇷'}
+                </span>
+                <span className="hidden lg:inline font-mono">{language.toUpperCase()}</span>
+                <ChevronDown className={`w-3 h-3 text-slate-400 transition-transform ${showLangDropdown ? 'rotate-180' : ''}`} />
+              </button>
+
+              {/* Language Dropdown */}
+              {showLangDropdown && (
+                <div className="absolute right-0 top-full mt-1.5 w-52 bg-white border-2 border-emerald-300 rounded-xl shadow-xl overflow-hidden z-[70]">
+                  {/* Header */}
+                  <div className="px-3 py-2 border-b border-emerald-100 bg-emerald-50/50">
+                    <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Ngôn ngữ</span>
+                  </div>
+                  <button
+                    onClick={() => { setLanguage('vi'); setShowLangDropdown(false); }}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-sm hover:bg-emerald-50 transition-colors ${language === 'vi' ? 'bg-emerald-100 text-emerald-800 font-semibold' : 'text-slate-700'}`}
+                  >
+                    <span className="text-base">🇻🇳</span>
+                    <span>Tiếng Việt</span>
+                    {language === 'vi' && <span className="ml-auto text-emerald-600 font-bold">✓</span>}
+                  </button>
+                  <button
+                    onClick={() => { setLanguage('en'); setShowLangDropdown(false); }}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-sm hover:bg-emerald-50 transition-colors ${language === 'en' ? 'bg-emerald-100 text-emerald-800 font-semibold' : 'text-slate-700'}`}
+                  >
+                    <span className="text-base">🇺🇸</span>
+                    <span>English</span>
+                    {language === 'en' && <span className="ml-auto text-emerald-600 font-bold">✓</span>}
+                  </button>
+                  <button
+                    onClick={() => { setLanguage('ar'); setShowLangDropdown(false); }}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-sm hover:bg-emerald-50 transition-colors ${language === 'ar' ? 'bg-emerald-100 text-emerald-800 font-semibold' : 'text-slate-700'}`}
+                  >
+                    <span className="text-base">🇸🇦</span>
+                    <span>العربية</span>
+                    {language === 'ar' && <span className="ml-auto text-emerald-600 font-bold">✓</span>}
+                  </button>
+                  <button
+                    onClick={() => { setLanguage('fr'); setShowLangDropdown(false); }}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-sm hover:bg-emerald-50 transition-colors ${language === 'fr' ? 'bg-emerald-100 text-emerald-800 font-semibold' : 'text-slate-700'}`}
+                  >
+                    <span className="text-base">🇫🇷</span>
+                    <span>Français</span>
+                    {language === 'fr' && <span className="ml-auto text-emerald-600 font-bold">✓</span>}
+                  </button>
+                </div>
+              )}
+            </div>
 
             <div className="h-5 w-px bg-slate-200 mx-0.5 sm:mx-1"></div>
 
@@ -1337,13 +1791,24 @@ export function AdminPrompts() {
                   <p className="text-[11px] text-slate-500">{t('agentCount')}</p>
                 </div>
               </div>
-              <button
-                onClick={() => setShowAddNewAgent(true)}
-                className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-brand-700 hover:bg-brand-800 text-white rounded-lg text-xs font-semibold shadow-xs transition"
-              >
-                <Plus className="w-3 h-3" />
-                <span>{t('addNew')}</span>
-              </button>
+              <div className="flex items-center gap-1">
+                {/* Nút Sắp xếp - Mở popup */}
+                <button
+                  onClick={() => openSortModal()}
+                  className="inline-flex items-center gap-1 px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-600 border border-slate-200 rounded-lg text-[11px] font-medium transition shadow-xs"
+                  title="Sắp xếp thứ tự Agent"
+                >
+                  <SlidersHorizontal className="w-3 h-3" />
+                  <span>Sắp xếp</span>
+                </button>
+                <button
+                  onClick={() => { setNewAgentForm({ name: '', description: '', iso_code: '', system_prompt: '' }); setError(''); setShowAddNewAgent(true); }}
+                  className="inline-flex items-center gap-1 px-2 py-1 bg-brand-700 hover:bg-brand-800 text-white rounded-lg text-[11px] font-medium shadow-xs transition"
+                >
+                  <Plus className="w-3 h-3" />
+                  <span>{t('addNew')}</span>
+                </button>
+              </div>
             </div>
 
             {/* Search */}
@@ -1425,11 +1890,11 @@ export function AdminPrompts() {
                     onDragEnd={handleDragEnd}
                     onClick={() => selectAgent(agent)}
                     className={clsx(
-                      'p-3 rounded-2xl transition-all flex items-start gap-3 cursor-pointer group relative',
+                      'p-2 rounded-xl transition-all flex items-start gap-2 cursor-pointer group relative',
                       isDragging
                         ? 'opacity-50 scale-[0.98]'
                         : isDragOver
-                        ? 'scale-[1.02] ring-2 ring-brand-300'
+                        ? 'scale-[1.01] ring-2 ring-brand-300'
                         : isSelected
                         ? 'bg-brand-50 border-2 border-brand-600 shadow-sm'
                         : 'bg-white border border-slate-200/90 hover:border-slate-300 shadow-xs',
@@ -1442,7 +1907,7 @@ export function AdminPrompts() {
 
                     {/* Emoji Avatar */}
                     <div className={clsx(
-                      'w-11 h-11 rounded-2xl flex items-center justify-center text-xl flex-shrink-0 shadow-xs',
+                      'w-9 h-9 rounded-xl flex items-center justify-center text-base flex-shrink-0 shadow-xs',
                       isSelected
                         ? 'bg-teal-800 border border-teal-700 text-white'
                         : 'bg-slate-50 border border-slate-200'
@@ -1453,7 +1918,7 @@ export function AdminPrompts() {
                     {/* Info */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-1">
-                        <h3 className="text-xs font-bold text-slate-900 truncate">{agent.name}</h3>
+                        <h3 className="text-xs font-bold text-slate-900 truncate">{getLocalizedAgentName(agent)}</h3>
                         {isSelected ? (
                           <span className="text-[10px] font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200/90 px-2 py-0.5 rounded-md flex items-center gap-1 flex-shrink-0">
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
@@ -1470,10 +1935,10 @@ export function AdminPrompts() {
                           </span>
                         )}
                       </div>
-                      <p className="text-[11px] text-slate-500 truncate mt-1">
+                      <p className="text-[10px] text-slate-500 truncate mt-0.5">
                         {agent.description || 'Không có mô tả'}
                       </p>
-                      <div className="flex items-center gap-1.5 text-[10px] text-slate-500 mt-1.5 font-mono">
+                      <div className="flex items-center gap-1 text-[9px] text-slate-500 mt-1 font-mono">
                         {agent.iso_code ? (
                           <>
                             <span className={clsx(
@@ -1491,7 +1956,35 @@ export function AdminPrompts() {
                       </div>
                     </div>
 
-                    {/* Drag handle */}
+                    {/* Action Buttons - Show on hover */}
+                    <div className="absolute right-1 top-1 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                      {/* Edit Button */}
+                      <button
+                        onClick={(e) => handleOpenEditAgent(agent, e)}
+                        className="p-1 bg-white hover:bg-brand-50 border border-slate-200 hover:border-brand-300 rounded-lg shadow-sm transition-colors"
+                        title={t('editAgent')}
+                      >
+                        <Settings className="w-3 h-3 text-slate-600 hover:text-brand-700" />
+                      </button>
+                      {/* Duplicate Button */}
+                      <button
+                        onClick={(e) => handleDuplicateAgent(agent, e)}
+                        className="p-1 bg-white hover:bg-blue-50 border border-slate-200 hover:border-blue-300 rounded-lg shadow-sm transition-colors"
+                        title={t('duplicateAgent')}
+                      >
+                        <FileText className="w-3 h-3 text-slate-600 hover:text-blue-700" />
+                      </button>
+                      {/* Delete Button */}
+                      <button
+                        onClick={(e) => handleOpenDeleteConfirm(agent, e)}
+                        className="p-1 bg-white hover:bg-red-50 border border-slate-200 hover:border-red-300 rounded-lg shadow-sm transition-colors"
+                        title={t('deleteAgent')}
+                      >
+                        <Trash2 className="w-3 h-3 text-slate-600 hover:text-red-600" />
+                      </button>
+                    </div>
+
+                    {/* Drag handle - nhỏ gọn */}
                     <GripVertical className="w-3.5 h-3.5 text-slate-300 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
                   </div>
                 );
@@ -1500,7 +1993,7 @@ export function AdminPrompts() {
           </div>
 
           {/* Footer Status */}
-          <div className="p-3 bg-slate-50 border-t border-slate-200">
+          <div className="p-2.5 bg-slate-50 border-t border-slate-200">
             <div className="flex justify-between items-center">
               <span className="text-[11px] text-slate-500 font-medium flex items-center gap-1">
                 <SlidersHorizontal className="w-3 h-3 text-slate-400 rotate-90" />
@@ -1508,7 +2001,7 @@ export function AdminPrompts() {
               </span>
               <span className="font-medium text-emerald-700 flex items-center gap-1.5 text-[11px]">
                 <CloudUpload className="w-3 h-3 text-emerald-600" />
-                {t('syncStatus')} 13:42
+                {t('syncStatus')}
               </span>
             </div>
           </div>
@@ -1525,7 +2018,7 @@ export function AdminPrompts() {
                     <span className="w-2.5 h-2.5 rounded-full bg-brand-600"></span>
                     <span>{t('workspace')}:</span>
                     <span className="bg-brand-50 text-brand-800 px-2 py-0.5 rounded border border-brand-200 font-semibold">
-                      {selectedAgent.name}
+                      {getLocalizedAgentName(selectedAgent)}
                     </span>
                   </div>
                   <span className="text-xs text-slate-400 hidden sm:inline">|</span>
@@ -1720,7 +2213,10 @@ export function AdminPrompts() {
                 </div>
 
                 {/* System Prompt Editor Card */}
-                <div className="bg-white rounded-2xl border border-slate-200/90 shadow-card overflow-hidden">
+                <div
+                  onClick={openPromptModal}
+                  className="bg-white rounded-2xl border border-slate-200/90 shadow-card overflow-hidden cursor-pointer"
+                >
                   {/* Editor Toolbar */}
                   <div className="bg-slate-50 px-5 py-3 flex flex-wrap items-center justify-between gap-3 border-b border-slate-200/90">
                     <div className="flex items-center gap-2.5">
@@ -1742,14 +2238,14 @@ export function AdminPrompts() {
                         <span className="text-brand-700 font-bold">{formData.system_prompt.length}</span> / 4,000 {t('characters')}
                       </div>
                       <button
-                        onClick={copyPrompt}
+                        onClick={(e) => { e.stopPropagation(); copyPrompt(); }}
                         className="p-1.5 bg-white hover:bg-slate-50 text-slate-600 hover:text-slate-800 rounded-lg border border-slate-200 transition shadow-xs"
                         title={t('copy')}
                       >
                         <FileText className="w-3 h-3" />
                       </button>
                       <button
-                        onClick={() => { setShowAiOptimize(true); setAiOptimizeResult(''); }}
+                        onClick={(e) => { e.stopPropagation(); setShowAiOptimize(true); setAiOptimizeResult(''); }}
                         className="inline-flex items-center gap-1.5 px-3 py-1 bg-gradient-to-r from-brand-700 to-teal-700 hover:from-brand-800 hover:to-teal-800 text-white text-xs font-bold rounded-lg transition shadow-sm"
                       >
                         <Wand2 className="w-3 h-3 text-amber-200" />
@@ -1759,12 +2255,16 @@ export function AdminPrompts() {
                   </div>
 
                   {/* Code Editor */}
-                  <div className="relative bg-slate-50/70">
+                  <div
+                    onClick={(e) => { e.stopPropagation(); openPromptModal(); }}
+                    className="relative bg-slate-50/70"
+                  >
                     <textarea
                       value={formData.system_prompt}
                       onChange={(e) => setFormData({ ...formData, system_prompt: e.target.value })}
                       placeholder={t('systemPromptPlaceholder')}
                       rows={16}
+                      onClick={(e) => e.stopPropagation()}
                       className="w-full p-5 bg-transparent border-0 focus:ring-0 resize-y text-slate-800 placeholder-slate-400 font-mono text-[12px] leading-relaxed selection:bg-brand-100 selection:text-brand-900"
                       spellCheck={false}
                     />
@@ -2016,7 +2516,7 @@ export function AdminPrompts() {
                   {t('testSandbox')}
                 </h2>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Agent: <span className="font-semibold">{selectedAgent?.name}</span>
+                  Agent: <span className="font-semibold">{selectedAgent ? getLocalizedAgentName(selectedAgent) : ''}</span>
                 </p>
               </div>
               <button
@@ -2068,7 +2568,7 @@ export function AdminPrompts() {
                   <History className="w-5 h-5 text-brand-700" />
                   {t('versionHistory')}
                 </h2>
-                <p className="text-xs text-slate-500 mt-0.5">{selectedAgent?.name}</p>
+                <p className="text-xs text-slate-500 mt-0.5">{selectedAgent ? getLocalizedAgentName(selectedAgent) : ''}</p>
               </div>
               <button
                 onClick={() => setShowVersionHistory(false)}
@@ -2127,7 +2627,7 @@ export function AdminPrompts() {
                 <p className="text-xs text-slate-500 mt-0.5">{language === 'vi' ? 'Tạo Agent AI mới' : language === 'ar' ? 'إنشاء وكيل جديد' : language === 'fr' ? 'Créer un nouvel agent' : 'Create new AI Agent'}</p>
               </div>
               <button
-                onClick={() => { setShowAddNewAgent(false); setNewAgentForm({ name: '', description: '', iso_code: '' }); setError(''); }}
+                onClick={() => { setShowAddNewAgent(false); setNewAgentForm({ name: '', description: '', iso_code: '', system_prompt: '' }); setError(''); }}
                 className="p-2 hover:bg-slate-100 rounded-xl transition-colors"
               >
                 <X className="w-5 h-5 text-slate-500" />
@@ -2167,17 +2667,27 @@ export function AdminPrompts() {
                   className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-700/20 focus:border-brand-700 transition text-sm font-mono"
                 />
               </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">{t('systemPrompt')} <span className="text-rose-500">*</span></label>
+                <textarea
+                  value={newAgentForm.system_prompt}
+                  onChange={(e) => setNewAgentForm({ ...newAgentForm, system_prompt: e.target.value })}
+                  placeholder={t('systemPromptPlaceholder')}
+                  rows={4}
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-700/20 focus:border-brand-700 transition text-sm resize-none font-mono"
+                />
+              </div>
             </div>
             <div className="p-4 border-t border-slate-200 flex justify-end gap-3">
               <button
-                onClick={() => { setShowAddNewAgent(false); setNewAgentForm({ name: '', description: '', iso_code: '' }); setError(''); }}
+                onClick={() => { setShowAddNewAgent(false); setNewAgentForm({ name: '', description: '', iso_code: '', system_prompt: '' }); setError(''); }}
                 className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition"
               >
                 {t('cancel')}
               </button>
               <button
                 onClick={handleAddNewAgent}
-                disabled={addAgentLoading}
+                disabled={addAgentLoading || !newAgentForm.name.trim() || !newAgentForm.system_prompt.trim()}
                 className="inline-flex items-center gap-2 px-5 py-2 bg-brand-700 hover:bg-brand-800 disabled:bg-slate-300 text-white rounded-xl text-xs font-bold transition"
               >
                 {addAgentLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
@@ -2198,7 +2708,7 @@ export function AdminPrompts() {
               </div>
               <h2 className="text-lg font-bold text-slate-800 mb-2">{t('publishConfirmTitle')}</h2>
               <p className="text-sm text-slate-500 mb-1">
-                Agent <span className="font-semibold text-slate-700">{selectedAgent?.name}</span> {t('publishConfirmDesc')}
+                Agent <span className="font-semibold text-slate-700">{selectedAgent ? getLocalizedAgentName(selectedAgent) : ''}</span> {t('publishConfirmDesc')}
               </p>
               <p className="text-xs text-slate-400">{t('changesApply')}</p>
             </div>
@@ -2292,6 +2802,272 @@ export function AdminPrompts() {
           onClose={() => setToast(null)}
         />
       )}
+
+      {/* ===== SORT AGENTS MODAL ===== */}
+      {showSortModal && (
+        <div 
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowSortModal(false);
+          }}
+        >
+          {/* Backdrop */}
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+          
+          {/* Modal */}
+          <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-lg max-h-[85vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="px-6 py-4 bg-gradient-to-r from-brand-700 to-teal-600 text-white flex items-center justify-between flex-shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+                  <SlidersHorizontal className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base">Sắp xếp Agent</h3>
+                  <p className="text-xs text-white/70">Kéo thả hoặc dùng nút mũi tên để thay đổi thứ tự</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowSortModal(false)}
+                className="w-8 h-8 rounded-lg bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors"
+              >
+                <X className="w-4 h-4 text-white" />
+              </button>
+            </div>
+
+            {/* Agent List */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-2">
+              {sortAgents.map((agent, index) => {
+                const localizedName = getLocalizedAgentName(agent);
+                const isDragging = draggedId === agent.id;
+                const isDragOver = dragOverId === agent.id;
+                
+                return (
+                  <div
+                    key={agent.id}
+                    draggable
+                    onDragStart={(e) => handleSortDragStart(e, agent.id)}
+                    onDragOver={(e) => handleSortDragOver(e, agent.id)}
+                    onDrop={(e) => handleSortDrop(e, agent.id)}
+                    onDragEnd={handleSortDragEnd}
+                    className={clsx(
+                      'flex items-center gap-3 p-3 rounded-xl border-2 transition-all cursor-grab active:cursor-grabbing',
+                      isDragging
+                        ? 'border-brand-400 bg-brand-50 opacity-75 scale-[1.02] shadow-lg'
+                        : isDragOver
+                        ? 'border-teal-400 bg-teal-50'
+                        : 'border-slate-200 bg-white hover:border-brand-300 hover:bg-brand-50/50'
+                    )}
+                  >
+                    {/* Drag Handle */}
+                    <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400">
+                      <GripVertical className="w-4 h-4" />
+                    </div>
+                    
+                    {/* Order Number */}
+                    <div className="flex-shrink-0 w-7 h-7 rounded-lg bg-brand-100 text-brand-700 font-bold text-xs flex items-center justify-center">
+                      {index + 1}
+                    </div>
+                    
+                    {/* Avatar */}
+                    {agent.avatar_url && isValidImageUrl(agent.avatar_url) ? (
+                      <img 
+                        src={agent.avatar_url} 
+                        alt={localizedName}
+                        className="w-9 h-9 rounded-lg object-cover flex-shrink-0 shadow-sm" 
+                      />
+                    ) : (
+                      <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-brand-700 to-teal-600 flex items-center justify-center text-white text-lg flex-shrink-0 shadow-sm">
+                        {getBotEmoji(agent.bot_id ?? undefined, agent.name)}
+                      </div>
+                    )}
+                    
+                    {/* Name & Info */}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-slate-800 truncate">{localizedName}</p>
+                      <p className="text-[11px] text-slate-500 truncate">
+                        {agent.iso_code && <span className="font-mono">{agent.iso_code}</span>}
+                        {agent.iso_code && ' · '}
+                        <span className={agent.is_active ? 'text-emerald-600' : 'text-amber-600'}>
+                          {agent.is_active ? 'Active' : 'Draft'}
+                        </span>
+                      </p>
+                    </div>
+                    
+                    {/* Move Buttons */}
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      <button
+                        onClick={() => moveSortUp(index)}
+                        disabled={index === 0}
+                        className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-brand-100 text-slate-500 hover:text-brand-700 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-colors"
+                        title="Di chuyển lên"
+                      >
+                        <ArrowUp className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => moveSortDown(index)}
+                        disabled={index === sortAgents.length - 1}
+                        className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-brand-100 text-slate-500 hover:text-brand-700 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-colors"
+                        title="Di chuyển xuống"
+                      >
+                        <ArrowDown className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Footer */}
+            <div className="px-4 py-4 border-t border-slate-200 flex items-center justify-end gap-3 flex-shrink-0 bg-slate-50">
+              <button
+                onClick={() => setShowSortModal(false)}
+                className="px-4 py-2 text-sm font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-colors"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                onClick={saveSortOrder}
+                className="px-5 py-2 text-sm font-bold text-white bg-gradient-to-r from-brand-700 to-teal-600 hover:from-brand-800 hover:to-teal-700 rounded-xl shadow-lg shadow-brand-700/25 hover:shadow-brand-700/40 transition-all flex items-center gap-2"
+              >
+                <Save className="w-4 h-4" />
+                Lưu thay đổi
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== CATEGORY ORDER MANAGER (Floating) ===== */}
+      <CategoryOrderManager language={language} />
+
+      {/* ===== EDIT AGENT MODAL ===== */}
+      {showEditAgent && editingAgent && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg">
+            {/* Header */}
+            <div className="px-6 py-4 bg-gradient-to-r from-brand-700 to-teal-600 text-white rounded-t-2xl">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+                    <Settings className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-lg">{t('editAgentTitle')}</h3>
+                    <p className="text-xs text-white/70">{getLocalizedAgentName(editingAgent)}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowEditAgent(false)}
+                  className="w-8 h-8 rounded-lg bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors"
+                >
+                  <X className="w-4 h-4 text-white" />
+                </button>
+              </div>
+            </div>
+
+            {/* Form */}
+            <div className="p-6 space-y-4">
+              {/* Agent Name */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                  {t('editAgentName')} <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={editAgentForm.name}
+                  onChange={(e) => setEditAgentForm(prev => ({ ...prev, name: e.target.value }))}
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-700/20 focus:border-brand-700 transition"
+                  placeholder={t('editAgentName')}
+                />
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                  {t('editAgentDescription')}
+                </label>
+                <textarea
+                  value={editAgentForm.description}
+                  onChange={(e) => setEditAgentForm(prev => ({ ...prev, description: e.target.value }))}
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-700/20 focus:border-brand-700 transition resize-none"
+                  rows={3}
+                  placeholder={t('editAgentDescription')}
+                />
+              </div>
+
+              {/* ISO Code */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                  {t('isoStandard')}
+                </label>
+                <input
+                  type="text"
+                  value={editAgentForm.iso_code}
+                  onChange={(e) => setEditAgentForm(prev => ({ ...prev, iso_code: e.target.value }))}
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm font-mono focus:outline-none focus:ring-2 focus:ring-brand-700/20 focus:border-brand-700 transition"
+                  placeholder="ISO 9241-171"
+                />
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 border-t border-slate-200 flex items-center justify-end gap-3">
+              <button
+                onClick={() => setShowEditAgent(false)}
+                className="px-4 py-2 text-sm font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-colors"
+              >
+                {t('cancel')}
+              </button>
+              <button
+                onClick={handleSaveEditAgent}
+                disabled={editAgentLoading || !editAgentForm.name.trim()}
+                className="px-5 py-2 text-sm font-bold text-white bg-gradient-to-r from-brand-700 to-teal-600 hover:from-brand-800 hover:to-teal-700 disabled:from-slate-300 disabled:to-slate-400 rounded-xl shadow-lg shadow-brand-700/25 hover:shadow-brand-700/40 transition-all flex items-center gap-2"
+              >
+                {editAgentLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                {editAgentLoading ? t('savingChanges') : t('saveDraft')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== DELETE CONFIRM MODAL ===== */}
+      {showDeleteConfirm && deletingAgent && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
+            {/* Header */}
+            <div className="p-6 text-center">
+              <div className="w-14 h-14 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Trash2 className="w-7 h-7 text-red-600" />
+              </div>
+              <h2 className="text-lg font-bold text-slate-800 mb-2">{t('confirmDeleteTitle')}</h2>
+              <p className="text-sm text-slate-500 mb-1">
+                <span className="font-semibold text-slate-700">{getLocalizedAgentName(deletingAgent)}</span>
+              </p>
+              <p className="text-xs text-slate-400">{t('confirmDeleteDesc')}</p>
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t border-slate-200 flex gap-3">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="flex-1 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
+              >
+                {t('cancel')}
+              </button>
+              <button
+                onClick={handleDeleteAgent}
+                disabled={deleteAgentLoading}
+                className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-slate-300 text-white rounded-xl text-sm font-bold transition"
+              >
+                {deleteAgentLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                {deleteAgentLoading ? t('savingChanges') : t('deleteAgent')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -2363,6 +3139,162 @@ function AgentAvatar({ name, avatarUrl, avatar, botId, size = 'md', className = 
         size === 'sm' ? 'w-4 h-4' : size === 'md' ? 'w-6 h-6' : 'w-7 h-7',
         'text-white'
       )} />
+    </div>
+  );
+}
+
+// ============== CATEGORY ORDER MANAGER COMPONENT ==============
+interface CategoryOrderManagerProps {
+  language: Language;
+}
+
+function CategoryOrderManager({ language }: CategoryOrderManagerProps) {
+  const { categoryOrder, setCategoryOrder, loadFromBackend } = useSystemSettingsStore();
+  const [localOrder, setLocalOrder] = useState<string[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [showManager, setShowManager] = useState(false);
+
+  // Sync với store khi mở
+  useEffect(() => {
+    if (showManager) {
+      setLocalOrder(categoryOrder || ['vision', 'hearing', 'communication', 'cognition', 'mobility', 'daily_living', 'education']);
+    }
+  }, [showManager, categoryOrder]);
+
+  const botNames: Record<string, { name: string; icon: string; color: string }> = {
+    vision: { name: 'Cảm giác - Thị giác', icon: '👁️', color: 'bg-violet-100 text-violet-700' },
+    hearing: { name: 'Cảm giác - Thính giác', icon: '👂', color: 'bg-blue-100 text-blue-700' },
+    communication: { name: 'Giọng nói & Lời nói', icon: '🎤', color: 'bg-rose-100 text-rose-700' },
+    cognition: { name: 'Tâm thần - Nhận thức', icon: '🧠', color: 'bg-amber-100 text-amber-700' },
+    mobility: { name: 'Vận động thần kinh', icon: '🦾', color: 'bg-green-100 text-green-700' },
+    daily_living: { name: 'Hỗ trợ sinh hoạt', icon: '🏠', color: 'bg-purple-100 text-purple-700' },
+    education: { name: 'Giáo dục', icon: '📚', color: 'bg-teal-100 text-teal-700' },
+  };
+
+  const moveUp = (index: number) => {
+    if (index > 0) {
+      const newOrder = [...localOrder];
+      [newOrder[index - 1], newOrder[index]] = [newOrder[index], newOrder[index - 1]];
+      setLocalOrder(newOrder);
+    }
+  };
+
+  const moveDown = (index: number) => {
+    if (index < localOrder.length - 1) {
+      const newOrder = [...localOrder];
+      [newOrder[index], newOrder[index + 1]] = [newOrder[index + 1], newOrder[index]];
+      setLocalOrder(newOrder);
+    }
+  };
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      const res = await systemApi.updateSettings({ categoryOrder: localOrder });
+      if (res.success) {
+        setCategoryOrder(localOrder);
+        // ⭐ Broadcast để ChatPage cập nhật ngay
+        broadcastAgentChange({ type: 'category-order-changed', categoryOrder: localOrder });
+        setSaved(true);
+        setTimeout(() => setSaved(false), 3000);
+      }
+    } catch (e) {
+      console.error('[CategoryOrderManager] Save error:', e);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed bottom-6 right-6 z-40">
+      {/* Toggle Button */}
+      <button
+        onClick={() => setShowManager(!showManager)}
+        className={clsx(
+          'w-14 h-14 rounded-2xl shadow-xl flex items-center justify-center transition-all',
+          'bg-gradient-to-br from-brand-700 to-teal-600 text-white',
+          'hover:shadow-2xl hover:scale-105',
+          showManager && 'rotate-45'
+        )}
+      >
+        <Settings className="w-6 h-6" />
+      </button>
+
+      {/* Manager Panel */}
+      {showManager && (
+        <div className="absolute bottom-20 right-0 w-80 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
+          {/* Header */}
+          <div className="px-4 py-3 bg-gradient-to-r from-brand-700 to-teal-600 text-white">
+            <h3 className="font-bold text-sm">Sắp xếp Categories</h3>
+            <p className="text-xs text-white/70">Thay đổi thứ tự hiển thị trong Chat</p>
+          </div>
+
+          {/* Category List */}
+          <div className="p-3 space-y-2 max-h-80 overflow-y-auto">
+            {localOrder.map((catId, index) => {
+              const bot = botNames[catId] || { name: catId, icon: '🤖', color: 'bg-gray-100 text-gray-700' };
+              return (
+                <div
+                  key={catId}
+                  className="flex items-center gap-2 p-2 rounded-xl bg-slate-50 border border-slate-200 hover:border-brand-300 transition-colors"
+                >
+                  <div className="w-6 h-6 rounded-lg bg-brand-100 text-brand-700 font-bold text-xs flex items-center justify-center">
+                    {index + 1}
+                  </div>
+                  <div className={clsx('w-8 h-8 rounded-lg flex items-center justify-center text-lg', bot.color)}>
+                    {bot.icon}
+                  </div>
+                  <span className="flex-1 text-xs font-medium text-slate-700 truncate">{bot.name}</span>
+                  <button
+                    onClick={() => moveUp(index)}
+                    disabled={index === 0}
+                    className="p-1 rounded hover:bg-slate-200 disabled:opacity-30 disabled:cursor-not-allowed"
+                  >
+                    <ArrowUp className="w-4 h-4 text-slate-600" />
+                  </button>
+                  <button
+                    onClick={() => moveDown(index)}
+                    disabled={index === localOrder.length - 1}
+                    className="p-1 rounded hover:bg-slate-200 disabled:opacity-30 disabled:cursor-not-allowed"
+                  >
+                    <ArrowDown className="w-4 h-4 text-slate-600" />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Save Button */}
+          <div className="px-3 pb-3">
+            <button
+              onClick={handleSave}
+              disabled={isSaving}
+              className={clsx(
+                'w-full py-2.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 transition-all',
+                saved
+                  ? 'bg-green-500 text-white'
+                  : 'bg-brand-700 text-white hover:bg-brand-800',
+                isSaving && 'opacity-50 cursor-not-allowed'
+              )}
+            >
+              {isSaving ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : saved ? (
+                <>
+                  <Check className="w-4 h-4" />
+                  Đã lưu!
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4" />
+                  Lưu thứ tự
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

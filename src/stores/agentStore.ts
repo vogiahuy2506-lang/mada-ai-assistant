@@ -262,10 +262,10 @@ const agentStore = create<AgentState>()(
 
       getActiveAgents: () => {
         const agents = get().agents.filter(a => a.isActive);
-        // Sort by sort_order (if available), then by createdAt as fallback
+        // Sort by sortOrder (from backend sort_order), then by createdAt as fallback
         return agents.sort((a, b) => {
-          const orderA = (a as any).sort_order ?? 0;
-          const orderB = (b as any).sort_order ?? 0;
+          const orderA = a.sortOrder ?? 0;
+          const orderB = b.sortOrder ?? 0;
           if (orderA !== orderB) return orderA - orderB;
           // Fallback: older agents first
           return (a.createdAt || 0) - (b.createdAt || 0);

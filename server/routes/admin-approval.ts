@@ -16,13 +16,13 @@ import db from '../lib/db';
 
 const router = Router();
 
-// All routes require admin role
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-router.use(authenticate as any, requireRole('admin') as any);
+// ⭐ Áp dụng auth cho TỪNG route riêng lẻ thay vì router.use()
+// Để tránh chặn các endpoint /api/admin/* KHÔNG thuộc approvalRoutes
+const requireAdminAuth = [authenticate as any, requireRole('admin') as any];
 
 // ============== GET /api/admin/approvals/pending =============
 
-router.get('/pending', (_req: Request, res: Response) => {
+router.get('/pending', requireAdminAuth, (_req: Request, res: Response) => {
   try {
     const pendingUsers = getPendingUsers();
     
@@ -48,7 +48,7 @@ router.get('/pending', (_req: Request, res: Response) => {
 
 // ============== GET /api/admin/approvals/stats =============
 
-router.get('/stats', (_req: Request, res: Response) => {
+router.get('/stats', requireAdminAuth, (_req: Request, res: Response) => {
   try {
     const pendingCount = getPendingUsersCount();
     
@@ -79,7 +79,7 @@ router.get('/stats', (_req: Request, res: Response) => {
 });
 
 // ============== POST /api/admin/approvals/:userId/approve =============
-router.post('/:userId/approve', async (req: Request, res: Response) => {
+router.post('/:userId/approve', requireAdminAuth, async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
     const adminId = (req as Request & { user?: { id: string } }).user?.id || '';
@@ -101,7 +101,7 @@ router.post('/:userId/approve', async (req: Request, res: Response) => {
 });
 
 // ============== POST /api/admin/approvals/:userId/reject =============
-router.post('/:userId/reject', async (req: Request, res: Response) => {
+router.post('/:userId/reject', requireAdminAuth, async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
     const { reason } = req.body;
@@ -124,7 +124,7 @@ router.post('/:userId/reject', async (req: Request, res: Response) => {
 });
 
 // ============== POST /api/admin/approvals/bulk-approve =============
-router.post('/bulk-approve', async (req: Request, res: Response) => {
+router.post('/bulk-approve', requireAdminAuth, async (req: Request, res: Response) => {
   try {
     const { userIds } = req.body;
     const adminId = (req as Request & { user?: { id: string } }).user?.id || '';

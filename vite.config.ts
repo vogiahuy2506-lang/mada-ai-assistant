@@ -43,11 +43,11 @@ export default defineConfig({
     },
     proxy: {
       '/api': {
-        target: 'http://localhost:3009',
+        target: 'http://localhost:3008',
         changeOrigin: true,
       },
       '/ws': {
-        target: 'ws://localhost:3009',
+        target: 'ws://localhost:3008',
         ws: true,
       },
     },

@@ -846,6 +846,23 @@ export function ChatPage() {
     return () => window.removeEventListener('focus', onFocus);
   }, [loadAgents]);
 
+  // ⭐ Sync system settings (categoryOrder) from backend on mount + when window regains focus
+  const loadSystemSettings = useSystemSettingsStore((s) => s.loadFromBackend);
+  useEffect(() => {
+    console.log('[ChatPage] Loading system settings from backend...');
+    loadSystemSettings().then(() => {
+      console.log('[ChatPage] System settings loaded, categoryOrder:', useSystemSettingsStore.getState().categoryOrder);
+    }).catch((err) => {
+      console.error('[ChatPage] Failed to load system settings:', err);
+    });
+    const onFocus = () => {
+      console.log('[ChatPage] Window focus - reloading system settings...');
+      loadSystemSettings();
+    };
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [loadSystemSettings]);
+
   // ⭐ Fetch custom questions from API on mount
   useEffect(() => {
     const categories: ATCategory[] = ['vision', 'hearing', 'mobility', 'cognition', 'communication', 'daily_living', 'education'];
@@ -866,9 +883,22 @@ export function ChatPage() {
   useEffect(() => {
     const cleanup = onAgentChange((event) => {
       console.log('[ChatPage] 📡 Received agent change broadcast:', event.type, event);
-      
+
+      // ⭐ Xử lý thay đổi category order (từ AdminSettings)
+      if (event.type === 'category-order-changed') {
+        console.log('[ChatPage] 🔄 Category order changed, reloading system settings...');
+        useSystemSettingsStore.getState().loadFromBackend();
+        return;
+      }
+
       // Reload agents ngay lập tức khi có thay đổi từ Admin
-      loadAgents();
+      // Dùng getState() để đảm bảo luôn gọi đúng phiên bản mới nhất của loadAgents
+      console.log('[ChatPage] 🔄 Calling loadAgents() due to broadcast...');
+      useAgentStore.getState().loadAgents().then(() => {
+        const agents = useAgentStore.getState().agents;
+        console.log('[ChatPage] ✅ loadAgents complete. agents count:', agents.length);
+        agents.forEach((a, i) => console.log(`  [${i}] ${a.name} (sortOrder: ${a.sortOrder})`));
+      });
       
       // ⭐ Nếu là thay đổi questions, fetch lại questions từ API
       if (event.type === 'questions-changed') {
@@ -889,7 +919,7 @@ export function ChatPage() {
       }
     });
     return cleanup;
-  }, [loadAgents, language]);
+  }, [language]);
 
   // Load chat settings from backend on mount
   useEffect(() => {
@@ -1187,10 +1217,19 @@ export function ChatPage() {
   }, []);
 
   // Agent state - subscribe to agents array directly for proper reactivity
+  // NOTE: Both selectors must read from `s.agents` to ensure Zustand tracks changes properly.
+  // The old approach used `useAgentStore((s) => s.getActiveAgents)` which returned the same
+  // function reference every time, causing Zustand to skip re-renders and leave activeAgents stale.
   const agents = useAgentStore((s) => s.agents);
-  // Get sorted active agents from store (sorted by sortOrder, then createdAt)
+  const activeAgents = useAgentStore((s) => {
+    return s.agents.filter(a => a.isActive).sort((a, b) => {
+      const orderA = a.sortOrder ?? 0;
+      const orderB = b.sortOrder ?? 0;
+      if (orderA !== orderB) return orderA - orderB;
+      return (a.createdAt || 0) - (b.createdAt || 0);
+    });
+  });
   const getActiveAgents = useAgentStore((s) => s.getActiveAgents);
-  const activeAgents = getActiveAgents();
   const { selectedAgentId } = useSelectedAgentStore();
   // Fallback to default agent if no agent is selected or activeAgents is empty
   const defaultAgent = activeAgents[0];
@@ -3291,11 +3330,11 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
               </button>
 
               {showLanguageMenu && (
-                <div className="absolute right-0 top-full mt-2 w-64 bg-white border border-slate-200 rounded-2xl shadow-lg overflow-hidden z-50">
-                  <div className="px-4 py-3 bg-gradient-to-r from-blue-500 to-indigo-500">
-                    <p className="text-sm font-semibold text-white">{t('chat.selectLanguage')}</p>
-                  </div>
-                  <div className="p-2">
+                <div 
+                  className="absolute right-0 top-full mt-2 w-56 bg-white border border-black/10 rounded-2xl shadow-2xl overflow-hidden z-50"
+                  dir="ltr"
+                >
+                  <div className="p-2 space-y-1">
                     {LANGUAGES.map((lang) => (
                       <button
                         key={lang.code}
@@ -3304,18 +3343,31 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
                           setShowLanguageMenu(false);
                         }}
                         className={clsx(
-                          'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors',
+                          'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200',
                           language === lang.code
-                            ? 'bg-blue-50 text-blue-700'
-                            : 'hover:bg-slate-50 text-slate-700'
+                            ? 'bg-emerald-500 text-white'
+                            : 'hover:bg-gray-50 text-gray-700'
                         )}
                       >
-                        <span className="text-xl">{lang.flag}</span>
-                        <div className="flex-1 text-left">
-                          <span className="font-medium text-sm">{lang.name}</span>
-                        </div>
+                        <span className="text-lg flex-shrink-0">{lang.flag}</span>
+                        <span className={clsx(
+                          'flex-1 text-left text-sm font-medium',
+                          language === lang.code ? 'text-white' : ''
+                        )}>
+                          {lang.name}
+                        </span>
+                        <span className={clsx(
+                          'text-xs',
+                          language === lang.code ? 'text-white/80' : 'text-gray-400'
+                        )}>
+                          {lang.code.toUpperCase()}
+                        </span>
                         {language === lang.code && (
-                          <Check className="w-4 h-4 text-blue-500" />
+                          <div className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
+                            <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                            </svg>
+                          </div>
                         )}
                       </button>
                     ))}

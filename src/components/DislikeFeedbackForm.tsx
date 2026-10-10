@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, ThumbsDown, Check, AlertCircle, MessageSquare, ChevronDown } from 'lucide-react';
+import { X, ThumbsDown, Check, AlertCircle } from 'lucide-react';
 import clsx from 'clsx';
 import type { Language } from '@/types';
 
@@ -13,6 +13,20 @@ interface FeedbackQuestion {
   icon: string;
   isActive: boolean;
   sortOrder: number;
+}
+
+// Map API response to component interface
+function mapApiQuestion(q: any): FeedbackQuestion {
+  return {
+    id: q.id,
+    text_vi: q.text_vi || '',
+    text_en: q.text_en || '',
+    text_ar: q.text_ar || '',
+    text_fr: q.text_fr || '',
+    icon: q.icon || 'plus-circle',
+    isActive: q.is_active === 1,
+    sortOrder: q.sort_order || 0,
+  };
 }
 
 interface DislikeFeedbackFormProps {
@@ -86,51 +100,51 @@ function getQuestionText(question: FeedbackQuestion, lang: Language): string {
 // Translations for the form
 const translations: Record<Language, Record<string, string>> = {
   vi: {
-    title: 'Gửi phản hồi',
+    title: 'Gửi góp ý chất lượng',
     subtitle: 'MADA AI Assistant',
-    reasonLabel: 'Vui lòng chọn lý do phản hồi tiêu cực:',
-    detailsPlaceholder: 'Nhập phản hồi chi tiết của bạn tại đây...',
-    saveToDashboard: 'Lưu vào Dashboard để theo dõi',
-    submit: 'Gửi phản hồi',
-    cancel: 'Hủy',
-    chatbotResponse: 'Câu trả lời đang được phản hồi:',
-    thankYou: 'Cảm ơn bạn đã phản hồi!',
+    reasonLabel: 'Vui lòng chọn lý do góp ý:',
+    detailsPlaceholder: 'Mô tả thêm chi tiết (tùy chọn)...',
+    saveToDashboard: 'Lưu vào Dashboard',
+    saveToDashboardHint: 'Giúp đội ngũ theo dõi & cải thiện',
+    submit: 'Gửi góp ý',
+    cancel: 'Hủy bỏ',
+    thankYou: 'Cảm ơn bạn đã góp ý!',
     selectAtLeastOne: 'Vui lòng chọn ít nhất một lý do',
   },
   en: {
-    title: 'Send Feedback',
+    title: 'Send Quality Feedback',
     subtitle: 'MADA AI Assistant',
-    reasonLabel: 'Please select the reason for your negative feedback:',
-    detailsPlaceholder: 'Enter your detailed feedback here...',
-    saveToDashboard: 'Save to Dashboard for tracking',
-    submit: 'Submit Feedback',
+    reasonLabel: 'Please select the reason for your feedback:',
+    detailsPlaceholder: 'Add more details (optional)...',
+    saveToDashboard: 'Save to Dashboard',
+    saveToDashboardHint: 'Help the team track & improve',
+    submit: 'Send Feedback',
     cancel: 'Cancel',
-    chatbotResponse: 'Chatbot response being replied to:',
     thankYou: 'Thank you for your feedback!',
     selectAtLeastOne: 'Please select at least one reason',
   },
   ar: {
-    title: 'إرسال التعليق',
+    title: 'إرسال تعليقات الجودة',
     subtitle: 'MADA AI Assistant',
-    reasonLabel: 'الرجاء تحديد سبب التعليق السلبي:',
-    detailsPlaceholder: 'أدخل تعليقك التفصيلي هنا...',
-    saveToDashboard: 'حفظ إلى لوحة التحكم للتتبع',
+    reasonLabel: 'الرجاء تحديد سبب التعليق:',
+    detailsPlaceholder: 'إضافة تفاصيل إضافية (اختياري)...',
+    saveToDashboard: 'حفظ إلى لوحة التحكم',
+    saveToDashboardHint: 'مساعدة الفريق على التتبع والتحسين',
     submit: 'إرسال التعليق',
     cancel: 'إلغاء',
-    chatbotResponse: 'رد الشات بوت قيد التعليق:',
-    thankYou: 'شكراً ل تعليقك!',
+    thankYou: 'شكراً لتعليقك!',
     selectAtLeastOne: 'الرجاء تحديد سبب واحد على الأقل',
   },
   fr: {
-    title: 'Envoyer les commentaires',
+    title: 'Envoyer des commentaires de qualité',
     subtitle: 'MADA AI Assistant',
-    reasonLabel: 'Veuillez sélectionner la raison de votre commentaire négatif:',
-    detailsPlaceholder: 'Entrez vos commentaires détaillés ici...',
-    saveToDashboard: 'Enregistrer dans le tableau de bord pour le suivi',
-    submit: 'Soumettre les commentaires',
+    reasonLabel: 'Veuillez sélectionner la raison du commentaire:',
+    detailsPlaceholder: 'Ajouter plus de détails (facultatif)...',
+    saveToDashboard: "Enregistrer dans le tableau de bord",
+    saveToDashboardHint: "Aider l'équipe à suivre et améliorer",
+    submit: "Soumettre le commentaire",
     cancel: 'Annuler',
-    chatbotResponse: 'Réponse du chatbot étant répondue:',
-    thankYou: 'Merci pour vos commentaires!',
+    thankYou: 'Merci pour votre commentaire!',
     selectAtLeastOne: 'Veuillez sélectionner au moins une raison',
   },
 };
@@ -159,7 +173,13 @@ export function DislikeFeedbackForm({
         if (res.ok) {
           const data = await res.json();
           if (data.success && data.data && data.data.length > 0) {
-            setQuestions(data.data);
+            const mappedQuestions = data.data
+              .filter((q: any) => q.is_active === 1) // Only show active questions
+              .map(mapApiQuestion)
+              .sort((a: FeedbackQuestion, b: FeedbackQuestion) => a.sortOrder - b.sortOrder);
+            if (mappedQuestions.length > 0) {
+              setQuestions(mappedQuestions);
+            }
           }
         }
       } catch (err) {
@@ -218,7 +238,6 @@ export function DislikeFeedbackForm({
     setError('');
 
     try {
-      // Submit to backend
       const res = await fetch('/api/feedback', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -233,16 +252,10 @@ export function DislikeFeedbackForm({
 
       if (res.ok) {
         setShowThankYou(true);
-        onSubmit({
-          selectedReasons,
-          details,
-          saveToDashboard,
-        });
-
-        // Close after showing thank you message
-        setTimeout(() => {
-          onClose();
-        }, 1500);
+        onSubmit({ selectedReasons, details, saveToDashboard });
+        setTimeout(() => { onClose(); }, 2000);
+      } else {
+        setError('Failed to submit feedback. Please try again.');
       }
     } catch (err) {
       console.error('[DislikeFeedbackForm] Submit error:', err);
@@ -252,315 +265,274 @@ export function DislikeFeedbackForm({
     }
   };
 
-  // Render icon based on icon name
-  const renderIcon = (iconName: string) => {
-    switch (iconName) {
-      case 'alert-circle':
-        return <AlertCircle className="w-5 h-5 text-amber-500" />;
-      case 'target':
-        return (
-          <svg className="w-5 h-5 text-red-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="12" cy="12" r="10" />
-            <circle cx="12" cy="12" r="6" />
-            <circle cx="12" cy="12" r="2" />
-          </svg>
-        );
-      case 'message-square':
-        return <MessageSquare className="w-5 h-5 text-blue-500" />;
-      case 'plus-circle':
-        return (
-          <svg className="w-5 h-5 text-purple-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="12" cy="12" r="10" />
-            <line x1="12" y1="8" x2="12" y2="16" />
-            <line x1="8" y1="12" x2="16" y2="12" />
-          </svg>
-        );
-      default:
-        return <ChevronDown className="w-5 h-5 text-slate-400" />;
-    }
-  };
-
   if (!isOpen) return null;
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm animate-fade-in"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) {
-          onClose();
-        }
-      }}
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+      style={{ backgroundColor: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(6px)' }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 animate-slide-up overflow-hidden">
-        {/* Header - Modern Gradient */}
-        <div className="relative bg-gradient-to-r from-teal-600 via-teal-500 to-cyan-500 px-5 py-4">
-          <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCA0MCA0MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxwYXRoIGQ9Ik0zNiAxOGMtOS45NDEgMC0xOCA4LjA1OS0xOCAxOHM4LjA1OSAxOCAxOCAxOCAxOC04LjA1OSAxOC0xOC04LjA1OS0xOC0xOC0xOHptMCAzMmMtNy43MzIgMC0xNC02LjI2OC0xNC0xNHM2LjI2OC0xNCAxNC0xNCAxNCA2LjI2OCAxNCAxNC02LjI2OCAxNC0xNCAxNHoiIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iLjAzIi8+PC9nPjwvc3ZnPg==')] opacity-20" />
-          <div className="relative flex items-center justify-between">
+      {/* Main Card */}
+      <div
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col animate-in fade-in zoom-in-95 duration-200"
+        style={{ maxHeight: '90vh', overflow: 'hidden' }}
+      >
+        {/* ─── HEADER ─── */}
+        <div className="relative px-5 pt-5 pb-4 flex-shrink-0">
+          {/* Accent bar */}
+          <div className="absolute top-0 left-6 right-6 h-1 bg-gradient-to-r from-red-400 via-rose-400 to-red-500 rounded-full" />
+
+          <div className="flex items-start justify-between mt-1">
+            {/* Left: icon + title */}
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center shadow-lg">
-                <ThumbsDown className="w-5 h-5 text-white" />
+              <div className={clsx(
+                'w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0',
+                'bg-gradient-to-br from-red-400 to-rose-500'
+              )}>
+                <ThumbsDown className="w-5 h-5 text-white" strokeWidth={2} />
               </div>
               <div>
-                <h2 className="text-base font-bold text-white">{t('title')}</h2>
-                <p className="text-xs text-white/80">{t('subtitle')}</p>
+                <h2 className="text-[15px] font-bold text-slate-800 leading-snug">{t('title')}</h2>
+                <p className="text-xs text-slate-400 mt-0.5">{t('subtitle')}</p>
               </div>
             </div>
+
+            {/* Close button */}
             <button
               onClick={onClose}
-              className="p-2 rounded-full hover:bg-white/20 text-white/80 hover:text-white transition-all backdrop-blur-sm"
+              className={clsx(
+                'w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0',
+                'text-slate-400 hover:text-slate-600 hover:bg-slate-100',
+                'transition-all duration-150 cursor-pointer'
+              )}
             >
-              <X className="w-5 h-5" />
+              <X className="w-4 h-4" />
             </button>
           </div>
         </div>
 
-        {/* Content */}
-        <div className="p-5">
-          {showThankYou ? (
-            <div className="text-center py-10 animate-fade-in">
-              <div className="w-20 h-20 rounded-full bg-gradient-to-br from-teal-400 to-cyan-400 flex items-center justify-center mx-auto mb-5 shadow-xl shadow-teal-200/50">
-                <Check className="w-10 h-10 text-white" strokeWidth={3} />
-              </div>
-              <h3 className="text-lg font-bold bg-gradient-to-r from-teal-600 to-cyan-600 bg-clip-text text-transparent mb-2">{t('thankYou')}</h3>
-              <p className="text-sm text-slate-500">
-                {language === 'vi' ? 'Phản hồi của bạn đã được ghi nhận!' :
-                 language === 'en' ? 'Your feedback has been recorded!' :
-                 language === 'ar' ? 'تم تسجيل تعليقك!' :
-                 'Votre commentaire a été enregistré!'}
-              </p>
-            </div>
-          ) : (
-            <>
-              {/* Reason Selection - Modern Pill Style */}
-              <div className="mb-4">
-                <label className="block text-sm font-semibold text-slate-700 mb-3">
-                  {t('reasonLabel')}
-                </label>
-                <div className="space-y-2">
-                  {questions
-                    .filter((q) => q.isActive)
-                    .sort((a, b) => a.sortOrder - b.sortOrder)
-                    .map((question) => {
-                      const isSelected = selectedReasons.includes(question.id);
-                      const isOther = question.id === 'other';
+        {/* ─── SCROLLABLE CONTENT ─── */}
+        <div className="flex-1 overflow-y-auto px-5 pb-2 space-y-4">
 
-                      return (
-                        <div
-                          key={question.id}
-                          onClick={() => handleReasonToggle(question.id)}
-                          role="button"
-                          tabIndex={0}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' || e.key === ' ') {
-                              e.preventDefault();
-                              handleReasonToggle(question.id);
-                            }
-                          }}
-                          className={clsx(
-                            'flex items-start gap-3 p-3.5 rounded-xl border-2 cursor-pointer transition-all duration-200 select-none',
-                            isSelected
-                              ? 'border-teal-400 bg-gradient-to-r from-teal-50 to-cyan-50 shadow-sm shadow-teal-100'
-                              : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
-                          )}
-                        >
-                          {/* Custom Checkbox - Modern Circle */}
-                          <div
-                            className={clsx(
-                              'w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 transition-all duration-200',
-                              isSelected
-                                ? 'bg-gradient-to-br from-teal-500 to-cyan-500 shadow-lg shadow-teal-200'
-                                : 'bg-slate-100 border-2 border-slate-300'
-                            )}
-                          >
-                            {isSelected ? (
-                              <svg className="w-3 h-3 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-                                <polyline points="20 6 9 17 4 12" />
-                              </svg>
-                            ) : null}
-                          </div>
-                          
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2.5">
-                              <span className={clsx(
-                                'transition-colors duration-200',
-                                isSelected ? 'text-teal-700' : 'text-slate-600'
-                              )}>
-                                {renderIcon(question.icon)}
-                              </span>
-                              <span
-                                className={clsx(
-                                  'text-sm font-medium',
-                                  isSelected ? 'text-teal-700' : 'text-slate-600'
-                                )}
-                              >
-                                {getQuestionText(question, language)}
-                              </span>
-                            </div>
-                            {isOther && isSelected && (
-                              <textarea
-                                value={details}
-                                onChange={(e) => setDetails(e.target.value)}
-                                onClick={(e) => e.stopPropagation()}
-                                placeholder={t('detailsPlaceholder')}
-                                className="w-full mt-3 p-3 text-sm border-2 border-teal-200 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-teal-200 focus:border-teal-300 transition-all bg-white"
-                                rows={2}
-                                autoFocus
-                              />
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                </div>
-              </div>
+          {/* Reason selection */}
+          <div>
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2.5 px-1">
+              {t('reasonLabel')}
+            </p>
+            <div className="space-y-2">
+              {questions
+                .filter((q) => q.isActive)
+                .sort((a, b) => a.sortOrder - b.sortOrder)
+                .map((question) => {
+                  const isSelected = selectedReasons.includes(question.id);
+                  const isOther = question.id === 'other';
 
-              {/* Details Textarea (only if not "Other" selected) */}
-              {!selectedReasons.includes('other') && (
-                <div className="mb-4">
-                  <textarea
-                    value={details}
-                    onChange={(e) => setDetails(e.target.value)}
-                    placeholder={t('detailsPlaceholder')}
-                    className="w-full p-3 text-sm border-2 border-slate-200 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-teal-200 focus:border-teal-300 transition-all bg-slate-50/50"
-                    rows={3}
-                  />
-                </div>
-              )}
-
-              {/* Save to Dashboard Toggle - Modern UI */}
-              <div className="mb-4">
-                <button
-                  type="button"
-                  onClick={() => setSaveToDashboard(!saveToDashboard)}
-                  className={clsx(
-                    'w-full flex items-center justify-between px-4 py-3 rounded-xl border-2 transition-all duration-200',
-                    saveToDashboard
-                      ? 'bg-gradient-to-r from-teal-50 to-cyan-50 border-secondary/30 hover:border-secondary/50'
-                      : 'bg-slate-50 border-slate-200 hover:border-slate-300'
-                  )}
-                >
-                  {/* Left: Icon + Text */}
-                  <div className="flex items-center gap-3">
-                    <div className={clsx(
-                      'w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-200',
-                      saveToDashboard
-                        ? 'bg-gradient-to-br from-teal-500 to-cyan-500 shadow-lg shadow-teal-200'
-                        : 'bg-slate-200'
-                    )}>
-                      <svg 
+                  return (
+                    <div key={question.id}>
+                      {/* Option row */}
+                      <div
+                        onClick={() => handleReasonToggle(question.id)}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            handleReasonToggle(question.id);
+                          }
+                        }}
                         className={clsx(
-                          'w-4.5 h-4.5 transition-colors duration-200',
-                          saveToDashboard ? 'text-white' : 'text-slate-500'
-                        )} 
-                        viewBox="0 0 24 24" 
-                        fill="none" 
-                        stroke="currentColor" 
-                        strokeWidth="2.5"
+                          'flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all duration-150 select-none',
+                          isSelected
+                            ? 'border-red-400 bg-red-50 shadow-sm'
+                            : 'border-slate-200 hover:border-red-200 hover:bg-red-50/40'
+                        )}
                       >
-                        <path d="M9 17H7A5 5 0 0 1 7 7h2" />
-                        <path d="M15 7h2a5 5 0 1 1 0 10h-2" />
-                        <line x1="8" y1="12" x2="16" y2="12" />
-                      </svg>
-                    </div>
-                    <div className="text-left">
-                      <p className={clsx(
-                        'text-sm font-semibold transition-colors duration-200',
-                        saveToDashboard ? 'text-teal-700' : 'text-slate-600'
-                      )}>
-                        {t('saveToDashboard')}
-                      </p>
-                      <p className={clsx(
-                        'text-[11px] transition-colors duration-200',
-                        saveToDashboard ? 'text-teal-500' : 'text-slate-400'
-                      )}>
-                        {language === 'vi' ? 'Theo dõi & cải thiện câu trả lời' :
-                         language === 'en' ? 'Track & improve responses' :
-                         language === 'ar' ? 'تتبع وتحسين الردود' :
-                         'Suivre et améliorer les réponses'}
-                      </p>
-                    </div>
-                  </div>
-                  
-                  {/* Right: Toggle Switch */}
-                  <div className={clsx(
-                    'relative w-12 h-7 rounded-full transition-all duration-300',
-                    saveToDashboard
-                      ? 'bg-gradient-to-r from-teal-500 to-cyan-500 shadow-lg shadow-teal-200/50'
-                      : 'bg-slate-300'
-                  )}>
-                    <div className={clsx(
-                      'absolute top-1 w-5 h-5 bg-white rounded-full shadow-md transition-all duration-300',
-                      saveToDashboard
-                        ? 'left-6 translate-x-0'
-                        : 'left-1 -translate-x-0'
-                    )}>
-                      {saveToDashboard && (
-                        <svg className="w-full h-full p-0.5 text-teal-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-                          <polyline points="20 6 9 17 4 12" />
-                        </svg>
+                        {/* Checkbox - clean design */}
+                        <div className={clsx(
+                          'w-5 h-5 rounded-lg flex items-center justify-center flex-shrink-0 transition-all duration-200',
+                          isSelected
+                            ? 'bg-red-500 shadow-sm'
+                            : 'bg-white border-2 border-slate-300'
+                        )}>
+                          {isSelected && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
+                        </div>
+
+                        {/* Label only - clean and simple */}
+                        <span className={clsx(
+                          'text-sm font-medium flex-1 leading-snug',
+                          isSelected ? 'text-red-700' : 'text-slate-600'
+                        )}>
+                          {getQuestionText(question, language)}
+                        </span>
+
+                        {/* Small indicator for selected */}
+                        {isSelected && (
+                          <div className="w-1.5 h-1.5 rounded-full bg-red-400 flex-shrink-0" />
+                        )}
+                      </div>
+
+                      {/* Details textarea (only for "Other") */}
+                      {isOther && isSelected && (
+                        <div className="mt-2 ml-8">
+                          <textarea
+                            value={details}
+                            onChange={(e) => setDetails(e.target.value)}
+                            onClick={(e) => e.stopPropagation()}
+                            placeholder={t('detailsPlaceholder')}
+                            className={clsx(
+                              'w-full p-3 text-sm rounded-xl resize-none transition-all duration-150',
+                              'border-2 border-red-200 bg-white',
+                              'focus:outline-none focus:border-red-300 focus:ring-2 focus:ring-red-100'
+                            )}
+                            rows={2}
+                            autoFocus
+                          />
+                        </div>
                       )}
                     </div>
-                  </div>
-                </button>
-              </div>
+                  );
+                })}
+            </div>
+          </div>
 
-              {/* Error Message */}
-              {error && (
-                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl">
-                  <p className="text-xs text-red-600 flex items-center gap-2">
-                    <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                    {error}
-                  </p>
-                </div>
-              )}
+          {/* Details textarea (for non-"Other" selections) */}
+          {!selectedReasons.includes('other') && selectedReasons.length > 0 && (
+            <div>
+              <textarea
+                value={details}
+                onChange={(e) => setDetails(e.target.value)}
+                placeholder={t('detailsPlaceholder')}
+                className={clsx(
+                  'w-full p-3 text-sm rounded-xl resize-none transition-all duration-150',
+                  'border-2 border-slate-200 bg-white',
+                  'focus:outline-none focus:border-red-300 focus:ring-2 focus:ring-red-50'
+                )}
+                rows={2}
+              />
+            </div>
+          )}
 
-              {/* Action Buttons - Modern Style */}
-              <div className="flex gap-3">
-                <button
-                  onClick={onClose}
-                  className="flex-1 px-4 py-3 text-sm font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all"
-                >
-                  {t('cancel')}
-                </button>
-                <button
-                  onClick={handleSubmit}
-                  disabled={isSubmitting || selectedReasons.length === 0}
-                  className={clsx(
-                    'flex-1 px-4 py-3 text-sm font-semibold text-white rounded-xl transition-all duration-200',
-                    selectedReasons.length > 0
-                      ? 'bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 shadow-lg shadow-teal-200 hover:shadow-xl hover:shadow-teal-300 active:scale-[0.98]'
-                      : 'bg-slate-300 cursor-not-allowed'
-                  )}
-                >
-                  {isSubmitting ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24">
-                        <circle
-                          className="opacity-25"
-                          cx="12"
-                          cy="12"
-                          r="10"
-                          stroke="currentColor"
-                          strokeWidth="4"
-                          fill="none"
-                        />
-                        <path
-                          className="opacity-75"
-                          fill="currentColor"
-                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                        />
-                      </svg>
-                      Processing...
-                    </span>
-                  ) : (
-                    t('submit')
-                  )}
-                </button>
-              </div>
-            </>
+          {/* Error */}
+          {error && (
+            <div className={clsx(
+              'flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-sm',
+              'bg-red-50 border border-red-100 text-red-600'
+            )}>
+              <AlertCircle className="w-4 h-4 flex-shrink-0 text-red-400" />
+              <span className="font-medium">{error}</span>
+            </div>
           )}
         </div>
+
+        {/* ─── FOOTER ─── */}
+        <div className="flex-shrink-0 px-5 pb-5 pt-1 space-y-3 border-t border-slate-100 mt-2">
+          {/* Save to Dashboard toggle */}
+          <button
+            type="button"
+            onClick={() => setSaveToDashboard(!saveToDashboard)}
+            className={clsx(
+              'w-full flex items-center justify-between px-4 py-3 rounded-xl border-2 transition-all duration-150 cursor-pointer',
+              saveToDashboard
+                ? 'border-red-200 bg-red-50/80'
+                : 'border-slate-100 bg-slate-50/80 hover:border-slate-200'
+            )}
+          >
+            <div className="flex items-center gap-3">
+              <div className={clsx(
+                'w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-150',
+                saveToDashboard ? 'bg-gradient-to-br from-red-400 to-rose-500' : 'bg-slate-200'
+              )}>
+                <svg
+                  className={clsx('w-4 h-4 transition-colors duration-150', saveToDashboard ? 'text-white' : 'text-slate-400')}
+                  viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"
+                >
+                  <rect x="3" y="3" width="7" height="7" rx="1" />
+                  <rect x="14" y="3" width="7" height="7" rx="1" />
+                  <rect x="3" y="14" width="7" height="7" rx="1" />
+                  <rect x="14" y="14" width="7" height="7" rx="1" />
+                </svg>
+              </div>
+              <div className="text-left">
+                <p className={clsx('text-sm font-semibold', saveToDashboard ? 'text-red-700' : 'text-slate-600')}>
+                  {t('saveToDashboard')}
+                </p>
+                <p className={clsx('text-[11px]', saveToDashboard ? 'text-red-400' : 'text-slate-400')}>
+                  {t('saveToDashboardHint')}
+                </p>
+              </div>
+            </div>
+
+            {/* Toggle */}
+            <div className={clsx(
+              'relative w-11 h-6 rounded-full transition-all duration-200 flex-shrink-0',
+              saveToDashboard ? 'bg-red-500' : 'bg-slate-300'
+            )}>
+              <div className={clsx(
+                'absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-transform duration-200',
+                saveToDashboard ? 'translate-x-5' : 'translate-x-0.5'
+              )} />
+            </div>
+          </button>
+
+          {/* Action buttons */}
+          <div className="flex gap-3">
+            <button
+              onClick={onClose}
+              className={clsx(
+                'px-5 py-2.5 text-sm font-medium rounded-xl transition-all duration-150 cursor-pointer',
+                'text-slate-500 hover:text-slate-700 hover:bg-slate-100'
+              )}
+            >
+              {t('cancel')}
+            </button>
+            <button
+              onClick={handleSubmit}
+              disabled={isSubmitting || selectedReasons.length === 0}
+              className={clsx(
+                'flex-1 px-4 py-2.5 text-sm font-semibold rounded-xl transition-all duration-150 cursor-pointer',
+                'disabled:cursor-not-allowed disabled:opacity-50',
+                selectedReasons.length > 0
+                  ? 'bg-gradient-to-r from-red-500 to-rose-500 text-white hover:from-red-600 hover:to-rose-600 active:scale-[0.98] shadow-lg shadow-red-200'
+                  : 'bg-slate-200 text-slate-400'
+              )}
+            >
+              {isSubmitting ? (
+                <span className="flex items-center justify-center gap-2">
+                  <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  Sending...
+                </span>
+              ) : (
+                t('submit')
+              )}
+            </button>
+          </div>
+        </div>
       </div>
+
+      {/* Thank you overlay */}
+      {showThankYou && (
+        <div
+          className="fixed inset-0 z-[10000] flex items-center justify-center p-4 pointer-events-none"
+          style={{ backgroundColor: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(4px)' }}
+        >
+          <div className="bg-white rounded-2xl shadow-2xl p-8 text-center animate-in zoom-in-95 duration-300">
+            <div className="w-16 h-16 rounded-full bg-green-50 border-2 border-green-100 flex items-center justify-center mx-auto mb-4">
+              <Check className="w-8 h-8 text-green-500" strokeWidth={2.5} />
+            </div>
+            <h3 className="text-lg font-bold text-slate-800 mb-1">{t('thankYou')}</h3>
+            <p className="text-sm text-slate-500">
+              {language === 'vi' ? 'Phản hồi của bạn đã được ghi nhận!' :
+               language === 'en' ? 'Your feedback has been recorded!' :
+               language === 'ar' ? 'تم تسجيل تعليقك!' :
+               'Votre commentaire a été enregistré!'}
+            </p>
+          </div>
+        </div>
+      )}
     </div>,
     document.body
   );

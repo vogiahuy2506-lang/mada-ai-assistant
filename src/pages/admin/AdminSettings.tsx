@@ -6,7 +6,8 @@ import { useSystemSettingsStore, useAuthStore, useLanguageStore } from '@/stores
 import { translations, Language } from '@/lib/translations';
 import clsx from 'clsx';
 import { systemApi } from '@/lib/api';
-import { CheckCircle, Check, Loader2, AlertCircle, Shield, Settings, Lock, Cloud, CreditCard, Mail, Bug, Sparkles, FileText, Image, Video, Music, File, Pencil, Save, X, GripVertical, ArrowUp, ArrowDown } from 'lucide-react';
+import { broadcastAgentChange } from '@/lib/agentBroadcast';
+import { CheckCircle, Check, Loader2, AlertCircle, Shield, Settings, Lock, Cloud, CreditCard, Mail, Bug, Sparkles, FileText, Image, Video, Music, File, Pencil, Save, X } from 'lucide-react';
 
 type Tab = 'general' | 'plans' | 'security' | 'ai' | 'integrations' | 'live' | 'system' | 'templates';
 
@@ -82,6 +83,13 @@ export function AdminSettings() {
         setAllSettings(res.data);
         setSavedAt(new Date().toLocaleTimeString());
         setTimeout(() => setSavedAt(null), 3000);
+
+        // ⭐ Broadcast category order change to all ChatPage instances
+        console.log('[AdminSettings] Broadcasting category order change:', categoryOrder);
+        broadcastAgentChange({
+          type: 'category-order-changed',
+          categoryOrder: categoryOrder,
+        });
       } else {
         setSaveError(lang['admin.settings.general.saveFailed']);
       }
@@ -316,96 +324,7 @@ export function AdminSettings() {
             </div>
           </div>
 
-          {/* ⭐ Bot Order - Sắp xếp thứ tự hiển thị các bot */}
-          <div className="bg-white rounded-2xl border border-outline-variant overflow-hidden">
-            <div className="px-8 py-6 border-b border-outline-variant">
-              <h3 className="text-lg font-black text-on-surface">{lang['admin.settings.arrangeBots'] || 'Sắp xếp Bot'}</h3>
-              <p className="text-sm text-on-surface-variant mt-1">{lang['admin.settings.dragToReorder'] || 'Kéo thả để thay đổi thứ tự hiển thị của các bot trong sidebar'}</p>
-            </div>
-            <div className="p-8">
-              {/* Bot order list */}
-              <div className="space-y-2">
-                {(categoryOrder || ['vision', 'hearing', 'communication', 'cognition', 'mobility', 'daily_living', 'education']).map((botId, index) => {
-                  const botNames: Record<string, { name: string; icon: string; color: string }> = {
-                    vision: { name: lang['admin.settings.bot.vision'] || 'Cảm giác - Thị giác', icon: '👁️', color: 'bg-violet-100 text-violet-700' },
-                    hearing: { name: lang['admin.settings.bot.hearing'] || 'Cảm giác - Thính giác', icon: '👂', color: 'bg-blue-100 text-blue-700' },
-                    communication: { name: lang['admin.settings.bot.communication'] || 'Giọng nói & Lời nói', icon: '🎤', color: 'bg-rose-100 text-rose-700' },
-                    cognition: { name: lang['admin.settings.bot.cognition'] || 'Tâm thần - Nhận thức', icon: '🧠', color: 'bg-amber-100 text-amber-700' },
-                    mobility: { name: lang['admin.settings.bot.mobility'] || 'Vận động thần kinh', icon: '🦾', color: 'bg-green-100 text-green-700' },
-                    daily_living: { name: lang['admin.settings.bot.dailyLiving'] || 'Hỗ trợ sinh hoạt', icon: '🏠', color: 'bg-purple-100 text-purple-700' },
-                    education: { name: lang['admin.settings.bot.education'] || 'Giáo dục', icon: '📚', color: 'bg-teal-100 text-teal-700' },
-                  };
-                  const bot = botNames[botId] || { name: botId, icon: '🤖', color: 'bg-gray-100 text-gray-700' };
 
-                  return (
-                    <div
-                      key={botId}
-                      className="flex items-center gap-3 p-4 rounded-xl bg-surface-variant/30 border border-outline-variant hover:border-primary/50 hover:bg-primary/5 transition-all group"
-                    >
-                      {/* Drag handle */}
-                      <div className="flex-shrink-0 cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600 opacity-50 group-hover:opacity-100 transition-opacity">
-                        <GripVertical className="w-5 h-5" />
-                      </div>
-
-                      {/* Order number */}
-                      <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary font-bold text-sm flex items-center justify-center flex-shrink-0">
-                        {index + 1}
-                      </div>
-
-                      {/* Bot icon and name */}
-                      <div className={`w-10 h-10 rounded-xl ${bot.color} flex items-center justify-center text-xl flex-shrink-0`}>
-                        {bot.icon}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-on-surface">{bot.name}</p>
-                        <p className="text-xs text-on-surface-variant">{botId}</p>
-                      </div>
-
-                      {/* Move buttons */}
-                      <div className="flex items-center gap-1 flex-shrink-0">
-                        <button
-                          onClick={() => {
-                            if (index > 0 && categoryOrder) {
-                              const newOrder = [...categoryOrder];
-                              [newOrder[index - 1], newOrder[index]] = [newOrder[index], newOrder[index - 1]];
-                              setCategoryOrder(newOrder);
-                            }
-                          }}
-                          disabled={index === 0}
-                          className="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                          title={lang['common.moveUp'] || 'Di chuyển lên'}
-                        >
-                          <ArrowUp className="w-4 h-4 text-gray-600" />
-                        </button>
-                        <button
-                          onClick={() => {
-                            const maxIndex = (categoryOrder || ['vision', 'hearing', 'communication', 'cognition', 'mobility', 'daily_living', 'education']).length - 1;
-                            if (index < maxIndex && categoryOrder) {
-                              const newOrder = [...categoryOrder];
-                              [newOrder[index], newOrder[index + 1]] = [newOrder[index + 1], newOrder[index]];
-                              setCategoryOrder(newOrder);
-                            }
-                          }}
-                          disabled={index === (categoryOrder || ['vision', 'hearing', 'communication', 'cognition', 'mobility', 'daily_living', 'education']).length - 1}
-                          className="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                          title={lang['common.moveDown'] || 'Di chuyển xuống'}
-                        >
-                          <ArrowDown className="w-4 h-4 text-gray-600" />
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div className="mt-4 flex items-center gap-2 text-sm text-on-surface-variant">
-                <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-                {lang['admin.settings.orderApplied'] || 'Thứ tự sẽ được áp dụng ngay lập tức sau khi lưu'}
-              </div>
-            </div>
-          </div>
-
-          {/* Pricing Plans Editor */}
           <PricingPlansEditor language={language} />
 
           {/* Save Button for Quota Settings */}

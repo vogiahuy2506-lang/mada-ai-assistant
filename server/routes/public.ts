@@ -404,6 +404,8 @@ router.get('/agents', (_req, res) => {
       knowledge_url: a.knowledge_url || null,
       productUrl: a.product_url || a.productUrl || null,
       product_url: a.product_url || null,
+      sort_order: a.sort_order ?? 0,
+      sortOrder: a.sort_order ?? 0,
       createdAt: a.created_at,
       created_at: a.created_at,
       updatedAt: a.updated_at,

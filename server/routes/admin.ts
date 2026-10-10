@@ -535,7 +535,7 @@ router.post('/agents', requireAdmin, (req: Request, res: Response) => {
     const {
       id, name, description, avatar, system_prompt, capabilities,
       is_active, mada_category, bot_id, prompt_id,
-      avatar_url, knowledge_url, product_urls,
+      avatar_url, knowledge_url, product_urls, sort_order,
     } = req.body;
 
     if (!name || !system_prompt) {
@@ -556,9 +556,10 @@ router.post('/agents', requireAdmin, (req: Request, res: Response) => {
         created_at, updated_at,
         avatar_url, knowledge_url, product_url,
         last_crawl_at, last_crawl_status, last_crawl_count,
-        prompt_id, crawl_follow_links, crawl_max_depth, crawl_max_pages
+        prompt_id, crawl_follow_links, crawl_max_depth, crawl_max_pages,
+        sort_order
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       agentId,
       name,
@@ -582,6 +583,7 @@ router.post('/agents', requireAdmin, (req: Request, res: Response) => {
       0,     // crawl_follow_links
       1,     // crawl_max_depth
       5,     // crawl_max_pages
+      sort_order || 0,
     );
 
     const agent = db.prepare('SELECT * FROM admin_agents WHERE id = ?').get(agentId) as any;

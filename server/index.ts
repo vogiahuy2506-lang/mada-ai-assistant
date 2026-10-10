@@ -530,13 +530,13 @@ app.use('/api/mada-scraper', madaScraperRoutes);
 // vì approvalRoutes có global auth middleware chặn TẤT CẢ /api/admin/*
 // Nếu adminRoutes sau → public endpoints như /file-settings/public bị chặn 401
 app.use('/api/admin', adminRoutes);
+app.use('/api/admin/suggested-questions', suggestedQuestionsRoutes); // ← mount TRƯỚC approvalRoutes (auth middleware)
 app.use('/api/admin', approvalRoutes);
 app.use('/api/consultation', consultationRoutes);
 app.use('/api/consult', consultationApiRoutes);
 app.use('/api/admin/scraper', adminScraperRoutes);
 app.use('/api/admin/prompts', promptsRoutes);
 app.use('/api/admin/prompt-templates', promptTemplatesRoutes);
-app.use('/api/admin/suggested-questions', suggestedQuestionsRoutes);
 app.use('/api/public', publicRoutes);
 
 // ============== PERMISSIONS ROUTES ==============

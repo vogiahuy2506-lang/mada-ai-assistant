@@ -435,12 +435,12 @@ export function AdminAgents() {
   const { user } = useAuthStore();
   const isSuperAdmin = user?.role === 'super_admin';
   const isReadOnly = !isSuperAdmin;
-  const language: Language = 'vi' as Language;
+  const language: Language = useLanguageStore((s) => s.language ?? 'vi') as Language;
   const loadAgentsForChat = useAgentStore((s) => s.loadAgents);
   const removeAgentForChat = useAgentStore((s) => s.removeAgent);
 
-  // Always use Vietnamese
-  globalLanguage = 'vi';
+  // Update global language for the translation helper
+  globalLanguage = language;
 
   const [agents, setAgents] = useState<Agent[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -561,6 +561,7 @@ export function AdminAgents() {
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [crawling, setCrawling] = useState(false);
   const [crawlResult, setCrawlResult] = useState<{ totalDocs: number; results: CrawlResult[] } | null>(null);
+  const [formError, setFormError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // System prompt editor modal
@@ -778,10 +779,19 @@ export function AdminAgents() {
     });
     setNewProductUrl('');
     setCrawlResult(null);
+    setFormError('');
   };
 
   const handleSubmit = async () => {
-    if (!formData.name.trim() || !formData.system_prompt.trim()) return;
+    if (!formData.name.trim()) {
+      setFormError('Vui lòng nhập Tên Agent.');
+      return;
+    }
+    if (!formData.system_prompt.trim()) {
+      setFormError('Vui lòng nhập System Prompt.');
+      return;
+    }
+    setFormError('');
 
     try {
       const agentData: any = {
@@ -806,14 +816,14 @@ export function AdminAgents() {
       if (editingId) {
         const res = await adminApi.updateAgent(editingId, agentData);
         if (!res.success) {
-          alert(res.error);
+          setFormError(res.error || 'Lỗi khi lưu Agent.');
           return;
         }
       } else {
         // ⭐ Agent mới luôn được bật mặc định để xuất hiện ở trang chat
         const res = await adminApi.createAgent({ ...agentData, is_active: true });
         if (!res.success) {
-          alert(res.error);
+          setFormError(res.error || 'Lỗi khi tạo Agent.');
           return;
         }
         savedAgentId = res.data?.id || null;
@@ -863,7 +873,7 @@ export function AdminAgents() {
       setEditingId(null);
       save();
     } catch (err: any) {
-      alert(err.message);
+      setFormError(err?.message || 'Lỗi không xác định khi lưu Agent.');
     }
   };
 
@@ -928,6 +938,7 @@ export function AdminAgents() {
     setNewProductUrl('');
     setEditingId(agent.id);
     setCrawlResult(null);
+    setFormError('');
     setShowForm(true);
   };
 
@@ -1236,8 +1247,12 @@ export function AdminAgents() {
   const openCreateForm = () => {
     if (!isSuperAdmin) return;
     resetForm();
+    // ⭐ Set initial sort_order to next available number
+    const maxSortOrder = Math.max(0, ...agents.map(a => (a as any).sort_order ?? 0));
+    setFormData(prev => ({ ...prev, sort_order: maxSortOrder + 1 }));
     setEditingId(null);
     setShowForm(true);
+    setFormError('');
   };
 
   // ============== RENDER ==============
@@ -1294,7 +1309,7 @@ export function AdminAgents() {
                   </div>
                 </div>
                 <button
-                  onClick={() => { setShowForm(false); setEditingId(null); resetForm(); }}
+                  onClick={() => { setShowForm(false); setEditingId(null); resetForm(); setFormError(''); }}
                   className="w-8 h-8 rounded-full bg-white border border-slate-300 flex items-center justify-center hover:bg-gray-100 transition-colors shadow-sm"
                 >
                   <span className="material-symbols-outlined text-sm">close</span>
@@ -1309,6 +1324,13 @@ export function AdminAgents() {
               }}
               className="p-4 space-y-4"
             >
+              {/* Validation / API error banner */}
+              {formError && (
+                <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-sm text-red-700">
+                  <span className="material-symbols-outlined text-red-500 text-base mt-0.5 shrink-0">error</span>
+                  <span>{formError}</span>
+                </div>
+              )}
               {/* Avatar — emoji OR uploaded image */}
               <div>
                 <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2">{tAgent('agent.form.avatarUpload', language)}</label>
@@ -1698,6 +1720,44 @@ export function AdminAgents() {
                     </button>
                   ))}
                 </div>
+              </div>
+
+              {/* Sort Order */}
+              <div className="flex items-center gap-3 p-3 rounded-xl bg-gradient-to-br from-amber-50 to-orange-50/40 border-2 border-amber-200">
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-amber-600 text-base">format_list_numbered</span>
+                  <label className="text-[10px] font-bold text-amber-700 uppercase tracking-wider">
+                    {tAgent('agent.form.sortOrder', language)}
+                  </label>
+                </div>
+                <div className="flex items-center gap-1 ml-auto">
+                  <button
+                    type="button"
+                    onClick={() => setFormData(prev => ({ ...prev, sort_order: Math.max(0, prev.sort_order - 1) }))}
+                    className="w-8 h-8 rounded-lg bg-white border border-amber-200 hover:bg-amber-100 flex items-center justify-center text-amber-600 hover:text-amber-800 transition-all shadow-sm"
+                    title="Giảm thứ tự"
+                  >
+                    <span className="material-symbols-outlined text-sm">remove</span>
+                  </button>
+                  <input
+                    type="number"
+                    min={0}
+                    value={formData.sort_order}
+                    onChange={(e) => setFormData(prev => ({ ...prev, sort_order: Math.max(0, parseInt(e.target.value) || 0) }))}
+                    className="w-16 px-2 py-1.5 rounded-lg bg-white border-2 border-amber-300 text-sm font-bold text-center text-amber-800 focus:outline-none focus:ring-2 focus:ring-amber-400/50"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setFormData(prev => ({ ...prev, sort_order: prev.sort_order + 1 }))}
+                    className="w-8 h-8 rounded-lg bg-white border border-amber-200 hover:bg-amber-100 flex items-center justify-center text-amber-600 hover:text-amber-800 transition-all shadow-sm"
+                    title="Tăng thứ tự"
+                  >
+                    <span className="material-symbols-outlined text-sm">add</span>
+                  </button>
+                </div>
+                <span className="text-[10px] text-amber-600/80">
+                  {editingId ? '(Sửa số thứ tự để thay đổi vị trí hiển thị)' : `(STT tiếp theo: ${Math.max(0, ...agents.map(a => (a as any).sort_order ?? 0)) + 1})`}
+                </span>
               </div>
 
               {/* ============== SUGGESTED QUESTIONS - ENHANCED UI ============== */}
@@ -2661,7 +2721,7 @@ export function AdminAgents() {
                         />
                         <span className="text-2xl">{bot.avatar}</span>
                         <div className="flex-1 min-w-0">
-                          <div className="font-bold text-sm text-on-surface truncate">{language === 'vi' ? bot.nameVi : bot.name}</div>
+                          <div className="font-bold text-sm text-on-surface truncate">{bot.name}</div>
                         </div>
                         {exists && (
                           <span className="absolute -top-1 -right-1 text-[10px] font-bold bg-slate-200 text-slate-500 px-2 py-0.5 rounded">
@@ -2743,9 +2803,9 @@ export function AdminAgents() {
 
                                 {/* Bot Info */}
                                 <div className="flex-1 min-w-0">
-                                  <h4 className="font-bold text-base text-slate-800 truncate mb-1">{language === 'vi' ? bot.nameVi : bot.name}</h4>
+                                  <h4 className="font-bold text-base text-slate-800 truncate mb-1">{bot.name}</h4>
                                   <p className="text-sm text-slate-500 line-clamp-2 leading-relaxed">
-                                    {language === 'vi' ? bot.descriptionVi : bot.description || 'Không có mô tả'}
+                                    {bot.description || 'Không có mô tả'}
                                   </p>
                                 </div>
                               </div>

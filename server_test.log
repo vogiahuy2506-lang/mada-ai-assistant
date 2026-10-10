@@ -1,0 +1,36 @@
+
+> mada-ai-assistant@1.0.0 server
+> tsx watch server/index.ts
+
+📦 SQLite database initialized at /Users/vohuy/Downloads/MADA AI ASSISTANT/mada-ai-assistant/data/mada.db
+✅ Knowledge items translation columns added
+✅ KB Products translation columns added
+🌱 Seeded 9 KB categories (4 languages: VI/EN/AR/FR)
+🤖 admin_agents already has 8 rows — skipping seed
+📋 admin_prompts already has 10 rows — skipping seed
+📋 prompt_templates already has 25 rows — skipping seed
+✅ Migrated suggested_prompts to correct values
+✅ Schema created
+✅ Users table schema is up-to-date
+👤 Admin already exists: admin@mada.vn
+🔑 SuperAdmin password verified: superadmin@mada.vn
+⚠️  Using default JWT_SECRET. Set JWT_SECRET env var in production!
+ℹ️ [System] MADA AI Server started on port 3008
+ℹ️ [RAG Engine] Vector store initialized with 65 documents
+✅ [Auth Service] Auth service configured (SQLite + JWT + bcrypt)
+ℹ️ [Security] CORS policy: any localhost port allowed (dev)
+🔧 Initializing services...
+✅ Using Gemini embeddings: AQ.Ab8RN6I...
+📁 Static files root: /Users/vohuy/Downloads/MADA AI ASSISTANT/mada-ai-assistant/dist/client
+📁 Assets path: /Users/vohuy/Downloads/MADA AI ASSISTANT/mada-ai-assistant/dist/client/assets
+📁 Assets exist: true
+📦 Serving frontend from /Users/vohuy/Downloads/MADA AI ASSISTANT/mada-ai-assistant/dist/client
+✅ Permissions schema initialized
+📋 Permissions already seeded (48 rows) — skipping
+🚀 MADA AI Server running on http://0.0.0.0:3008
+📚 API Documentation: http://localhost:3008/api/health
+🌐 Frontend: http://localhost:3008/
+⚡ RAG Enabled: false
+🤖 Gemini Configured: true
+🛡️  Guardrails: Active
+🔐 Auth: SQLite + bcrypt + JWT (admin: admin@mada.vn)

@@ -14,7 +14,8 @@ export type AgentEvent =
   | { type: 'agent-toggled'; agentId: string }
   | { type: 'agents-imported'; agentIds: string[] }
   | { type: 'agent-reordered'; agentIds: string[] }
-  | { type: 'questions-changed'; agentId?: string; category?: string };
+  | { type: 'questions-changed'; agentId?: string; category?: string }
+  | { type: 'category-order-changed'; categoryOrder?: string[] };
 
 let _channel: BroadcastChannel | null = null;
 

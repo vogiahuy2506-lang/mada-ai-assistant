@@ -321,10 +321,13 @@ interface LanguageState {
 export const useLanguageStore = create<LanguageState>()(
   persist(
     (set) => ({
-      language: 'vi',
+      language: 'vi' as const,
       setLanguage: (language) => set({ language }),
     }),
-    { name: 'mada-language' }
+    { 
+      name: 'mada-language',
+      partialize: (state) => ({ language: state.language }),
+    }
   )
 );
 

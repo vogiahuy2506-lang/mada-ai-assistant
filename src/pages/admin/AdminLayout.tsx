@@ -296,7 +296,6 @@ const NAV_ITEMS: NavItem[] = [
   // Gộp Câu hỏi gợi ý vào AI Agents tab → xoá khỏi sidebar
   { labelKey: 'admin.layout.navSystemPrompts', href: '/admin/prompts', icon: 'edit_note' },
   { labelKey: 'admin.layout.navConsultations', href: '/admin/consultations', icon: 'support_agent' },
-  { labelKey: 'admin.layout.navNotifications', href: '/admin/notifications', icon: 'notifications' },
   { labelKey: 'admin.layout.navFeedbackQuestions', href: '/admin/feedback-questions', icon: 'thumb_down' },
   { labelKey: 'admin.layout.navFileUpload', href: '/admin/file-management', icon: 'upload_file', superAdminOnly: true },
   { labelKey: 'admin.layout.navSettings', href: '/admin/settings', icon: 'settings_suggest', superAdminOnly: true },
@@ -473,19 +472,7 @@ export function AdminLayout({
             )}
           </div>
           <div className="flex items-center gap-3">
-            {/* Notification Bell */}
-            <Link
-              to="/admin/notifications"
-              className={clsx(
-                'relative flex items-center gap-2 px-3 py-1.5 rounded-xl text-sm font-medium transition-all',
-                location.pathname === '/admin/notifications'
-                  ? 'bg-primary/10 text-primary'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              )}
-            >
-              <span className="material-symbols-outlined text-[18px]">notifications</span>
-              <span className="hidden lg:inline">{tL('notifications.title')}</span>
-            </Link>
+            {/* Notification Bell placeholder - notifications page removed */}
 
             <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-primary/5 border border-primary/20">
               <span className="material-symbols-outlined text-[18px] text-primary">account_circle</span>
@@ -515,43 +502,41 @@ export function AdminLayout({
                 <span className="material-symbols-outlined text-[14px] text-primary/70 transition-transform duration-300 group-hover/btn:translate-y-0.5">expand_more</span>
               </button>
               
-              {/* Premium Dropdown */}
-              <div className="absolute right-0 top-full mt-2 py-2 px-2 rounded-2xl bg-white/95 backdrop-blur-xl border border-black/10 shadow-2xl shadow-black/10 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 z-50 min-w-[200px]">
+              {/* Premium Dropdown - Clean Design */}
+              <div className="absolute right-0 top-full mt-2 py-2 px-2 rounded-2xl bg-white border border-black/10 shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 z-50 min-w-[220px]">
                 {/* Arrow */}
-                <div className="absolute -top-1.5 right-5 w-3 h-3 bg-white/95 border-l border-t border-black/10 rotate-45"></div>
+                <div className="absolute -top-1.5 right-5 w-3 h-3 bg-white border-l border-t border-black/10 rotate-45"></div>
                 
-                <div className="relative">
-                  <div className="px-2.5 py-1 mb-1">
-                    <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">{tL('admin.layout.switchLanguage')}</p>
-                  </div>
-                  
+                <div className="space-y-1">
                   {/* Vietnamese */}
                   <button
                     onClick={() => setLanguage('vi')}
                     className={clsx(
-                      'w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl transition-all duration-200 group/lang',
+                      'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200',
                       language === 'vi' 
-                        ? 'bg-gradient-to-r from-primary/20 to-primary/10 border border-primary/30' 
-                        : 'hover:bg-gray-50 border border-transparent'
+                        ? 'bg-emerald-500 text-white' 
+                        : 'hover:bg-gray-50 text-gray-700'
                     )}
                   >
-                    <div className={clsx(
-                      'w-7 h-7 rounded-md flex items-center justify-center text-base transition-all',
-                      language === 'vi' ? 'bg-primary/20' : 'bg-gray-100'
+                    <span className="text-lg">🇻🇳</span>
+                    <span className={clsx(
+                      'flex-1 text-left text-sm font-medium',
+                      language === 'vi' ? 'text-white' : ''
                     )}>
-                      🇻🇳
-                    </div>
-                    <div className="flex-1 text-left">
-                      <p className={clsx(
-                        'font-semibold text-xs transition-colors',
-                        language === 'vi' ? 'text-primary' : 'text-gray-700'
-                      )}>
-                        {tL('admin.layout.langVi')}
-                      </p>
-                      <p className="text-[10px] text-gray-400">Việt Nam</p>
-                    </div>
+                      {tL('admin.layout.langVi')}
+                    </span>
+                    <span className={clsx(
+                      'text-xs',
+                      language === 'vi' ? 'text-white/80' : 'text-gray-400'
+                    )}>
+                      VI
+                    </span>
                     {language === 'vi' && (
-                      <span className="material-symbols-outlined text-primary text-[16px]">check</span>
+                      <div className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center">
+                        <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                        </svg>
+                      </div>
                     )}
                   </button>
                   
@@ -559,29 +544,31 @@ export function AdminLayout({
                   <button
                     onClick={() => setLanguage('en')}
                     className={clsx(
-                      'w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl transition-all duration-200 group/lang',
+                      'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200',
                       language === 'en' 
-                        ? 'bg-gradient-to-r from-primary/20 to-primary/10 border border-primary/30' 
-                        : 'hover:bg-gray-50 border border-transparent'
+                        ? 'bg-emerald-500 text-white' 
+                        : 'hover:bg-gray-50 text-gray-700'
                     )}
                   >
-                    <div className={clsx(
-                      'w-7 h-7 rounded-md flex items-center justify-center text-base transition-all',
-                      language === 'en' ? 'bg-primary/20' : 'bg-gray-100'
+                    <span className="text-lg">🇺🇸</span>
+                    <span className={clsx(
+                      'flex-1 text-left text-sm font-medium',
+                      language === 'en' ? 'text-white' : ''
                     )}>
-                      🇺🇸
-                    </div>
-                    <div className="flex-1 text-left">
-                      <p className={clsx(
-                        'font-semibold text-xs transition-colors',
-                        language === 'en' ? 'text-primary' : 'text-gray-700'
-                      )}>
-                        {tL('admin.layout.langEn')}
-                      </p>
-                      <p className="text-[10px] text-gray-400">United States</p>
-                    </div>
+                      {tL('admin.layout.langEn')}
+                    </span>
+                    <span className={clsx(
+                      'text-xs',
+                      language === 'en' ? 'text-white/80' : 'text-gray-400'
+                    )}>
+                      EN
+                    </span>
                     {language === 'en' && (
-                      <span className="material-symbols-outlined text-primary text-[16px]">check</span>
+                      <div className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center">
+                        <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                        </svg>
+                      </div>
                     )}
                   </button>
                   
@@ -589,29 +576,31 @@ export function AdminLayout({
                   <button
                     onClick={() => setLanguage('ar')}
                     className={clsx(
-                      'w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl transition-all duration-200 group/lang',
+                      'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200',
                       language === 'ar' 
-                        ? 'bg-gradient-to-r from-primary/20 to-primary/10 border border-primary/30' 
-                        : 'hover:bg-gray-50 border border-transparent'
+                        ? 'bg-emerald-500 text-white' 
+                        : 'hover:bg-gray-50 text-gray-700'
                     )}
                   >
-                    <div className={clsx(
-                      'w-7 h-7 rounded-md flex items-center justify-center text-base transition-all',
-                      language === 'ar' ? 'bg-primary/20' : 'bg-gray-100'
+                    <span className="text-lg">🇸🇦</span>
+                    <span className={clsx(
+                      'flex-1 text-left text-sm font-medium',
+                      language === 'ar' ? 'text-white' : ''
                     )}>
-                      🇸🇦
-                    </div>
-                    <div className="flex-1 text-left">
-                      <p className={clsx(
-                        'font-semibold text-xs transition-colors',
-                        language === 'ar' ? 'text-primary' : 'text-gray-700'
-                      )}>
-                        {tL('admin.layout.langAr')}
-                      </p>
-                      <p className="text-[10px] text-gray-400">العربية</p>
-                    </div>
+                      {tL('admin.layout.langAr')}
+                    </span>
+                    <span className={clsx(
+                      'text-xs',
+                      language === 'ar' ? 'text-white/80' : 'text-gray-400'
+                    )}>
+                      AR
+                    </span>
                     {language === 'ar' && (
-                      <span className="material-symbols-outlined text-primary text-[16px]">check</span>
+                      <div className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center">
+                        <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                        </svg>
+                      </div>
                     )}
                   </button>
                   
@@ -619,29 +608,31 @@ export function AdminLayout({
                   <button
                     onClick={() => setLanguage('fr')}
                     className={clsx(
-                      'w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl transition-all duration-200 group/lang',
+                      'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200',
                       language === 'fr' 
-                        ? 'bg-gradient-to-r from-primary/20 to-primary/10 border border-primary/30' 
-                        : 'hover:bg-gray-50 border border-transparent'
+                        ? 'bg-emerald-500 text-white' 
+                        : 'hover:bg-gray-50 text-gray-700'
                     )}
                   >
-                    <div className={clsx(
-                      'w-7 h-7 rounded-md flex items-center justify-center text-base transition-all',
-                      language === 'fr' ? 'bg-primary/20' : 'bg-gray-100'
+                    <span className="text-lg">🇫🇷</span>
+                    <span className={clsx(
+                      'flex-1 text-left text-sm font-medium',
+                      language === 'fr' ? 'text-white' : ''
                     )}>
-                      🇫🇷
-                    </div>
-                    <div className="flex-1 text-left">
-                      <p className={clsx(
-                        'font-semibold text-xs transition-colors',
-                        language === 'fr' ? 'text-primary' : 'text-gray-700'
-                      )}>
-                        {tL('admin.layout.langFr')}
-                      </p>
-                      <p className="text-[10px] text-gray-400">France</p>
-                    </div>
+                      {tL('admin.layout.langFr')}
+                    </span>
+                    <span className={clsx(
+                      'text-xs',
+                      language === 'fr' ? 'text-white/80' : 'text-gray-400'
+                    )}>
+                      FR
+                    </span>
                     {language === 'fr' && (
-                      <span className="material-symbols-outlined text-primary text-[16px]">check</span>
+                      <div className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center">
+                        <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                        </svg>
+                      </div>
                     )}
                   </button>
                 </div>

@@ -23,6 +23,7 @@ import { getFileUploadQuota, trackFileUpload } from '../lib/db';
 import { chatHistory, waitForRagReady } from '../lib/chat-context';
 import { logActivity } from '../index';
 import { parseAttachment } from '../lib/fileProcessor';
+import { translateContent } from '../lib/translationService';
 
 const router = express.Router();
 
@@ -2191,7 +2192,7 @@ router.get('/feedback/all-questions', requireAdmin, async (_req, res) => {
     const questions = db.prepare(`
       SELECT 
         id,
-        question_key as id,
+        question_key,
         text_vi,
         text_en,
         text_ar,
@@ -2217,7 +2218,7 @@ router.get('/feedback/all-questions', requireAdmin, async (_req, res) => {
  */
 router.post('/feedback/questions', requireAdmin, async (req, res) => {
   try {
-    const { text_vi, text_en, text_ar, text_fr, icon, sort_order } = req.body;
+    const { text_vi, text_en, text_ar, text_fr, icon, is_active, sort_order } = req.body;
     
     if (!text_vi) {
       return res.status(400).json({ 
@@ -2229,10 +2230,11 @@ router.post('/feedback/questions', requireAdmin, async (req, res) => {
     const id = `fq-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const questionKey = text_vi.toLowerCase().replace(/[^a-z0-9]+/g, '_').slice(0, 50);
     const now = new Date().toISOString();
+    const activeValue = (is_active !== undefined && is_active !== null) ? (is_active ? 1 : 0) : 1;
     
     db.prepare(`
       INSERT INTO feedback_questions (id, question_key, text_vi, text_en, text_ar, text_fr, icon, is_active, sort_order, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id,
       questionKey,
@@ -2241,6 +2243,7 @@ router.post('/feedback/questions', requireAdmin, async (req, res) => {
       text_ar || '',
       text_fr || '',
       icon || 'alert-circle',
+      activeValue,
       sort_order || 99,
       now,
       now
@@ -2263,40 +2266,51 @@ router.put('/feedback/questions/:id', requireAdmin, async (req, res) => {
     const { id } = req.params;
     const { text_vi, text_en, text_ar, text_fr, icon, is_active, sort_order } = req.body;
     
-    // Check if question exists
-    const existing = db.prepare('SELECT id FROM feedback_questions WHERE id = ?').get(id);
+    // Check if question exists and get current values
+    const existing = db.prepare('SELECT id, is_active, sort_order FROM feedback_questions WHERE id = ?').get(id) as any;
     if (!existing) {
       return res.status(404).json({ success: false, error: 'Question not found' });
     }
     
+    // Determine the is_active value to use
+    // If is_active is explicitly sent (0 or 1), use it. Otherwise keep existing.
+    const newIsActive = (is_active !== undefined && is_active !== null)
+      ? (is_active ? 1 : 0)
+      : existing.is_active;
+    
+    // Keep existing sort_order if not provided (sort_order is NOT NULL)
+    const newSortOrder = (sort_order !== undefined && sort_order !== null && sort_order !== '')
+      ? Number(sort_order)
+      : existing.sort_order;
+    
     const now = new Date().toISOString();
     
     db.prepare(`
-      UPDATE feedback_questions 
-      SET text_vi = COALESCE(?, text_vi),
-          text_en = COALESCE(?, text_en),
-          text_ar = COALESCE(?, text_ar),
-          text_fr = COALESCE(?, text_fr),
-          icon = COALESCE(?, icon),
-          is_active = COALESCE(?, is_active),
-          sort_order = COALESCE(?, sort_order),
+      UPDATE feedback_questions
+      SET text_vi = COALESCE(NULLIF(?, ''), text_vi),
+          text_en = COALESCE(NULLIF(?, ''), text_en),
+          text_ar = COALESCE(NULLIF(?, ''), text_ar),
+          text_fr = COALESCE(NULLIF(?, ''), text_fr),
+          icon = COALESCE(NULLIF(?, ''), icon),
+          is_active = ?,
+          sort_order = ?,
           updated_at = ?
       WHERE id = ?
     `).run(
-      text_vi,
-      text_en,
-      text_ar,
-      text_fr,
-      icon,
-      is_active !== undefined ? (is_active ? 1 : 0) : null,
-      sort_order,
+      text_vi ?? null,
+      text_en ?? null,
+      text_ar ?? null,
+      text_fr ?? null,
+      icon ?? null,
+      newIsActive,
+      newSortOrder,
       now,
       id
     );
     
     logActivity('info', `Updated feedback question: ${id}`, 'Admin');
     
-    res.json({ success: true, data: { id } });
+    res.json({ success: true, data: { id, is_active: newIsActive } });
   } catch (error) {
     console.error('❌ Update feedback question error:', error);
     res.status(500).json({ success: false, error: 'Internal server error' });
@@ -2396,5 +2410,129 @@ router.get('/feedback/stats', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/chat/feedback/questions/stats - Per-question selection stats
+ * Matches message_feedback.reason against feedback_questions.text_vi
+ */
+router.get('/feedback/questions/stats', async (req, res) => {
+  try {
+    // Get all active questions
+    const questions = db.prepare(`
+      SELECT id, question_key, text_vi, is_active
+      FROM feedback_questions
+      WHERE is_active = 1
+      ORDER BY sort_order ASC
+    `).all() as any[];
+
+    // Count total dislikes this month
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    const totalResult = db.prepare(`
+      SELECT COUNT(*) as total FROM message_feedback
+      WHERE rating = 'dislike' AND created_at >= ?
+    `).get(startOfMonth) as { total: number };
+    const totalDislike = totalResult?.total || 0;
+
+    // Count per question by matching reason to text_vi
+    const data = questions.map((q: any) => {
+      const countResult = db.prepare(`
+        SELECT COUNT(*) as cnt FROM message_feedback
+        WHERE rating = 'dislike' AND reason = ? AND created_at >= ?
+      `).get(q.text_vi, startOfMonth) as { cnt: number };
+      const count = countResult?.cnt || 0;
+      const percent = totalDislike > 0 ? Math.round((count / totalDislike) * 1000) / 10 : 0;
+      return {
+        question_key: q.question_key,
+        count,
+        percent,
+      };
+    });
+
+    res.json({ success: true, data });
+  } catch (error) {
+    console.error('❌ Feedback questions stats error:', error);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+});
+
+/**
+ * GET /api/chat/feedback/stats/monthly - Monthly stats for cards
+ * Returns: total dislike this month, vs last month %, top reason
+ */
+router.get('/feedback/stats/monthly', async (req, res) => {
+  try {
+    const now = new Date();
+    const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();
+    const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59).toISOString();
+
+    // This month dislikes
+    const thisMonthResult = db.prepare(`
+      SELECT COUNT(*) as total FROM message_feedback
+      WHERE rating = 'dislike' AND created_at >= ?
+    `).get(startOfThisMonth) as { total: number };
+    const totalDislikeMonth = thisMonthResult?.total || 0;
+
+    // Last month dislikes
+    const lastMonthResult = db.prepare(`
+      SELECT COUNT(*) as total FROM message_feedback
+      WHERE rating = 'dislike' AND created_at >= ? AND created_at <= ?
+    `).get(startOfLastMonth, endOfLastMonth) as { total: number };
+    const totalDislikeLastMonth = lastMonthResult?.total || 0;
+
+    // Calculate change percent
+    let dislikeChangePercent = 0;
+    if (totalDislikeLastMonth > 0) {
+      dislikeChangePercent = Math.round(((totalDislikeMonth - totalDislikeLastMonth) / totalDislikeLastMonth) * 1000) / 10;
+    } else if (totalDislikeMonth > 0) {
+      dislikeChangePercent = 100;
+    }
+
+    // Top reason this month (matching against feedback_questions.text_vi)
+    const topReasonRow = db.prepare(`
+      SELECT reason, COUNT(*) as cnt
+      FROM message_feedback
+      WHERE rating = 'dislike' AND reason IS NOT NULL AND reason != '' AND created_at >= ?
+      GROUP BY reason
+      ORDER BY cnt DESC
+      LIMIT 1
+    `).get(startOfThisMonth) as { reason: string; cnt: number } | undefined;
+
+    const topReason = topReasonRow?.reason || '';
+
+    res.json({
+      success: true,
+      data: {
+        totalDislikeMonth,
+        dislikeChangePercent,
+        topReason,
+      },
+    });
+  } catch (error) {
+    console.error('❌ Feedback monthly stats error:', error);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+});
+
 export default router;
 export { detectMessageLanguage };
+
+/**
+ * POST /api/chat/feedback/translate — Auto-translate a feedback question text
+ * Detect source language from the filled field, translate to the other 3
+ */
+router.post('/feedback/translate', requireAdmin, async (req, res) => {
+  try {
+    const { text, sourceLang } = req.body;
+
+    if (!text || !text.trim()) {
+      return res.status(400).json({ success: false, error: 'Text is required' });
+    }
+
+    const result = await translateContent(text.trim(), sourceLang || 'vi');
+    res.json({ success: true, data: result });
+  } catch (error) {
+    console.error('❌ Feedback translate error:', error);
+    res.status(500).json({ success: false, error: 'Translation failed' });
+  }
+});

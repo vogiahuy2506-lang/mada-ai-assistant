@@ -4,6 +4,9 @@ import { adminApi } from './adminApi';
 import { useAuthStore, useLanguageStore } from '@/stores';
 import { translations, type Language } from '@/lib/translations';
 import clsx from 'clsx';
+import {
+  Eye, HelpCircle, Accessibility, MessageSquare, Tag, Box,
+} from 'lucide-react';
 
 // ============== TYPES ==============
 type ATCategory = 'vision' | 'hearing' | 'mobility' | 'cognition' | 'communication' | 'daily_living' | 'education' | 'general';
@@ -24,15 +27,15 @@ interface SuggestedQuestion {
 }
 
 // ============== CONSTANTS ==============
-const CATEGORIES: { value: ATCategory; label: string; labelEn: string; labelAr: string; labelFr: string; icon: string }[] = [
-  { value: 'vision', label: 'Thị giác', labelEn: 'Vision', labelAr: 'البصر', labelFr: 'Vision', icon: '👁️' },
-  { value: 'hearing', label: 'Thính giác', labelEn: 'Hearing', labelAr: 'السمع', labelFr: 'Audition', icon: '👂' },
-  { value: 'mobility', label: 'Vận động', labelEn: 'Mobility', labelAr: 'التنقل', labelFr: 'Mobilité', icon: '🦴' },
-  { value: 'cognition', label: 'Nhận thức', labelEn: 'Cognition', labelAr: 'الإدراك', labelFr: 'Cognition', icon: '🧠' },
-  { value: 'communication', label: 'Giao tiếp', labelEn: 'Communication', labelAr: 'التواصل', labelFr: 'Communication', icon: '💬' },
-  { value: 'daily_living', label: 'Sinh hoạt', labelEn: 'Daily Living', labelAr: 'الحياة اليومية', labelFr: 'Vie quotidienne', icon: '🦽' },
-  { value: 'education', label: 'Giáo dục', labelEn: 'Education', labelAr: 'التعليم', labelFr: 'Éducation', icon: '📋' },
-  { value: 'general', label: 'Tổng quát', labelEn: 'General', labelAr: 'عام', labelFr: 'Général', icon: '📦' },
+const CATEGORIES: { value: ATCategory; label: string; labelEn: string; labelAr: string; labelFr: string; icon: React.ReactNode }[] = [
+  { value: 'vision', label: 'Thị giác', labelEn: 'Vision', labelAr: 'البصر', labelFr: 'Vision', icon: <Eye className="w-4 h-4" /> },
+  { value: 'hearing', label: 'Thính giác', labelEn: 'Hearing', labelAr: 'السمع', labelFr: 'Audition', icon: <HelpCircle className="w-4 h-4" /> },
+  { value: 'mobility', label: 'Vận động', labelEn: 'Mobility', labelAr: 'التنقل', labelFr: 'Mobilité', icon: <Accessibility className="w-4 h-4" /> },
+  { value: 'cognition', label: 'Nhận thức', labelEn: 'Cognition', labelAr: 'الإدراك', labelFr: 'Cognition', icon: <HelpCircle className="w-4 h-4" /> },
+  { value: 'communication', label: 'Giao tiếp', labelEn: 'Communication', labelAr: 'التواصل', labelFr: 'Communication', icon: <MessageSquare className="w-4 h-4" /> },
+  { value: 'daily_living', label: 'Sinh hoạt', labelEn: 'Daily Living', labelAr: 'الحياة اليومية', labelFr: 'Vie quotidienne', icon: <Accessibility className="w-4 h-4" /> },
+  { value: 'education', label: 'Giáo dục', labelEn: 'Education', labelAr: 'التعليم', labelFr: 'Éducation', icon: <Tag className="w-4 h-4" /> },
+  { value: 'general', label: 'Tổng quát', labelEn: 'General', labelAr: 'عام', labelFr: 'Général', icon: <Box className="w-4 h-4" /> },
 ];
 
 const VIEW_MODES: { value: ViewMode; label: string; labelEn: string; labelAr: string; labelFr: string }[] = [
@@ -475,7 +478,7 @@ export default function AdminSuggestedQuestions() {
     if (language === 'en') return c.labelEn;
     return c.label;
   };
-  const getCategoryIcon = (cat: string) => CATEGORIES.find(c => c.value === cat)?.icon || '📦';
+  const getCategoryIcon = (cat: string) => CATEGORIES.find(c => c.value === cat)?.icon || <Box className="w-4 h-4" />;
   const getViewModeLabelByLang = (mode: string) => {
     const v = VIEW_MODES.find(x => x.value === mode);
     if (!v) return mode;

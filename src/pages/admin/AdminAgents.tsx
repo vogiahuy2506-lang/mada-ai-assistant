@@ -5,6 +5,12 @@ import { MADA_BOTS } from '@/lib/madaBots';
 import { broadcastAgentChange } from '@/lib/agentBroadcast';
 import { useAuthStore, usePromptStore, useAgentStore, useLanguageStore } from '@/stores';
 import clsx from 'clsx';
+import {
+  Eye, EyeOff, Edit3, Trash2, Plus, PlusCircle, Check, X, AlertTriangle,
+  MessageSquare, Sparkles, Zap, ChevronDown, ChevronUp, Search,
+  Loader2, ThumbsDown, HelpCircle, Tag, FileText, Accessibility,
+  Box, Globe, CheckCircle2, RefreshCw, Send, Copy, ExternalLink,
+} from 'lucide-react';
 
 // ============== GLOBAL TRANSLATION HELPER ==============
 const t = (key: string): string => {
@@ -118,15 +124,15 @@ interface SuggestedQuestion {
   is_active: number;
 }
 
-const SQ_CATEGORIES: { value: ATCategory; label: string; icon: string }[] = [
-  { value: 'vision', label: 'Thị giác', icon: '👁️' },
-  { value: 'hearing', label: 'Thính giác', icon: '👂' },
-  { value: 'mobility', label: 'Vận động', icon: '🦴' },
-  { value: 'cognition', label: 'Nhận thức', icon: '🧠' },
-  { value: 'communication', label: 'Giao tiếp', icon: '💬' },
-  { value: 'daily_living', label: 'Sinh hoạt', icon: '🦽' },
-  { value: 'education', label: 'Giáo dục', icon: '📋' },
-  { value: 'general', label: 'Tổng quát', icon: '📦' },
+const SQ_CATEGORIES: { value: ATCategory; label: string; icon: React.ReactNode }[] = [
+  { value: 'vision', label: 'Thị giác', icon: <Eye className="w-3.5 h-3.5" /> },
+  { value: 'hearing', label: 'Thính giác', icon: <Accessibility className="w-3.5 h-3.5" /> },
+  { value: 'mobility', label: 'Vận động', icon: <Accessibility className="w-3.5 h-3.5" /> },
+  { value: 'cognition', label: 'Nhận thức', icon: <HelpCircle className="w-3.5 h-3.5" /> },
+  { value: 'communication', label: 'Giao tiếp', icon: <MessageSquare className="w-3.5 h-3.5" /> },
+  { value: 'daily_living', label: 'Sinh hoạt', icon: <Accessibility className="w-3.5 h-3.5" /> },
+  { value: 'education', label: 'Giáo dục', icon: <Tag className="w-3.5 h-3.5" /> },
+  { value: 'general', label: 'Tổng quát', icon: <Box className="w-3.5 h-3.5" /> },
 ];
 
 const SQ_LANGUAGES: { value: LanguageType; label: string; flag: string }[] = [
@@ -2021,10 +2027,10 @@ export function AdminAgents() {
                           )}>
                             {/* Category Icon */}
                             <div className={clsx(
-                              'w-8 h-8 rounded-lg flex items-center justify-center text-base shrink-0 mt-0.5',
-                              q.is_active === 1 ? 'bg-blue-50' : 'bg-slate-100'
+                              'w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5',
+                              q.is_active === 1 ? 'bg-blue-50 text-blue-500' : 'bg-slate-100 text-slate-400'
                             )}>
-                              {SQ_CATEGORIES.find(c => c.value === q.category)?.icon || '📦'}
+                              {SQ_CATEGORIES.find(c => c.value === q.category)?.icon || <Box className="w-4 h-4" />}
                             </div>
 
                             {/* Content */}
@@ -2162,13 +2168,13 @@ export function AdminAgents() {
           
           // Generate consistent color based on agent name
           const colorOptions = [
-            { bg: 'bg-amber-50', border: 'border-amber-100', icon: '👂' },
-            { bg: 'bg-blue-50', border: 'border-blue-100', icon: '👁️' },
-            { bg: 'bg-emerald-50', border: 'border-emerald-100', icon: '💬' },
-            { bg: 'bg-purple-50', border: 'border-purple-100', icon: '🧠' },
-            { bg: 'bg-orange-50', border: 'border-orange-100', icon: '🦾' },
-            { bg: 'bg-cyan-50', border: 'border-cyan-100', icon: '♿' },
-            { bg: 'bg-teal-50', border: 'border-teal-100', icon: '📋' },
+            { bg: 'bg-amber-50', border: 'border-amber-100', icon: <Accessibility className="w-4 h-4 text-amber-500" /> },
+            { bg: 'bg-blue-50', border: 'border-blue-100', icon: <Eye className="w-4 h-4 text-blue-500" /> },
+            { bg: 'bg-emerald-50', border: 'border-emerald-100', icon: <MessageSquare className="w-4 h-4 text-emerald-500" /> },
+            { bg: 'bg-purple-50', border: 'border-purple-100', icon: <HelpCircle className="w-4 h-4 text-purple-500" /> },
+            { bg: 'bg-orange-50', border: 'border-orange-100', icon: <Zap className="w-4 h-4 text-orange-500" /> },
+            { bg: 'bg-cyan-50', border: 'border-cyan-100', icon: <Accessibility className="w-4 h-4 text-cyan-500" /> },
+            { bg: 'bg-teal-50', border: 'border-teal-100', icon: <Tag className="w-4 h-4 text-teal-500" /> },
           ];
           const colorIdx = idx % colorOptions.length;
           const colors = colorOptions[colorIdx];
@@ -2187,11 +2193,17 @@ export function AdminAgents() {
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center gap-3">
                     <div className={clsx(
-                      'w-14 h-14 rounded-xl border flex items-center justify-center text-3xl shadow-inner group-hover:scale-105 transition-transform',
+                      'w-14 h-14 rounded-xl border flex items-center justify-center shadow-inner group-hover:scale-105 transition-transform',
                       colors.bg,
                       colors.border
                     )}>
-                      {agent.avatar || colors.icon}
+                      {agent.avatar ? (
+                        typeof agent.avatar === 'string' && agent.avatar.startsWith('http') ? (
+                          <img src={agent.avatar} alt="" className="w-8 h-8 rounded-lg object-contain" />
+                        ) : (
+                          <span className="text-2xl">{agent.avatar}</span>
+                        )
+                      ) : colors.icon}
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
@@ -2249,30 +2261,32 @@ export function AdminAgents() {
               </div>
               
               {/* Card Footer: Actions & STT */}
-              <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between gap-1.5 min-w-0 overflow-hidden">
-                {/* Action Buttons - Left Side, tiny */}
-                <div className="flex items-center gap-0.5 flex-shrink-0">
+              <div className="mt-4 pt-3 border-t border-slate-100/60 flex items-center justify-between gap-3">
+                {/* Action Buttons - Modern Style */}
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                  {/* Toggle Active */}
                   <button
                     onClick={() => toggleAgentActive(agent.id)}
                     disabled={!isSuperAdmin}
                     className={clsx(
-                      'inline-flex items-center justify-center w-2 h-2 rounded-full transition-all hover:scale-110 active:scale-95',
+                      'group relative inline-flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-200 hover:scale-105 active:scale-95',
                       isActive
-                        ? 'text-emerald-600 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200'
-                        : 'text-slate-400 bg-slate-100 hover:bg-slate-200 border border-slate-200'
+                        ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100 ring-1 ring-emerald-200'
+                        : 'bg-slate-100 text-slate-400 hover:bg-slate-200 hover:text-slate-600'
                     )}
-                    title={isActive ? 'Đang Bật - Bấm để Tắt' : 'Đang Tắt - Bấm để Bật'}
+                    title={isActive ? 'Tắt Agent' : 'Bật Agent'}
                   >
-                    <span className="material-symbols-outlined text-[4px]">power_settings_new</span>
+                    <span className="material-symbols-outlined text-sm">power_settings_new</span>
+                    {/* Tooltip */}
+                    <span className={clsx(
+                      'absolute -top-9 left-1/2 -translate-x-1/2 px-2 py-1 rounded-md text-[10px] font-medium whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none',
+                      isActive ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-white'
+                    )}>
+                      {isActive ? 'Tắt' : 'Bật'}
+                    </span>
                   </button>
-                  <button
-                    onClick={() => handleEdit(agent)}
-                    disabled={!isSuperAdmin}
-                    className="w-2 h-2 flex items-center justify-center rounded-full text-slate-500 hover:text-[#006575] bg-slate-50 hover:bg-teal-50 border border-slate-200 transition-all hover:scale-110 active:scale-95 disabled:opacity-50"
-                    title="Chỉnh sửa"
-                  >
-                    <span className="material-symbols-outlined text-[4px]">edit</span>
-                  </button>
+                  
+                  {/* Test Agent */}
                   <button
                     onClick={() => {
                       const madaBot = MADA_BOTS.find(m => m.id === agent.id);
@@ -2281,63 +2295,98 @@ export function AdminAgents() {
                       setTestAgentObj({ ...agent, name: displayName });
                       setTestMessages([]);
                     }}
-                    className="w-2 h-2 flex items-center justify-center rounded-full text-sky-600 bg-sky-50 hover:bg-sky-100 border border-sky-200 transition-all hover:scale-110 active:scale-95"
-                    title="Test"
+                    className="group relative inline-flex items-center justify-center w-8 h-8 rounded-lg bg-sky-50 text-sky-600 hover:bg-sky-100 hover:text-sky-700 ring-1 ring-sky-200 transition-all duration-200 hover:scale-105 active:scale-95"
+                    title="Test Agent"
                   >
-                    <span className="material-symbols-outlined text-[4px]">play_arrow</span>
+                    <span className="material-symbols-outlined text-sm">play_circle</span>
+                    {/* Tooltip */}
+                    <span className="absolute -top-9 left-1/2 -translate-x-1/2 px-2 py-1 rounded-md text-[10px] font-medium bg-sky-600 text-white whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none">
+                      Test
+                    </span>
                   </button>
+                  
+                  {/* View KB */}
                   <button
                     onClick={() => {
                       const madaBot = MADA_BOTS.find(m => m.id === agent.id);
                       const displayName = madaBot ? (language === 'vi' ? madaBot.nameVi : madaBot.name) : agent.name;
                       openKbModal({ id: agent.id, name: displayName });
                     }}
-                    className="w-2 h-2 flex items-center justify-center rounded-full text-violet-600 bg-violet-50 hover:bg-violet-100 border border-violet-200 transition-all hover:scale-110 active:scale-95"
-                    title="KB"
+                    className="group relative inline-flex items-center justify-center w-8 h-8 rounded-lg bg-violet-50 text-violet-600 hover:bg-violet-100 hover:text-violet-700 ring-1 ring-violet-200 transition-all duration-200 hover:scale-105 active:scale-95"
+                    title="Xem Knowledge Base"
                   >
-                    <span className="material-symbols-outlined text-[4px]">database</span>
+                    <span className="material-symbols-outlined text-sm">database</span>
+                    {/* Tooltip */}
+                    <span className="absolute -top-9 left-1/2 -translate-x-1/2 px-2 py-1 rounded-md text-[10px] font-medium bg-violet-600 text-white whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none">
+                      KB
+                    </span>
                   </button>
+                  
+                  {/* Edit */}
+                  <button
+                    onClick={() => handleEdit(agent)}
+                    disabled={!isSuperAdmin}
+                    className="group relative inline-flex items-center justify-center w-8 h-8 rounded-lg bg-amber-50 text-amber-600 hover:bg-amber-100 hover:text-amber-700 ring-1 ring-amber-200 transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100"
+                    title="Chỉnh sửa"
+                  >
+                    <span className="material-symbols-outlined text-sm">edit</span>
+                    {/* Tooltip */}
+                    <span className="absolute -top-9 left-1/2 -translate-x-1/2 px-2 py-1 rounded-md text-[10px] font-medium bg-amber-600 text-white whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none">
+                      Sửa
+                    </span>
+                  </button>
+                  
+                  {/* Delete */}
                   {isSuperAdmin ? (
                     <button
                       onClick={() => handleDelete(agent.id)}
-                      className="w-2 h-2 flex items-center justify-center rounded-full text-rose-500 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition-all hover:scale-110 active:scale-95"
-                      title="Xóa"
+                      className="group relative inline-flex items-center justify-center w-8 h-8 rounded-lg bg-rose-50 text-rose-500 hover:bg-rose-100 hover:text-rose-700 ring-1 ring-rose-200 transition-all duration-200 hover:scale-105 active:scale-95"
+                      title="Xóa Agent"
                     >
-                      <span className="material-symbols-outlined text-[4px]">delete</span>
+                      <span className="material-symbols-outlined text-sm">delete</span>
+                      {/* Tooltip */}
+                      <span className="absolute -top-9 left-1/2 -translate-x-1/2 px-2 py-1 rounded-md text-[10px] font-medium bg-rose-600 text-white whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none">
+                        Xóa
+                      </span>
                     </button>
                   ) : (
-                    <div className="w-2 h-2 flex items-center justify-center rounded-full text-gray-400 bg-gray-100 border border-gray-200 cursor-not-allowed">
-                      <span className="material-symbols-outlined text-[4px]">lock</span>
+                    <div className="group relative inline-flex items-center justify-center w-8 h-8 rounded-lg bg-gray-100 text-gray-400 ring-1 ring-gray-200 cursor-not-allowed">
+                      <span className="material-symbols-outlined text-sm">lock</span>
+                      <span className="absolute -top-9 left-1/2 -translate-x-1/2 px-2 py-1 rounded-md text-[10px] font-medium bg-gray-600 text-white whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none">
+                        Không có quyền
+                      </span>
                     </div>
                   )}
                 </div>
 
-                {/* STT Stepper - Right Side */}
-                <div className="flex items-center bg-slate-100 px-0.5 py-0.5 rounded-full border border-slate-200 gap-0.5 flex-shrink-0">
+                {/* STT Stepper - Right Side - Modern Pill Style */}
+                <div className="flex items-center gap-1 flex-shrink-0">
                   {isSuperAdmin ? (
-                    <>
+                    <div className="flex items-center bg-gradient-to-r from-slate-100 to-slate-50 px-1 py-0.5 rounded-full border border-slate-200/80 shadow-sm">
                       <button
                         onClick={() => handleSortChange(agent.id, 'down')}
-                        className="w-3 h-3 flex items-center justify-center rounded-full bg-white text-slate-500 hover:text-slate-800 hover:bg-slate-50 border border-slate-200 active:scale-90 transition-all"
-                        title="Giảm"
+                        className="w-6 h-6 flex items-center justify-center rounded-full bg-white text-slate-500 hover:text-slate-800 hover:bg-slate-50 shadow-sm border border-slate-200 active:scale-90 transition-all"
+                        title="Giảm thứ tự"
                       >
-                        <span className="text-[6px] font-bold leading-none select-none">−</span>
+                        <span className="material-symbols-outlined text-xs">remove</span>
                       </button>
-                      <span className="w-3 text-center font-mono font-bold text-[7px] text-[#006575] leading-none flex items-center justify-center">
-                        {String((agent as any).sort_order ?? 0).padStart(2, '0')}
+                      <span className="w-8 text-center font-mono font-bold text-xs text-[#006575] leading-none flex items-center justify-center px-1">
+                        #{String((agent as any).sort_order ?? 0).padStart(2, '0')}
                       </span>
                       <button
                         onClick={() => handleSortChange(agent.id, 'up')}
-                        className="w-3 h-3 flex items-center justify-center rounded-full bg-white text-slate-500 hover:text-slate-800 hover:bg-slate-50 border border-slate-200 active:scale-90 transition-all"
-                        title="Tăng"
+                        className="w-6 h-6 flex items-center justify-center rounded-full bg-white text-slate-500 hover:text-slate-800 hover:bg-slate-50 shadow-sm border border-slate-200 active:scale-90 transition-all"
+                        title="Tăng thứ tự"
                       >
-                        <span className="text-[6px] font-bold leading-none select-none">+</span>
+                        <span className="material-symbols-outlined text-xs">add</span>
                       </button>
-                    </>
+                    </div>
                   ) : (
-                    <span className="w-3 text-center font-mono font-bold text-[7px] text-[#006575] leading-none flex items-center justify-center px-0.5">
-                      {String((agent as any).sort_order ?? 0).padStart(2, '0')}
-                    </span>
+                    <div className="flex items-center bg-gradient-to-r from-slate-100 to-slate-50 px-2 py-1 rounded-full border border-slate-200/80 shadow-sm">
+                      <span className="font-mono font-bold text-xs text-[#006575] leading-none">
+                        #{String((agent as any).sort_order ?? 0).padStart(2, '0')}
+                      </span>
+                    </div>
                   )}
                 </div>
               </div>

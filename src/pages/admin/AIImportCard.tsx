@@ -120,14 +120,14 @@ interface ImportPreviewResponse {
 
 /** Map MADA category ID → label + color */
 export const MADA_CATEGORY_LABELS: Record<string, { label: string; color: string; bg: string }> = {
-  vision: { label: '👁️ Thị giác', color: 'text-purple-700', bg: 'bg-purple-50 border-purple-200' },
+  vision: { label: '👁 Thị giác', color: 'text-purple-700', bg: 'bg-purple-50 border-purple-200' },
   hearing: { label: '🔊 Thính giác', color: 'text-blue-700', bg: 'bg-blue-50 border-blue-200' },
   communication: { label: '💬 Giao tiếp', color: 'text-teal-700', bg: 'bg-teal-50 border-teal-200' },
   mobility: { label: '🦽 Vận động', color: 'text-green-700', bg: 'bg-green-50 border-green-200' },
   cognition: { label: '🧠 Nhận thức', color: 'text-amber-700', bg: 'bg-amber-50 border-amber-200' },
   daily_living: { label: '🏠 Sinh hoạt', color: 'text-orange-700', bg: 'bg-orange-50 border-orange-200' },
   web_accessibility: { label: '🌐 Web A11y', color: 'text-cyan-700', bg: 'bg-cyan-50 border-cyan-200' },
-  general: { label: '📋 Tổng quát', color: 'text-gray-700', bg: 'bg-gray-50 border-gray-200' },
+  general: { label: '📁 Tổng quát', color: 'text-gray-700', bg: 'bg-gray-50 border-gray-200' },
 };
 
 interface AIImportCardProps {

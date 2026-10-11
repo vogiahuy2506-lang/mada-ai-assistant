@@ -9,7 +9,7 @@ export default defineConfig({
     }),
   ],
   optimizeDeps: {
-    exclude: ['chunk-DRWLMN53', 'chunk-PJEEZAML']
+    include: ['react', 'react-dom', 'zustand', 'zustand/middleware', 'use-sync-external-store'],
   },
   resolve: {
     alias: {
@@ -17,7 +17,7 @@ export default defineConfig({
       'react': path.resolve(__dirname, 'node_modules/react'),
       'react-dom': path.resolve(__dirname, 'node_modules/react-dom'),
     },
-    dedupe: ['react', 'react-dom', 'react-router-dom'],
+    dedupe: ['react', 'react-dom', 'react-router-dom', 'zustand', 'use-sync-external-store'],
   },
   css: {
     modules: {

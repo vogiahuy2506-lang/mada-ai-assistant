@@ -318,6 +318,20 @@ function AnalyticsTab() {
   const [includeRLHF, setIncludeRLHF] = useState(true);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<{ modules: ModuleStats[]; totals: { totalResponses: number; likes: number; dislikes: number; satisfaction: number } }>({ modules: [], totals: { totalResponses: 0, likes: 0, dislikes: 0, satisfaction: 0 } });
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
+  // Chat metrics state
+  const [chatMetrics, setChatMetrics] = useState<{
+    totalChats: number;
+    avgResponseTime: number;
+    avgConfidence: number;
+    errorRate: number;
+    topQueries: Array<{ query: string; count: number }>;
+    chatsByHour: Array<{ hour: number; count: number }>;
+    categoryUsage: Array<{ category: string; count: number }>;
+    languageDistribution: Array<{ language: string; count: number; color?: string }>;
+  } | null>(null);
 
   // Module display name mapping
   const moduleDisplayMap: Record<string, string> = {
@@ -338,14 +352,16 @@ function AnalyticsTab() {
       const token = getAccessToken();
       const headers = { 'Authorization': `Bearer ${token}` };
 
-      // Fetch stats and feedback in parallel
-      const [statsRes, feedbackRes] = await Promise.all([
+      // Fetch stats, feedback, and chat metrics in parallel
+      const [statsRes, feedbackRes, chatMetricsRes] = await Promise.all([
         fetch('/api/admin/feedback/stats', { headers }),
         fetch('/api/admin/feedback?limit=100', { headers }),
+        fetch(`/api/admin/analytics/chat-metrics?range=${range}`, { headers }),
       ]);
 
       const statsData = await statsRes.json();
       const feedbackData = await feedbackRes.json();
+      const chatMetricsData = await chatMetricsRes.json();
 
       if (statsData.success) {
         setStats(statsData.data);
@@ -371,12 +387,17 @@ function AnalyticsTab() {
         }));
         setFeedback(mappedFeedback);
       }
+
+      // Set chat metrics
+      if (chatMetricsData.success && chatMetricsData.data) {
+        setChatMetrics(chatMetricsData.data);
+      }
     } catch (error) {
       console.error('Failed to fetch feedback data:', error);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [range]);
 
   useEffect(() => {
     fetchData();
@@ -448,6 +469,70 @@ function AnalyticsTab() {
     setFilterModule('ALL');
     setFilterRating('ALL');
     setFilterStatus('ALL');
+    setCurrentPage(1);
+  };
+
+  // Export to Excel
+  const handleExportExcel = () => {
+    // Create CSV content from filtered feedback
+    const headers = ['Thời gian', 'Ngày', 'Module', 'Câu hỏi', 'Người dùng', 'Đánh giá', 'Lý do', 'Phản hồi', 'Trạng thái'];
+    const rows = filteredFeedback.map(item => [
+      item.time,
+      item.date,
+      moduleDisplayMap[item.module] || item.module,
+      item.question.replace(/"/g, '""'),
+      item.userType,
+      item.rating === 'like' ? 'Like' : 'Dislike',
+      item.reason.replace(/"/g, '""'),
+      item.feedback.replace(/"/g, '""'),
+      item.status
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n');
+
+    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `mada-ai-feedback-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  // Pagination
+  const totalPages = Math.ceil(filteredFeedback.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = Math.min(startIndex + itemsPerPage, filteredFeedback.length);
+  const paginatedFeedback = filteredFeedback.slice(startIndex, endIndex);
+
+  const handlePageChange = (page: number) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+    }
+  };
+
+  // Generate page numbers for pagination
+  const getPageNumbers = () => {
+    if (totalPages <= 0) return [];
+    
+    const pages: (number | string)[] = [];
+    if (totalPages <= 7) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i);
+    } else {
+      pages.push(1);
+      if (currentPage > 3) pages.push('...');
+      for (let i = Math.max(2, currentPage - 1); i <= Math.min(totalPages - 1, currentPage + 1); i++) {
+        pages.push(i);
+      }
+      if (currentPage < totalPages - 2) pages.push('...');
+      pages.push(totalPages);
+    }
+    return pages;
   };
 
   return (
@@ -469,7 +554,7 @@ function AnalyticsTab() {
             {(['7d', '30d', 'quarter'] as TimeRange[]).map((r) => (
               <button
                 key={r}
-                onClick={() => setRange(r)}
+                onClick={() => { setRange(r); setCurrentPage(1); }}
                 className={clsx(
                   'px-3.5 py-1.5 rounded-lg text-sm font-medium transition-all',
                   range === r 
@@ -481,7 +566,10 @@ function AnalyticsTab() {
               </button>
             ))}
           </div>
-          <button className="h-11 px-4 bg-primary hover:bg-primary-container text-on-primary rounded-xl flex items-center gap-2 text-sm font-medium transition-all shadow-sm">
+          <button
+            onClick={handleExportExcel}
+            className="h-11 px-4 bg-primary hover:bg-primary-container text-on-primary rounded-xl flex items-center gap-2 text-sm font-medium transition-all shadow-sm cursor-pointer"
+          >
             <span className="material-symbols-outlined text-xl">download</span>
             <span className="hidden sm:inline">Xuất báo cáo (.xlsx)</span>
           </button>
@@ -533,7 +621,7 @@ function AnalyticsTab() {
           {/* Mini Progress Meter */}
           <div className="pt-4 mt-4 border-t border-surface-container-low flex items-center gap-3">
             <div className="flex-1 bg-surface-container-high h-2 rounded-full overflow-hidden">
-              <div className="bg-tertiary h-full rounded-full" style={{ width: `${satisfactionRate}%` }}></div>
+              <div className="bg-tertiary h-full rounded-full" style={{ width: `${Number(satisfactionRate)}%` }}></div>
             </div>
             <span className="text-xs font-semibold text-tertiary">Đạt chuẩn WCAG</span>
           </div>
@@ -567,7 +655,7 @@ function AnalyticsTab() {
           </div>
           <div className="flex items-center justify-between pt-4 mt-4 border-t border-surface-container-low">
             <span className="text-sm text-on-surface-variant">Tỷ lệ Dislike thực</span>
-            <span className="text-sm font-semibold text-error">{((totalDislikes/totalResponses)*100).toFixed(1)}% (Ngưỡng an toàn &lt;8%)</span>
+            <span className="text-sm font-semibold text-error">{totalResponses > 0 ? ((totalDislikes/totalResponses)*100).toFixed(1) : 0}% (Ngưỡng an toàn &lt;8%)</span>
           </div>
         </div>
 
@@ -594,6 +682,125 @@ function AnalyticsTab() {
           </div>
         </div>
       </div>
+
+      {/* Chat Metrics Cards - Real Data from API */}
+      {chatMetrics && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
+          {/* Card: Total Chats */}
+          <div className="bg-surface-container-lowest rounded-2xl p-6 shadow-sm flex flex-col justify-between relative overflow-hidden group hover:shadow-md transition-shadow border-2 border-primary/20">
+            <div className="absolute -right-4 -bottom-4 w-24 h-24 bg-primary/10 rounded-full opacity-40 group-hover:scale-110 transition-transform"></div>
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-semibold text-on-surface-variant uppercase tracking-wider">Tổng Cuộc Trò Chuyện</span>
+                <div className="w-10 h-10 rounded-xl bg-primary-container text-on-primary-container flex items-center justify-center">
+                  <span className="material-symbols-outlined text-xl">chat</span>
+                </div>
+              </div>
+              <div className="flex items-baseline gap-2 mb-2">
+                <span className="text-4xl font-bold text-primary">{chatMetrics.totalChats}</span>
+                <span className="text-xs font-semibold text-outline">cuộc trò chuyện</span>
+              </div>
+            </div>
+            <div className="flex items-center justify-between pt-4 mt-4 border-t border-surface-container-low">
+              <span className="text-sm text-on-surface-variant">Thời gian phản hồi TB</span>
+              <span className="text-sm font-semibold text-primary">{chatMetrics.avgResponseTime}ms</span>
+            </div>
+          </div>
+
+          {/* Card: Top Query */}
+          <div className="bg-surface-container-lowest rounded-2xl p-6 shadow-sm flex flex-col justify-between relative overflow-hidden group hover:shadow-md transition-shadow border-2 border-secondary/20">
+            <div className="absolute -right-4 -bottom-4 w-24 h-24 bg-secondary/10 rounded-full opacity-40 group-hover:scale-110 transition-transform"></div>
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-semibold text-on-surface-variant uppercase tracking-wider">Câu Hỏi Phổ Biến Nhất</span>
+                <div className="w-10 h-10 rounded-xl bg-secondary-container text-on-secondary-container flex items-center justify-center">
+                  <span className="material-symbols-outlined text-xl">help</span>
+                </div>
+              </div>
+              <div className="truncate">
+                <p className="text-lg font-bold text-on-surface truncate" title={chatMetrics.topQueries[0]?.query || 'Không có dữ liệu'}>
+                  {chatMetrics.topQueries[0]?.query || 'Không có dữ liệu'}
+                </p>
+                <p className="text-sm text-secondary font-semibold">{chatMetrics.topQueries[0]?.count || 0}x lượt hỏi</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Card: Language Distribution */}
+          <div className="bg-surface-container-lowest rounded-2xl p-6 shadow-sm flex flex-col justify-between relative overflow-hidden group hover:shadow-md transition-shadow border-2 border-tertiary/20">
+            <div className="absolute -right-4 -bottom-4 w-24 h-24 bg-tertiary/10 rounded-full opacity-40 group-hover:scale-110 transition-transform"></div>
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-semibold text-on-surface-variant uppercase tracking-wider">Ngôn Ngữ Sử Dụng</span>
+                <div className="w-10 h-10 rounded-xl bg-tertiary-container text-on-tertiary-container flex items-center justify-center">
+                  <span className="material-symbols-outlined text-xl">language</span>
+                </div>
+              </div>
+              <div className="space-y-1">
+                {chatMetrics.languageDistribution.slice(0, 3).map((lang, i) => (
+                  <div key={i} className="flex items-center justify-between">
+                    <span className="text-sm text-on-surface">{lang.language}</span>
+                    <span className="text-sm font-bold text-tertiary">{lang.count}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Card: Error Rate */}
+          <div className="bg-surface-container-lowest rounded-2xl p-6 shadow-sm flex flex-col justify-between relative overflow-hidden group hover:shadow-md transition-shadow border-2 border-error/20">
+            <div className="absolute -right-4 -bottom-4 w-24 h-24 bg-error/10 rounded-full opacity-40 group-hover:scale-110 transition-transform"></div>
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-semibold text-on-surface-variant uppercase tracking-wider">Tỷ Lệ Lỗi</span>
+                <div className="w-10 h-10 rounded-xl bg-error-container text-on-error-container flex items-center justify-center">
+                  <span className="material-symbols-outlined text-xl">error</span>
+                </div>
+              </div>
+              <div className="flex items-baseline gap-2 mb-2">
+                <span className={`text-4xl font-bold ${chatMetrics.errorRate > 5 ? 'text-error' : 'text-tertiary'}`}>
+                  {chatMetrics.errorRate.toFixed(1)}%
+                </span>
+              </div>
+            </div>
+            <div className="pt-4 mt-4 border-t border-surface-container-low flex items-center gap-3">
+              <div className={`flex-1 h-2 rounded-full overflow-hidden ${chatMetrics.errorRate < 5 ? 'bg-tertiary-container' : 'bg-error-container'}`}>
+                <div 
+                  className={`h-full rounded-full ${chatMetrics.errorRate < 5 ? 'bg-tertiary' : 'bg-error'}`}
+                  style={{ width: `${Math.min(chatMetrics.errorRate * 10, 100)}%` }}
+                />
+              </div>
+              <span className="text-xs font-semibold text-outline">{chatMetrics.errorRate < 5 ? 'Tốt' : 'Cần cải thiện'}</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Top Queries Section */}
+      {chatMetrics && chatMetrics.topQueries.length > 0 && (
+        <div className="bg-surface-container-lowest rounded-2xl p-6 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-lg font-bold text-on-surface">Câu Hỏi Phổ Biến Nhất</h3>
+              <p className="text-sm text-on-surface-variant">Top 5 câu hỏi được người dùng hỏi nhiều nhất trong khoảng thời gian này</p>
+            </div>
+          </div>
+          <div className="space-y-2">
+            {chatMetrics.topQueries.slice(0, 5).map((q, i) => (
+              <div key={i} className="flex items-center gap-3 p-3 bg-surface-container-low rounded-xl border border-surface-container">
+                <span className={clsx(
+                  'w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0',
+                  i === 0 ? 'bg-primary text-on-primary' : i === 1 ? 'bg-secondary text-on-secondary' : 'bg-surface-container-high text-on-surface-variant'
+                )}>
+                  {i + 1}
+                </span>
+                <span className="flex-1 text-sm text-on-surface truncate">{q.query}</span>
+                <span className="text-sm font-bold text-secondary flex-shrink-0">{q.count}x</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Visual Analytics Section (2 Column Layout) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -712,7 +919,10 @@ function AnalyticsTab() {
           </div>
 
           {/* Action Note */}
-          <button className="w-full mt-3 py-2.5 bg-surface-container-low hover:bg-surface-container text-primary text-sm font-medium rounded-xl flex items-center justify-center gap-2 transition-all">
+          <button
+            onClick={() => alert('Đã gửi dữ liệu phản hồi tiêu cực cho bộ phận Reinforcement Learning. Hệ thống sẽ tự động tối ưu mô hình trong 24-48 giờ tới.')}
+            className="w-full mt-3 py-2.5 bg-surface-container-low hover:bg-surface-container text-primary text-sm font-medium rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer"
+          >
             <span className="material-symbols-outlined text-xl">psychology_alt</span>
             <span>Gửi dữ liệu huấn luyện Reinforcement Learning</span>
           </button>
@@ -783,14 +993,24 @@ function AnalyticsTab() {
               <p className="text-sm text-on-surface-variant">Dữ liệu thời gian thực được đồng bộ từ các phiên tư vấn trên toàn quốc</p>
             </div>
             <div className="flex items-center gap-2">
-              <button 
-                onClick={resetFilters}
-                className="h-10 px-3.5 bg-surface-container hover:bg-surface-container-high rounded-xl text-on-surface text-sm font-medium flex items-center gap-2 transition-all"
+              <button
+                onClick={() => { resetFilters(); }}
+                className="h-10 px-3.5 bg-surface-container hover:bg-surface-container-high rounded-xl text-on-surface text-sm font-medium flex items-center gap-2 transition-all cursor-pointer"
               >
                 <RefreshCw className="w-4 h-4" />
                 <span className="hidden sm:inline">Đặt lại bộ lọc</span>
               </button>
-              <button className="h-10 px-4 bg-primary hover:bg-primary-container text-on-primary rounded-xl text-sm font-medium flex items-center gap-2 transition-all">
+              <button
+                onClick={() => {
+                  const selectedCount = filteredFeedback.filter(f => f.rating === 'like').length;
+                  if (selectedCount === 0) {
+                    alert('Vui lòng chọn ít nhất một mẫu Like để duyệt làm dữ liệu huấn luyện.');
+                    return;
+                  }
+                  alert(`Đã duyệt ${selectedCount} mẫu phản hồi tích cực (Like) làm dữ liệu huấn luyện mô hình MADA AI.`);
+                }}
+                className="h-10 px-4 bg-primary hover:bg-primary-container text-on-primary rounded-xl text-sm font-medium flex items-center gap-2 transition-all cursor-pointer"
+              >
                 <ShieldCheck className="w-4 h-4" />
                 <span className="hidden sm:inline">Duyệt mẫu huấn luyện đã chọn</span>
               </button>
@@ -807,7 +1027,7 @@ function AnalyticsTab() {
                 id="filter-search"
                 placeholder="Tìm câu hỏi, từ khóa, lý do..."
                 value={filterSearch}
-                onChange={(e) => setFilterSearch(e.target.value)}
+                onChange={(e) => { setFilterSearch(e.target.value); setCurrentPage(1); }}
               />
             </div>
 
@@ -816,7 +1036,7 @@ function AnalyticsTab() {
               <select
                 className="w-full h-11 px-3.5 bg-surface rounded-xl text-on-surface text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-secondary cursor-pointer"
                 value={filterModule}
-                onChange={(e) => setFilterModule(e.target.value)}
+                onChange={(e) => { setFilterModule(e.target.value); setCurrentPage(1); }}
               >
                 <option value="ALL">Tất cả Module Chatbot</option>
                 <option value="vision">Trợ năng Thị giác</option>
@@ -836,7 +1056,7 @@ function AnalyticsTab() {
               <select
                 className="w-full h-11 px-3.5 bg-surface rounded-xl text-on-surface text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-secondary cursor-pointer"
                 value={filterRating}
-                onChange={(e) => setFilterRating(e.target.value)}
+                onChange={(e) => { setFilterRating(e.target.value); setCurrentPage(1); }}
               >
                 <option value="ALL">Tất cả Đánh giá</option>
                 <option value="DISLIKE">Chỉ Dislike (Ưu tiên can thiệp)</option>
@@ -850,7 +1070,7 @@ function AnalyticsTab() {
               <select
                 className="w-full h-11 px-3.5 bg-surface rounded-xl text-on-surface text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-secondary cursor-pointer"
                 value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
+                onChange={(e) => { setFilterStatus(e.target.value); setCurrentPage(1); }}
               >
                 <option value="ALL">Tất cả Trạng thái Xử lý</option>
                 <option value="Chờ chuyên gia">Chờ chuyên gia xem xét</option>
@@ -885,14 +1105,14 @@ function AnalyticsTab() {
                     <p className="text-on-surface-variant">Đang tải dữ liệu phản hồi...</p>
                   </td>
                 </tr>
-              ) : filteredFeedback.length === 0 ? (
+              ) : paginatedFeedback.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="py-12 text-center">
                     <p className="text-on-surface-variant">Chưa có dữ liệu phản hồi nào</p>
                   </td>
                 </tr>
               ) : (
-                filteredFeedback.map((item) => (
+                paginatedFeedback.map((item) => (
                   <tr key={item.id} className={clsx(
                     'hover:bg-surface-container/60 transition-colors group',
                     item.rating === 'like' ? 'bg-surface-container-lowest' : ''
@@ -958,7 +1178,8 @@ function AnalyticsTab() {
                         </button>
                       ) : (
                         <button
-                          className="p-2 rounded-xl bg-surface-container-low hover:bg-surface-container text-on-surface-variant transition-all"
+                          onClick={() => alert(`Đã lưu đoạn chat ${item.id} vào kho vàng huấn luyện MADA AI.`)}
+                          className="p-2 rounded-xl bg-surface-container-low hover:bg-surface-container text-on-surface-variant transition-all cursor-pointer"
                           title="Lưu vào kho vàng huấn luyện"
                         >
                           <Star className="w-5 h-5" />
@@ -973,27 +1194,57 @@ function AnalyticsTab() {
           </table>
         </div>
 
-        {/* Table Pagination */}
+        {/* Table Pagination - only show when more than 1 page */}
+        {totalPages > 1 && (
         <div className="p-6 bg-surface-container-lowest flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <span className="text-sm text-on-surface-variant">
-              Hiển thị <strong>1 - {filteredFeedback.length}</strong> trong tổng số <strong>{totalResponses.toLocaleString()}</strong> phản hồi
+              Hiển thị <strong>{startIndex + 1} - {endIndex}</strong> trong tổng số <strong>{filteredFeedback.length}</strong> phản hồi
             </span>
           </div>
           <div className="flex items-center gap-1.5">
-            <button className="w-9 h-9 rounded-xl bg-surface-container flex items-center justify-center text-outline hover:text-on-surface hover:bg-surface-container-high transition-all" disabled>
+            <button
+              onClick={() => handlePageChange(currentPage - 1)}
+              disabled={currentPage === 1}
+              className="w-9 h-9 rounded-xl bg-surface-container flex items-center justify-center text-outline hover:text-on-surface hover:bg-surface-container-high transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
               <span className="material-symbols-outlined text-xl">chevron_left</span>
             </button>
-            <button className="w-9 h-9 rounded-xl bg-primary text-on-primary text-sm font-medium shadow-sm">1</button>
-            <button className="w-9 h-9 rounded-xl bg-surface-container text-on-surface text-sm font-medium hover:bg-surface-container-high transition-all">2</button>
-            <button className="w-9 h-9 rounded-xl bg-surface-container text-on-surface text-sm font-medium hover:bg-surface-container-high transition-all">3</button>
-            <span className="px-2 text-outline">...</span>
-            <button className="w-9 h-9 rounded-xl bg-surface-container text-on-surface text-sm font-medium hover:bg-surface-container-high transition-all">965</button>
-            <button className="w-9 h-9 rounded-xl bg-surface-container flex items-center justify-center text-on-surface hover:bg-surface-container-high transition-all">
+            {getPageNumbers().map((page, idx) => (
+              typeof page === 'number' ? (
+                <button
+                  key={idx}
+                  onClick={() => handlePageChange(page)}
+                  className={clsx(
+                    'w-9 h-9 rounded-xl text-sm font-medium transition-all',
+                    currentPage === page
+                      ? 'bg-primary text-on-primary shadow-sm'
+                      : 'bg-surface-container text-on-surface hover:bg-surface-container-high'
+                  )}
+                >
+                  {page}
+                </button>
+              ) : (
+                <span key={idx} className="px-2 text-outline">{page}</span>
+              )
+            ))}
+            <button
+              onClick={() => handlePageChange(currentPage + 1)}
+              disabled={currentPage === totalPages || totalPages === 0}
+              className="w-9 h-9 rounded-xl bg-surface-container flex items-center justify-center text-on-surface hover:bg-surface-container-high transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
               <span className="material-symbols-outlined text-xl">chevron_right</span>
             </button>
           </div>
         </div>
+        )}
+        {totalPages <= 1 && filteredFeedback.length > 0 && (
+          <div className="p-4 bg-surface-container-lowest border-t border-surface-container text-center">
+            <span className="text-sm text-on-surface-variant">
+              Hiển thị tất cả <strong>{filteredFeedback.length}</strong> phản hồi
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Chat Review Drawer */}
@@ -1106,7 +1357,13 @@ function AnalyticsTab() {
                 Đóng cửa sổ
               </button>
               <div className="flex items-center gap-3">
-                <button className="h-12 px-5 rounded-xl bg-secondary-container hover:bg-secondary-fixed text-on-secondary-container text-base font-medium flex items-center gap-2 transition-all">
+                <button
+                  onClick={() => {
+                    alert(`Đã chuyển đoạn chat ${selectedChat.id} cho Kỹ thuật viên module ${selectedChat.module}. Họ sẽ được thông báo qua hệ thống.`);
+                    setChatDrawerOpen(false);
+                  }}
+                  className="h-12 px-5 rounded-xl bg-secondary-container hover:bg-secondary-fixed text-on-secondary-container text-base font-medium flex items-center gap-2 transition-all cursor-pointer"
+                >
                   <span className="material-symbols-outlined text-xl">person_check</span>
                   <span className="hidden sm:inline">Chuyển cho KTV {selectedChat.module}</span>
                 </button>

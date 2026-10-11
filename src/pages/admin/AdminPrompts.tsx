@@ -13,7 +13,8 @@ import {
   GripVertical, Settings,
   ChevronDown, Bell, Play, History, CloudUpload,
   SlidersHorizontal, Database, Wand2, ArrowLeft,
-  ArrowUp, ArrowDown, Save
+  ArrowUp, ArrowDown, Save,
+  Eye, HelpCircle, Accessibility, Tag,
 } from 'lucide-react';
 
 // ============== TYPES ==============
@@ -59,28 +60,35 @@ interface KnowledgeUrl {
   status?: 'vectorized' | 'pending' | 'error';
 }
 
-// ============== MADA BOT EMOJI MAPPING ==============
-const MADA_BOT_EMOJI: Record<string, string> = {};
-MADA_BOTS.forEach((bot) => { MADA_BOT_EMOJI[bot.id] = bot.avatar; });
+// ============== MADA BOT ICON MAPPING ==============
+const MADA_BOT_ICONS: Record<string, React.ReactNode> = {
+  'bot-hearing': <HelpCircle className="w-5 h-5 text-amber-500" />,
+  'bot-vision': <Eye className="w-5 h-5 text-blue-500" />,
+  'bot-speech': <MessageSquare className="w-5 h-5 text-purple-500" />,
+  'bot-cognitive': <HelpCircle className="w-5 h-5 text-pink-500" />,
+  'bot-neuro': <Accessibility className="w-5 h-5 text-orange-500" />,
+  'bot-mobility': <Accessibility className="w-5 h-5 text-cyan-500" />,
+  'bot-regulatory': <Tag className="w-5 h-5 text-teal-500" />,
+};
 
-const EMOJI_BY_KEYWORD: [string, string][] = [
-  ['hearing', '👂'], ['thính', '👂'],
-  ['vision', '👁️'], ['thị', '👁️'], ['eye', '👁️'],
-  ['speech', '💬'], ['voice', '💬'], ['giọng', '💬'],
-  ['cognitive', '🧠'], ['mental', '🧠'], ['nhận thức', '🧠'],
-  ['neuro', '🦴'], ['movement', '🦴'], ['vận động', '🦴'],
-  ['mobility', '🦽'], ['di chuyển', '🦽'],
-  ['regulatory', '📋'], ['standards', '📋'], ['quy định', '📋'],
+const ICON_BY_KEYWORD: [string, React.ReactNode][] = [
+  ['hearing', <HelpCircle className="w-4 h-4 text-amber-500" />], ['thính', <HelpCircle className="w-4 h-4 text-amber-500" />],
+  ['vision', <Eye className="w-4 h-4 text-blue-500" />], ['thị', <Eye className="w-4 h-4 text-blue-500" />], ['eye', <Eye className="w-4 h-4 text-blue-500" />],
+  ['speech', <MessageSquare className="w-4 h-4 text-purple-500" />], ['voice', <MessageSquare className="w-4 h-4 text-purple-500" />], ['giọng', <MessageSquare className="w-4 h-4 text-purple-500" />],
+  ['cognitive', <HelpCircle className="w-4 h-4 text-pink-500" />], ['mental', <HelpCircle className="w-4 h-4 text-pink-500" />], ['nhận thức', <HelpCircle className="w-4 h-4 text-pink-500" />],
+  ['neuro', <Accessibility className="w-4 h-4 text-orange-500" />], ['movement', <Accessibility className="w-4 h-4 text-orange-500" />], ['vận động', <Accessibility className="w-4 h-4 text-orange-500" />],
+  ['mobility', <Accessibility className="w-4 h-4 text-cyan-500" />], ['di chuyển', <Accessibility className="w-4 h-4 text-cyan-500" />],
+  ['regulatory', <Tag className="w-4 h-4 text-teal-500" />], ['standards', <Tag className="w-4 h-4 text-teal-500" />], ['quy định', <Tag className="w-4 h-4 text-teal-500" />],
 ];
 
-function getBotEmoji(botId?: string, name?: string): string {
-  if (botId && MADA_BOT_EMOJI[botId]) return MADA_BOT_EMOJI[botId];
-  if (!name) return '🤖';
+function getBotIcon(botId?: string, name?: string): React.ReactNode {
+  if (botId && MADA_BOT_ICONS[botId]) return MADA_BOT_ICONS[botId];
+  if (!name) return <Bot className="w-6 h-6 text-[#026773]" />;
   const lower = name.toLowerCase();
-  for (const [kw, emoji] of EMOJI_BY_KEYWORD) {
-    if (lower.includes(kw)) return emoji;
+  for (const [kw, icon] of ICON_BY_KEYWORD) {
+    if (lower.includes(kw)) return icon;
   }
-  return '🤖';
+  return <Bot className="w-6 h-6 text-[#026773]" />;
 }
 
 // ============== TRANSLATIONS ==============
@@ -1877,7 +1885,7 @@ export function AdminPrompts() {
                 const isSelected = selectedAgent?.id === agent.id;
                 const isDragging = draggedId === agent.id;
                 const isDragOver = dragOverId === agent.id;
-                const emoji = getBotEmoji(agent.bot_id ?? undefined, agent.name);
+                const icon = getBotIcon(agent.bot_id ?? undefined, agent.name);
 
                 return (
                   <div
@@ -1912,7 +1920,7 @@ export function AdminPrompts() {
                         ? 'bg-teal-800 border border-teal-700 text-white'
                         : 'bg-slate-50 border border-slate-200'
                     )}>
-                      {emoji}
+                      {icon}
                     </div>
 
                     {/* Info */}
@@ -2877,8 +2885,8 @@ export function AdminPrompts() {
                         className="w-9 h-9 rounded-lg object-cover flex-shrink-0 shadow-sm" 
                       />
                     ) : (
-                      <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-brand-700 to-teal-600 flex items-center justify-center text-white text-lg flex-shrink-0 shadow-sm">
-                        {getBotEmoji(agent.bot_id ?? undefined, agent.name)}
+                      <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-brand-700 to-teal-600 flex items-center justify-center text-white flex-shrink-0 shadow-sm">
+                        {getBotIcon(agent.bot_id ?? undefined, agent.name)}
                       </div>
                     )}
                     
@@ -3092,9 +3100,9 @@ function AgentAvatar({ name, avatarUrl, avatar, botId, size = 'md', className = 
   size?: 'sm' | 'md' | 'lg';
   className?: string;
 }) {
-  const resolvedEmoji = (avatar && isEmoji(avatar))
-    ? avatar
-    : getBotEmoji(botId, name);
+  const resolvedIcon = (avatar && isEmoji(avatar))
+    ? <span className="text-xl select-none leading-none">{avatar}</span>
+    : getBotIcon(botId, name);
 
   const sizeClasses = {
     sm: 'w-9 h-9 text-base',
@@ -3115,19 +3123,6 @@ function AgentAvatar({ name, avatarUrl, avatar, botId, size = 'md', className = 
     );
   }
 
-  if (resolvedEmoji !== '🤖' || avatar) {
-    return (
-      <div className={clsx(
-        'rounded-2xl flex items-center justify-center shadow-md flex-shrink-0',
-        'bg-gradient-to-tr from-brand-700 via-teal-600 to-emerald-400 text-white',
-        sizeClasses[size],
-        className
-      )}>
-        <span className="select-none leading-none">{resolvedEmoji}</span>
-      </div>
-    );
-  }
-
   return (
     <div className={clsx(
       'rounded-2xl flex items-center justify-center shadow-md flex-shrink-0',
@@ -3135,10 +3130,7 @@ function AgentAvatar({ name, avatarUrl, avatar, botId, size = 'md', className = 
       sizeClasses[size],
       className
     )}>
-      <Bot className={clsx(
-        size === 'sm' ? 'w-4 h-4' : size === 'md' ? 'w-6 h-6' : 'w-7 h-7',
-        'text-white'
-      )} />
+      {resolvedIcon}
     </div>
   );
 }

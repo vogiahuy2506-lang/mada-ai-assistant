@@ -10,7 +10,7 @@
  * - Horizontal layout for better readability
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Check, Star, MapPin, ShoppingCart, User } from 'lucide-react';
 import { getImageUrl } from '@/lib/imageProxy';
 import { t } from '@/lib/translations';
@@ -119,7 +119,23 @@ export function ProductCard({
             <div className="w-36 h-36 lg:w-full lg:h-48 rounded-2xl overflow-hidden bg-white flex-shrink-0 border border-slate-100 shadow-sm relative group-hover:shadow-md transition-shadow">
               {(() => {
                 const safeUrl = getImageUrl(product.image_url);
-                return safeUrl ? (
+                // ⭐ Fix: Track image error state properly
+                const [imageError, setImageError] = useState(false);
+                if (!safeUrl || imageError) {
+                  return (
+                    <div
+                      className="fallback-icon absolute inset-0 w-full h-full flex items-center justify-center text-white"
+                      style={{
+                        background: `linear-gradient(135deg, ${getCategoryGradient(product.category)})`,
+                      }}
+                    >
+                      <span className="material-symbols-outlined text-5xl lg:text-6xl" style={{ fontVariationSettings: "'FILL' 1" }}>
+                        {getCategoryIcon(product.category)}
+                      </span>
+                    </div>
+                  );
+                }
+                return (
                   <img
                     src={safeUrl}
                     alt={`${product.name} - ${product.category}`}
@@ -128,26 +144,13 @@ export function ProductCard({
                     decoding="async"
                     referrerPolicy="no-referrer"
                     crossOrigin="anonymous"
-                    onError={(e) => {
-                      const target = e.currentTarget as HTMLImageElement;
-                      target.style.display = 'none';
+                    onError={() => {
+                      console.warn(`[ProductCard] Failed to load image: ${product.image_url}`);
+                      setImageError(true);
                     }}
                   />
-                ) : null;
+                );
               })()}
-              {/* Category-based fallback */}
-              <div
-                className="fallback-icon absolute inset-0 w-full h-full flex items-center justify-center text-white"
-                style={{
-                  background: `linear-gradient(135deg, ${getCategoryGradient(product.category)})`,
-                }}
-                aria-hidden="true"
-              >
-                <span className="material-symbols-outlined text-5xl lg:text-6xl" style={{ fontVariationSettings: "'FILL' 1" }}>
-                  {getCategoryIcon(product.category)}
-                </span>
-              </div>
-            </div>
 
             {/* Match Score Badge */}
             {matchScore !== undefined && (

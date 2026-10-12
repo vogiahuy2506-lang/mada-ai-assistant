@@ -4371,6 +4371,9 @@ function MessageBubble({
                   gradientClass = 'from-amber-500 to-orange-500';
                 }
                 
+                // ⭐ Fix: Track image load error state per product
+                const [imageError, setImageError] = useState(false);
+                
                 return (
                   <div
                     key={product.id || index}
@@ -4378,16 +4381,17 @@ function MessageBubble({
                   >
                     {/* Hình ảnh sản phẩm - LỚN VÀ NỔI BẬT */}
                     <div className={`relative h-32 bg-gradient-to-br ${gradientClass} overflow-hidden`}>
-                      {product.image_url ? (
+                      {/* ⭐ Fix: Hiển thị fallback KHI image_url trống HOẶC KHI load lỗi */}
+                      {product.image_url && !imageError ? (
                         <img 
                           src={getImageUrl(product.image_url)} 
                           alt={productTitle}
                           className="w-full h-full object-cover object-center"
                           loading="lazy"
                           referrerPolicy="no-referrer"
-                          onError={(e) => {
-                            const target = e.target as HTMLImageElement;
-                            target.style.display = 'none';
+                          onError={() => {
+                            console.warn(`[ProductImage] Failed to load: ${product.image_url}`);
+                            setImageError(true);
                           }}
                         />
                       ) : (

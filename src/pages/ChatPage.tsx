@@ -4,6 +4,7 @@ import { useChatStore, useChatHistoryStore, useLanguageStore, useAuthStore, useA
 import madaLogo from '@/assets/mada-logo.png';
 import { QuotaIndicator } from '@/components/auth/QuotaIndicator';
 import { DislikeFeedbackForm } from '@/components/DislikeFeedbackForm';
+import AttachmentModal from '@/components/ui/AttachmentModal';
 import {
   Send, Plus, User, Mic,
   Volume2, ChevronDown, Check,
@@ -838,7 +839,7 @@ export function ChatPage() {
   const [isBotsCollapsed, setIsBotsCollapsed] = useState(false); // Kept for potential future use
   const [isRecording, setIsRecording] = useState(false);
   const [showLanguageMenu, setShowLanguageMenu] = useState(false);
-  const [showAttachmentMenu, setShowAttachmentMenu] = useState(false);
+  const [showAttachmentModal, setShowAttachmentModal] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<{ fileId: string; name: string; type: string; size: number; content?: string; originalFile?: File; isLoading?: boolean; isCancelling?: boolean }[]>([]);
    
@@ -1624,7 +1625,7 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
       }
       
       if (shouldCloseLang) setShowLanguageMenu(false);
-      if (shouldCloseAttach) setShowAttachmentMenu(false);
+      if (shouldCloseAttach) setShowAttachmentModal(false);
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -2643,7 +2644,49 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
   };
 
   const handleFileAttach = () => {
-    setShowAttachmentMenu(!showAttachmentMenu);
+    if (fileQuotaExhausted) return;
+    setShowAttachmentModal(true);
+  };
+
+  // Handle attachment option selection from modal
+  const handleAttachmentOptionSelect = (option: 'document' | 'image' | 'camera' | 'ocr') => {
+    setShowAttachmentModal(false);
+
+    const acceptMap: Record<string, string> = {
+      document: '.pdf,.doc,.docx,.txt,.xlsx,.xls,.csv,.md',
+      image: 'image/*',
+      camera: 'image/*',
+      ocr: 'image/*',
+    };
+
+    // For camera and ocr, we could trigger camera mode
+    if (option === 'camera' || option === 'ocr') {
+      // Open camera/file input for now
+      triggerFileInput(acceptMap[option]);
+      return;
+    }
+
+    triggerFileInput(acceptMap[option]);
+  };
+
+  // Helper function to trigger file input
+  const triggerFileInput = (accept: string) => {
+    const limitCheck = canAddFiles();
+    if (!limitCheck.allowed) {
+      alert(limitCheck.reason);
+      return;
+    }
+
+    if (fileQuotaExhausted) {
+      usePaywallModalStore.getState().open('file_upload_exhausted');
+      return;
+    }
+
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = accept;
+    input.multiple = true;
+    input.click();
   };
 
   const handleAttachmentSelect = (_type: string, accept: string) => {
@@ -2651,13 +2694,13 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
     const limitCheck = canAddFiles();
     if (!limitCheck.allowed) {
       alert(limitCheck.reason);
-      setShowAttachmentMenu(false);
+      setShowAttachmentModal(false);
       return;
     }
 
     // ⭐ Check monthly file upload quota
     if (fileQuotaExhausted) {
-      setShowAttachmentMenu(false);
+      setShowAttachmentModal(false);
       usePaywallModalStore.getState().open('file_upload_exhausted');
       return;
     }
@@ -2779,7 +2822,7 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
     };
     
     input.click();
-    setShowAttachmentMenu(false);
+    setShowAttachmentModal(false);
   };
 
   const handleRemoveFile = (index: number) => {
@@ -2803,7 +2846,7 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
     }
 
     setIsFetchingUrl(true);
-    setShowAttachmentMenu(false);
+    setShowAttachmentModal(false);
 
     try {
       const response = await fetch(`/api/scrape?url=${encodeURIComponent(url)}`);
@@ -3834,14 +3877,12 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
                       'p-2 rounded-full transition-colors',
                       fileQuotaExhausted
                         ? 'opacity-40 cursor-not-allowed text-on-surface-variant'
-                        : showAttachmentMenu
-                        ? 'bg-primary text-white'
                         : 'text-on-surface-variant hover:text-on-background hover:bg-surface-container-low'
                     )}
                     title={
                       fileQuotaExhausted
                         ? t('chat.monthlyLimitReached')
-                        : 'Đính kèm'
+                        : 'Đính kèm tệp & Dữ liệu'
                     }
                     id="attachment-btn"
                   >
@@ -3876,34 +3917,11 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
                   )}
 
                   {/* Attachment Menu */}
-                  {showAttachmentMenu && (
-                    <div 
-                      className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-white border border-outline rounded-xl shadow-lg z-[9999] overflow-hidden"
-                      style={{ 
-                        boxShadow: '0 4px 20px rgba(0,0,0,0.12)',
-                        width: '420px',
-                      }}
-                    >
-                      {/* Compact icon grid - 5 cột để hiển thị đủ không chồng */}
-                      <div className="p-2 grid grid-cols-5 gap-1">
-                        {getAttachmentOptions(language).map((option) => (
-                          <button
-                            key={option.id}
-                            onClick={() => handleAttachmentSelect(option.id, option.accept)}
-                            className="flex flex-col items-center gap-1 px-1 py-2 rounded-lg hover:bg-slate-100 transition-all group"
-                            title={option.label}
-                          >
-                            <div className="w-10 h-10 rounded-lg bg-slate-100 group-hover:bg-primary/10 flex items-center justify-center transition-colors">
-                              <option.icon className="w-5 h-5 text-slate-600 group-hover:text-primary" />
-                            </div>
-                            <span className="text-[10px] text-slate-600 group-hover:text-primary font-medium text-center leading-tight">
-                              {option.label}
-                            </span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                  <AttachmentModal
+                    isOpen={showAttachmentModal}
+                    onClose={() => setShowAttachmentModal(false)}
+                    onSelectOption={handleAttachmentOptionSelect}
+                  />
                 </div>
                 )}
 

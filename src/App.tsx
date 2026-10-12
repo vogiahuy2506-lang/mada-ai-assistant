@@ -14,6 +14,7 @@ import { ChatPage } from '@/pages/ChatPage';
 import { WidgetPage } from '@/pages/WidgetPage';
 import { GuestWidgetPage } from '@/pages/GuestWidgetPage';
 import { IntegrationGuidePage } from '@/pages/IntegrationGuidePage';
+import AttachmentDemo from '@/pages/AttachmentDemo';
 const AdminOverview = lazy(() => import('@/pages/admin/AdminOverview'));
 const AdminUsers = lazy(() => import('@/pages/admin/AdminUsers'));
 const AdminReports = lazy(() => import('@/pages/admin/AdminReports'));
@@ -105,6 +106,7 @@ function App() {
           <Route path="/widget" element={<GuestWidgetPage />} />
           <Route path="/guest-widget" element={<GuestWidgetPage />} />
           <Route path="/integration-guide" element={<IntegrationGuidePage />} />
+          <Route path="/demo/attachment" element={<AttachmentDemo />} />
           <Route path="/history" element={<ProfilePage />} />
           <Route path="/favorites" element={<ProfilePage />} />
           <Route path="/profile" element={<ProfilePage />} />

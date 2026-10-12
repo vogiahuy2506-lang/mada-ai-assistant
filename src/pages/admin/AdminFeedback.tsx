@@ -9,8 +9,7 @@ import {
   Filter, Eye, RefreshCw,
   ChevronLeft, ChevronRight,
   Search, X,
-  SentimentSatisfied, SentimentDissatisfied,
-  ChatBubbleOutline,
+  SmilePlus, Frown,
 } from 'lucide-react';
 
 type Language = 'vi' | 'en' | 'ar' | 'fr';
@@ -618,7 +617,7 @@ export default function AdminFeedback() {
               <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200/60">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center">
-                    <SentimentDissatisfied className="w-5 h-5 text-red-600" />
+                    <Frown className="w-5 h-5 text-red-600" />
                   </div>
                   <div>
                     <h3 className="font-bold text-slate-900">{t('topDislikeReasons')}</h3>
@@ -647,7 +646,7 @@ export default function AdminFeedback() {
                   </div>
                 ) : (
                   <div className="flex flex-col items-center justify-center py-8 text-slate-500">
-                    <SentimentSatisfied className="w-12 h-12 mb-3 opacity-30" />
+                    <SmilePlus className="w-12 h-12 mb-3 opacity-30" />
                     <p className="text-sm">{t('noDislikeReasons')}</p>
                   </div>
                 )}

@@ -145,12 +145,22 @@ jobs:
               echo "PINECONE_ENVIRONMENT=us-east-1"
               echo "NODE_ENV=production"
               echo "PORT=3000"
+              # ===== Mail / SMTP (consultation notifications) =====
+              echo "MAIL_HOST=${{ secrets.MAIL_HOST }}"
+              echo "MAIL_PORT=${{ secrets.MAIL_PORT }}"
+              echo "MAIL_SECURE=${{ secrets.MAIL_SECURE }}"
+              echo "MAIL_TLS=${{ secrets.MAIL_TLS }}"
+              echo "MAIL_USERNAME=${{ secrets.MAIL_USERNAME }}"
+              echo "MAIL_PASSWORD=${{ secrets.MAIL_PASSWORD }}"
+              echo "MAIL_FROM=${{ secrets.MAIL_FROM }}"
+              echo "CONSULTATION_EMAIL=${{ secrets.CONSULTATION_EMAIL }}"
+              echo "ADMIN_URL=${{ secrets.ADMIN_URL }}"
             } | sudo tee $APP_DIR/.env > /dev/null
 
             # Merge backup env vars (keep custom settings - but JWT_SECRET already handled above)
             if [ "$HAS_EXISTING_ENV" = "true" ]; then
               echo "Merging backup env vars..."
-              grep -v -E '^(GEMINI_API_KEY|PINECONE_API_KEY|PINECONE_INDEX_NAME|JWT_SECRET|ADMIN_EMAIL|ADMIN_PASSWORD|SUPER_ADMIN_EMAIL|SUPER_ADMIN_PASSWORD|VECTOR_DB_PROVIDER|PINECONE_ENVIRONMENT|NODE_ENV|PORT)=' /tmp/mada-env-backup.env | sudo tee -a $APP_DIR/.env > /dev/null
+              grep -v -E '^(GEMINI_API_KEY|PINECONE_API_KEY|PINECONE_INDEX_NAME|JWT_SECRET|ADMIN_EMAIL|ADMIN_PASSWORD|SUPER_ADMIN_EMAIL|SUPER_ADMIN_PASSWORD|VECTOR_DB_PROVIDER|PINECONE_ENVIRONMENT|NODE_ENV|PORT|MAIL_HOST|MAIL_PORT|MAIL_SECURE|MAIL_TLS|MAIL_USERNAME|MAIL_PASSWORD|MAIL_FROM|CONSULTATION_EMAIL|ADMIN_URL)=' /tmp/mada-env-backup.env | sudo tee -a $APP_DIR/.env > /dev/null
             fi
 
             echo "=== Step 10: Set permissions ==="

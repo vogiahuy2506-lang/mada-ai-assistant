@@ -5,7 +5,7 @@ import clsx from 'clsx';
 import {
   ThumbsUp, ThumbsDown, MessageSquare,
   BarChart2, Calendar, TrendingUp,
-  Loader2,
+  Loader2, ExternalLink, History,
 } from 'lucide-react';
 
 type Language = 'vi' | 'en' | 'ar' | 'fr';
@@ -22,6 +22,7 @@ const translations: Record<Language, Record<string, string>> = {
     noDislikeReasons: 'Chưa có phản hồi tiêu cực',
     recentFeedback: 'Phản hồi gần đây',
     noFeedback: 'Chưa có phản hồi nào',
+    viewChatHistory: 'Xem lịch sử chat',
     timeRange: 'Khoảng thời gian:',
     range24h: '24 giờ',
     range7d: '7 ngày',
@@ -119,6 +120,8 @@ export default function AdminFeedback() {
     total: number;
     reasons: { reason: string; count: number }[];
   } | null>(null);
+  const [feedbackList, setFeedbackList] = useState<any[]>([]);
+  const [loadingList, setLoadingList] = useState(false);
 
   const language: Language = 'vi'; // Default to Vietnamese
 
@@ -126,7 +129,54 @@ export default function AdminFeedback() {
 
   useEffect(() => {
     fetchStats();
+    fetchFeedbackList();
   }, [timeRange]);
+
+  const fetchFeedbackList = async () => {
+    setLoadingList(true);
+    try {
+      const token = getAccessToken();
+      const params = new URLSearchParams();
+      params.append('limit', '20');
+
+      if (timeRange !== 'all') {
+        const now = new Date();
+        let startDate: Date;
+
+        switch (timeRange) {
+          case '24h':
+            startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+            break;
+          case '7d':
+            startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+            break;
+          case '30d':
+            startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+            break;
+          case '90d':
+            startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+            break;
+          default:
+            startDate = new Date(0);
+        }
+
+        params.append('start_date', startDate.toISOString());
+      }
+
+      const res = await fetch(`/api/chat/feedback/list?${params}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setFeedbackList(data.data?.feedback || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch feedback list:', err);
+    } finally {
+      setLoadingList(false);
+    }
+  };
 
   const fetchStats = async () => {
     setLoading(true);
@@ -336,6 +386,64 @@ export default function AdminFeedback() {
                 <div className="text-center py-8 text-slate-500">
                   <ThumbsDown className="w-8 h-8 mx-auto mb-2 opacity-30" />
                   <p>{t('noDislikeReasons')}</p>
+                </div>
+              )}
+            </div>
+
+            {/* Feedback List with Chat History Links */}
+            <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-200/60">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold text-slate-900 flex items-center gap-2">
+                  <History className="w-5 h-5 text-slate-500" />
+                  {t('recentFeedback')}
+                </h3>
+              </div>
+
+              {loadingList ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-6 h-6 animate-spin text-[#0047ff]" />
+                </div>
+              ) : feedbackList.length > 0 ? (
+                <div className="space-y-3">
+                  {feedbackList.map((item, index) => (
+                    <div key={index} className="flex items-center gap-3 p-3 rounded-xl border border-slate-200 hover:border-slate-300 transition">
+                      <div className={clsx(
+                        'w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0',
+                        item.rating === 'like' ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'
+                      )}>
+                        {item.rating === 'like' ? (
+                          <ThumbsUp className="w-4 h-4" />
+                        ) : (
+                          <ThumbsDown className="w-4 h-4" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-slate-700 line-clamp-1">
+                          {item.reason || (item.rating === 'like' ? 'Thích' : 'Không thích')}
+                        </p>
+                        <p className="text-xs text-slate-400 mt-0.5">
+                          {new Date(item.created_at).toLocaleString('vi-VN')}
+                        </p>
+                      </div>
+                      {item.session_id && (
+                        <a
+                          href={`/chat?session=${item.session_id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[#0047ff] hover:bg-blue-50 rounded-lg transition"
+                          title={t('viewChatHistory')}
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                          <span>{t('viewChatHistory')}</span>
+                        </a>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-slate-500">
+                  <MessageSquare className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                  <p>{t('noFeedback')}</p>
                 </div>
               )}
             </div>

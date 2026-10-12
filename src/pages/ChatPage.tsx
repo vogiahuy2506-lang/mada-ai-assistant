@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useChatStore, useChatHistoryStore, useLanguageStore, useAuthStore, useAnonQuotaStore, usePaywallModalStore, useAuthModalStore, useAgentStore, useSelectedAgentStore, useSystemSettingsStore, useViewModeStore, useChatSettingsStore } from '@/stores';
 import madaLogo from '@/assets/mada-logo.png';
 import { QuotaIndicator } from '@/components/auth/QuotaIndicator';
@@ -822,6 +822,7 @@ function ProductImage({
 
 export function ChatPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { language, setLanguage } = useLanguageStore();
   const { messages, addMessage, clearMessages, isLoading, setLoading, setMessages } = useChatStore();
   const user = useAuthStore((s) => s.user);
@@ -947,6 +948,22 @@ export function ChatPage() {
         .catch(err => console.error('[ChatPage] Failed to fetch custom questions:', err));
     });
   }, [language]);
+
+  // ⭐ Load conversation from URL session parameter
+  useEffect(() => {
+    const sessionId = searchParams.get('session');
+    if (sessionId) {
+      console.log('[ChatPage] Loading session from URL:', sessionId);
+      // Set the active conversation ID to load from URL
+      setActiveConversationId(sessionId);
+      // Load messages for this session
+      getMessagesForConversation(sessionId).then((msgs) => {
+        if (msgs && msgs.length > 0) {
+          setMessages(msgs);
+        }
+      });
+    }
+  }, [searchParams]);
 
   // ⭐ Lắng nghe broadcast từ AdminAgents - cập nhật agents ngay khi admin thêm/sửa/xóa bot
   useEffect(() => {
@@ -4488,6 +4505,7 @@ function MessageBubble({
         }}
         messageContent={message.content}
         messageId={dislikeMessageId}
+        conversationId={activeConversationId || ''}
         language={language}
       />
     </div>

@@ -39,6 +39,7 @@ interface DislikeFeedbackFormProps {
   }) => void;
   messageContent: string;
   messageId: string;
+  conversationId: string;
   language?: Language;
 }
 
@@ -147,6 +148,7 @@ export function DislikeFeedbackForm({
   onClose,
   onSubmit,
   messageId,
+  conversationId,
   language = 'vi',
 }: DislikeFeedbackFormProps) {
   const [questions, setQuestions] = useState<FeedbackQuestion[]>(DEFAULT_FEEDBACK_QUESTIONS);
@@ -237,6 +239,7 @@ export function DislikeFeedbackForm({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message_id: messageId,
+          session_id: conversationId,
           rating: 'dislike',
           selectedReasons,
           details,

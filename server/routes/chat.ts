@@ -2517,6 +2517,82 @@ router.get('/feedback/stats/monthly', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/chat/feedback/list - Get individual feedback entries for admin
+ * Includes session_id for linking to chat history
+ */
+router.get('/feedback/list', async (req, res) => {
+  try {
+    const { agent_id, start_date, end_date, limit = 50, offset = 0 } = req.query;
+
+    let query = `
+      SELECT
+        mf.id,
+        mf.message_id,
+        mf.session_id,
+        mf.user_id,
+        mf.rating,
+        mf.reason,
+        mf.agent_id,
+        mf.language,
+        mf.created_at
+      FROM message_feedback mf
+      WHERE 1=1
+    `;
+    const params: any[] = [];
+
+    if (agent_id) {
+      query += ' AND mf.agent_id = ?';
+      params.push(agent_id);
+    }
+
+    if (start_date) {
+      query += ' AND mf.created_at >= ?';
+      params.push(start_date);
+    }
+
+    if (end_date) {
+      query += ' AND mf.created_at <= ?';
+      params.push(end_date);
+    }
+
+    query += ' ORDER BY mf.created_at DESC LIMIT ? OFFSET ?';
+    params.push(Number(limit), Number(offset));
+
+    const feedbackList = db.prepare(query).all(...params);
+
+    // Get total count
+    let countQuery = 'SELECT COUNT(*) as total FROM message_feedback mf WHERE 1=1';
+    const countParams: any[] = [];
+
+    if (agent_id) {
+      countQuery += ' AND mf.agent_id = ?';
+      countParams.push(agent_id);
+    }
+    if (start_date) {
+      countQuery += ' AND mf.created_at >= ?';
+      countParams.push(start_date);
+    }
+    if (end_date) {
+      countQuery += ' AND mf.created_at <= ?';
+      countParams.push(end_date);
+    }
+
+    const countResult = db.prepare(countQuery).get(...countParams) as { total: number };
+
+    res.json({
+      success: true,
+      data: {
+        feedback: feedbackList,
+        total: countResult?.total || 0,
+      },
+    });
+  } catch (error) {
+    console.error('❌ Feedback list error:', error);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+});
+
 export default router;
 export { detectMessageLanguage };
 

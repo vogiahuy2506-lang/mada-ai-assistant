@@ -129,7 +129,7 @@ router.post('/', async (req, res) => {
 
         const adminBaseUrl = process.env.ADMIN_URL || process.env.BASE_URL || 'https://mada.vn';
         const viewLink = `${adminBaseUrl}/admin/consultations`;
-        const formattedDate = new Date(now).toLocaleString('vi-VN', {
+        const formattedDate = new Date(now).toLocaleString('en-US', {
           weekday: 'long',
           year: 'numeric',
           month: 'long',
@@ -141,7 +141,7 @@ router.post('/', async (req, res) => {
         await transporter.sendMail({
           from: process.env.MAIL_FROM || 'MADA AI <noreply@mada.vn>',
           to: adminEmail,
-          subject: `[MADA] Yêu cầu tư vấn mới từ ${name}`,
+          subject: `[MADA] New Consultation Request from ${name}`,
           html: `
 <!DOCTYPE html>
 <html>
@@ -153,8 +153,8 @@ router.post('/', async (req, res) => {
   
   <!-- Header -->
   <div style="background: linear-gradient(135deg, #0047ff 0%, #0052cc 100%); padding: 24px; border-radius: 12px 12px 0 0; text-align: center;">
-    <h1 style="color: white; margin: 0; font-size: 24px; font-weight: 600;">📋 Yêu cầu Tư vấn Mới</h1>
-    <p style="color: rgba(255,255,255,0.9); margin: 8px 0 0; font-size: 14px;">MADA AI - Hỗ trợ Công nghệ Hỗ trợ</p>
+    <h1 style="color: white; margin: 0; font-size: 24px; font-weight: 600;">📋 New Consultation Request</h1>
+    <p style="color: rgba(255,255,255,0.9); margin: 8px 0 0; font-size: 14px;">MADA AI - Tech Support Assistant</p>
   </div>
   
   <!-- Content -->
@@ -162,16 +162,16 @@ router.post('/', async (req, res) => {
     
     <!-- Request ID -->
     <div style="background: #f0f4ff; padding: 12px 16px; border-radius: 8px; margin-bottom: 20px;">
-      <p style="margin: 0; font-size: 12px; color: #666; text-transform: uppercase; letter-spacing: 0.5px;">Mã yêu cầu</p>
+      <p style="margin: 0; font-size: 12px; color: #666; text-transform: uppercase; letter-spacing: 0.5px;">Request ID</p>
       <p style="margin: 4px 0 0; font-family: monospace; font-size: 14px; color: #0047ff; font-weight: 600;">${id}</p>
     </div>
     
     <!-- Contact Information -->
-    <h2 style="font-size: 16px; color: #333; margin: 0 0 16px; padding-bottom: 8px; border-bottom: 2px solid #0047ff;">👤 Thông tin liên hệ</h2>
+    <h2 style="font-size: 16px; color: #333; margin: 0 0 16px; padding-bottom: 8px; border-bottom: 2px solid #0047ff;">👤 Contact Information</h2>
     
     <table style="width: 100%; border-collapse: collapse; margin-bottom: 24px;">
       <tr>
-        <td style="padding: 8px 0; color: #666; width: 120px;">Họ tên:</td>
+        <td style="padding: 8px 0; color: #666; width: 120px;">Name:</td>
         <td style="padding: 8px 0; font-weight: 600; color: #333;">${name}</td>
       </tr>
       <tr>
@@ -181,17 +181,17 @@ router.post('/', async (req, res) => {
         </td>
       </tr>
       <tr>
-        <td style="padding: 8px 0; color: #666;">Điện thoại:</td>
-        <td style="padding: 8px 0; color: #333;">${phone || '<em>Không cung cấp</em>'}</td>
+        <td style="padding: 8px 0; color: #666;">Phone:</td>
+        <td style="padding: 8px 0; color: #333;">${phone || '<em>Not provided</em>'}</td>
       </tr>
       <tr>
-        <td style="padding: 8px 0; color: #666;">Ngày gửi:</td>
+        <td style="padding: 8px 0; color: #666;">Submitted:</td>
         <td style="padding: 8px 0; color: #333;">${formattedDate}</td>
       </tr>
     </table>
     
     <!-- Request Details -->
-    <h2 style="font-size: 16px; color: #333; margin: 0 0 16px; padding-bottom: 8px; border-bottom: 2px solid #0047ff;">💬 Nội dung yêu cầu</h2>
+    <h2 style="font-size: 16px; color: #333; margin: 0 0 16px; padding-bottom: 8px; border-bottom: 2px solid #0047ff;">💬 Request Details</h2>
     <div style="background: #f8f9fa; padding: 16px; border-radius: 8px; margin-bottom: 20px;">
       <p style="margin: 0; color: #333; line-height: 1.6; white-space: pre-wrap;">${message}</p>
     </div>
@@ -199,32 +199,32 @@ router.post('/', async (req, res) => {
     <!-- Action Button -->
     <div style="text-align: center; margin-top: 24px;">
       <a href="${viewLink}" style="display: inline-block; background: #0047ff; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;">
-        Xem yêu cầu trong Admin Panel
+        View Request in Admin Panel
       </a>
     </div>
   </div>
   
   <!-- Footer -->
   <div style="text-align: center; padding: 20px; color: #999; font-size: 12px;">
-    <p style="margin: 0;">Email này được gửi tự động từ MADA AI. Vui lòng không reply email này.</p>
+    <p style="margin: 0;">This email was automatically sent from MADA AI. Please do not reply to this email.</p>
   </div>
 </body>
 </html>
           `,
           text: `
-YÊU CẦU TƯ VẤN MỚI
-================
+NEW CONSULTATION REQUEST
+========================
 
-Mã yêu cầu: ${id}
-Họ tên: ${name}
+Request ID: ${id}
+Name: ${name}
 Email: ${email}
-Điện thoại: ${phone || 'Không cung cấp'}
-Ngày gửi: ${formattedDate}
+Phone: ${phone || 'Not provided'}
+Submitted: ${formattedDate}
 
-Nội dung:
+Message:
 ${message}
 
-Xem chi tiết: ${viewLink}
+View details: ${viewLink}
           `,
         });
         

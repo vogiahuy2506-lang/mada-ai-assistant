@@ -3812,7 +3812,7 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
             )}
 
             {/* Redesigned Pill Input with Layered Shadow - Material Design 3 Style */}
-            <div className="relative overflow-hidden">
+            <div className="relative">
               {/* Floating Lightning Icon */}
               <div className="absolute -top-3 -right-3 z-50">
                 <div className="w-8 h-8 bg-secondary-container rounded-full flex items-center justify-center border-[2px] border-on-background shadow-[3px_3px_0_0_rgba(25,27,35,1)] hover:-translate-y-0.5 hover:shadow-[4px_4px_0_0_rgba(25,27,35,1)] transition-all cursor-pointer">
@@ -3843,6 +3843,7 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
                         ? t('chat.monthlyLimitReached')
                         : 'Đính kèm'
                     }
+                    id="attachment-btn"
                   >
                     <Plus className="w-5 h-5" />
                   </button>
@@ -3876,70 +3877,28 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
 
                   {/* Attachment Menu */}
                   {showAttachmentMenu && (
-                    <div className="absolute bottom-full left-0 mb-2 w-72 bg-white border border-white/80 backdrop-blur-xl rounded-2xl shadow-[4px_4px_0_0_rgba(25,27,35,1)] z-50 overflow-hidden">
-                      <div className="px-4 py-3 border-b border-outline-variant/50 bg-primary flex items-center justify-between">
-                        <p className="text-sm font-bold text-white">{t('chat.addAttachment')}</p>
-                        <button
-                          onClick={() => setShowUrlInput(!showUrlInput)}
-                          className={clsx(
-                            'px-3 py-1 text-xs font-semibold rounded-full transition-colors',
-                            showUrlInput
-                              ? 'bg-white text-primary'
-                              : 'bg-white/20 text-white hover:bg-white/30'
-                          )}
-                        >
-                          🌐 URL
-                        </button>
-                      </div>
-
-                      {/* URL Input Section */}
-                      {showUrlInput && (
-                        <div className="p-3 border-b border-outline-variant/50 bg-primary-fixed/30">
-                          <p className="text-xs text-primary mb-2">{t('chat.enterUrl')}</p>
-                          <div className="flex gap-2">
-                            <input
-                              type="text"
-                              value={urlInputValue}
-                              onChange={(e) => setUrlInputValue(e.target.value)}
-                              onKeyDown={(e) => e.key === 'Enter' && handleFetchUrl()}
-                              placeholder={t('chat.urlPlaceholder')}
-                              className="flex-1 px-3 py-2 text-sm border border-outline rounded-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 bg-white"
-                            />
-                            <button
-                              onClick={handleFetchUrl}
-                              disabled={!urlInputValue.trim() || isFetchingUrl}
-                              className="px-4 py-2 bg-primary text-white text-sm font-semibold rounded-lg hover:bg-primary/90 disabled:opacity-50 flex items-center gap-2 shadow-sm"
-                            >
-                              {isFetchingUrl ? (
-                                <>
-                                  <Loader2 className="w-4 h-4 animate-spin" />
-                                  Đang tải...
-                                </>
-                              ) : (
-                                <>
-                                  <Sparkles className="w-4 h-4" />
-                                  Đọc
-                                </>
-                              )}
-                            </button>
-                          </div>
-                        </div>
-                      )}
-
-                      <div className="p-1.5 grid grid-cols-1 gap-0.5">
+                    <div 
+                      className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-white border border-outline rounded-xl shadow-lg z-[9999] overflow-hidden"
+                      style={{ 
+                        boxShadow: '0 4px 20px rgba(0,0,0,0.12)',
+                        width: '420px',
+                      }}
+                    >
+                      {/* Compact icon grid - 5 cột để hiển thị đủ không chồng */}
+                      <div className="p-2 grid grid-cols-5 gap-1">
                         {getAttachmentOptions(language).map((option) => (
                           <button
                             key={option.id}
                             onClick={() => handleAttachmentSelect(option.id, option.accept)}
-                            className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-surface-container-low transition-colors text-left group"
+                            className="flex flex-col items-center gap-1 px-1 py-2 rounded-lg hover:bg-slate-100 transition-all group"
+                            title={option.label}
                           >
-                            <div className="w-10 h-10 rounded-xl bg-primary-fixed flex items-center justify-center group-hover:bg-primary-fixed-dim transition-colors flex-shrink-0">
-                              <option.icon className="w-5 h-5 text-primary" />
+                            <div className="w-10 h-10 rounded-lg bg-slate-100 group-hover:bg-primary/10 flex items-center justify-center transition-colors">
+                              <option.icon className="w-5 h-5 text-slate-600 group-hover:text-primary" />
                             </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-semibold text-on-background">{option.label}</p>
-                              <p className="text-xs text-on-surface-variant">{option.description}</p>
-                            </div>
+                            <span className="text-[10px] text-slate-600 group-hover:text-primary font-medium text-center leading-tight">
+                              {option.label}
+                            </span>
                           </button>
                         ))}
                       </div>

@@ -200,9 +200,9 @@ export const useChatSettingsStore = create<ChatSettingsState>()(
     (set, get) => ({
       greeting: { ...DEFAULT_GREETING },
       description: { ...DEFAULT_DESCRIPTION },
-      // ⭐ Default = FALSE — feature chỉ bật khi backend xác nhận.
-      // Ngăn việc user thấy nút đính kèm trước khi API trả về.
-      fileAttachmentEnabled: false,
+      // ⭐ Default = TRUE — hiển thị nút đính kèm theo mặc định
+      // Backend trả về feature_file_attachment_enabled=false để ẩn nút khi cần
+      fileAttachmentEnabled: true,
       showSuggestedQuestions: true,
       suggestedPrompts: [...DEFAULT_SUGGESTED_PROMPTS],
       aiInstructions: {
@@ -252,17 +252,21 @@ export const useChatSettingsStore = create<ChatSettingsState>()(
           // for feature_file_attachment_enabled from FileManagement admin page
           try {
             const fileRes = await fetch('/api/admin/file-settings/public');
+            console.log('[ChatSettings] File settings response status:', fileRes.status);
             if (fileRes.ok) {
               const fileData = await fileRes.json();
+              console.log('[ChatSettings] File settings data:', fileData);
               if (fileData.success && fileData.data) {
                 // Use file-settings as source of truth for fileAttachmentEnabled
+                const enabled = fileData.data.feature_file_attachment_enabled ?? true;
+                console.log('[ChatSettings] Setting fileAttachmentEnabled to:', enabled);
                 set({
-                  fileAttachmentEnabled: fileData.data.feature_file_attachment_enabled ?? true,
+                  fileAttachmentEnabled: enabled,
                 });
               }
             }
           } catch (e) {
-            console.warn('Failed to load file settings:', e);
+            console.error('[ChatSettings] Failed to load file settings:', e);
           }
 
           // Load AI instructions from public endpoint

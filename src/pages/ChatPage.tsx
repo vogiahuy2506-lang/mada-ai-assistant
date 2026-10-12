@@ -4376,13 +4376,9 @@ function MessageBubble({
                 }
                 
                 return (
-                  <a
+                  <div
                     key={product.id || index}
-                    href={productLink}
-                    target={isExternalLink ? '_blank' : '_self'}
-                    rel={isExternalLink ? 'noopener noreferrer' : ''}
                     className="group block bg-white rounded-xl border border-slate-200 overflow-hidden hover:border-secondary/40 hover:shadow-lg hover:shadow-secondary/10 transition-all duration-200 hover:-translate-y-0.5"
-                    style={{ textDecoration: 'none' }}
                   >
                     {/* Hình ảnh sản phẩm - LỚN VÀ NỔI BẬT */}
                     <div className={`relative h-32 bg-gradient-to-br ${gradientClass} overflow-hidden`}>
@@ -4459,7 +4455,7 @@ function MessageBubble({
                         </button>
                       </div>
                     </div>
-                  </a>
+                  </div>
                 );
               })}
             </div>

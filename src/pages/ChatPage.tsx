@@ -4180,7 +4180,7 @@ function MessageBubble({
                 key={idx}
                 role="listitem"
                 className={clsx(
-                  'flex items-center gap-3 px-4 py-3 rounded-2xl rounded-br-sm text-sm border-2 transition-all',
+                  'flex items-center gap-3 px-4 py-3 rounded-2xl rounded-br-sm text-sm border-2 transition-all hover:shadow-md',
                   attachment.preview
                     ? 'bg-white/95 backdrop-blur-sm border-white/40 shadow-md'
                     : 'bg-white/90 border-white/30 shadow-sm'
@@ -4209,7 +4209,14 @@ function MessageBubble({
             ))}
           </div>
         )}
-        <div className="max-w-[85%] px-4 py-3 bg-[#0047ff] text-white rounded-2xl group-hover/rounded-br-sm relative" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+        
+        {/* User Message Bubble - Enhanced with gradient effect */}
+        <div className="relative max-w-[85%]">
+          {/* Gradient border effect */}
+          <div className="absolute -inset-[1px] bg-gradient-to-r from-blue-600 via-indigo-500 to-purple-500 rounded-2xl rounded-tl-sm blur-[2px] opacity-30 group-hover:opacity-50 transition-opacity duration-300"></div>
+          
+          {/* Main bubble */}
+          <div className="relative bg-gradient-to-br from-[#0047ff] to-[#0033cc] text-white rounded-2xl rounded-tl-sm px-4 py-3 shadow-lg shadow-blue-500/25 group-hover:shadow-xl group-hover:shadow-blue-500/30 transition-all duration-300" dir={language === 'ar' ? 'rtl' : 'ltr'}>
           {isEditing ? (
             <div className="space-y-2">
               <textarea
@@ -4225,7 +4232,7 @@ function MessageBubble({
                     setEditingMessage(null);
                     setLocalEditText('');
                   }}
-                  className="px-3 py-1 text-xs bg-white/20 hover:bg-white/30 rounded-full transition-colors"
+                  className="px-3 py-1 text-xs bg-white/20 hover:bg-white/30 rounded-full transition-colors backdrop-blur-sm"
                 >
                   {t('chat.cancel')}
                 </button>
@@ -4246,7 +4253,7 @@ function MessageBubble({
                       }
                     }
                   }}
-                  className="px-3 py-1 text-xs bg-white text-[#0047ff] hover:bg-white/90 rounded-full font-medium transition-colors"
+                  className="px-3 py-1 text-xs bg-white text-[#0047ff] hover:bg-white/90 rounded-full font-medium transition-colors shadow-sm"
                 >
                   {t('chat.resend')}
                 </button>
@@ -4255,6 +4262,7 @@ function MessageBubble({
           ) : (
             <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.content}</p>
           )}
+          </div>
         </div>
       </div>
     );
@@ -4262,69 +4270,116 @@ function MessageBubble({
 
   return (
     <div className="flex items-start gap-3 animate-fade-in group">
-      {/* Avatar - Smaller */}
-      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#e0e7ff] to-[#c7d2fe] flex items-center justify-center flex-shrink-0 border-2 border-[#191b23]">
-        <BotIcon className="w-4 h-4 text-[#0047ff]" />
+      {/* Avatar - Enhanced with glow effect */}
+      <div className="relative">
+        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#e0e7ff] to-[#c7d2fe] flex items-center justify-center flex-shrink-0 border-2 border-[#191b23] shadow-lg shadow-indigo-100/50 group-hover:shadow-xl group-hover:shadow-indigo-200/50 transition-all duration-300">
+          <BotIcon className="w-5 h-5 text-[#0047ff]" />
+        </div>
+        {/* Online indicator dot */}
+        <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 rounded-full border-2 border-white animate-pulse"></div>
       </div>
 
       <div className="flex-1 max-w-[85%]">
-        {/* ⭐ Nội dung câu trả lời AI - Đơn giản */}
-        <div className="text-sm text-slate-700 leading-relaxed [&_p]:mb-3 [&_p]:leading-relaxed [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:my-3 [&_ul]:space-y-1.5 [&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:my-3 [&_ol]:space-y-1.5 [&_li]:leading-relaxed [&_li]:mb-1 [&_h3]:text-base [&_h3]:font-bold [&_h3]:mt-4 [&_h3]:mb-2 [&_h2]:text-lg [&_h2]:font-bold [&_h2]:mt-4 [&_h2]:mb-2 [&_strong]:font-bold [&_code]:bg-slate-100 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-xs [&_pre]:bg-slate-100 [&_pre]:p-3 [&_pre]:rounded-lg [&_pre]:overflow-x-auto [&_pre]:my-3 [&_blockquote]:border-l-4 [&_blockquote]:border-slate-300 [&_blockquote]:pl-3 [&_blockquote]:italic [&_blockquote]:text-slate-600 [&_a]:text-blue-500 [&_a]:underline" dir={language === 'ar' ? 'rtl' : 'ltr'}>
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>
-            {message.content}
-          </ReactMarkdown>
+        {/* ⭐ AI Message Content - Enhanced styling */}
+        <div className="relative">
+          {/* Message bubble background with gradient border effect */}
+          <div className="absolute -inset-[1px] bg-gradient-to-r from-indigo-500/20 via-purple-500/20 to-pink-500/20 rounded-2xl blur-[2px] opacity-50 group-hover:opacity-75 transition-opacity duration-300"></div>
+          
+          {/* Main message content */}
+          <div className="relative bg-white/80 backdrop-blur-sm rounded-2xl rounded-tl-sm border border-slate-200/50 p-4 shadow-sm group-hover:shadow-md group-hover:bg-white/90 transition-all duration-300">
+            <div className="text-sm text-slate-700 leading-relaxed [&_p]:mb-3 [&_p]:leading-relaxed [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:my-3 [&_ul]:space-y-1.5 [&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:my-3 [&_ol]:space-y-1.5 [&_li]:leading-relaxed [&_li]:mb-1 [&_h3]:text-base [&_h3]:font-bold [&_h3]:mt-4 [&_h3]:mb-2 [&_h2]:text-lg [&_h2]:font-bold [&_h2]:mt-4 [&_h2]:mb-2 [&_strong]:font-bold [&_code]:bg-slate-100 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-xs [&_pre]:bg-slate-100 [&_pre]:p-3 [&_pre]:rounded-lg [&_pre]:overflow-x-auto [&_pre]:my-3 [&_blockquote]:border-l-4 [&_blockquote]:border-slate-300 [&_blockquote]:pl-3 [&_blockquote]:italic [&_blockquote]:text-slate-600 [&_a]:text-blue-500 [&_a]:underline" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {message.content}
+              </ReactMarkdown>
+            </div>
+          </div>
         </div>
 
-        {/* ⭐ FOOTER: Feedback + Consultation - NHỎ GỌN */}
+        {/* ⭐ FOOTER: Feedback + Consultation - ENHANCED UI */}
         <div className="mt-3 flex items-center justify-between gap-3">
           
-          {/* ⭐ LIKE/DISLIKE Buttons - NHỎ */}
+          {/* ⭐ LIKE/DISLIKE Buttons - Enhanced with tooltips and animations */}
           <div className="flex items-center gap-1 relative">
             {feedback ? (
-              <span className="text-xs text-slate-400 flex items-center gap-1">
+              <div className={clsx(
+                'flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-300',
+                feedback === 'like' 
+                  ? 'bg-emerald-50 border border-emerald-200 text-emerald-600 shadow-sm shadow-emerald-100' 
+                  : 'bg-red-50 border border-red-200 text-red-500 shadow-sm shadow-red-100'
+              )}>
                 {feedback === 'like' ? (
                   <>
-                    <ThumbsUp className="w-3.5 h-3.5 text-emerald-500 fill-emerald-500" />
+                    <ThumbsUp className="w-4 h-4 fill-current" />
                     <span className="hidden sm:inline">{t('chat.liked')}</span>
                   </>
                 ) : (
                   <>
-                    <ThumbsDown className="w-3.5 h-3.5 text-red-400 fill-red-400" />
+                    <ThumbsDown className="w-4 h-4 fill-current" />
                     <span className="hidden sm:inline">{t('chat.feedbackSent')}</span>
                   </>
                 )}
-              </span>
+              </div>
             ) : (
               <>
-                <button
-                  onClick={() => submitFeedback('like')}
-                  disabled={submittingFeedback}
-                  className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-emerald-500 transition-all disabled:opacity-50"
-                  title={t('chat.helpful')}
-                >
-                  <ThumbsUp className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => {
-                    setDislikeMessageId(message.id);
-                    setShowDislikeReason(true);
-                  }}
-                  className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-red-400 transition-all"
-                  title={t('chat.notHelpful')}
-                >
-                  <ThumbsDown className="w-4 h-4" />
-                </button>
-                {/* ⭐ Nút liên hệ tư vấn viên - NHỎ GỌN */}
-                <button 
-                  onClick={onRequestConsultation}
-                  className="flex items-center gap-1 bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 text-amber-900 px-2 py-1 rounded-full text-[10px] font-semibold transition-all shadow-sm shadow-amber-200 hover:shadow-md hover:shadow-amber-300 active:scale-95"
-                  title={t('chat.contactConsultant')}
-                >
-                  <span className="material-symbols-outlined text-[10px]">support_agent</span>
-                  <span>{t('chat.consult')}</span>
-                </button>
+                {/* ⭐ Like Button - Enhanced with tooltip */}
+                <div className="relative group/like">
+                  <button
+                    onClick={() => submitFeedback('like')}
+                    disabled={submittingFeedback}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 border border-transparent hover:border-emerald-200 transition-all duration-200 disabled:opacity-50 hover:scale-105 active:scale-95"
+                  >
+                    <ThumbsUp className="w-4 h-4 group-hover/like:fill-emerald-500 transition-all duration-200" />
+                    <span className="hidden sm:inline">{t('chat.helpful')}</span>
+                  </button>
+                  {/* Tooltip */}
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-slate-800 text-white text-[10px] rounded-lg opacity-0 invisible group-hover/like:opacity-100 group-hover/like:visible transition-all duration-200 whitespace-nowrap pointer-events-none z-10">
+                    {t('chat.helpful')}
+                    <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-[4px] border-r-[4px] border-t-[4px] border-l-transparent border-r-transparent border-t-slate-800"></div>
+                  </div>
+                </div>
+                
+                {/* ⭐ Dislike Button - Enhanced with tooltip */}
+                <div className="relative group/dislike">
+                  <button
+                    onClick={() => {
+                      setDislikeMessageId(message.id);
+                      setShowDislikeReason(true);
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium text-slate-500 hover:text-red-500 hover:bg-red-50 border border-transparent hover:border-red-200 transition-all duration-200 hover:scale-105 active:scale-95"
+                  >
+                    <ThumbsDown className="w-4 h-4" />
+                    <span className="hidden sm:inline">{t('chat.notHelpful')}</span>
+                  </button>
+                  {/* Tooltip */}
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-slate-800 text-white text-[10px] rounded-lg opacity-0 invisible group-hover/dislike:opacity-100 group-hover/dislike:visible transition-all duration-200 whitespace-nowrap pointer-events-none z-10">
+                    {t('chat.notHelpful')}
+                    <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-[4px] border-r-[4px] border-t-[4px] border-l-transparent border-r-transparent border-t-slate-800"></div>
+                  </div>
+                </div>
+                
+                {/* ⭐ Nút liên hệ tư vấn viên - Enhanced */}
+                <div className="relative group/consult">
+                  <button 
+                    onClick={onRequestConsultation}
+                    className="flex items-center gap-1.5 bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 text-amber-900 px-3 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 shadow-sm shadow-amber-200/50 hover:shadow-lg hover:shadow-amber-300/50 active:scale-95 border border-amber-300/50 hover:-translate-y-0.5"
+                  >
+                    <span className="material-symbols-outlined text-[14px]">support_agent</span>
+                    <span className="hidden sm:inline">{t('chat.consult')}</span>
+                  </button>
+                  {/* Tooltip */}
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-amber-800 text-white text-[10px] rounded-lg opacity-0 invisible group-hover/consult:opacity-100 group-hover/consult:visible transition-all duration-200 whitespace-nowrap pointer-events-none z-10">
+                    {t('chat.contactConsultant')}
+                    <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-[4px] border-r-[4px] border-t-[4px] border-l-transparent border-r-transparent border-t-amber-800"></div>
+                  </div>
+                </div>
               </>
             )}
+          </div>
+          
+          {/* ⭐ Response Time - Enhanced with pulse animation */}
+          <div className="flex items-center gap-1.5 text-[11px] text-slate-400 hover:text-slate-500 transition-colors duration-200">
+            <span className="material-symbols-outlined text-[14px] animate-pulse">schedule</span>
+            <span className="hidden sm:inline">{t('chat.responseTime')}</span>
           </div>
         </div>
 

@@ -1203,4 +1203,189 @@ export const adminApi = {
       byPriority: Array<{ priority: string; count: number }>;
     }>('/support/stats/overview');
   },
+
+  // ============== FEEDBACK ==============
+  async getFeedbackList(params?: {
+    agent_id?: string;
+    start_date?: string;
+    end_date?: string;
+    limit?: number;
+    offset?: number;
+  }) {
+    const p = new URLSearchParams();
+    if (params?.agent_id) p.set('agent_id', params.agent_id);
+    if (params?.start_date) p.set('start_date', params.start_date);
+    if (params?.end_date) p.set('end_date', params.end_date);
+    if (params?.limit) p.set('limit', String(params.limit));
+    if (params?.offset) p.set('offset', String(params.offset));
+    const qs = p.toString();
+    return request<{
+      feedback: Array<{
+        id: string;
+        message_id: string;
+        session_id: string;
+        user_id: string | null;
+        rating: 'like' | 'dislike';
+        reason: string | null;
+        agent_id: string | null;
+        language: string | null;
+        created_at: string;
+      }>;
+      total: number;
+    }>(`/chat/feedback/list${qs ? `?${qs}` : ''}`);
+  },
+
+  async getFeedbackStats(params?: {
+    agent_id?: string;
+    start_date?: string;
+    end_date?: string;
+  }) {
+    const p = new URLSearchParams();
+    if (params?.agent_id) p.set('agent_id', params.agent_id);
+    if (params?.start_date) p.set('start_date', params.start_date);
+    if (params?.end_date) p.set('end_date', params.end_date);
+    const qs = p.toString();
+    return request<{
+      stats: Array<{ rating: string; count: number }>;
+      total: number;
+      reasons: Array<{ reason: string; count: number }>;
+    }>(`/chat/feedback/stats${qs ? `?${qs}` : ''}`);
+  },
+
+  async getFeedbackDetail(id: string) {
+    return request<{
+      id: string;
+      message_id: string;
+      session_id: string;
+      user_id: string | null;
+      rating: 'like' | 'dislike';
+      reason: string | null;
+      agent_id: string | null;
+      language: string | null;
+      created_at: string;
+      message_content?: string;
+      message_role?: string;
+      message_agent_id?: string;
+      conversation_title?: string;
+      conversation_language?: string;
+      user_name?: string;
+      user_email?: string;
+    }>(`/chat/feedback/${id}`);
+  },
+
+  async getFeedbackConversation(sessionId: string) {
+    return request<{
+      conversation: {
+        id: string;
+        title: string;
+        agent_id: string | null;
+        language: string | null;
+        user_id: string | null;
+        user_name?: string;
+        user_email?: string;
+        created_at: string;
+        updated_at: string;
+      };
+      feedback: Array<{
+        id: string;
+        message_id: string;
+        session_id: string;
+        user_id: string | null;
+        rating: 'like' | 'dislike';
+        reason: string | null;
+        agent_id: string | null;
+        language: string | null;
+        created_at: string;
+        message_content?: string;
+        message_role?: string;
+        message_agent_id?: string;
+      }>;
+    }>(`/chat/feedback/conversation/${sessionId}`);
+  },
+
+  async getFeedbackDaily(params?: { days?: number }) {
+    const p = new URLSearchParams();
+    if (params?.days) p.set('days', String(params.days));
+    const qs = p.toString();
+    return request<{
+      dailyStats: Array<{
+        date: string;
+        rating: string;
+        count: number;
+      }>;
+      reasonsByDay: Array<{
+        date: string;
+        reason: string;
+        count: number;
+      }>;
+    }>(`/chat/feedback/daily${qs ? `?${qs}` : ''}`);
+  },
+
+  // ============== FEEDBACK QUESTIONS ==============
+  async getFeedbackQuestions() {
+    return request<Array<{
+      id: string;
+      question_key: string;
+      text_vi: string;
+      text_en: string;
+      text_ar: string;
+      text_fr: string;
+      icon: string;
+      is_active: number;
+      sort_order: number;
+      created_at: string;
+      updated_at: string;
+    }>>('/chat/feedback/all-questions');
+  },
+
+  async createFeedbackQuestion(data: {
+    text_vi: string;
+    text_en: string;
+    text_ar: string;
+    text_fr: string;
+    icon?: string;
+    is_active?: boolean;
+    sort_order?: number;
+  }) {
+    return request<{ id: string; question_key: string }>('/chat/feedback/questions', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async updateFeedbackQuestion(id: string, data: {
+    text_vi?: string;
+    text_en?: string;
+    text_ar?: string;
+    text_fr?: string;
+    icon?: string;
+    is_active?: boolean;
+    sort_order?: number;
+  }) {
+    return request<{ id: string; is_active: number }>(`/chat/feedback/questions/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async deleteFeedbackQuestion(id: string) {
+    return request<{ success: boolean }>(`/chat/feedback/questions/${id}`, { method: 'DELETE' });
+  },
+
+  async getFeedbackQuestionStats() {
+    return request<Array<{
+      question_key: string;
+      text_vi: string;
+      count: number;
+      percent: number;
+    }>>('/chat/feedback/questions/stats');
+  },
+
+  async getFeedbackMonthlyStats() {
+    return request<{
+      totalDislikeMonth: number;
+      dislikeChangePercent: number;
+      topReason: string | null;
+    }>('/chat/feedback/stats/monthly');
+  },
 };

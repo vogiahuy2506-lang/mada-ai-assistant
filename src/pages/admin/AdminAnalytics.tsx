@@ -426,40 +426,51 @@ export function AdminAnalytics() {
         </div>
       </section>
 
-      {/* Stats Row */}
+      {/* Stats Row - Enhanced with Material Symbols and hover effects */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <div className="relative bg-gradient-to-br from-indigo-500/10 to-violet-500/10 backdrop-blur-xl rounded-2xl p-4 border-[3px] border-black flex items-center gap-3 shadow-[6px_6px_0px_0px_#000] transform rotate-[-0.3deg] hover:rotate-0 transition-all">
-          <div className="w-10 h-10 rounded-xl bg-indigo-100 border border-slate-300 flex items-center justify-center shadow-sm">
-            <Users className="w-5 h-5 text-indigo-600" />
+        {/* Total Users */}
+        <div className="relative group bg-gradient-to-br from-indigo-500/10 to-violet-500/10 backdrop-blur-xl rounded-2xl p-4 border-[3px] border-black flex items-center gap-3 shadow-[6px_6px_0px_0px_#000] transform rotate-[-0.3deg] hover:rotate-0 hover:scale-[1.02] hover:shadow-[8px_8px_0px_0px_#000] transition-all duration-300 cursor-pointer">
+          <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-indigo-500/20 to-violet-500/20 rounded-full -translate-y-1/2 translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500 flex items-center justify-center shadow-lg shadow-indigo-200/50 group-hover:shadow-xl group-hover:shadow-indigo-300/50 transition-all duration-300">
+            <span className="material-symbols-outlined text-white text-xl">group</span>
           </div>
-          <div>
+          <div className="relative z-10">
             <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">{t('totalUsers')}</p>
             <h3 className="text-xl font-black text-on-surface">{(userStats?.total ?? 0).toLocaleString()}</h3>
           </div>
         </div>
-        <div className="relative bg-gradient-to-br from-violet-500/10 to-purple-500/10 backdrop-blur-xl rounded-2xl p-4 border-[3px] border-black flex items-center gap-3 shadow-[6px_6px_0px_0px_#000] transform rotate-[0.3deg] hover:rotate-0 transition-all">
-          <div className="w-10 h-10 rounded-xl bg-violet-100 border border-slate-300 flex items-center justify-center shadow-sm">
-            <BarChart2 className="w-5 h-5 text-violet-600" />
+        
+        {/* Total Chats */}
+        <div className="relative group bg-gradient-to-br from-violet-500/10 to-purple-500/10 backdrop-blur-xl rounded-2xl p-4 border-[3px] border-black flex items-center gap-3 shadow-[6px_6px_0px_0px_#000] transform rotate-[0.3deg] hover:rotate-0 hover:scale-[1.02] hover:shadow-[8px_8px_0px_0px_#000] transition-all duration-300 cursor-pointer">
+          <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-violet-500/20 to-purple-500/20 rounded-full -translate-y-1/2 translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-500 to-purple-500 flex items-center justify-center shadow-lg shadow-violet-200/50 group-hover:shadow-xl group-hover:shadow-violet-300/50 transition-all duration-300">
+            <span className="material-symbols-outlined text-white text-xl">chat</span>
           </div>
-          <div>
+          <div className="relative z-10">
             <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">{t('totalChats')}</p>
             <h3 className="text-xl font-black text-on-surface">{(chatMetrics?.totalChats ?? 0).toLocaleString()}</h3>
           </div>
         </div>
-        <div className="relative bg-gradient-to-br from-teal-500/10 to-emerald-500/10 backdrop-blur-xl rounded-2xl p-4 border-[3px] border-black flex items-center gap-3 shadow-[6px_6px_0px_0px_#000] transform rotate-[-0.3deg] hover:rotate-0 transition-all">
-          <div className="w-10 h-10 rounded-xl bg-teal-100 border border-slate-300 flex items-center justify-center shadow-sm">
-            <Library className="w-5 h-5 text-teal-600" />
+        
+        {/* KB Documents */}
+        <div className="relative group bg-gradient-to-br from-teal-500/10 to-emerald-500/10 backdrop-blur-xl rounded-2xl p-4 border-[3px] border-black flex items-center gap-3 shadow-[6px_6px_0px_0px_#000] transform rotate-[-0.3deg] hover:rotate-0 hover:scale-[1.02] hover:shadow-[8px_8px_0px_0px_#000] transition-all duration-300 cursor-pointer">
+          <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-teal-500/20 to-emerald-500/20 rounded-full -translate-y-1/2 translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-teal-500 to-emerald-500 flex items-center justify-center shadow-lg shadow-teal-200/50 group-hover:shadow-xl group-hover:shadow-teal-300/50 transition-all duration-300">
+            <span className="material-symbols-outlined text-white text-xl">menu_book</span>
           </div>
-          <div>
+          <div className="relative z-10">
             <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">{t('kbDocuments')}</p>
             <h3 className="text-xl font-black text-on-surface">{safeKb.totalDocuments.toLocaleString()}</h3>
           </div>
         </div>
-        <div className="relative bg-gradient-to-br from-red-500/10 to-orange-500/10 backdrop-blur-xl rounded-2xl p-4 border-[3px] border-black flex items-center gap-3 shadow-[6px_6px_0px_0px_#000] transform rotate-[0.3deg] hover:rotate-0 transition-all">
-          <div className="w-10 h-10 rounded-xl bg-red-100 border border-slate-300 flex items-center justify-center shadow-sm">
-            <Receipt className="w-5 h-5 text-red-600" />
+        
+        {/* Log Events */}
+        <div className="relative group bg-gradient-to-br from-red-500/10 to-orange-500/10 backdrop-blur-xl rounded-2xl p-4 border-[3px] border-black flex items-center gap-3 shadow-[6px_6px_0px_0px_#000] transform rotate-[0.3deg] hover:rotate-0 hover:scale-[1.02] hover:shadow-[8px_8px_0px_0px_#000] transition-all duration-300 cursor-pointer">
+          <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-red-500/20 to-orange-500/20 rounded-full -translate-y-1/2 translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-red-500 to-orange-500 flex items-center justify-center shadow-lg shadow-red-200/50 group-hover:shadow-xl group-hover:shadow-red-300/50 transition-all duration-300">
+            <span className="material-symbols-outlined text-white text-xl">fact_check</span>
           </div>
-          <div>
+          <div className="relative z-10">
             <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">{t('logEvents')}</p>
             <h3 className="text-xl font-black text-on-surface">{safeLogs.total.toLocaleString()}</h3>
           </div>
@@ -486,11 +497,14 @@ export function AdminAnalytics() {
       </div>
 
       {/* ====== CHARTS ROW ====== */}
+      {/* ====== CHARTS ROW ====== */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
         {/* Hourly Activity */}
-        <div className="bg-white rounded-xl border border-slate-300 p-6 shadow-sm">
-          <div className="flex items-center gap-2 mb-4">
-            <Activity className="w-4 h-4 text-indigo-500" />
+        <div className="bg-white rounded-xl border border-slate-300 p-6 shadow-sm hover:shadow-lg hover:border-indigo-200 transition-all duration-300 group">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500 flex items-center justify-center shadow-lg shadow-indigo-200 group-hover:shadow-xl group-hover:shadow-indigo-300 transition-all">
+              <span className="material-symbols-outlined text-white text-lg">monitoring</span>
+            </div>
             <h3 className="text-sm font-black text-slate-800">{t('hourlyActivity')}</h3>
           </div>
           {loading ? (
@@ -503,9 +517,11 @@ export function AdminAnalytics() {
         </div>
 
         {/* Language Distribution */}
-        <div className="bg-white rounded-xl border border-slate-300 p-6 shadow-sm">
-          <div className="flex items-center gap-2 mb-4">
-            <Globe className="w-4 h-4 text-indigo-500" />
+        <div className="bg-white rounded-xl border border-slate-300 p-6 shadow-sm hover:shadow-lg hover:border-violet-200 transition-all duration-300 group">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-500 flex items-center justify-center shadow-lg shadow-violet-200 group-hover:shadow-xl group-hover:shadow-violet-300 transition-all">
+              <span className="material-symbols-outlined text-white text-lg">language</span>
+            </div>
             <h3 className="text-sm font-black text-slate-800">{t('languageDistribution')}</h3>
           </div>
           {loading ? (
@@ -516,9 +532,11 @@ export function AdminAnalytics() {
         </div>
 
         {/* Category Distribution */}
-        <div className="bg-white rounded-xl border border-slate-300 p-6 shadow-sm">
-          <div className="flex items-center gap-2 mb-4">
-            <BarChart2 className="w-4 h-4 text-indigo-500" />
+        <div className="bg-white rounded-xl border border-slate-300 p-6 shadow-sm hover:shadow-lg hover:border-purple-200 transition-all duration-300 group">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shadow-lg shadow-purple-200 group-hover:shadow-xl group-hover:shadow-purple-300 transition-all">
+              <span className="material-symbols-outlined text-white text-lg">category</span>
+            </div>
             <h3 className="text-sm font-black text-slate-800">{t('categoryDistribution')}</h3>
           </div>
           {loading ? (
@@ -532,9 +550,11 @@ export function AdminAnalytics() {
       </div>
 
       {/* ====== TOP QUERIES ====== */}
-      <div className="bg-white rounded-xl border border-slate-300 p-6 mb-4 shadow-sm">
-        <div className="flex items-center gap-2 mb-4">
-          <CheckCircle2 className="w-4 h-4 text-indigo-500" />
+      <div className="bg-white rounded-xl border border-slate-300 p-6 mb-4 shadow-sm hover:shadow-lg hover:border-teal-200 transition-all duration-300">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-500 to-emerald-500 flex items-center justify-center shadow-lg shadow-teal-200">
+            <span className="material-symbols-outlined text-white text-lg">quiz</span>
+          </div>
           <h3 className="text-sm font-black text-slate-800">{t('topQueries')}</h3>
         </div>
         {loading ? (
@@ -544,15 +564,15 @@ export function AdminAnalytics() {
         ) : (
           <div className="space-y-1.5">
             {(chatMetrics?.topQueries ?? []).map((q, i) => (
-              <div key={i} className="flex items-center gap-3 p-2 bg-slate-50 rounded-lg border border-slate-200">
+              <div key={i} className="flex items-center gap-3 p-2.5 bg-slate-50 rounded-lg border border-slate-200 hover:bg-indigo-50 hover:border-indigo-200 transition-all cursor-pointer group/item">
                 <span className={clsx(
-                  'w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0',
-                  i === 0 ? 'bg-indigo-500 text-white' : i === 1 ? 'bg-violet-500 text-white' : 'bg-slate-200 text-slate-600'
+                  'w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 shadow-sm',
+                  i === 0 ? 'bg-gradient-to-br from-indigo-500 to-violet-500 text-white' : i === 1 ? 'bg-gradient-to-br from-violet-500 to-purple-500 text-white' : 'bg-slate-200 text-slate-600'
                 )}>
                   {i + 1}
                 </span>
-                <span className="flex-1 text-sm truncate text-slate-700">{q.query}</span>
-                <span className="text-sm font-bold text-slate-500 flex-shrink-0">{q.count}x</span>
+                <span className="flex-1 text-sm truncate text-slate-700 group-hover/item:text-indigo-700 transition-colors">{q.query}</span>
+                <span className="text-sm font-bold text-slate-500 flex-shrink-0 px-2.5 py-0.5 bg-slate-100 rounded-full group-hover/item:bg-indigo-100 group-hover/item:text-indigo-600 transition-all">{q.count}x</span>
               </div>
             ))}
           </div>
@@ -562,26 +582,33 @@ export function AdminAnalytics() {
       {/* ====== SERVER + LOGS + USER ROW ====== */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-8">
         {/* Server Health */}
-        <div className="bg-white rounded-xl border border-slate-300 p-6 shadow-sm">
-          <div className="flex items-center gap-2 mb-4">
-            <Server className="w-4 h-4 text-indigo-500" />
-            <h3 className="text-sm font-black text-slate-800">{t('serverHealth')}</h3>
+        <div className="bg-white rounded-xl border border-slate-300 p-6 shadow-sm hover:shadow-lg hover:border-blue-200 transition-all duration-300 group">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-blue-200 group-hover:shadow-xl group-hover:shadow-blue-300 transition-all">
+              <span className="material-symbols-outlined text-white text-lg">dns</span>
+            </div>
+            <div>
+              <h3 className="text-sm font-black text-slate-800">{t('serverHealth')}</h3>
+              <p className="text-[10px] text-slate-500">{t('serverHealthSub')}</p>
+            </div>
           </div>
-          <p className="text-xs text-slate-500 mb-3">{t('serverHealthSub')}</p>
           {loading || !safeSrv ? (
             <p className="text-xs text-slate-400">{t('loading')}</p>
           ) : (
             <div className="space-y-2">
               {[
-                { label: t('nodeVersion'), value: safeSrv.nodeVersion },
-                { label: t('platform'), value: safeSrv.platform },
-                { label: t('uptime'), value: formatUptime(safeSrv.uptime) },
-                { label: t('memoryRss'), value: `${bytesToMB(safeSrv.memory.rss)} MB` },
-                { label: t('heapUsed'), value: `${bytesToMB(safeSrv.memory.heapUsed)} MB` },
+                { label: t('nodeVersion'), value: safeSrv.nodeVersion, icon: 'code' },
+                { label: t('platform'), value: safeSrv.platform, icon: 'computer' },
+                { label: t('uptime'), value: formatUptime(safeSrv.uptime), icon: 'schedule' },
+                { label: t('memoryRss'), value: `${bytesToMB(safeSrv.memory.rss)} MB`, icon: 'memory' },
+                { label: t('heapUsed'), value: `${bytesToMB(safeSrv.memory.heapUsed)} MB`, icon: 'data_usage' },
               ].map(item => (
-                <div key={item.label} className="flex justify-between items-center p-2.5 bg-slate-50 rounded-lg border border-slate-200">
-                  <span className="text-xs font-medium text-slate-600">{item.label}</span>
-                  <span className="text-xs font-bold font-mono text-slate-800">{item.value}</span>
+                <div key={item.label} className="flex justify-between items-center p-2.5 bg-slate-50 rounded-lg border border-slate-200 hover:bg-blue-50 hover:border-blue-200 transition-all">
+                  <span className="text-xs font-medium text-slate-600 flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[14px] text-slate-400">{item.icon}</span>
+                    {item.label}
+                  </span>
+                  <span className="text-xs font-bold font-mono text-slate-800 bg-white px-2 py-0.5 rounded shadow-sm">{item.value}</span>
                 </div>
               ))}
             </div>
@@ -589,9 +616,11 @@ export function AdminAnalytics() {
         </div>
 
         {/* Log Activity */}
-        <div className="bg-white rounded-xl border border-slate-300 p-6 shadow-sm">
-          <div className="flex items-center gap-2 mb-4">
-            <Receipt className="w-4 h-4 text-indigo-500" />
+        <div className="bg-white rounded-xl border border-slate-300 p-6 shadow-sm hover:shadow-lg hover:border-amber-200 transition-all duration-300 group">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center shadow-lg shadow-amber-200 group-hover:shadow-xl group-hover:shadow-amber-300 transition-all">
+              <span className="material-symbols-outlined text-white text-lg">receipt_long</span>
+            </div>
             <h3 className="text-sm font-black text-slate-800">{t('logActivity')}</h3>
           </div>
           {loading ? (
@@ -601,12 +630,15 @@ export function AdminAnalytics() {
               {logLevelBars.map(b => (
                 <div key={b.level}>
                   <div className="flex justify-between mb-1.5">
-                    <span className="text-xs font-bold capitalize text-slate-700">{t(b.level)}</span>
-                    <span className="text-xs font-black text-slate-800">{b.count}</span>
+                    <span className="text-xs font-bold capitalize text-slate-700 flex items-center gap-2">
+                      <span className={clsx('w-2 h-2 rounded-full', b.color)}></span>
+                      {t(b.level)}
+                    </span>
+                    <span className="text-xs font-black text-slate-800 bg-slate-100 px-2 py-0.5 rounded-full">{b.count}</span>
                   </div>
                   <div className="h-2.5 w-full bg-slate-100 rounded-full overflow-hidden border border-slate-200">
                     <div
-                      className={`h-full ${b.color} transition-all rounded-full`}
+                      className={`h-full ${b.color} transition-all rounded-full hover:opacity-80`}
                       style={{ width: `${(b.count / maxLog) * 100}%` }}
                     />
                   </div>
@@ -617,29 +649,33 @@ export function AdminAnalytics() {
         </div>
 
         {/* User Breakdown */}
-        <div className="bg-white rounded-xl border border-slate-300 p-6 shadow-sm">
-          <div className="flex items-center gap-2 mb-4">
-            <Users className="w-4 h-4 text-indigo-500" />
-            <h3 className="text-sm font-black text-slate-800">{t('userBreakdown')}</h3>
+        <div className="bg-white rounded-xl border border-slate-300 p-6 shadow-sm hover:shadow-lg hover:border-emerald-200 transition-all duration-300 group">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center shadow-lg shadow-emerald-200 group-hover:shadow-xl group-hover:shadow-emerald-300 transition-all">
+              <span className="material-symbols-outlined text-white text-lg">group</span>
+            </div>
+            <div>
+              <h3 className="text-sm font-black text-slate-800">{t('userBreakdown')}</h3>
+              <p className="text-[10px] text-slate-500">{t('userBreakdownSub')}</p>
+            </div>
           </div>
-          <p className="text-xs text-slate-500 mb-3">{t('userBreakdownSub')}</p>
           {loading || !userStats ? (
             <p className="text-xs text-slate-400">{t('loading')}</p>
           ) : (
             <div className="grid grid-cols-2 gap-2">
               {[
-                { label: t('total'), value: userStats.total, color: 'text-indigo-600' },
-                { label: t('active'), value: userStats.active, color: 'text-emerald-600' },
-                { label: t('admins'), value: userStats.admins, color: 'text-violet-600' },
-                { label: t('enterprise'), value: userStats.enterprise, color: 'text-amber-600' },
-                { label: t('pro'), value: userStats.pro, color: 'text-blue-600' },
-                { label: t('free'), value: userStats.free, color: 'text-slate-500' },
-                { label: t('pending'), value: userStats.pending, color: 'text-amber-600' },
-                { label: t('suspended'), value: userStats.suspended, color: 'text-red-600' },
+                { label: t('total'), value: userStats.total, color: 'bg-gradient-to-br from-indigo-500 to-violet-500', textColor: 'text-white' },
+                { label: t('active'), value: userStats.active, color: 'bg-gradient-to-br from-emerald-400 to-green-500', textColor: 'text-white' },
+                { label: t('admins'), value: userStats.admins, color: 'bg-gradient-to-br from-violet-500 to-purple-500', textColor: 'text-white' },
+                { label: t('enterprise'), value: userStats.enterprise, color: 'bg-gradient-to-br from-amber-500 to-orange-500', textColor: 'text-white' },
+                { label: t('pro'), value: userStats.pro, color: 'bg-gradient-to-br from-blue-500 to-cyan-500', textColor: 'text-white' },
+                { label: t('free'), value: userStats.free, color: 'bg-slate-100', textColor: 'text-slate-600' },
+                { label: t('pending'), value: userStats.pending, color: 'bg-gradient-to-br from-yellow-400 to-amber-500', textColor: 'text-white' },
+                { label: t('suspended'), value: userStats.suspended, color: 'bg-gradient-to-br from-red-500 to-rose-500', textColor: 'text-white' },
               ].map(s => (
-                <div key={s.label} className="p-2.5 bg-slate-50 rounded-lg border border-slate-200 text-center">
+                <div key={s.label} className={clsx('p-2.5 rounded-lg border border-slate-200 text-center shadow-sm hover:scale-105 transition-all cursor-pointer')}>
                   <p className="text-[10px] font-bold text-slate-500 uppercase mb-0.5">{s.label}</p>
-                  <p className={`text-lg font-black leading-tight ${s.color}`}>{s.value}</p>
+                  <p className={clsx('text-lg font-black leading-tight', s.textColor)}>{s.value}</p>
                 </div>
               ))}
             </div>

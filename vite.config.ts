@@ -47,10 +47,6 @@ export default defineConfig({
         target: 'http://localhost:3008',
         changeOrigin: true,
       },
-      '/ws': {
-        target: 'ws://localhost:3008',
-        ws: true,
-      },
     },
   },
   cacheDir: 'node_modules/.vite',

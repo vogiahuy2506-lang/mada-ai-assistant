@@ -2593,6 +2593,137 @@ router.get('/feedback/list', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/chat/feedback/:id - Get feedback detail with message content and conversation info
+ */
+router.get('/feedback/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Get feedback entry
+    const feedback = db.prepare(`
+      SELECT 
+        mf.*,
+        cm.content as message_content,
+        cm.role as message_role,
+        cm.agent_id as message_agent_id,
+        cc.title as conversation_title,
+        cc.language as conversation_language,
+        u.name as user_name,
+        u.email as user_email
+      FROM message_feedback mf
+      LEFT JOIN chat_messages cm ON cm.id = mf.message_id
+      LEFT JOIN chat_conversations cc ON cc.id = mf.session_id
+      LEFT JOIN users u ON u.id = mf.user_id
+      WHERE mf.id = ?
+    `).get(id) as any;
+
+    if (!feedback) {
+      return res.status(404).json({ success: false, error: 'Feedback not found' });
+    }
+
+    res.json({
+      success: true,
+      data: feedback,
+    });
+  } catch (error) {
+    console.error('❌ Feedback detail error:', error);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+});
+
+/**
+ * GET /api/chat/feedback/conversation/:sessionId - Get all feedback for a conversation
+ */
+router.get('/feedback/conversation/:sessionId', async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+
+    // Get all feedback for the conversation
+    const feedback = db.prepare(`
+      SELECT 
+        mf.*,
+        cm.content as message_content,
+        cm.role as message_role,
+        cm.agent_id as message_agent_id
+      FROM message_feedback mf
+      LEFT JOIN chat_messages cm ON cm.id = mf.message_id
+      WHERE mf.session_id = ?
+      ORDER BY mf.created_at ASC
+    `).all(sessionId);
+
+    // Get conversation info
+    const conversation = db.prepare(`
+      SELECT 
+        cc.*,
+        u.name as user_name,
+        u.email as user_email
+      FROM chat_conversations cc
+      LEFT JOIN users u ON u.id = cc.user_id
+      WHERE cc.id = ?
+    `).get(sessionId) as any;
+
+    res.json({
+      success: true,
+      data: {
+        conversation,
+        feedback,
+      },
+    });
+  } catch (error) {
+    console.error('❌ Feedback conversation error:', error);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+});
+
+/**
+ * GET /api/chat/feedback/daily - Get daily feedback statistics for chart
+ */
+router.get('/feedback/daily', async (req, res) => {
+  try {
+    const { days = 30 } = req.query;
+    const daysNum = Number(days) || 30;
+
+    // Get daily stats
+    const dailyStats = db.prepare(`
+      SELECT 
+        DATE(created_at) as date,
+        rating,
+        COUNT(*) as count
+      FROM message_feedback
+      WHERE created_at >= DATE('now', '-' || ? || ' days')
+      GROUP BY DATE(created_at), rating
+      ORDER BY date ASC
+    `).all(daysNum);
+
+    // Get reasons by day
+    const reasonsByDay = db.prepare(`
+      SELECT 
+        DATE(created_at) as date,
+        reason,
+        COUNT(*) as count
+      FROM message_feedback
+      WHERE rating = 'dislike' 
+        AND reason IS NOT NULL 
+        AND reason != ''
+        AND created_at >= DATE('now', '-' || ? || ' days')
+      GROUP BY DATE(created_at), reason
+      ORDER BY date DESC, count DESC
+    `).all(daysNum);
+
+    res.json({
+      success: true,
+      data: {
+        dailyStats,
+        reasonsByDay,
+      },
+    });
+  } catch (error) {
+    console.error('❌ Feedback daily error:', error);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+});
+
 export default router;
 export { detectMessageLanguage };
 

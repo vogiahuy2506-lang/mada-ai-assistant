@@ -4033,6 +4033,7 @@ function MessageBubble({
   // ⭐ Feedback state
   const [feedback, setFeedback] = useState<'like' | 'dislike' | null>(message.feedback || null);
   const [showDislikeReason, setShowDislikeReason] = useState(false);
+  const [dislikeMessageId, setDislikeMessageId] = useState<string>('');
   const [_dislikeReason, _setDislikeReason] = useState('');
   const [submittingFeedback, setSubmittingFeedback] = useState(false);
 
@@ -4227,6 +4228,7 @@ function MessageBubble({
                 </button>
                 <button
                   onClick={() => {
+                    setDislikeMessageId(message.id);
                     setShowDislikeReason(true);
                   }}
                   className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-red-400 transition-all"
@@ -4406,6 +4408,7 @@ function MessageBubble({
           setShowDislikeReason(false);
         }}
         messageContent={message.content}
+        messageId={dislikeMessageId}
         language={language}
       />
     </div>

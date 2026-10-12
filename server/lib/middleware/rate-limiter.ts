@@ -10,7 +10,7 @@ interface RateLimitEntry {
 const rateLimitStore = new Map<string, RateLimitEntry>();
 
 const DEFAULT_WINDOW_MS = 60 * 1000; // 1 minute
-const DEFAULT_MAX_REQUESTS = 100;
+const DEFAULT_MAX_REQUESTS = 1000; // Increased for testing
 
 export function createRateLimiter(options: { windowMs?: number; max?: number } = {}) {
   const windowMs = options.windowMs || DEFAULT_WINDOW_MS;

@@ -18,7 +18,7 @@ interface FeedbackQuestion {
 // Map API response to component interface
 function mapApiQuestion(q: any): FeedbackQuestion {
   return {
-    id: q.id,
+    id: q.question_key || q.db_id,  // Use question_key as the identifier
     text_vi: q.text_vi || '',
     text_en: q.text_en || '',
     text_ar: q.text_ar || '',
@@ -35,9 +35,9 @@ interface DislikeFeedbackFormProps {
   onSubmit: (data: {
     selectedReasons: string[];
     details: string;
-    saveToDashboard: boolean;
   }) => void;
   messageContent: string;
+  messageId: string;
   language?: Language;
 }
 
@@ -104,8 +104,6 @@ const translations: Record<Language, Record<string, string>> = {
     subtitle: 'MADA AI Assistant',
     reasonLabel: 'Vui lòng chọn lý do góp ý:',
     detailsPlaceholder: 'Mô tả thêm chi tiết (tùy chọn)...',
-    saveToDashboard: 'Lưu vào Dashboard',
-    saveToDashboardHint: 'Giúp đội ngũ theo dõi & cải thiện',
     submit: 'Gửi góp ý',
     cancel: 'Hủy bỏ',
     thankYou: 'Cảm ơn bạn đã góp ý!',
@@ -116,8 +114,6 @@ const translations: Record<Language, Record<string, string>> = {
     subtitle: 'MADA AI Assistant',
     reasonLabel: 'Please select the reason for your feedback:',
     detailsPlaceholder: 'Add more details (optional)...',
-    saveToDashboard: 'Save to Dashboard',
-    saveToDashboardHint: 'Help the team track & improve',
     submit: 'Send Feedback',
     cancel: 'Cancel',
     thankYou: 'Thank you for your feedback!',
@@ -128,8 +124,6 @@ const translations: Record<Language, Record<string, string>> = {
     subtitle: 'MADA AI Assistant',
     reasonLabel: 'الرجاء تحديد سبب التعليق:',
     detailsPlaceholder: 'إضافة تفاصيل إضافية (اختياري)...',
-    saveToDashboard: 'حفظ إلى لوحة التحكم',
-    saveToDashboardHint: 'مساعدة الفريق على التتبع والتحسين',
     submit: 'إرسال التعليق',
     cancel: 'إلغاء',
     thankYou: 'شكراً لتعليقك!',
@@ -140,8 +134,6 @@ const translations: Record<Language, Record<string, string>> = {
     subtitle: 'MADA AI Assistant',
     reasonLabel: 'Veuillez sélectionner la raison du commentaire:',
     detailsPlaceholder: 'Ajouter plus de détails (facultatif)...',
-    saveToDashboard: "Enregistrer dans le tableau de bord",
-    saveToDashboardHint: "Aider l'équipe à suivre et améliorer",
     submit: "Soumettre le commentaire",
     cancel: 'Annuler',
     thankYou: 'Merci pour votre commentaire!',
@@ -153,12 +145,12 @@ export function DislikeFeedbackForm({
   isOpen,
   onClose,
   onSubmit,
+  messageId,
   language = 'vi',
 }: DislikeFeedbackFormProps) {
   const [questions, setQuestions] = useState<FeedbackQuestion[]>(DEFAULT_FEEDBACK_QUESTIONS);
   const [selectedReasons, setSelectedReasons] = useState<string[]>([]);
   const [details, setDetails] = useState('');
-  const [saveToDashboard, setSaveToDashboard] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showThankYou, setShowThankYou] = useState(false);
   const [error, setError] = useState('');
@@ -172,11 +164,13 @@ export function DislikeFeedbackForm({
         const res = await fetch('/api/chat/feedback/questions');
         if (res.ok) {
           const data = await res.json();
+          console.log('[DislikeFeedbackForm] API response:', data);
           if (data.success && data.data && data.data.length > 0) {
             const mappedQuestions = data.data
               .filter((q: any) => q.is_active === 1) // Only show active questions
               .map(mapApiQuestion)
               .sort((a: FeedbackQuestion, b: FeedbackQuestion) => a.sortOrder - b.sortOrder);
+            console.log('[DislikeFeedbackForm] Mapped questions:', mappedQuestions);
             if (mappedQuestions.length > 0) {
               setQuestions(mappedQuestions);
             }
@@ -212,7 +206,6 @@ export function DislikeFeedbackForm({
     if (isOpen) {
       setSelectedReasons([]);
       setDetails('');
-      setSaveToDashboard(true);
       setShowThankYou(false);
       setError('');
     }
@@ -238,21 +231,21 @@ export function DislikeFeedbackForm({
     setError('');
 
     try {
-      const res = await fetch('/api/feedback', {
+      const res = await fetch('/api/chat/feedback', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          message_id: messageId,
           rating: 'dislike',
           selectedReasons,
           details,
-          saveToDashboard,
           language,
         }),
       });
 
       if (res.ok) {
         setShowThankYou(true);
-        onSubmit({ selectedReasons, details, saveToDashboard });
+        onSubmit({ selectedReasons, details });
         setTimeout(() => { onClose(); }, 2000);
       } else {
         setError('Failed to submit feedback. Please try again.');
@@ -278,27 +271,14 @@ export function DislikeFeedbackForm({
         className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col animate-in fade-in zoom-in-95 duration-200"
         style={{ maxHeight: '90vh', overflow: 'hidden' }}
       >
-        {/* ─── HEADER ─── */}
-        <div className="relative px-5 pt-5 pb-4 flex-shrink-0">
-          {/* Accent bar */}
-          <div className="absolute top-0 left-6 right-6 h-1 bg-gradient-to-r from-red-400 via-rose-400 to-red-500 rounded-full" />
-
-          <div className="flex items-start justify-between mt-1">
-            {/* Left: icon + title */}
-            <div className="flex items-center gap-3">
-              <div className={clsx(
-                'w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0',
-                'bg-gradient-to-br from-red-400 to-rose-500'
-              )}>
-                <ThumbsDown className="w-5 h-5 text-white" strokeWidth={2} />
-              </div>
-              <div>
-                <h2 className="text-[15px] font-bold text-slate-800 leading-snug">{t('title')}</h2>
-                <p className="text-xs text-slate-400 mt-0.5">{t('subtitle')}</p>
-              </div>
+        {/* ─── SCROLLABLE CONTENT ─── */}
+        <div className="flex-1 overflow-y-auto px-5 py-2 space-y-4 pb-4">
+          {/* Header với nút đóng */}
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-[15px] font-bold text-slate-800">{t('title')}</h2>
+              <p className="text-xs text-slate-400">{t('subtitle')}</p>
             </div>
-
-            {/* Close button */}
             <button
               onClick={onClose}
               className={clsx(
@@ -310,10 +290,29 @@ export function DislikeFeedbackForm({
               <X className="w-4 h-4" />
             </button>
           </div>
-        </div>
 
-        {/* ─── SCROLLABLE CONTENT ─── */}
-        <div className="flex-1 overflow-y-auto px-5 pb-2 space-y-4">
+          {/* Banner gửi góp ý */}
+          <div className="bg-gradient-to-r from-red-50 via-rose-50 to-red-50 border border-red-100 rounded-xl px-4 py-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-400 to-rose-500 flex items-center justify-center flex-shrink-0 shadow-sm">
+                <ThumbsDown className="w-5 h-5 text-white" strokeWidth={2} />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-red-700">
+                  {language === 'vi' ? 'Gửi góp ý chất lượng' :
+                   language === 'en' ? 'Send Quality Feedback' :
+                   language === 'ar' ? 'إرسال تعليقات الجودة' :
+                   'Envoyer des commentaires de qualité'}
+                </p>
+                <p className="text-[11px] text-red-500/70">
+                  {language === 'vi' ? 'Giúp chúng tôi cải thiện câu trả lời tốt hơn' :
+                   language === 'en' ? 'Help us improve our responses' :
+                   language === 'ar' ? 'ساعدنا في تحسين ردودنا' :
+                   'Aidez-nous à améliorer nos réponses'}
+                </p>
+              </div>
+            </div>
+          </div>
 
           {/* Reason selection */}
           <div>
@@ -426,55 +425,7 @@ export function DislikeFeedbackForm({
         </div>
 
         {/* ─── FOOTER ─── */}
-        <div className="flex-shrink-0 px-5 pb-5 pt-1 space-y-3 border-t border-slate-100 mt-2">
-          {/* Save to Dashboard toggle */}
-          <button
-            type="button"
-            onClick={() => setSaveToDashboard(!saveToDashboard)}
-            className={clsx(
-              'w-full flex items-center justify-between px-4 py-3 rounded-xl border-2 transition-all duration-150 cursor-pointer',
-              saveToDashboard
-                ? 'border-red-200 bg-red-50/80'
-                : 'border-slate-100 bg-slate-50/80 hover:border-slate-200'
-            )}
-          >
-            <div className="flex items-center gap-3">
-              <div className={clsx(
-                'w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-150',
-                saveToDashboard ? 'bg-gradient-to-br from-red-400 to-rose-500' : 'bg-slate-200'
-              )}>
-                <svg
-                  className={clsx('w-4 h-4 transition-colors duration-150', saveToDashboard ? 'text-white' : 'text-slate-400')}
-                  viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"
-                >
-                  <rect x="3" y="3" width="7" height="7" rx="1" />
-                  <rect x="14" y="3" width="7" height="7" rx="1" />
-                  <rect x="3" y="14" width="7" height="7" rx="1" />
-                  <rect x="14" y="14" width="7" height="7" rx="1" />
-                </svg>
-              </div>
-              <div className="text-left">
-                <p className={clsx('text-sm font-semibold', saveToDashboard ? 'text-red-700' : 'text-slate-600')}>
-                  {t('saveToDashboard')}
-                </p>
-                <p className={clsx('text-[11px]', saveToDashboard ? 'text-red-400' : 'text-slate-400')}>
-                  {t('saveToDashboardHint')}
-                </p>
-              </div>
-            </div>
-
-            {/* Toggle */}
-            <div className={clsx(
-              'relative w-11 h-6 rounded-full transition-all duration-200 flex-shrink-0',
-              saveToDashboard ? 'bg-red-500' : 'bg-slate-300'
-            )}>
-              <div className={clsx(
-                'absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-transform duration-200',
-                saveToDashboard ? 'translate-x-5' : 'translate-x-0.5'
-              )} />
-            </div>
-          </button>
-
+        <div className="flex-shrink-0 px-5 pb-5 pt-1 mt-2">
           {/* Action buttons */}
           <div className="flex gap-3">
             <button

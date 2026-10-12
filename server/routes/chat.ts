@@ -2163,19 +2163,21 @@ router.get('/feedback/questions', async (_req, res) => {
   try {
     const questions = db.prepare(`
       SELECT 
-        id,
-        question_key as id,
+        id as db_id,
+        question_key,
         text_vi,
         text_en,
         text_ar,
         text_fr,
         icon,
-        is_active as isActive,
-        sort_order as sortOrder
+        is_active,
+        sort_order
       FROM feedback_questions
       WHERE is_active = 1
       ORDER BY sort_order ASC
     `).all();
+    
+    console.log('[DEBUG] Feedback questions from DB:', JSON.stringify(questions, null, 2));
     
     res.json({ success: true, data: questions });
   } catch (error) {
@@ -2190,7 +2192,7 @@ router.get('/feedback/questions', async (_req, res) => {
 router.get('/feedback/all-questions', requireAdmin, async (_req, res) => {
   try {
     const questions = db.prepare(`
-      SELECT 
+      SELECT
         id,
         question_key,
         text_vi,
@@ -2198,10 +2200,10 @@ router.get('/feedback/all-questions', requireAdmin, async (_req, res) => {
         text_ar,
         text_fr,
         icon,
-        is_active as isActive,
-        sort_order as sortOrder,
-        created_at as createdAt,
-        updated_at as updatedAt
+        is_active,
+        sort_order,
+        created_at,
+        updated_at
       FROM feedback_questions
       ORDER BY sort_order ASC
     `).all();

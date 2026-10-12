@@ -7,7 +7,6 @@ import {
   BarChart2, Calendar, TrendingUp, TrendingDown,
   Loader2, ExternalLink, History,
   Filter, Eye, RefreshCw,
-  ThumbUpIcon, ThumbDownIcon,
   ChevronLeft, ChevronRight,
   Search, X,
   SentimentSatisfied, SentimentDissatisfied,

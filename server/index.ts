@@ -153,7 +153,7 @@ app.use((_req, res, next) => {
     "default-src 'self'; " +
     "script-src 'self' 'unsafe-inline' 'unsafe-eval'; " +
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; " +
-    "font-src 'self' https://fonts.gstatic.com data:; " +
+    "font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com data:; " +
     "img-src 'self' data: blob: http://localhost:* https://localhost:* https://api.dicebear.com https://img.onelife.vn; " +
     "connect-src 'self' http://localhost:* https://localhost:* ws://localhost:* wss://localhost:* https://api.dicebear.com; " +
     "frame-ancestors 'self'; " +

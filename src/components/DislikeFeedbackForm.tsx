@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, ThumbsDown, Check, AlertCircle } from 'lucide-react';
 import clsx from 'clsx';
-import madaLogo from '@/assets/mada-logo.png';
 import type { Language } from '@/types';
 
 interface FeedbackQuestion {
@@ -267,72 +266,56 @@ export function DislikeFeedbackForm({
   return createPortal(
     <div
       className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
-      style={{ backgroundColor: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(6px)' }}
+      style={{ backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)' }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       {/* Main Card */}
       <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col animate-in fade-in zoom-in-95 duration-200"
-        style={{ maxHeight: '90vh', overflow: 'hidden' }}
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 animate-in fade-in zoom-in-95 duration-200"
       >
-        {/* ─── SCROLLABLE CONTENT ─── */}
-        <div className="flex-1 overflow-y-auto px-5 py-2 space-y-4 pb-4">
-          {/* Header Banner */}
-          <div className="bg-gradient-to-r from-[#006D77] to-[#0A9396] rounded-xl px-4 py-3.5 flex items-center gap-3 shadow-sm">
-            <img src={madaLogo} alt="MADA" className="h-10 flex-shrink-0" />
-            <div className="flex-1 min-w-0">
-              <h2 className="text-[15px] font-bold text-white leading-tight">
-                {t('title')}
-              </h2>
-              <p className="text-xs text-white/70 mt-0.5">
-                {t('subtitle')}
-              </p>
-            </div>
-          </div>
-
-          {/* Header với nút đóng */}
-          <div className="flex items-center justify-end">
-            <button
-              onClick={onClose}
-              className={clsx(
-                'w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0',
-                'text-slate-400 hover:text-slate-600 hover:bg-slate-100',
-                'transition-all duration-150 cursor-pointer'
-              )}
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-
-          {/* Banner gửi góp ý */}
-          <div className="bg-gradient-to-r from-red-50 via-rose-50 to-red-50 border border-red-100 rounded-xl px-4 py-3">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-400 to-rose-500 flex items-center justify-center flex-shrink-0 shadow-sm">
-                <ThumbsDown className="w-5 h-5 text-white" strokeWidth={2} />
+        {/* ─── HEADER ─── */}
+        <div className="px-5 pt-5 pb-4">
+          {/* Close button + Title */}
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-red-50 flex items-center justify-center">
+                <ThumbsDown className="w-4.5 h-4.5 text-red-500" strokeWidth={2} />
               </div>
               <div>
-                <p className="text-sm font-bold text-red-700">
-                  {language === 'vi' ? 'Gửi góp ý chất lượng' :
-                   language === 'en' ? 'Send Quality Feedback' :
-                   language === 'ar' ? 'إرسال تعليقات الجودة' :
-                   'Envoyer des commentaires de qualité'}
-                </p>
-                <p className="text-[11px] text-red-500/70">
-                  {language === 'vi' ? 'Giúp chúng tôi cải thiện câu trả lời tốt hơn' :
-                   language === 'en' ? 'Help us improve our responses' :
-                   language === 'ar' ? 'ساعدنا في تحسين ردودنا' :
-                   'Aidez-nous à améliorer nos réponses'}
+                <h2 className="text-base font-semibold text-slate-800 leading-tight">
+                  {language === 'vi' ? 'Gửi góp ý' :
+                   language === 'en' ? 'Send Feedback' :
+                   language === 'ar' ? 'إرسال تعليق' :
+                   'Envoyer un commentaire'}
+                </h2>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  {language === 'vi' ? 'Giúp chúng tôi cải thiện hơn' :
+                   language === 'en' ? 'Help us improve' :
+                   language === 'ar' ? 'ساعدنا في التحسن' :
+                   'Aidez-nous à nous améliorer'}
                 </p>
               </div>
             </div>
+            <button
+              onClick={onClose}
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-all cursor-pointer"
+            >
+              <X className="w-4.5 h-4.5" />
+            </button>
           </div>
+        </div>
 
+        {/* Divider */}
+        <div className="h-px bg-slate-100 mx-5" />
+
+        {/* ─── CONTENT ─── */}
+        <div className="px-5 py-4 space-y-4">
           {/* Reason selection */}
           <div>
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2.5 px-1">
+            <p className="text-xs font-medium text-slate-500 mb-2.5">
               {t('reasonLabel')}
             </p>
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               {questions
                 .filter((q) => q.isActive)
                 .sort((a, b) => a.sortOrder - b.sortOrder)
@@ -354,34 +337,29 @@ export function DislikeFeedbackForm({
                           }
                         }}
                         className={clsx(
-                          'flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all duration-150 select-none',
+                          'flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all duration-150 select-none',
                           isSelected
-                            ? 'border-red-400 bg-red-50 shadow-sm'
-                            : 'border-slate-200 hover:border-red-200 hover:bg-red-50/40'
+                            ? 'bg-red-50 border border-red-200'
+                            : 'bg-slate-50 border border-transparent hover:bg-slate-100'
                         )}
                       >
-                        {/* Checkbox - clean design */}
+                        {/* Checkbox */}
                         <div className={clsx(
-                          'w-5 h-5 rounded-lg flex items-center justify-center flex-shrink-0 transition-all duration-200',
+                          'w-5 h-5 rounded-lg border-2 flex items-center justify-center flex-shrink-0 transition-all duration-150',
                           isSelected
-                            ? 'bg-red-500 shadow-sm'
-                            : 'bg-white border-2 border-slate-300'
+                            ? 'bg-red-500 border-red-500'
+                            : 'border-slate-300 bg-white'
                         )}>
                           {isSelected && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
                         </div>
 
-                        {/* Label only - clean and simple */}
+                        {/* Label */}
                         <span className={clsx(
-                          'text-sm font-medium flex-1 leading-snug',
-                          isSelected ? 'text-red-700' : 'text-slate-600'
+                          'text-sm flex-1',
+                          isSelected ? 'text-red-700 font-medium' : 'text-slate-600'
                         )}>
                           {getQuestionText(question, language)}
                         </span>
-
-                        {/* Small indicator for selected */}
-                        {isSelected && (
-                          <div className="w-1.5 h-1.5 rounded-full bg-red-400 flex-shrink-0" />
-                        )}
                       </div>
 
                       {/* Details textarea (only for "Other") */}
@@ -392,11 +370,7 @@ export function DislikeFeedbackForm({
                             onChange={(e) => setDetails(e.target.value)}
                             onClick={(e) => e.stopPropagation()}
                             placeholder={t('detailsPlaceholder')}
-                            className={clsx(
-                              'w-full p-3 text-sm rounded-xl resize-none transition-all duration-150',
-                              'border-2 border-red-200 bg-white',
-                              'focus:outline-none focus:border-red-300 focus:ring-2 focus:ring-red-100'
-                            )}
+                            className="w-full p-3 text-sm rounded-xl resize-none transition-all duration-150 bg-white border border-slate-200 focus:outline-none focus:border-red-300 focus:ring-2 focus:ring-red-50"
                             rows={2}
                             autoFocus
                           />
@@ -415,11 +389,7 @@ export function DislikeFeedbackForm({
                 value={details}
                 onChange={(e) => setDetails(e.target.value)}
                 placeholder={t('detailsPlaceholder')}
-                className={clsx(
-                  'w-full p-3 text-sm rounded-xl resize-none transition-all duration-150',
-                  'border-2 border-slate-200 bg-white',
-                  'focus:outline-none focus:border-red-300 focus:ring-2 focus:ring-red-50'
-                )}
+                className="w-full p-3 text-sm rounded-xl resize-none transition-all duration-150 bg-slate-50 border border-transparent focus:outline-none focus:border-slate-200 focus:bg-white"
                 rows={2}
               />
             </div>
@@ -427,26 +397,19 @@ export function DislikeFeedbackForm({
 
           {/* Error */}
           {error && (
-            <div className={clsx(
-              'flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-sm',
-              'bg-red-50 border border-red-100 text-red-600'
-            )}>
-              <AlertCircle className="w-4 h-4 flex-shrink-0 text-red-400" />
+            <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm bg-red-50 text-red-600">
+              <AlertCircle className="w-4 h-4 flex-shrink-0" />
               <span className="font-medium">{error}</span>
             </div>
           )}
         </div>
 
         {/* ─── FOOTER ─── */}
-        <div className="flex-shrink-0 px-5 pb-5 pt-1 mt-2">
-          {/* Action buttons */}
-          <div className="flex gap-3">
+        <div className="px-5 pb-5 pt-2">
+          <div className="flex gap-2.5">
             <button
               onClick={onClose}
-              className={clsx(
-                'px-5 py-2.5 text-sm font-medium rounded-xl transition-all duration-150 cursor-pointer',
-                'text-slate-500 hover:text-slate-700 hover:bg-slate-100'
-              )}
+              className="px-4 py-2.5 text-sm font-medium rounded-xl text-slate-500 hover:text-slate-700 hover:bg-slate-100 transition-all cursor-pointer"
             >
               {t('cancel')}
             </button>
@@ -455,9 +418,9 @@ export function DislikeFeedbackForm({
               disabled={isSubmitting || selectedReasons.length === 0}
               className={clsx(
                 'flex-1 px-4 py-2.5 text-sm font-semibold rounded-xl transition-all duration-150 cursor-pointer',
-                'disabled:cursor-not-allowed disabled:opacity-50',
+                'disabled:cursor-not-allowed disabled:opacity-40',
                 selectedReasons.length > 0
-                  ? 'bg-gradient-to-r from-red-500 to-rose-500 text-white hover:from-red-600 hover:to-rose-600 active:scale-[0.98] shadow-lg shadow-red-200'
+                  ? 'bg-red-500 text-white hover:bg-red-600 active:scale-[0.98]'
                   : 'bg-slate-200 text-slate-400'
               )}
             >
@@ -467,7 +430,7 @@ export function DislikeFeedbackForm({
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                   </svg>
-                  Sending...
+                  {language === 'vi' ? 'Đang gửi...' : 'Sending...'}
                 </span>
               ) : (
                 t('submit')
@@ -481,13 +444,13 @@ export function DislikeFeedbackForm({
       {showThankYou && (
         <div
           className="fixed inset-0 z-[10000] flex items-center justify-center p-4 pointer-events-none"
-          style={{ backgroundColor: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(4px)' }}
+          style={{ backgroundColor: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(6px)' }}
         >
-          <div className="bg-white rounded-2xl shadow-2xl p-8 text-center animate-in zoom-in-95 duration-300">
-            <div className="w-16 h-16 rounded-full bg-green-50 border-2 border-green-100 flex items-center justify-center mx-auto mb-4">
-              <Check className="w-8 h-8 text-green-500" strokeWidth={2.5} />
+          <div className="bg-white rounded-2xl shadow-2xl px-8 py-10 text-center animate-in zoom-in-95 duration-300">
+            <div className="w-14 h-14 rounded-full bg-emerald-50 border-2 border-emerald-100 flex items-center justify-center mx-auto mb-4">
+              <Check className="w-7 h-7 text-emerald-500" strokeWidth={2.5} />
             </div>
-            <h3 className="text-lg font-bold text-slate-800 mb-1">{t('thankYou')}</h3>
+            <h3 className="text-lg font-semibold text-slate-800 mb-1">{t('thankYou')}</h3>
             <p className="text-sm text-slate-500">
               {language === 'vi' ? 'Phản hồi của bạn đã được ghi nhận!' :
                language === 'en' ? 'Your feedback has been recorded!' :

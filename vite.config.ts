@@ -10,6 +10,7 @@ export default defineConfig({
   ],
   optimizeDeps: {
     include: ['react', 'react-dom', 'zustand', 'zustand/middleware', 'use-sync-external-store'],
+    exclude: ['chunk-DRWLMN53', 'chunk-PJEEZAML'],
   },
   resolve: {
     alias: {

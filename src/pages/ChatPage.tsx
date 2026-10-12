@@ -27,6 +27,37 @@ import { onAgentChange } from '@/lib/agentBroadcast';
 import { onSettingsChange } from '@/lib/settingsBroadcast';
 import { MADA_BOTS } from '@/lib/madaBots';
 
+// ⭐ Map botId → ATCategory (dùng để sync thứ tự agent ↔ sidebar)
+// NOTE: bot-neuro → mobility (neuromuscular), bot-mobility → daily_living
+const BOT_ID_TO_CATEGORY: Record<string, ATCategory> = {
+  'bot-vision': 'vision',
+  'bot-hearing': 'hearing',
+  'bot-speech': 'communication',
+  'bot-cognitive': 'cognition',
+  'bot-neuro': 'mobility',
+  'bot-mobility': 'daily_living',
+  'bot-regulatory': 'education',
+};
+
+/** Tính sortedCategories từ thứ tự agent (theo sortOrder), KHÔNG dùng categoryOrder từ system settings.
+ *  Đảm bảo sidebar đồng bộ với thứ tự trong AdminPrompts. */
+function getSortedCategoriesFromAgents(activeAgents: { botId?: string; sortOrder?: number }[]): ATCategory[] {
+  const allCategories = Object.keys(CATEGORY_INFO) as ATCategory[];
+  // Map botId → category theo thứ tự sortOrder
+  const orderedCats: ATCategory[] = [];
+  for (const agent of activeAgents) {
+    if (agent.botId && BOT_ID_TO_CATEGORY[agent.botId]) {
+      const cat = BOT_ID_TO_CATEGORY[agent.botId];
+      if (!orderedCats.includes(cat)) orderedCats.push(cat);
+    }
+  }
+  // Thêm các category còn thiếu (không có agent tương ứng) vào cuối
+  for (const cat of allCategories) {
+    if (!orderedCats.includes(cat)) orderedCats.push(cat);
+  }
+  return orderedCats;
+}
+
 // Attachment options - use getAttachmentOptions(language) inside component
 function getAttachmentOptions(lang: Language) {
   const labels: Record<Language, { addAttachment: string; image: string; imageDesc: string; document: string; video: string; videoDesc: string; audio: string; audioDesc: string; file: string; fileDesc: string; enterUrl: string; urlPlaceholder: string }> = {
@@ -831,15 +862,53 @@ export function ChatPage() {
   // ⭐ Sync agents from backend on mount + when window regains focus
   const loadAgents = useAgentStore((s) => s.loadAgents);
   useEffect(() => {
-    // ⭐ Force reload từ backend - không dùng cache
+    // ⭐ Force reload từ backend - xóa cache localStorage trước để luôn lấy dữ liệu mới nhất
+    // Đây là nguyên nhân chính: persist middleware đọc từ localStorage cũ khiến sidebar không cập nhật
+    try {
+      const storageKey = 'mada-agents'; // key của persist middleware
+      const raw = localStorage.getItem(storageKey);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed.state?.agents && parsed.state.agents.length > 0) {
+          console.log('[ChatPage] Clearing stale agent cache from localStorage before fresh fetch...');
+          // Xóa agents cũ trong persist storage để force fetch từ API
+          const newState = { ...parsed, state: { ...parsed.state, agents: [], lastSynced: null } };
+          localStorage.setItem(storageKey, JSON.stringify(newState));
+          // Đồng thời xóa trong store hiện tại
+          useAgentStore.setState({ agents: [], lastSynced: null });
+        }
+      }
+    } catch (e) {
+      console.warn('[ChatPage] Could not clear agent cache:', e);
+    }
+
     console.log('[ChatPage] Loading agents from backend...');
     loadAgents().then(() => {
-      console.log('[ChatPage] Agents loaded, count:', useAgentStore.getState().agents.length);
+      const count = useAgentStore.getState().agents.length;
+      console.log('[ChatPage] Agents loaded, count:', count);
+      if (count > 0) {
+        useAgentStore.getState().agents.forEach((a, i) => {
+          console.log(`  [${i}] "${a.name}" sortOrder=${a.sortOrder ?? '?'} botId=${a.botId || 'none'}`);
+        });
+      }
     }).catch((err) => {
       console.error('[ChatPage] Failed to load agents:', err);
     });
     const onFocus = () => {
       console.log('[ChatPage] Window focus - reloading agents...');
+      // Xóa cache trước khi reload
+      try {
+        const storageKey = 'mada-agents';
+        const raw = localStorage.getItem(storageKey);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed.state?.agents?.length > 0) {
+            const newState = { ...parsed, state: { ...parsed.state, agents: [], lastSynced: null } };
+            localStorage.setItem(storageKey, JSON.stringify(newState));
+            useAgentStore.setState({ agents: [], lastSynced: null });
+          }
+        }
+      } catch (_) {}
       loadAgents();
     };
     window.addEventListener('focus', onFocus);
@@ -893,6 +962,24 @@ export function ChatPage() {
 
       // Reload agents ngay lập tức khi có thay đổi từ Admin
       // Dùng getState() để đảm bảo luôn gọi đúng phiên bản mới nhất của loadAgents
+      // ⭐ Xóa cache localStorage TRƯỚC khi reload để đảm bảo không dùng dữ liệu cũ
+      const clearCache = () => {
+        try {
+          const storageKey = 'mada-agents';
+          const raw = localStorage.getItem(storageKey);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (parsed.state?.agents?.length > 0) {
+              console.log('[ChatPage] 🔄 Clearing localStorage cache before broadcast reload...');
+              const newState = { ...parsed, state: { ...parsed.state, agents: [], lastSynced: null } };
+              localStorage.setItem(storageKey, JSON.stringify(newState));
+              useAgentStore.setState({ agents: [], lastSynced: null });
+            }
+          }
+        } catch (_) {}
+      };
+      clearCache();
+
       console.log('[ChatPage] 🔄 Calling loadAgents() due to broadcast...');
       useAgentStore.getState().loadAgents().then(() => {
         const agents = useAgentStore.getState().agents;
@@ -2511,17 +2598,12 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
   };
 
   // File upload limits (from Admin Settings)
-  const { maxFilesPerSession, maxFilesTotal, categoryOrder } = useSystemSettingsStore();
+  const { maxFilesPerSession, maxFilesTotal } = useSystemSettingsStore();
   const MAX_FILES_PER_SESSION = maxFilesPerSession || 10;
   const MAX_FILES_TOTAL = maxFilesTotal || 100;
 
-  // ⭐ Categories sorted by admin-defined order
-  const allCategories = Object.keys(CATEGORY_INFO) as ATCategory[];
-  const sortedCategories = categoryOrder?.length
-    ? categoryOrder.filter(cat => allCategories.includes(cat as ATCategory)).concat(
-        allCategories.filter(cat => !categoryOrder.includes(cat))
-      ) as ATCategory[]
-    : allCategories;
+  // ⭐ Categories sorted by activeAgents order (sync với AdminPrompts sort_order)
+  const sortedCategories = getSortedCategoriesFromAgents(activeAgents);
   
   // Track total files uploaded (persisted)
   const [totalFilesUploaded, setTotalFilesUploaded] = useState(() => {
@@ -4306,10 +4388,11 @@ function MessageBubble({
                     <div className={`relative h-32 bg-gradient-to-br ${gradientClass} overflow-hidden`}>
                       {product.image_url ? (
                         <img 
-                          src={product.image_url} 
+                          src={getImageUrl(product.image_url)} 
                           alt={productTitle}
                           className="w-full h-full object-cover object-center"
                           loading="lazy"
+                          referrerPolicy="no-referrer"
                           onError={(e) => {
                             const target = e.target as HTMLImageElement;
                             target.style.display = 'none';

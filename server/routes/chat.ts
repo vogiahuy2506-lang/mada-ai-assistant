@@ -424,9 +424,10 @@ async function getSuggestedProducts(ragSources: any[], message: string, effectiv
       const normalizedUrl = productUrl.replace(/\/$/, '');
       
       // Try to find by source_url OR product_url (both exact and normalized)
+      // NOTE: Only remove trailing slash to normalize, NOT all slashes
       const product = db.prepare(`
         SELECT * FROM kb_products 
-        WHERE REPLACE(source_url, '/', '') = ? OR REPLACE(product_url, '/', '') = ?
+        WHERE source_url = ? OR product_url = ?
            OR source_url = ? OR product_url = ?
         LIMIT 1
       `).get(normalizedUrl, normalizedUrl, productUrl, productUrl) as any;

@@ -972,6 +972,9 @@ export function AdminAgents() {
   };
 
   // ============== SORT ORDER HANDLER ==============
+  // NOTE: sort_order nhỏ hơn → hiển thị trước (ở trên)
+  // "up" = di chuyển lên trên = giảm sort_order
+  // "down" = di chuyển xuống dưới = tăng sort_order
   const handleSortChange = async (id: string, direction: 'up' | 'down') => {
     if (!isSuperAdmin) {
       alert(tAgent('agent.noPermissionEdit', language));
@@ -980,21 +983,41 @@ export function AdminAgents() {
     const agent = agents.find(a => a.id === id);
     if (!agent) return;
     const currentOrder = (agent as any).sort_order ?? 0;
-    let newOrder: number;
+
+    // Tìm agent kế cận để swap sort_order
+    let targetOrder: number;
+    let swapAgentId: string | null = null;
     if (direction === 'up') {
-      newOrder = currentOrder + 1;
+      targetOrder = currentOrder - 1;
+      if (targetOrder < 1) return; // Đã ở trên cùng
+      const swapAgent = agents.find(a => (a as any).sort_order === targetOrder);
+      swapAgentId = swapAgent?.id ?? null;
     } else {
-      newOrder = Math.max(1, currentOrder - 1);
+      targetOrder = currentOrder + 1;
+      const swapAgent = agents.find(a => (a as any).sort_order === targetOrder);
+      swapAgentId = swapAgent?.id ?? null;
     }
+
     try {
-      const res = await adminApi.updateAgent(id, { sort_order: newOrder });
-      if (res.success) {
+      // Swap sort_order của 2 agent cùng lúc
+      const updates: Promise<any>[] = [];
+      updates.push(adminApi.updateAgent(id, { sort_order: targetOrder }));
+      if (swapAgentId) {
+        updates.push(adminApi.updateAgent(swapAgentId, { sort_order: currentOrder }));
+      }
+      const results = await Promise.all(updates);
+      const allSuccess = results.every(r => r.success);
+      if (allSuccess) {
         await loadAgents();
+        // ⭐ Broadcast để ChatPage cập nhật ngay lập tức
         broadcastAgentChange({ type: 'agent-updated', agentId: id });
+        if (swapAgentId) {
+          broadcastAgentChange({ type: 'agent-updated', agentId: swapAgentId });
+        }
         void loadAgentsForChat();
         save();
       } else {
-        alert(res.error);
+        alert(results.find(r => !r.success)?.error || 'Lỗi khi đổi thứ tự.');
       }
     } catch (err: any) {
       alert(err.message);

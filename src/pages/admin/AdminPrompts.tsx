@@ -626,6 +626,14 @@ export function AdminPrompts() {
   const [knowledgeUrls, setKnowledgeUrls] = useState<KnowledgeUrl[]>([]);
   const [newUrl, setNewUrl] = useState('');
 
+  // Add URL Modal
+  const [showAddUrlModal, setShowAddUrlModal] = useState(false);
+  const [urlModalInput, setUrlModalInput] = useState('');
+
+  // Add Question Modal
+  const [showAddQuestionModal, setShowAddQuestionModal] = useState(false);
+  const [questionModalInput, setQuestionModalInput] = useState('');
+
   // Drag & Drop state
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
@@ -1026,6 +1034,11 @@ export function AdminPrompts() {
           setAgents(prev => prev.map(a =>
             a.id === selectedAgent.id ? { ...a, ...formData } : a
           ));
+          // ⭐ Broadcast để ChatPage reload agent ngay lập tức
+          broadcastAgentChange({
+            type: 'agent-updated',
+            agentId: selectedAgent.id,
+          });
           // Show success toast
           const savedMsg = language === 'vi' ? 'Đã lưu thành công!' : 
                           language === 'ar' ? 'تم الحفظ بنجاح!' :
@@ -1138,16 +1151,74 @@ export function AdminPrompts() {
   };
 
   const handleAddUrl = () => {
-    if (!newUrl.trim()) return;
+    console.log('[handleAddUrl] Called, newUrl:', newUrl);
+    if (!newUrl.trim()) {
+      console.log('[handleAddUrl] Empty URL, returning');
+      return;
+    }
     const newEntry: KnowledgeUrl = {
       id: `kb-${Date.now()}`,
       url: newUrl.trim(),
       status: 'pending',
     };
+    console.log('[handleAddUrl] Adding:', newEntry);
     const updatedUrls = [...knowledgeUrls, newEntry];
     setKnowledgeUrls(updatedUrls);
     setFormData({ ...formData, knowledge_url: updatedUrls.map(u => u.url).join('\n') });
     setNewUrl('');
+    console.log('[handleAddUrl] Done, updatedUrls:', updatedUrls);
+  };
+
+  // Add URL from Modal
+  const handleAddUrlFromModal = () => {
+    if (!urlModalInput.trim()) return;
+    const newEntry: KnowledgeUrl = {
+      id: `kb-${Date.now()}`,
+      url: urlModalInput.trim(),
+      status: 'pending',
+    };
+    const updatedUrls = [...knowledgeUrls, newEntry];
+    setKnowledgeUrls(updatedUrls);
+    setFormData({ ...formData, knowledge_url: updatedUrls.map(u => u.url).join('\n') });
+    setUrlModalInput('');
+    setShowAddUrlModal(false);
+  };
+
+  // Add Question from Modal
+  const handleAddQuestionFromModal = async () => {
+    if (!questionModalInput.trim() || !selectedAgent) return;
+    try {
+      const token = getAccessToken();
+      const res = await fetch('/api/admin/suggested-questions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          agent_id: selectedAgent.id,
+          category: (selectedAgent as any).mada_category || 'general',
+          question: questionModalInput.trim(),
+          sort_order: questions.length + 1,
+          is_active: true,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          setQuestions([...questions, data.data]);
+          broadcastQuestionsChange(selectedAgent.id, (selectedAgent as any).mada_category || 'general');
+          const successMsg = language === 'vi' ? 'Đã thêm câu hỏi!' :
+                            language === 'ar' ? 'تمت إضافة السؤال!' :
+                            language === 'fr' ? 'Question ajoutée!' : 'Question added!';
+          setToast({ message: successMsg, type: 'success' });
+        }
+      }
+    } catch (err) {
+      console.error('Failed to add question:', err);
+    }
+    setQuestionModalInput('');
+    setShowAddQuestionModal(false);
   };
 
   const handleRemoveUrl = (id: string) => {
@@ -1302,6 +1373,11 @@ export function AdminPrompts() {
         if (data.success) {
           setFormData(prev => ({ ...prev, is_active: true }));
           setAgents(prev => prev.map(a => a.id === selectedAgent.id ? { ...a, ...formData, is_active: true } : a));
+          // ⭐ Broadcast để ChatPage reload agent ngay lập tức
+          broadcastAgentChange({
+            type: 'agent-updated',
+            agentId: selectedAgent.id,
+          });
           setShowPublishConfirm(false);
           // Show success toast
           const publishMsg = language === 'vi' ? 'Đã xuất bản thành công!' : 
@@ -1376,6 +1452,11 @@ export function AdminPrompts() {
             selectAgent({ ...selectedAgent, ...editAgentForm });
             setFormData(prev => ({ ...prev, ...editAgentForm }));
           }
+          // ⭐ Broadcast để ChatPage reload agent ngay lập tức
+          broadcastAgentChange({
+            type: 'agent-updated',
+            agentId: editingAgent.id,
+          });
           setShowEditAgent(false);
           setEditingAgent(null);
           // Show success toast
@@ -2294,27 +2375,15 @@ export function AdminPrompts() {
                       <span className="text-[11px] text-slate-400 font-medium">{t('autoSync')}</span>
                     </div>
 
-                    {/* Add URL */}
-                    <div className="flex items-center gap-2">
-                      <div className="relative flex-1">
-                        <Database className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 w-3 h-3" />
-                        <input
-                          type="url"
-                          value={newUrl}
-                          onChange={(e) => setNewUrl(e.target.value)}
-                          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddUrl(); } }}
-                          placeholder={t('urlPlaceholder')}
-                          className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50/80 border border-slate-200 rounded-xl text-slate-700 placeholder-slate-400 focus:bg-white focus:ring-2 focus:ring-brand-700/20 focus:border-brand-700 transition"
-                        />
-                      </div>
-                      <button
-                        onClick={handleAddUrl}
-                        className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-brand-700 hover:bg-brand-800 text-white rounded-xl text-xs font-bold shadow-xs transition focus:ring-2 focus:ring-brand-700"
-                      >
-                        <Plus className="w-3 h-3" />
-                        <span>{t('addUrl')}</span>
-                      </button>
-                    </div>
+                    {/* Add URL Button */}
+                    <button
+                      type="button"
+                      onClick={() => { setUrlModalInput(''); setShowAddUrlModal(true); }}
+                      className="inline-flex items-center gap-2 px-4 py-2.5 bg-brand-700 hover:bg-brand-800 text-white rounded-xl text-xs font-bold shadow-sm transition focus:ring-2 focus:ring-brand-700 active:bg-brand-900 w-full justify-center"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>{t('addUrl')}</span>
+                    </button>
 
                     {/* URL List */}
                     <div className="space-y-2 pt-1">
@@ -2361,27 +2430,15 @@ export function AdminPrompts() {
                       <span className="text-[11px] text-slate-400 font-medium">{t('showOnNewChat')}</span>
                     </div>
 
-                    {/* Add Question */}
-                    <div className="flex items-center gap-2">
-                      <div className="relative flex-1">
-                        <MessageSquare className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 w-3 h-3" />
-                        <input
-                          type="text"
-                          value={newQuestion}
-                          onChange={(e) => setNewQuestion(e.target.value)}
-                          placeholder={t('questionPlaceholder')}
-                          className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50/80 border border-slate-200 rounded-xl text-slate-700 placeholder-slate-400 focus:bg-white focus:ring-2 focus:ring-brand-700/20 focus:border-brand-700 transition"
-                          onKeyPress={(e) => e.key === 'Enter' && handleAddQuestion()}
-                        />
-                      </div>
-                      <button
-                        onClick={handleAddQuestion}
-                        className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-brand-700 hover:bg-brand-800 text-white rounded-xl text-xs font-bold shadow-xs transition focus:ring-2 focus:ring-brand-700"
-                      >
-                        <Plus className="w-3 h-3" />
-                        <span>{t('addQuestion')}</span>
-                      </button>
-                    </div>
+                    {/* Add Question Button */}
+                    <button
+                      type="button"
+                      onClick={() => { setQuestionModalInput(''); setShowAddQuestionModal(true); }}
+                      className="inline-flex items-center gap-2 px-4 py-2.5 bg-brand-700 hover:bg-brand-800 text-white rounded-xl text-xs font-bold shadow-sm transition focus:ring-2 focus:ring-brand-700 active:bg-brand-900 w-full justify-center"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>{t('addQuestion')}</span>
+                    </button>
 
                     {/* Questions List */}
                     <div className="space-y-2 pt-1">
@@ -2508,6 +2565,124 @@ export function AdminPrompts() {
                   </button>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== ADD URL MODAL ===== */}
+      {showAddUrlModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="p-5 border-b border-slate-200 flex items-center justify-between bg-gradient-to-r from-brand-700 to-teal-600">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+                  <Database className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-white">Thêm URL Knowledge</h2>
+                  <p className="text-xs text-white/80">Thêm nguồn kiến thức mới cho Agent</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowAddUrlModal(false)}
+                className="p-2 hover:bg-white/20 rounded-xl transition-colors"
+              >
+                <X className="w-5 h-5 text-white" />
+              </button>
+            </div>
+            <div className="flex-1 p-5 flex flex-col gap-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-2">URL Document</label>
+                <input
+                  type="url"
+                  value={urlModalInput}
+                  onChange={(e) => setUrlModalInput(e.target.value)}
+                  placeholder="https://example.com/document..."
+                  className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-700/20 focus:border-brand-700 transition-all text-sm"
+                  autoFocus
+                />
+              </div>
+              <div className="bg-brand-50 rounded-xl p-3 border border-brand-100">
+                <p className="text-xs text-brand-700 flex items-start gap-2">
+                  <Database className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                  <span>URL sẽ được hệ thống tự động crawl và vector hóa để phục vụ RAG trong 24h.</span>
+                </p>
+              </div>
+            </div>
+            <div className="p-5 border-t border-slate-200 flex gap-3 justify-end">
+              <button
+                onClick={() => setShowAddUrlModal(false)}
+                className="px-5 py-2.5 text-slate-600 hover:bg-slate-100 rounded-xl transition-colors font-medium"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={handleAddUrlFromModal}
+                className="px-5 py-2.5 bg-gradient-to-r from-brand-700 to-teal-700 text-white rounded-xl font-semibold hover:from-brand-800 hover:to-teal-800 transition-all flex items-center gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                Thêm URL
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== ADD QUESTION MODAL ===== */}
+      {showAddQuestionModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="p-5 border-b border-slate-200 flex items-center justify-between bg-gradient-to-r from-brand-700 to-teal-600">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+                  <MessageSquare className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-white">Thêm Câu hỏi Gợi ý</h2>
+                  <p className="text-xs text-white/80">Thêm câu hỏi gợi ý mới cho người dùng</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowAddQuestionModal(false)}
+                className="p-2 hover:bg-white/20 rounded-xl transition-colors"
+              >
+                <X className="w-5 h-5 text-white" />
+              </button>
+            </div>
+            <div className="flex-1 p-5 flex flex-col gap-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-2">Câu hỏi gợi ý</label>
+                <textarea
+                  value={questionModalInput}
+                  onChange={(e) => setQuestionModalInput(e.target.value)}
+                  placeholder="Nhập câu hỏi gợi ý cho người dùng..."
+                  className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-700/20 focus:border-brand-700 transition-all text-sm resize-none"
+                  rows={3}
+                  autoFocus
+                />
+              </div>
+              <div className="bg-brand-50 rounded-xl p-3 border border-brand-100">
+                <p className="text-xs text-brand-700 flex items-start gap-2">
+                  <MessageSquare className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                  <span>Câu hỏi sẽ hiển thị khi người dùng bắt đầu cuộc trò chuyện mới với Agent này.</span>
+                </p>
+              </div>
+            </div>
+            <div className="p-5 border-t border-slate-200 flex gap-3 justify-end">
+              <button
+                onClick={() => setShowAddQuestionModal(false)}
+                className="px-5 py-2.5 text-slate-600 hover:bg-slate-100 rounded-xl transition-colors font-medium"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={handleAddQuestionFromModal}
+                className="px-5 py-2.5 bg-gradient-to-r from-brand-700 to-teal-700 text-white rounded-xl font-semibold hover:from-brand-800 hover:to-teal-800 transition-all flex items-center gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                Thêm câu hỏi
+              </button>
             </div>
           </div>
         </div>

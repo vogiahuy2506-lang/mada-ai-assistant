@@ -1,6 +1,4 @@
 import React, { ReactNode } from 'react';
-import { useLanguageStore } from '@/stores';
-import { t } from '@/lib/translations';
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -12,10 +10,14 @@ interface ErrorBoundaryState {
   error?: Error;
 }
 
-export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  // Use static store access since hooks can't be used in class components
-  private static language = useLanguageStore.getState().language ?? 'vi';
+// Default translations when store is not available
+const defaultTranslations: Record<string, string> = {
+  title: 'An error occurred',
+  unknown: 'Unknown error',
+  clearAndReload: 'Clear data and reload',
+};
 
+export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
   constructor(props: ErrorBoundaryProps) {
     super(props);
     this.state = { hasError: false };
@@ -27,6 +29,26 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error('🔴 React Error:', error, errorInfo);
+  }
+
+  // Get translations safely - don't call hooks in class components
+  private getTranslation(key: string): string {
+    // Try to get language from store using static getState (safe, no hooks)
+    let language = 'vi';
+    try {
+      // Dynamically import to avoid issues at module load time
+      const { useLanguageStore } = require('@/stores');
+      language = useLanguageStore.getState()?.language ?? 'vi';
+    } catch {
+      // Store not available, use default
+    }
+
+    try {
+      const { translations } = require('@/lib/translations');
+      return translations[language]?.[key] || defaultTranslations[key] || key;
+    } catch {
+      return defaultTranslations[key] || key;
+    }
   }
 
   render() {
@@ -54,9 +76,9 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
             textAlign: 'center',
             maxWidth: '500px',
           }}>
-            <h1 style={{ color: '#ba1a1a', marginBottom: '16px' }}>{t('error.title', ErrorBoundary.language)}</h1>
+            <h1 style={{ color: '#ba1a1a', marginBottom: '16px' }}>{this.getTranslation('error.title')}</h1>
             <p style={{ color: '#666', marginBottom: '20px' }}>
-              {this.state.error?.message || t('error.unknown', ErrorBoundary.language)}
+              {this.state.error?.message || this.getTranslation('error.unknown')}
             </p>
             <button
               onClick={() => {
@@ -73,7 +95,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
                 fontSize: '14px',
               }}
             >
-              {t('error.clearAndReload', ErrorBoundary.language)}
+              {this.getTranslation('error.clearAndReload')}
             </button>
           </div>
         </div>

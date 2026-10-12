@@ -956,12 +956,11 @@ export function ChatPage() {
       console.log('[ChatPage] Loading session from URL:', sessionId);
       // Set the active conversation ID to load from URL
       setActiveConversationId(sessionId);
-      // Load messages for this session
-      getMessagesForConversation(sessionId).then((msgs) => {
-        if (msgs && msgs.length > 0) {
-          setMessages(msgs);
-        }
-      });
+      // Load messages for this session (synchronous)
+      const msgs = getMessagesForConversation(sessionId);
+      if (msgs && msgs.length > 0) {
+        setMessages(msgs);
+      }
     }
   }, [searchParams]);
 
@@ -3593,6 +3592,7 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
                     speakingId={speakingId}
                     onRequestConsultation={() => setShowConsultationModal(true)}
                     language={language}
+                    activeConversationId={activeConversationId}
                   />
                 ))}
 
@@ -4116,6 +4116,7 @@ function MessageBubble({
   speakingId: _speakingId,
   onRequestConsultation,
   language = 'vi' as Language,
+  activeConversationId,
 }: {
   message: Message;
   onCopy: (content: string, id: string) => void;
@@ -4124,6 +4125,7 @@ function MessageBubble({
   speakingId: string | null;
   onRequestConsultation: () => void;
   language?: Language;
+  activeConversationId?: string | null;
 }) {
   const [showSources, _setShowSources] = useState(false);
   void showSources;

@@ -2379,9 +2379,9 @@ export function AdminPrompts() {
                     <button
                       type="button"
                       onClick={() => { setUrlModalInput(''); setShowAddUrlModal(true); }}
-                      className="inline-flex items-center gap-2 px-4 py-2.5 bg-brand-700 hover:bg-brand-800 text-white rounded-xl text-xs font-bold shadow-sm transition focus:ring-2 focus:ring-brand-700 active:bg-brand-900 w-full justify-center"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-brand-700 hover:bg-brand-800 text-white rounded-lg text-xs font-semibold shadow-sm transition"
                     >
-                      <Plus className="w-4 h-4" />
+                      <Plus className="w-3.5 h-3.5" />
                       <span>{t('addUrl')}</span>
                     </button>
 
@@ -2434,9 +2434,9 @@ export function AdminPrompts() {
                     <button
                       type="button"
                       onClick={() => { setQuestionModalInput(''); setShowAddQuestionModal(true); }}
-                      className="inline-flex items-center gap-2 px-4 py-2.5 bg-brand-700 hover:bg-brand-800 text-white rounded-xl text-xs font-bold shadow-sm transition focus:ring-2 focus:ring-brand-700 active:bg-brand-900 w-full justify-center"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-brand-700 hover:bg-brand-800 text-white rounded-lg text-xs font-semibold shadow-sm transition"
                     >
-                      <Plus className="w-4 h-4" />
+                      <Plus className="w-3.5 h-3.5" />
                       <span>{t('addQuestion')}</span>
                     </button>
 

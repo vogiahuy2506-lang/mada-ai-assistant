@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, ThumbsDown, Check, AlertCircle } from 'lucide-react';
 import clsx from 'clsx';
+import madaLogo from '@/assets/mada-logo.png';
 import type { Language } from '@/types';
 
 interface FeedbackQuestion {
@@ -273,12 +274,21 @@ export function DislikeFeedbackForm({
       >
         {/* ─── SCROLLABLE CONTENT ─── */}
         <div className="flex-1 overflow-y-auto px-5 py-2 space-y-4 pb-4">
-          {/* Header với nút đóng */}
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-[15px] font-bold text-slate-800">{t('title')}</h2>
-              <p className="text-xs text-slate-400">{t('subtitle')}</p>
+          {/* Header Banner */}
+          <div className="bg-gradient-to-r from-[#006D77] to-[#0A9396] rounded-xl px-4 py-3.5 flex items-center gap-3 shadow-sm">
+            <img src={madaLogo} alt="MADA" className="h-10 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <h2 className="text-[15px] font-bold text-white leading-tight">
+                {t('title')}
+              </h2>
+              <p className="text-xs text-white/70 mt-0.5">
+                {t('subtitle')}
+              </p>
             </div>
+          </div>
+
+          {/* Header với nút đóng */}
+          <div className="flex items-center justify-end">
             <button
               onClick={onClose}
               className={clsx(

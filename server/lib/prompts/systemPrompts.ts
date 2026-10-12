@@ -750,12 +750,30 @@ export function invalidateSystemPromptCache() {
 /**
  * Build complete system prompt từ các module
  *
- * Thứ tự ưu tiên (cao → thấp):
- *  1. DB prompts (admin_prompts) — nếu có
- *  2. AI Instructions từ system_settings (ai_instruction_*) — nếu có
- *  3. Emotion Settings từ system_settings (emotion_*) — nếu có
- *  4. Hardcoded modules (CORE_IDENTITY, LANGUAGE_RULES, ...) — fallback
- *  5. agentPrompt (hướng dẫn bổ sung từ Agent)
+ * KHI CÓ agentPrompt (bot cụ thể được chọn):
+ *  1. ⭐ Agent's system prompt — VAI TRÒ CHÍNH (identity ưu tiên cao nhất)
+ *  2. Language Rules
+ *  3. Persona Mode
+ *  4. Response Format
+ *  5. Content Guidelines
+ *  6. Safety Rules
+ *  7. AT Product Knowledge (bổ sung)
+ *  8. Follow-Up Questions Rules
+ *  9. Emotion Settings
+ * 10. AI Instructions (nếu có)
+ * 11. Main System Prompt (như ngữ cảnh bổ sung)
+ *
+ * KHI KHÔNG CÓ agentPrompt (chat chung):
+ *  1. Main System Prompt / CORE_IDENTITY
+ *  2. Language Rules
+ *  3. Persona Mode
+ *  4. Response Format
+ *  5. Content Guidelines
+ *  6. Safety Rules
+ *  7. Product Knowledge (đầy đủ)
+ *  8. Follow-Up Questions Rules
+ *  9. Emotion Settings
+ * 10. AI Instructions (nếu có)
  */
 export function buildSystemPrompt(
   lang: string,
@@ -909,12 +927,18 @@ export function buildSystemPrompt(
   // Load the single main system prompt from DB
   const { value: mainPrompt } = loadSystemPrompt();
 
+  // ⭐ When agentPrompt is provided, it becomes the PRIMARY identity
+  // The agent's specific expertise should OVERRIDE the generic main prompt
+  const isAgentChat = !!agentPrompt && agentPrompt.trim().length > 0;
+
   const parts = [
-    // 1. Main System Prompt (admin-written, language-agnostic)
-    mainPrompt || CORE_IDENTITY[langCode],
-    // 2. Language Rules (auto-added based on user's language)
+    // 1. IDENTITY: Agent-specific OR main system prompt (agent takes priority)
+    isAgentChat
+      ? `🤖 VAI TRÒ CHÍNH:\n${agentPrompt}`
+      : (mainPrompt || CORE_IDENTITY[langCode]),
+    // 2. Language Rules (always needed for consistency)
     LANGUAGE_RULES[langCode] || LANGUAGE_RULES.vi,
-    // 3. Persona Mode (auto-added based on userMode)
+    // 3. Persona Mode (always applied)
     PERSONA_MODES[langCode]?.[userMode] || PERSONA_MODES.vi.endUser,
     // 4. Response Format
     RESPONSE_FORMAT[langCode] || RESPONSE_FORMAT.en,
@@ -922,9 +946,17 @@ export function buildSystemPrompt(
     CONTENT_GUIDELINES[langCode as keyof typeof CONTENT_GUIDELINES] || CONTENT_GUIDELINES.en,
     // 6. Safety Rules
     SAFETY_RULES[langCode as keyof typeof SAFETY_RULES] || SAFETY_RULES.en,
-    // 7. Product Knowledge
-    PRODUCT_KNOWLEDGE[langCode as keyof typeof PRODUCT_KNOWLEDGE] || PRODUCT_KNOWLEDGE.en,
-    // ⭐ 8. Follow-Up Questions Rules (MANDATORY - hỏi lại khách hàng 2-3 lần trước khi đề xuất sản phẩm)
+    // 7. Product Knowledge (only for non-agent chat, or add on top)
+    ...(isAgentChat
+      ? [
+        // For agent chat: add AT knowledge on TOP of agent's specific expertise
+        `🔧 KIẾN THỨC AT BỔ SUNG:\n${PRODUCT_KNOWLEDGE[langCode as keyof typeof PRODUCT_KNOWLEDGE] || PRODUCT_KNOWLEDGE.en}`,
+      ]
+      : [
+        // For non-agent chat: use full product knowledge
+        PRODUCT_KNOWLEDGE[langCode as keyof typeof PRODUCT_KNOWLEDGE] || PRODUCT_KNOWLEDGE.en,
+      ]),
+    // ⭐ 8. Follow-Up Questions Rules
     FOLLOW_UP_RULES[langCode] || FOLLOW_UP_RULES.en,
     // 9. Emotion Settings Instructions
     `🎨 CÀI ĐẶT CẢM XÚC VÀ PHONG CÁCH:\n${getEmotionInstructions()}`,
@@ -932,12 +964,18 @@ export function buildSystemPrompt(
     aiInstructions.behaviorRules ? `📋 QUY TẮC ỨNG XỬ BỔ SUNG:\n${aiInstructions.behaviorRules}` : null,
     // 11. Tone of Voice từ AI Instructions (nếu có)
     aiInstructions.tone ? `🎭 GIỌNG VĂN BỔ SUNG:\n${aiInstructions.tone}` : null,
+    // 12. Main system prompt (only for non-agent chat, as context)
+    ...(isAgentChat && mainPrompt
+      ? [
+        // For agent chat: add main prompt as additional context
+        `📋 THÔNG TIN HỆ THỐNG:\n${mainPrompt}`,
+      ]
+      : (!isAgentChat && mainPrompt
+        ? [mainPrompt]
+        : [])),
   ].filter(Boolean);
 
-  if (agentPrompt) {
-    parts.push(`\n\n📝 HƯỚNG DẪN BỔ SUNG TỪ AGENT:\n${agentPrompt}`);
-  }
-
+  // No need to append agentPrompt again - it's already the primary identity above
   return parts.join('\n\n');
 }
 

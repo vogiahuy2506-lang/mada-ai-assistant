@@ -855,7 +855,8 @@ router.post('/', async (req, res) => {
     // if (!ready) { ... }
     
     const detectedLanguage = detectMessageLanguage(message);
-    const effectiveLanguage = (uiLanguage && ['vi', 'en', 'ar', 'fr'].includes(uiLanguage)) ? uiLanguage : detectedLanguage;
+    // ⭐ Ưu tiên detect từ message - nếu người dùng hỏi tiếng Anh thì reply tiếng Anh
+    const effectiveLanguage = (detectedLanguage && detectedLanguage !== 'unknown') ? detectedLanguage : ((uiLanguage && ['vi', 'en', 'ar', 'fr'].includes(uiLanguage)) ? uiLanguage : 'vi');
     
     console.log('🌍 Language settings:', { uiLanguage, detectedLanguage, effectiveLanguage, messagePreview: message?.slice(0, 30) });
     
@@ -1033,9 +1034,9 @@ router.post('/with-file', async (req, res) => {
     }
     
     const detectedLanguage = detectMessageLanguage(message);
-    const effectiveLanguage = (uiLanguage && ['vi', 'en', 'ar', 'fr'].includes(uiLanguage)) ? uiLanguage : detectedLanguage;
+    const effectiveLanguage = (detectedLanguage && detectedLanguage !== 'unknown') ? detectedLanguage : ((uiLanguage && ['vi', 'en', 'ar', 'fr'].includes(uiLanguage)) ? uiLanguage : 'vi');
     
-    console.log('📎 Chat with files:', { message: message?.slice(0, 50), fileCount: attachments?.length || 0 });
+    console.log('📎 Chat with files:', { message: message?.slice(0, 50), fileCount: attachments?.length || 0, effectiveLanguage });
     
     if (!message) {
       return res.status(400).json({ success: false, error: 'Message is required' });
@@ -1255,7 +1256,7 @@ router.post('/stream', async (req: any, res: any) => {
     
     // Language detection
     const detectedLanguage = detectMessageLanguage(message);
-    const effectiveLanguage = (uiLanguage && ['vi', 'en', 'ar', 'fr'].includes(uiLanguage)) ? uiLanguage : detectedLanguage;
+    const effectiveLanguage = (detectedLanguage && detectedLanguage !== 'unknown') ? detectedLanguage : ((uiLanguage && ['vi', 'en', 'ar', 'fr'].includes(uiLanguage)) ? uiLanguage : 'vi');
     
     // Guardrails check
     const guardrailsResult = guardrails.analyzeQuery(message, effectiveLanguage);
@@ -1959,7 +1960,7 @@ router.post('/consultation', async (req, res) => {
     }
     
     const detectedLanguage = detectMessageLanguage(message);
-    const effectiveLanguage = (uiLanguage && ['vi', 'en', 'ar', 'fr'].includes(uiLanguage)) ? uiLanguage : detectedLanguage;
+    const effectiveLanguage = (detectedLanguage && detectedLanguage !== 'unknown') ? detectedLanguage : ((uiLanguage && ['vi', 'en', 'ar', 'fr'].includes(uiLanguage)) ? uiLanguage : 'vi');
     
     // Create consultation session
     const { sessionId, session } = createConsultationSession(message, effectiveLanguage);
@@ -2011,7 +2012,7 @@ router.post('/consultation/direct', async (req, res) => {
     }
     
     const detectedLanguage = detectMessageLanguage(message);
-    const effectiveLanguage = (uiLanguage && ['vi', 'en', 'ar', 'fr'].includes(uiLanguage)) ? uiLanguage : detectedLanguage;
+    const effectiveLanguage = (detectedLanguage && detectedLanguage !== 'unknown') ? detectedLanguage : ((uiLanguage && ['vi', 'en', 'ar', 'fr'].includes(uiLanguage)) ? uiLanguage : 'vi');
     
     // Check for consultation trigger keywords
     const consultTriggers = [

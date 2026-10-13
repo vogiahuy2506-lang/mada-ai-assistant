@@ -2236,10 +2236,10 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
             }).catch((err) => console.warn('[ChatPage] Failed to save assistant message:', err?.message));
           }
 
-          // ⭐ Generate AI-powered follow-up questions
-          generateFollowUpWithAI(userMessage, fullContent, messages, language, viewMode)
+          // ⭐ Generate AI-powered follow-up questions (use responseLanguage)
+          generateFollowUpWithAI(userMessage, fullContent, messages, responseLanguage, viewMode)
             .then(followUps => setSuggestedFollowUps(followUps))
-            .catch(() => setSuggestedFollowUps(generateFollowUpQuestions(userMessage, fullContent, language)));
+            .catch(() => setSuggestedFollowUps(generateFollowUpQuestions(userMessage, fullContent, responseLanguage)));
 
           // ⭐ Post chat metric (stream mode)
           try {
@@ -2348,6 +2348,8 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
         apiSuccess = true;
         // Support both 'answer' and 'message' fields for compatibility
         const fullContent = data.data.answer || data.data.message || '';
+        // ⭐ Use response language for follow-up (match bot's language)
+        const responseLanguage = data.data.detectedLanguage || language;
         
         if (!fullContent) {
           throw new Error('Empty response from AI');
@@ -2372,7 +2374,7 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
 
         // ⭐ THÊM CÂU HỎI FOLLOW-UP KHI CHƯA ĐỦ CONTEXT (non-streaming mode)
         if (!isReadyForProductSuggestion && getMissingContext.length > 0) {
-          const followUpQuestion = getNextFollowUpQuestion(language);
+          const followUpQuestion = getNextFollowUpQuestion(responseLanguage);
           // Cập nhật message cuối cùng với follow-up question
           const updatedMessages = useChatStore.getState().messages;
           if (updatedMessages.length > 0) {
@@ -2398,10 +2400,10 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
           }).catch((err) => console.warn('[ChatPage] Failed to save assistant (non-stream):', err?.message));
         }
 
-        // ⭐ Generate AI-powered follow-up questions
-        generateFollowUpWithAI(userMessage, fullContent, messages, language, viewMode)
+        // ⭐ Generate AI-powered follow-up questions (use responseLanguage)
+        generateFollowUpWithAI(userMessage, fullContent, messages, responseLanguage, viewMode)
           .then(followUps => setSuggestedFollowUps(followUps))
-          .catch(() => setSuggestedFollowUps(generateFollowUpQuestions(userMessage, fullContent, language)));
+          .catch(() => setSuggestedFollowUps(generateFollowUpQuestions(userMessage, fullContent, responseLanguage)));
 
         // ⭐ Post chat metric (async, fire-and-forget) cho admin analytics
         try {

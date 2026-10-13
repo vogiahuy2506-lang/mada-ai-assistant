@@ -2230,6 +2230,7 @@ app.get('/api/health', (_req, res) => {
     ragEnabled: ragInitialized,
     geminiConfigured: !!process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'your_gemini_api_key_here',
     authEnabled: true,
+    mailConfigured: !!(process.env.MAIL_HOST && process.env.MAIL_USERNAME && process.env.MAIL_PASSWORD),
     endpoints: {
       auth: ['POST /api/auth/register', 'POST /api/auth/login', 'POST /api/auth/logout', 'GET /api/auth/me', 'POST /api/auth/refresh', 'PUT /api/auth/profile', 'PUT /api/auth/password'],
       users: ['GET /api/users', 'GET /api/users/:id', 'POST /api/users', 'PATCH /api/users/:id', 'DELETE /api/users/:id', 'GET /api/users/stats/overview'],
@@ -2253,6 +2254,48 @@ app.get('/api/health', (_req, res) => {
       ],
     },
   });
+});
+
+// Test email endpoint
+app.post('/api/test-email', async (req, res) => {
+  try {
+    const { to, subject, message } = req.body;
+
+    if (!process.env.MAIL_HOST || !process.env.MAIL_USERNAME || !process.env.MAIL_PASSWORD) {
+      return res.status(500).json({
+        success: false,
+        error: 'Email not configured. Check MAIL_HOST, MAIL_USERNAME, MAIL_PASSWORD in .env'
+      });
+    }
+
+    const nodemailer = await import('nodemailer');
+    const transporter = nodemailer.createTransport({
+      host: process.env.MAIL_HOST,
+      port: parseInt(process.env.MAIL_PORT || '465'),
+      secure: process.env.MAIL_SECURE === 'true',
+      requireTLS: process.env.MAIL_TLS === 'true',
+      auth: {
+        user: process.env.MAIL_USERNAME,
+        pass: process.env.MAIL_PASSWORD,
+      },
+    });
+
+    await transporter.sendMail({
+      from: process.env.MAIL_FROM || process.env.MAIL_USERNAME,
+      to: to || process.env.CONSULTATION_EMAIL || process.env.MAIL_USERNAME,
+      subject: subject || 'Test Email from MADA AI',
+      html: `<p>${message || 'This is a test email from MADA AI Assistant.'}</p>
+             <p>Timestamp: ${new Date().toISOString()}</p>`,
+    });
+
+    res.json({ success: true, message: 'Email sent successfully!' });
+  } catch (error: any) {
+    console.error('Test email error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to send email'
+    });
+  }
 });
 
 // ============== LANGUAGE DETECTION ==============

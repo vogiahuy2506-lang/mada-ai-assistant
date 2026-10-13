@@ -2161,6 +2161,7 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
         let sources: any[] = [];
         let confidence = 0.5;
         let suggestedProducts: any[] = [];
+        let responseLanguage = language; // Default to UI language, will be updated from server
 
         while (true) {
           const { done, value } = await reader.read();
@@ -2186,6 +2187,10 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
                 } else if (data.type === 'done') {
                   confidence = data.confidence || 0.5;
                   if (data.answer) fullContent = data.answer;
+                  // ⭐ Use response language for follow-up (match bot's language)
+                  if (data.detectedLanguage) {
+                    responseLanguage = data.detectedLanguage;
+                  }
                 } else if (data.type === 'error') {
                   throw new Error(data.error);
                 }
@@ -2202,9 +2207,10 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
         if (fullContent) {
           // ⭐ THÊM CÂU HỎI FOLLOW-UP KHI CHƯA ĐỦ CONTEXT
           // Bot sẽ hỏi thêm thông tin trước khi đề xuất sản phẩm
+          // ⭐ Use responseLanguage (detected from user message) instead of UI language
           let finalContent = fullContent;
           if (!isReadyForProductSuggestion && getMissingContext.length > 0) {
-            const followUpQuestion = getNextFollowUpQuestion(language);
+            const followUpQuestion = getNextFollowUpQuestion(responseLanguage);
             // Thêm câu hỏi follow-up vào cuối message
             finalContent = `${fullContent}\n\n*${followUpQuestion}*`;
           }

@@ -1268,7 +1268,7 @@ router.post('/stream', async (req: any, res: any) => {
     // Guardrails check
     const guardrailsResult = guardrails.analyzeQuery(message, effectiveLanguage);
     if (guardrailsResult.shouldRedirect) {
-      sendEvent({ type: 'done', answer: guardrailsResult.redirectResponse, sources: [] });
+      sendEvent({ type: 'done', answer: guardrailsResult.redirectResponse, sources: [], detectedLanguage: effectiveLanguage });
       return res.end();
     }
     
@@ -1307,6 +1307,7 @@ router.post('/stream', async (req: any, res: any) => {
         type: 'done',
         conversationId: productConvId,
         confidence: 0.9,
+        detectedLanguage: effectiveLanguage,
       });
       
       chatHistory.get(productConvId)!.push({ role: 'assistant', content: responseText });
@@ -1402,6 +1403,7 @@ router.post('/stream', async (req: any, res: any) => {
         type: 'done',
         conversationId: convId,
         confidence: streamResult.confidence || 0.5,
+        detectedLanguage: effectiveLanguage,
       });
       
       chatHistory.get(convId)!.push({ role: 'assistant', content: streamResult.answer || '' });
@@ -1526,6 +1528,7 @@ router.post('/stream', async (req: any, res: any) => {
           conversationId: convId,
           confidence: 0.3,
           isFallback: true,
+          detectedLanguage: effectiveLanguage,
         });
         
         chatHistory.get(convId)!.push({ role: 'assistant', content: fallbackAnswer });

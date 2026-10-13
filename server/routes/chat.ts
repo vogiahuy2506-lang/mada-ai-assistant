@@ -1859,7 +1859,9 @@ router.post('/products', async (req, res) => {
   try {
     const { message, language = 'vi', agentId } = req.body;
     
-    const effectiveLanguage = ['vi', 'en', 'ar', 'fr'].includes(language) ? language : 'vi';
+    // ⭐ Detect language from message for product recommendations
+    const detectedLanguage = detectMessageLanguage(message);
+    const effectiveLanguage = (detectedLanguage && detectedLanguage !== 'unknown') ? detectedLanguage : (['vi', 'en', 'ar', 'fr'].includes(language) ? language : 'vi');
     
     // ⭐ Handle MADA_PRODUCT_REQUEST
     const isProductRequest = message?.includes('[MADA_PRODUCT_REQUEST]');

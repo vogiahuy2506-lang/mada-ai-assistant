@@ -846,6 +846,43 @@ export function ChatPage() {
   const [_cancellingFiles, setCancellingFiles] = useState<Set<string>>(new Set());
   const [isGeneratingResponse, setIsGeneratingResponse] = useState(false);
 
+  // ⭐ Extended products state - store additional products per message ID
+  const [extendedProducts, setExtendedProducts] = useState<Record<string, any[]>>({});
+  const [loadingMoreProducts, setLoadingMoreProducts] = useState<Record<string, boolean>>({});
+
+  // ⭐ Fetch more products from /api/chat/products
+  const fetchMoreProducts = useCallback(async (messageId: string, userMessage: string) => {
+    if (loadingMoreProducts[messageId]) return;
+    
+    setLoadingMoreProducts(prev => ({ ...prev, [messageId]: true }));
+    
+    try {
+      const res = await fetch('/api/chat/products', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: userMessage,
+          language,
+        }),
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.data?.products?.length > 0) {
+          console.log(`📦 [fetchMoreProducts] Loaded ${data.data.products.length} more products for message ${messageId}`);
+          setExtendedProducts(prev => ({
+            ...prev,
+            [messageId]: data.data.products,
+          }));
+        }
+      }
+    } catch (err) {
+      console.warn('[ChatPage] Failed to fetch more products:', err);
+    } finally {
+      setLoadingMoreProducts(prev => ({ ...prev, [messageId]: false }));
+    }
+  }, [loadingMoreProducts, language]);
+
   // ⭐ File upload quota state (theo plan + tháng)
   const [fileQuota, setFileQuota] = useState<FileUploadQuota | null>(null);
   const fetchFileQuota = useCallback(async () => {
@@ -4513,7 +4550,117 @@ function MessageBubble({
                   </div>
                 );
               })}
+              
+              {/* ⭐ Render extended products (loaded from /api/chat/products) */}
+              {extendedProducts[message.id]?.map((product: SuggestedProduct, index: number) => {
+                const productTitle = language === 'en' && product.title_en ? product.title_en : product.title;
+                const productLink = product.product_url && /^https?:\/\//i.test(product.product_url) 
+                  ? product.product_url 
+                  : `/products/${product.id}`;
+                const isExternalLink = product.product_url && /^https?:\/\//i.test(product.product_url);
+                const brandDisplay = product.brand || 'MADA';
+                const madaAdvice = product.mada_advice || '';
+                
+                const categoryLower = (product.category || '').toLowerCase();
+                let gradientClass = 'from-blue-500 to-cyan-500';
+                if (categoryLower.includes('hearing') || categoryLower.includes('thính')) {
+                  gradientClass = 'from-cyan-500 to-blue-600';
+                } else if (categoryLower.includes('vision') || categoryLower.includes('thị')) {
+                  gradientClass = 'from-purple-500 to-pink-500';
+                } else if (categoryLower.includes('mobility') || categoryLower.includes('vận')) {
+                  gradientClass = 'from-emerald-500 to-teal-500';
+                } else if (categoryLower.includes('cognition') || categoryLower.includes('nhận')) {
+                  gradientClass = 'from-amber-500 to-orange-500';
+                }
+                
+                return (
+                  <div
+                    key={`extended-${product.id || index}`}
+                    className="group block bg-white rounded-xl border border-slate-200 overflow-hidden hover:border-secondary/40 hover:shadow-lg hover:shadow-secondary/10 transition-all duration-200 hover:-translate-y-0.5"
+                  >
+                    <div className={`relative h-32 bg-gradient-to-br ${gradientClass} overflow-hidden`}>
+                      <ProductImage imageUrl={product.image_url} alt={productTitle} />
+                      <div className="absolute top-2 left-2 px-2 py-0.5 bg-white/90 backdrop-blur-sm rounded-full">
+                        <span className="text-[10px] font-semibold text-slate-700">{brandDisplay}</span>
+                      </div>
+                    </div>
+                    <div className="p-3">
+                      <p className="text-[13px] font-semibold text-slate-800 line-clamp-2 group-hover:text-secondary transition-colors leading-tight">
+                        {productTitle}
+                      </p>
+                      {madaAdvice && (
+                        <p className="text-[11px] text-slate-500 line-clamp-1 mt-1">
+                          {madaAdvice.substring(0, 60)}{madaAdvice.length > 60 ? '...' : ''}
+                        </p>
+                      )}
+                      <div className="mt-3 flex flex-col gap-2">
+                        <a
+                          href={productLink}
+                          target={isExternalLink ? '_blank' : '_self'}
+                          rel={isExternalLink ? 'noopener noreferrer' : ''}
+                          className="flex items-center justify-center gap-2 px-3 py-2.5 bg-gradient-to-r from-[#006D77] to-[#0A9396] hover:from-[#005A63] hover:to-[#087E8B] text-white text-xs font-semibold rounded-lg shadow-sm hover:shadow-md transition-all duration-200 active:scale-[0.98]"
+                        >
+                          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <circle cx="9" cy="21" r="1" />
+                            <circle cx="20" cy="21" r="1" />
+                            <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+                          </svg>
+                          <span>{language === 'vi' ? 'Xem chi tiết & Mua sản phẩm' : language === 'en' ? 'View Details & Buy' : language === 'ar' ? 'عرض التفاصيل والشراء' : 'Voir détails et acheter'}</span>
+                        </a>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            onRequestConsultation();
+                          }}
+                          className="flex items-center justify-center gap-2 px-3 py-2 bg-white border-2 border-[#83C5BE]/50 hover:border-[#83C5BE] text-[#006D77] text-xs font-semibold rounded-lg transition-all duration-200 hover:bg-[#EDF6F9] active:scale-[0.98]"
+                        >
+                          <div className="w-5 h-5 rounded-full bg-gradient-to-br from-[#83C5BE] to-[#006D77] flex items-center justify-center">
+                            <svg className="w-3 h-3 text-white" viewBox="0 0 24 24" fill="currentColor">
+                              <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/>
+                            </svg>
+                          </div>
+                          <span>{language === 'vi' ? 'Liên hệ tư vấn viên chuyên khoa' : language === 'en' ? 'Contact Specialist Advisor' : language === 'ar' ? 'تواصل مع مستشار متخصص' : 'Contacter un conseiller'}</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
+            
+            {/* ⭐ Nút "Xem thêm sản phẩm" - Gọi /api/chat/products */}
+            {message.suggestedProducts.length > 0 && !extendedProducts[message.id] && (
+              <div className="mt-4 flex justify-start">
+                <button
+                  onClick={() => {
+                    // Find the user message that triggered this response
+                    const msgIndex = messages.findIndex(m => m.id === message.id);
+                    const userMsg = msgIndex > 0 ? messages[msgIndex - 1] : null;
+                    fetchMoreProducts(message.id, userMsg?.content || message.content);
+                  }}
+                  disabled={loadingMoreProducts[message.id]}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-[#006D77] to-[#0A9396] hover:from-[#005A63] hover:to-[#087E8B] text-white text-xs font-semibold rounded-full shadow-sm hover:shadow-md transition-all duration-200 active:scale-[0.98] disabled:opacity-60"
+                >
+                  {loadingMoreProducts[message.id] ? (
+                    <>
+                      <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                      {language === 'vi' ? 'Đang tải...' : language === 'en' ? 'Loading...' : 'جارٍ التحميل...'}
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M6 9l6 6 6-6"/>
+                      </svg>
+                      {language === 'vi' ? 'Xem thêm sản phẩm' : language === 'en' ? 'View More Products' : language === 'ar' ? 'عرض المزيد من المنتجات' : 'Voir plus de produits'}
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
             
             {/* ⭐ Nút Tư vấn chung - Ẩn vì mỗi card đã có nút riêng */}
             {/*

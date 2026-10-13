@@ -46,6 +46,30 @@ function useAppTranslations() {
   return { language, t };
 }
 
+// Languages that use right-to-left (RTL) script
+const RTL_LANGS = new Set(['ar']);
+// Map app language -> HTML lang attribute (BCP 47)
+const HTML_LANG_MAP: Record<'vi' | 'en' | 'ar' | 'fr', string> = {
+  vi: 'vi',
+  en: 'en',
+  ar: 'ar',
+  fr: 'fr',
+};
+
+/**
+ * Sync <html> element's `lang` and `dir` attributes whenever language changes.
+ * Critical for: SEO, accessibility (screen readers), browser auto-translate,
+ * and proper RTL layout for Arabic.
+ */
+function useHtmlLangSync() {
+  const language = useLanguageStore((s) => s.language ?? 'vi') as 'vi' | 'en' | 'ar' | 'fr';
+  useEffect(() => {
+    const html = document.documentElement;
+    html.lang = HTML_LANG_MAP[language] || language;
+    html.dir = RTL_LANGS.has(language) ? 'rtl' : 'ltr';
+  }, [language]);
+}
+
 // Loading fallback component
 function PageLoader({ t }: { t: (key: string) => string }) {
   return (
@@ -63,6 +87,9 @@ function App() {
   const refreshUser = useAuthStore((s) => s.refreshUser);
   const user = useAuthStore((s) => s.user);
   const { t } = useAppTranslations();
+
+  // Sync <html lang> and dir (LTR/RTL) with current language
+  useHtmlLangSync();
 
   // Refresh user data from server on mount to ensure role is correct
   useEffect(() => {

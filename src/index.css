@@ -371,3 +371,57 @@ html, body {
   max-width: 100%;
   box-sizing: border-box;
 }
+
+/* =============================================
+ * RTL (Right-to-Left) Support for Arabic
+ * =============================================
+ * When <html dir="rtl"> is set (see useHtmlLangSync in App.tsx),
+ * the entire page layout flips horizontally. We add a few helpers
+ * to fine-tune elements that should stay LTR (e.g. code blocks,
+ * product codes, English brand names) or be mirrored.
+ */
+
+/* Keep these elements LTR even when page is RTL */
+[dir='rtl'] .ltr-only,
+.ltr-only {
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+/* Force RTL inside an LTR section (e.g. Arabic text in English UI) */
+.rtl-only {
+  direction: rtl;
+  unicode-bidi: isolate;
+}
+
+/* Flip directional icons (chevrons, arrows) in RTL */
+[dir='rtl'] .flip-rtl {
+  transform: scaleX(-1);
+}
+
+/* Logical padding (uses padding-inline-start/end) - works in both LTR/RTL */
+.ps-1 { padding-inline-start: 0.25rem; }
+.ps-2 { padding-inline-start: 0.5rem; }
+.ps-3 { padding-inline-start: 0.75rem; }
+.ps-4 { padding-inline-start: 1rem; }
+.ps-6 { padding-inline-start: 1.5rem; }
+.pe-1 { padding-inline-end: 0.25rem; }
+.pe-2 { padding-inline-end: 0.5rem; }
+.pe-3 { padding-inline-end: 0.75rem; }
+.pe-4 { padding-inline-end: 1rem; }
+.pe-6 { padding-inline-end: 1.5rem; }
+
+.ms-1 { margin-inline-start: 0.25rem; }
+.ms-2 { margin-inline-start: 0.5rem; }
+.ms-3 { margin-inline-start: 0.75rem; }
+.ms-4 { margin-inline-start: 1rem; }
+.ms-auto { margin-inline-start: auto; }
+.me-1 { margin-inline-end: 0.25rem; }
+.me-2 { margin-inline-end: 0.5rem; }
+.me-3 { margin-inline-end: 0.75rem; }
+.me-4 { margin-inline-end: 1rem; }
+.me-auto { margin-inline-end: auto; }
+
+/* Text alignment helpers */
+.text-start { text-align: start; }
+.text-end { text-align: end; }

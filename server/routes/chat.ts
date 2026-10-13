@@ -230,6 +230,13 @@ function shouldShowProducts(message: string): boolean {
     'inspiration', 'victor reader', 'orcam', 'jaws', 'nvda', 'zoomtext',
     'braille', 'brailler', 'tactile', 'tời', 'caption', 'fm system', 'roger',
     'prosthetic', 'orthotic', 'orthopedic', 'crutch', 'cane', 'walker', 'stair',
+    // ⭐ EDUCATION KEYWORDS - học tập cho người khuyết tật
+    'học', 'học sinh', 'sinh viên', 'trường', 'bài tập', 'đọc sách',
+    'sách nói', 'audiobook', 'tài liệu', 'bài giảng', 'học online',
+    'student', 'learn', 'study', 'studying', 'school', 'textbook',
+    'classroom', 'education', 'dyslexia', 'reading', 'writing',
+    'người mù', 'người điếc', 'người khuyết tật', 'khiếm thị', 'khiếm thính',
+    'visually impaired', 'blind', 'deaf', 'hard of hearing', 'disabled',
     // English
     'device', 'product', 'buy', 'purchase', 'price', 'cost', 'where to buy',
     'recommend', 'suggest', 'wheelchair', 'hearing aid', 'screen reader',

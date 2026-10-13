@@ -1732,7 +1732,7 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
     for (const file of filesToProcess) {
       // Check file size (max 10MB)
       if (file.size > 10 * 1024 * 1024) {
-        alert(t('chat.fileTooLarge').replace('{{filename}}', file.name));
+        alert(t('chat.fileTooLarge'));
         continue;
       }
 
@@ -2808,7 +2808,7 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
               } else if (file.type === 'application/pdf') {
                 // PDF - gửi file lên server để parse
                 // Lưu file để gửi kèm request
-                fileData.content = t('chat.pdfFilePending').replace('{{name}}', file.name).replace('{{size}}', (file.size / 1024).toFixed(1));
+                fileData.content = t('chat.pdfFilePending');
                 fileData.originalFile = file; // Lưu file gốc để gửi lên server
               } else if (file.type.includes('word') || file.name.endsWith('.docx') || file.name.endsWith('.doc')) {
                 // DOCX - đọc bằng mammoth
@@ -2818,15 +2818,15 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
                 fileData.content = result.value.slice(0, 10000);
               } else if (file.type.includes('excel') || file.type.includes('spreadsheet') || file.name.endsWith('.xlsx') || file.name.endsWith('.xls') || file.name.endsWith('.csv')) {
                 // Excel/CSV - server sẽ parse bằng xlsx library
-                fileData.content = t('chat.pdfFilePending').replace('{{name}}', file.name).replace('{{size}}', (file.size / 1024).toFixed(1));
+                fileData.content = t('chat.pdfFilePending');
                 fileData.originalFile = file;
               } else if (file.type.startsWith('audio/') || /\.(mp3|wav|ogg|webm|aac|m4a|flac)$/i.test(file.name)) {
                 // Audio - server sẽ transcribe bằng Whisper API
-                fileData.content = t('chat.pdfFilePending').replace('{{name}}', file.name).replace('{{size}}', (file.size / 1024).toFixed(1));
+                fileData.content = t('chat.pdfFilePending');
                 fileData.originalFile = file;
               } else if (file.type.startsWith('video/') || /\.(mp4|webm|mov|avi|mkv)$/i.test(file.name)) {
                 // Video - server sẽ trích xuất audio + transcribe
-                fileData.content = t('chat.pdfFilePending').replace('{{name}}', file.name).replace('{{size}}', (file.size / 1024).toFixed(1));
+                fileData.content = t('chat.pdfFilePending');
                 fileData.originalFile = file;
               } else {
                 // Các loại file khác - thử đọc như text
@@ -2838,7 +2838,7 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
               }
             } catch (err) {
               console.error('Error reading file:', err);
-              fileData.content = t('chat.cannotReadFile').replace('{{name}}', file.name);
+              fileData.content = t('chat.cannotReadFile');
             }
             
             fileData.isLoading = false;
@@ -2906,7 +2906,7 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
       } else {
         addMessage({
           role: 'assistant',
-          content: t('chat.urlLoadError').replace('{{error}}', data.error || 'Unknown error'),
+          content: t('chat.urlLoadError'),
         });
       }
     } catch (error) {

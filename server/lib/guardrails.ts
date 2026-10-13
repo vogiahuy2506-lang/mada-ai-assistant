@@ -73,11 +73,19 @@ const WITHIN_SCOPE_KEYWORDS = [
   'chữ nổi', 'chữ Braille', 'khiếm thị', 'khiếm слух',
   'tự kỷ', 'chậm phát triển', 'cognitive', 'mobility',
   'blind', 'deaf', 'assistive', 'accessibility', 'a11y',
+  // ⭐ Education AT keywords - học tập cho người khuyết tật
+  'học sinh', 'sinh viên', 'học tập', 'giáo dục', 'trường học',
+  'student', 'learn', 'education', 'school', 'studying',
+  'người khuyết tật', 'người bị', 'người có', 'người mù', 'người điếc',
+  'atlas', 'tài liệu', 'sách nói', 'audiobook', 'đọc sách',
+  'accessibility', 'accessible', 'inclusive education', 'udl',
 
   // English
   'assistive technology', 'AT device', 'accessible', 'disability',
   'screen reader', 'JAWS', 'NVDA', 'OrCam', 'hearing aid',
-  ' AAC ', 'augmentative communication', 'prosthetic',
+  'aac', 'augmentative communication', 'prosthetic',
+  'visually impaired', 'low vision', 'hard of hearing',
+  'learning disability', 'dyslexia', 'adhd', 'autism',
 
   // Arabic
   'التكنولوجيا المساعدة', 'أجهزة مساعدة', 'إمكانية الوصول', 'إعاقة',
@@ -309,23 +317,67 @@ Je peux vous aider avec:
 3. 📋 Effectuer les examens nécessaires`,
 };
 
-const OUT_OF_SCOPE_RESPONSE_VI = `⚠️ **Câu hỏi nằm ngoài phạm vi tư vấn**
+const OUT_OF_SCOPE_RESPONSE_VI = `🤖 **Mình có thể giúp gì cho bạn?**
 
-Tôi là MADA AI Assistant chuyên về **Công nghệ Hỗ trợ**. Câu hỏi của bạn không thuộc lĩnh vực tôi có thể hỗ trợ.
+Câu hỏi của bạn có thể hơi khác so với các chủ đề chuyên sâu của MADA, nhưng mình vẫn có thể gợi ý một số hướng:
 
-Vui lòng hỏi về:
-- Thiết bị AT cho người khuyết tật
-- Tiêu chuẩn accessibility
-- Giải pháp công nghệ hỗ trợ`;
+**Các chủ đề MADA có thể hỗ trợ:**
+- 🖥️ Thiết bị AT cho người khuyết tật (thị giác, thính giác, vận động...)
+- 📚 Tiêu chuẩn accessibility (WCAG, ISO 9999)
+- 🔧 Giới thiệu sản phẩm công nghệ hỗ trợ
 
-const OUT_OF_SCOPE_RESPONSE_EN = `⚠️ **Out of Scope**
+**Bạn có thể thử hỏi cụ thể hơn:**
+- "Có thiết bị nào cho người khiếm thị đọc sách không?"
+- "Máy trợ thính giá bao nhiêu?"
+- "Xe lăn điện có những loại nào?"
 
-I'm MADA AI Assistant, specialized in **Assistive Technology**. Your question is outside my area of expertise.
+Mình sẵn sàng tư vấn về **thiết bị công nghệ hỗ trợ** bất cứ lúc nào! 😊`;
 
-Please ask about:
-- AT devices for people with disabilities
-- Accessibility standards
-- Assistive technology solutions`;
+const OUT_OF_SCOPE_RESPONSE_EN = `🤖 **How Can I Help You?**
+
+Your question might be slightly different from MADA's core topics, but I can still suggest some directions:
+
+**MADA topics I can support:**
+- 🖥️ AT devices for people with disabilities (vision, hearing, mobility...)
+- 📚 Accessibility standards (WCAG, ISO 9999)
+- 🔧 Assistive technology product recommendations
+
+**Try asking more specifically:**
+- "What devices help visually impaired people read books?"
+- "How much do hearing aids cost?"
+- "What types of wheelchairs are available?"
+
+I'm ready to consult on **assistive technology** anytime! 😊`;
+
+const OUT_OF_SCOPE_RESPONSE_AR = `🤖 **كيف يمكنني مساعدتك؟**
+
+سؤالك قد يختلف قليلاً عن الموضوعات الأساسية لمادا، لكن لا يزال بإمكاني تقديم بعض الاقتراحات:
+
+**مواضيع مادا التي يمكنني دعمها:**
+- 🖥️ أجهزة TA للأشخاص ذوي الإعاقة
+- 📚 معايير إمكانية الوصول (WCAG، ISO 9999)
+- 🔧 توصيات منتجات التكنولوجيا المساعدة
+
+**جرب السؤال بشكل أكثر تحديدًا:**
+- "ما الأجهزة التي تساعد ضعاف البصر على القراءة؟"
+- "كم تكلفة سماعات الأذن؟"
+
+أنا مستعد للاستشارة في **التكنولوجيا المساعدة** في أي وقت! 😊`;
+
+const OUT_OF_SCOPE_RESPONSE_FR = `🤖 **Comment puis-je vous aider?**
+
+Votre question peut être légèrement différente des sujets principaux de MADA, mais je peux toujours vous suggérer quelques directions:
+
+**Sujets MADA que je peux soutenir:**
+- 🖥️ Appareils TA pour personnes handicapées
+- 📚 Normes d'accessibilité (WCAG, ISO 9999)
+- 🔧 Recommandations de produits de technologie d'assistance
+
+**Essayez de poser des questions plus spécifiques:**
+- "Quels appareils aident les malvoyants à lire?"
+- "Combien coûtent les appareils auditifs?"
+
+Je suis prêt à consulter sur la **technologie d'assistance** à tout moment! 😊`;
 
 const HARMFUL_CONTENT_RESPONSE_VI = `⚠️ **Nội dung không phù hợp**
 
@@ -481,17 +533,24 @@ export class GuardrailsSystem {
     }
 
     // Step 3: Check out of scope
-    const outOfScope = this.checkOutOfScope(query);
-    if (outOfScope) {
-      console.warn(`⚠️ Guardrails: Out of scope (${outOfScope.type})`);
-      return {
-        isSafe: false,
-        shouldRedirect: true,
-        redirectResponse: language === 'vi' ? OUT_OF_SCOPE_RESPONSE_VI : OUT_OF_SCOPE_RESPONSE_EN,
-        detectedPattern: `out_of_scope_${outOfScope.type}`,
-        suggestedTopic: 'assistive_technology',
-      };
-    }
+  const outOfScope = this.checkOutOfScope(query);
+  if (outOfScope) {
+    console.warn(`⚠️ Guardrails: Out of scope (${outOfScope.type})`);
+    // Use full localized response
+    const outOfScopeResponses: Record<string, string> = {
+      vi: OUT_OF_SCOPE_RESPONSE_VI,
+      en: OUT_OF_SCOPE_RESPONSE_EN,
+      ar: OUT_OF_SCOPE_RESPONSE_AR,
+      fr: OUT_OF_SCOPE_RESPONSE_FR,
+    };
+    return {
+      isSafe: false,
+      shouldRedirect: true,
+      redirectResponse: outOfScopeResponses[language] || OUT_OF_SCOPE_RESPONSE_EN,
+      detectedPattern: `out_of_scope_${outOfScope.type}`,
+      suggestedTopic: 'assistive_technology',
+    };
+  }
 
     // Step 4: Check for PII (warn but allow)
     const piiDetected = this.detectPII(query);

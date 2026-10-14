@@ -2192,6 +2192,90 @@ router.get('/ai-instructions/public', (_req: Request, res: Response) => {
   }
 });
 
+// ============== AI PROMPT OPTIMIZE ==============
+// POST /api/admin/ai/optimize — tối ưu prompt bằng Gemini AI
+router.post('/ai/optimize', requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { prompt, language = 'vi' } = req.body;
+
+    if (!prompt || typeof prompt !== 'string' || prompt.trim().length === 0) {
+      return res.status(400).json({ success: false, error: 'Prompt is required' });
+    }
+
+    const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_GEMINI_API_KEY;
+    if (!apiKey || apiKey === 'your_gemini_api_key_here') {
+      return res.status(503).json({
+        success: false,
+        error: 'Gemini API key not configured. Please set GEMINI_API_KEY in environment.',
+      });
+    }
+
+    const langLabels: Record<string, string> = {
+      vi: 'Tiếng Việt',
+      en: 'English',
+      ar: 'العربية',
+      fr: 'Français',
+    };
+    const langLabel = langLabels[language] || 'Tiếng Việt';
+
+    const optimizePrompt = `Bạn là một chuyên gia về tối ưu prompt cho chatbot AI y tế và hỗ trợ tiếp cận.
+
+Nhiệm vụ: Tối ưu prompt sau để:
+1. Rõ ràng, cụ thể hơn
+2. Có cấu trúc tốt (system prompt chuẩn)
+3. Thêm context phù hợp nếu thiếu
+4. Đảm bảo an toàn và tuân thủ medical guidelines
+
+Prompt cần tối ưu:
+---
+${prompt.trim()}
+---
+
+Yêu cầu:
+- Trả về **chỉ** prompt đã tối ưu (không giải thích, không markdown code block, không preamble)
+- Giữ nguyên ngôn ngữ gốc của prompt (${langLabel})
+- Độ dài hợp lý, không quá dài không cần thiết
+- Nếu prompt đã tốt, trả về prompt gốc với cải tiến nhỏ
+`;
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: optimizePrompt }] }],
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 2048,
+          },
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const errText = await response.text().catch(() => '');
+      console.error('Gemini API error:', response.status, errText);
+      return res.status(502).json({
+        success: false,
+        error: `AI service error: ${response.status}`,
+      });
+    }
+
+    const data = await response.json();
+    const optimized = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || prompt;
+
+    res.json({
+      success: true,
+      optimized,
+      original: prompt,
+    });
+  } catch (error: any) {
+    console.error('[POST /ai/optimize] Error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // ⭐ ============== EMOTION SETTINGS (Super Admin only) ==============
 // GET /api/admin/emotion-settings — lấy emotion settings
 router.get('/emotion-settings', requireAdmin, (_req: Request, res: Response) => {

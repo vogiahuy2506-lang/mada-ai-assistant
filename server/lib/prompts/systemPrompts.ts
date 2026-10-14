@@ -140,6 +140,7 @@ export const RESPONSE_FORMAT = {
    - Với mỗi thiết bị: Tên → Giá (nếu có) → Đối tượng → Ưu điểm
    - Dùng danh sách gạch đầu dòng (-) hoặc đánh số (1., 2., 3.)
    - ⭐ **QUAN TRỌNG: Khi giới thiệu sản phẩm, LUÔN đính kèm LINK gốc của sản phẩm (VD: https://at.mada.org.qa/technology/ten-san-pham/)**
+   - ⭐ **Khi có thể, trích xuất image_url từ knowledge base để hiển thị hình ảnh sản phẩm**
 
 3. **Kết thúc** (1-2 câu):
    - Gợi ý bước tiếp theo

@@ -35,23 +35,25 @@ function toProxyImageUrl(madaUrl: string): string {
     return '';
   }
 
-  // Proxy tất cả MADA domains
-  if (madaUrl.includes('mada.org.qa') || madaUrl.includes('cdn.at.mada.org.qa')) {
+  // Proxy chỉ các domain cần thiết (cdn.at.mada.org.qa, cdn.mada.org.qa)
+  // KHÔNG proxy at.mada.org.qa vì browser có thể load trực tiếp
+  // (server proxy không hoạt động do sandbox restriction)
+  if (madaUrl.includes('cdn.at.mada.org.qa') || madaUrl.includes('cdn.mada.org.qa')) {
     return `/api/mada-image?url=${encodeURIComponent(madaUrl)}`;
   }
 
-  // Proxy các shop VN phổ biến
+  // at.mada.org.qa: load trực tiếp (browser có thể access)
+  if (madaUrl.includes('at.mada.org.qa') || madaUrl.includes('mada.org.qa')) {
+    return madaUrl;
+  }
+
+  // Shop VN và các domain khác: load trực tiếp
   const shopDomains = ['tgdd.vn', 'cellphones.com.vn', 'fptshop.com.vn', 'dienmayxanh.com', 'hstatic.net', 'viettelstore.vn'];
   if (shopDomains.some(d => madaUrl.includes(d))) {
-    return madaUrl; // Load trực tiếp không cần proxy
+    return madaUrl;
   }
 
-  // Proxy Wikimedia (Wikipedia images)
-  if (madaUrl.includes('upload.wikimedia.org')) {
-    return madaUrl; // Load trực tiếp
-  }
-
-  // Unknown domain → cố load trực tiếp (browser sẽ fail nếu có hotlink protection)
+  // Wikimedia và các domain khác → load trực tiếp
   return madaUrl;
 }
 

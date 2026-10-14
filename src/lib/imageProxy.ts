@@ -16,15 +16,20 @@
  *   - Tự detect URL rác (demo, broken, dead domain)
  */
 
+// PROXY_REQUIRED_HOSTS: Chỉ proxy các domain mà browser không thể access trực tiếp
+// Lưu ý: at.mada.org.qa được remove khỏi đây vì browser có thể load trực tiếp
+// (server proxy không hoạt động do sandbox restriction)
 const PROXY_REQUIRED_HOSTS = [
-  'at.mada.org.qa',
   'mada.org.qa',
   'cdn.at.mada.org.qa',
   'cdn.mada.org.qa',
 ];
 
+// ALLOWED_HOSTS: Browser có thể load trực tiếp (CORS allowed)
 const ALLOWED_HOSTS = [
   ...PROXY_REQUIRED_HOSTS,
+  // MADA domains - browser có thể load trực tiếp
+  'at.mada.org.qa',
   // Google Cloud Storage
   'storage.googleapis.com',
   'storage.cloud.google.com',

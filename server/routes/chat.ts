@@ -719,6 +719,18 @@ async function getSuggestedProducts(ragSources: any[], message: string, effectiv
     return false;
   };
   
+  // Helper: Check if text contains AT (Assistive Technology) keywords
+  const hasValidATKeywords = (text: string): boolean => {
+    const lower = text.toLowerCase();
+    const atKeywords = [
+      'wheelchair', 'xe lăn', 'máy trợ', 'hearing', 'vision', 'braille', 'aac',
+      'speech', 'communication', 'mobility', 'cognitive', 'assistive', 'disability',
+      'prosthetic', 'orthotic', 'hearing aid', 'screen reader', 'magnifier',
+      'người khuyết tật', 'công nghệ hỗ trợ', 'thiết bị hỗ trợ',
+    ];
+    return atKeywords.some(kw => lower.includes(kw));
+  };
+  
   // Helper: Get full product data from kb_products table
   const getProductFromDb = (productUrl: string): any => {
     if (!productUrl) return null;
@@ -927,18 +939,36 @@ async function getSuggestedProducts(ragSources: any[], message: string, effectiv
       };
     });
     
-    // ⭐ Filter out invalid products (bots, invalid URLs, no images, garbage titles)
+    // ⭐ Filter out invalid products (bots, invalid URLs, no images, garbage titles, non-AT products)
     suggestedProducts = suggestedProducts.filter((p: any) => {
       const botCheck = isBotEntry(p.title);
       const urlCheck = isValidProductUrl(p.product_url);
       // Filter out garbage titles (repeated chars like "kkkk", "aaaa", etc.)
       const titleLower = (p.title || '').toLowerCase();
       const garbageTitle = /^(.)\1{3,}$/.test(titleLower); // 4+ same chars repeated
-      if (garbageTitle) console.log(`📦 [Filter GARBAGE] "${p.title}"`);
-      console.log(`📦 [Filter] "${p.title}" | bot=${botCheck} | url_valid=${urlCheck} | url=${p.product_url}`);
+      // ⭐ Filter out non-AT products (category = 'general' without valid AT-related content)
+      const isNonATCategory = (p.category || '').toLowerCase() === 'general';
+      // ⭐ Filter out products from non-AT websites (e-commerce, cosmetics, etc.)
+      const nonATDomains = ['hasaki.vn', 'thegioididong.com', 'cellphones.com.vn', 'fptshop.com.vn', 
+                           'dienmayxanh.com', 'tiki.vn', 'lazada.vn', 'shopee.vn', 'youtube.com', 
+                           'facebook.com', 'tiktok.com', 'instagram.com'];
+      const productUrl = (p.product_url || p.source_url || '').toLowerCase();
+      const isFromNonATSite = nonATDomains.some(domain => productUrl.includes(domain));
+      // ⭐ Filter out products with generic titles
+      const genericTitles = ['sản phẩm về da', 'sản phẩm công nghệ', 'thế giới di động', 'cổng thông tin'];
+      const isGenericTitle = genericTitles.some(t => titleLower.includes(t));
+      
+      if (garbageTitle) console.log(`📦 [Filter GARBAGE TITLE] "${p.title}"`);
+      if (isNonATCategory) console.log(`📦 [Filter NON-AT CATEGORY] "${p.title}" - category: ${p.category}`);
+      if (isFromNonATSite) console.log(`📦 [Filter NON-AT SITE] "${p.title}" - url: ${p.product_url}`);
+      if (isGenericTitle) console.log(`📦 [Filter GENERIC TITLE] "${p.title}"`);
+      
       if (botCheck) return false;
       if (!urlCheck) return false;
       if (garbageTitle) return false;
+      if (isNonATCategory && !hasValidATKeywords(titleLower)) return false;
+      if (isFromNonATSite) return false;
+      if (isGenericTitle) return false;
       return true;
     });
     
@@ -1113,7 +1143,24 @@ async function getSuggestedProducts(ragSources: any[], message: string, effectiv
           if (!categoryMatch) console.log(`📦 [Fallback Filter OUT] "${p.title}" - category mismatch: ${productCategory} vs ${agentCategory}`);
         }
         
-        return hasImage && url.startsWith('http') && categoryMatch;
+        // ⭐ Filter out non-AT products in fallback
+        const productUrl = (p.product_url || '').toLowerCase();
+        const nonATDomains = ['hasaki.vn', 'thegioididong.com', 'cellphones.com.vn', 'fptshop.com.vn', 
+                             'dienmayxanh.com', 'tiki.vn', 'lazada.vn', 'shopee.vn', 'youtube.com', 
+                             'facebook.com', 'tiktok.com', 'instagram.com', 'amazon.com', 'lazada.', 'shopee.'];
+        const isFromNonATSite = nonATDomains.some(domain => productUrl.includes(domain));
+        const titleLower = (p.title || '').toLowerCase();
+        const isGeneralCategory = (p.category || '').toLowerCase() === 'general';
+        const genericTitles = ['sản phẩm về da', 'sản phẩm công nghệ', 'thế giới di động', 'cổng thông tin'];
+        const isGenericTitle = genericTitles.some(t => titleLower.includes(t));
+        const isGarbageTitle = /^(.)\1{3,}$/.test(titleLower);
+        
+        if (isFromNonATSite) console.log(`📦 [Fallback Filter OUT] "${p.title}" - non-AT site`);
+        if (isGeneralCategory) console.log(`📦 [Fallback Filter OUT] "${p.title}" - general category`);
+        if (isGenericTitle) console.log(`📦 [Fallback Filter OUT] "${p.title}" - generic title`);
+        if (isGarbageTitle) console.log(`📦 [Fallback Filter OUT] "${p.title}" - garbage title`);
+        
+        return hasImage && url.startsWith('http') && categoryMatch && !isFromNonATSite && !isGeneralCategory && !isGenericTitle && !isGarbageTitle;
       });
       
       console.log(`📦 [getSuggestedProducts] Returning ${suggestedProducts.length} products from kb_products`);

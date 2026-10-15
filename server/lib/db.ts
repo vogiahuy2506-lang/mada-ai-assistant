@@ -451,6 +451,7 @@ db.exec(`
     email TEXT NOT NULL,
     phone TEXT,
     message TEXT NOT NULL,
+    attachments TEXT,
     status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'reviewed', 'contacted')),
     notes TEXT,
     assigned_to TEXT,
@@ -461,7 +462,22 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_consultations_status ON consultations(status);
   CREATE INDEX IF NOT EXISTS idx_consultations_email ON consultations(email);
   CREATE INDEX IF NOT EXISTS idx_consultations_created ON consultations(created_at);
+  
+  -- Migration: add attachments column if not exists
+  PRAGMA table_info(consultations);
 `);
+
+// Add attachments column if not exists (migration)
+try {
+  const columns = db.prepare("PRAGMA table_info(consultations)").all() as any[];
+  const hasAttachments = columns.some((col: any) => col.name === 'attachments');
+  if (!hasAttachments) {
+    db.exec('ALTER TABLE consultations ADD COLUMN attachments TEXT');
+    console.log('✅ Migration: Added attachments column to consultations');
+  }
+} catch (e) {
+  console.log('⚠️ Migration check for attachments column:', e);
+}
 
 // ============== ADMIN AGENTS SCHEMA ==============
 

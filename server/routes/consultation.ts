@@ -1,8 +1,44 @@
 import { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
 import db from '../lib/db';
 
 const router = Router();
+
+// ============== MULTER CONFIG FOR CONSULTATION UPLOADS ==============
+const CONSULTATION_UPLOAD_DIR = path.join(process.cwd(), 'data', 'uploads', 'consultations');
+fs.mkdirSync(CONSULTATION_UPLOAD_DIR, { recursive: true });
+
+const consultationStorage = multer.diskStorage({
+  destination: (_req: any, _file: any, cb: any) => cb(null, CONSULTATION_UPLOAD_DIR),
+  filename: (_req: any, file: any, cb: any) => {
+    const ext = path.extname(file.originalname);
+    const safeName = `${Date.now()}_${uuidv4().slice(0, 8)}${ext}`;
+    cb(null, safeName);
+  },
+});
+
+const consultationUpload = multer({
+  storage: consultationStorage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB per file
+  fileFilter: (_req: any, file: any, cb: any) => {
+    // Allow common file types
+    const allowedTypes = [
+      'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'text/plain',
+    ];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('File type not supported'), false);
+    }
+  },
+});
 
 // Middleware: require admin authentication
 function requireAdmin(req: any, res: any, next: any) {
@@ -73,9 +109,41 @@ router.get('/:id', requireAdmin, (req, res) => {
 });
 
 // POST /api/consultation - Submit new consultation (public)
-router.post('/', async (req, res) => {
+router.post('/', consultationUpload.array('attachments', 5), async (req: any, res: any) => {
   try {
-    const { name, email, phone, message } = req.body;
+    // Handle both multipart and JSON
+    let { name, email, phone, message } = req.body;
+    let attachments: any[] = [];
+    
+    // If multipart (file upload), parse JSON fields from body
+    if (req.is('multipart/form-data')) {
+      // Fields come as strings from multipart
+      // Files come in req.files
+      if (req.files && req.files.length > 0) {
+        attachments = req.files.map((file: any) => ({
+          id: uuidv4(),
+          filename: file.originalname,
+          filepath: file.path,
+          mimetype: file.mimetype,
+          size: file.size,
+          url: `/api/consultation/file/${file.filename}`,
+        }));
+      }
+      // If attachments info sent as JSON string in body
+      if (req.body.attachments) {
+        try {
+          const existingAttachments = JSON.parse(req.body.attachments);
+          attachments = [...attachments, ...existingAttachments];
+        } catch (e) {
+          // ignore parse error
+        }
+      }
+    } else {
+      // JSON body - attachments might be base64 or URLs
+      if (req.body.attachments) {
+        attachments = Array.isArray(req.body.attachments) ? req.body.attachments : [req.body.attachments];
+      }
+    }
     
     if (!name || !email || !message) {
       return res.status(400).json({ 
@@ -87,10 +155,13 @@ router.post('/', async (req, res) => {
     const now = new Date().toISOString();
     const id = `consult-${uuidv4()}`;
     
+    // Store attachments as JSON in database
+    const attachmentsJson = attachments.length > 0 ? JSON.stringify(attachments) : null;
+    
     db.prepare(`
-      INSERT INTO consultations (id, name, email, phone, message, status, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, 'pending', ?, ?)
-    `).run(id, name, email, phone || '', message, now, now);
+      INSERT INTO consultations (id, name, email, phone, message, attachments, status, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?)
+    `).run(id, name, email, phone || '', message, attachmentsJson, now, now);
     
     // Log the submission
     db.prepare(`
@@ -98,8 +169,8 @@ router.post('/', async (req, res) => {
       VALUES (?, 'info', 'consultation', ?, ?, ?)
     `).run(
       uuidv4(),
-      `New consultation request from ${email}`,
-      JSON.stringify({ name, email, hasPhone: !!phone }),
+      `New consultation request from ${email}${attachments.length > 0 ? ` with ${attachments.length} attachment(s)` : ''}`,
+      JSON.stringify({ name, email, hasPhone: !!phone, attachmentsCount: attachments.length }),
       now
     );
 
@@ -117,6 +188,19 @@ router.post('/', async (req, res) => {
     console.log('📧 [EMAIL DEBUG] MAIL_HOST:', process.env.MAIL_HOST);
     console.log('📧 [EMAIL DEBUG] MAIL_USERNAME:', process.env.MAIL_USERNAME);
     console.log('📧 [EMAIL DEBUG] MAIL_PASSWORD set:', !!process.env.MAIL_PASSWORD);
+    console.log('📧 [EMAIL DEBUG] Attachments:', attachments.length);
+    
+    // Build email attachments array for nodemailer
+    const emailAttachments: any[] = [];
+    for (const att of attachments) {
+      if (att.filepath && fs.existsSync(att.filepath)) {
+        emailAttachments.push({
+          filename: att.filename,
+          path: att.filepath,
+          contentType: att.mimetype,
+        });
+      }
+    }
     
     // Send email notification if SMTP is configured
     if (process.env.MAIL_HOST && process.env.MAIL_USERNAME) {
@@ -146,11 +230,23 @@ router.post('/', async (req, res) => {
           minute: '2-digit',
           timeZoneName: 'short',
         });
+        
+        // Build attachments list for email
+        const attachmentsListHtml = attachments.length > 0
+          ? `<div style="background: #f8f9ff; padding: 16px 20px; border-radius: 10px; margin-bottom: 24px; border: 1px solid #e8edff;">
+              <p style="margin: 0 0 12px; color: #333; font-size: 14px; font-weight: 600;">📎 Attachments (${attachments.length} file${attachments.length > 1 ? 's' : ''})</p>
+              ${attachments.map(att => `<p style="margin: 4px 0; font-size: 13px; color: #555;">• ${att.filename} (${(att.size / 1024).toFixed(1)} KB)</p>`).join('')}
+            </div>`
+          : '';
+        
+        const attachmentsListText = attachments.length > 0
+          ? `\nAttachments (${attachments.length} file${attachments.length > 1 ? 's' : ''}):\n${attachments.map(att => `  • ${att.filename} (${(att.size / 1024).toFixed(1)} KB)`).join('\n')}`
+          : '';
 
         await transporter.sendMail({
           from: process.env.MAIL_FROM || 'MADA AI <noreply@mada.vn>',
           to: adminEmail,
-          subject: `[MADA] New Consultation Request from ${name}`,
+          subject: `[MADA] New Consultation Request from ${name}${attachments.length > 0 ? ` [${attachments.length} attachment(s)]` : ''}`,
           html: `
 <!DOCTYPE html>
 <html>
@@ -178,7 +274,7 @@ router.post('/', async (req, res) => {
     <!-- Greeting -->
     <p style="margin: 0 0 20px; font-size: 15px; color: #444; line-height: 1.6;">
       Dear MADA AI Support Team,<br>
-      A <strong>new consultation request</strong> has been submitted. Please review the details below and respond promptly.
+      A <strong>new consultation request</strong> has been submitted${attachments.length > 0 ? ` with <strong>${attachments.length} attachment(s)</strong>` : ''}. Please review the details below and respond promptly.
     </p>
     
     <!-- Contact Information -->
@@ -204,6 +300,9 @@ router.post('/', async (req, res) => {
         <td style="padding: 10px 0; color: #555; font-size: 14px;">${formattedDate}</td>
       </tr>
     </table>
+    
+    <!-- Attachments -->
+    ${attachmentsListHtml}
     
     <!-- Request Details -->
     <h2 style="font-size: 15px; color: #333; margin: 0 0 14px; padding-bottom: 10px; border-bottom: 2px solid #0047ff; font-weight: 700;">💬 Request Details</h2>
@@ -255,6 +354,7 @@ Contact Information:
   Email:    ${email}
   Phone:    ${phone || 'Not provided'}
   Submitted: ${formattedDate}
+${attachmentsListText}
 
 Request Details:
 ${message}
@@ -262,9 +362,10 @@ ${message}
 View Chat History: ${viewLink}
 View & Respond: ${viewLink}
           `,
+          attachments: emailAttachments,
         });
         
-        console.log(`✅ Email notification sent to ${adminEmail} for consultation ${id}`);
+        console.log(`✅ Email notification sent to ${adminEmail} for consultation ${id} with ${emailAttachments.length} attachment(s)`);
       } catch (emailError) {
         console.error('⚠️ Failed to send email notification:', emailError);
         // Don't fail the request if email fails
@@ -274,7 +375,14 @@ View & Respond: ${viewLink}
     }
     // ========== END EMAIL NOTIFICATION ==========
     
-    res.status(201).json({ success: true, data: { id, message: 'Consultation request submitted successfully' } });
+    res.status(201).json({ 
+      success: true, 
+      data: { 
+        id, 
+        message: 'Consultation request submitted successfully',
+        attachments: attachments.map((a: any) => ({ id: a.id, filename: a.filename, url: a.url, size: a.size })),
+      } 
+    });
   } catch (error: any) {
     console.error('Error creating consultation:', error);
     res.status(500).json({ success: false, error: error.message });
@@ -365,6 +473,28 @@ router.get('/stats/summary', requireAdmin, (_req, res) => {
     
     res.json({ success: true, data: stats });
   } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// GET /api/consultation/file/:filename - Download uploaded file
+router.get('/file/:filename', (req, res) => {
+  try {
+    const { filename } = req.params;
+    const filepath = path.join(CONSULTATION_UPLOAD_DIR, filename);
+    
+    // Security: ensure file is within upload directory
+    if (!filepath.startsWith(CONSULTATION_UPLOAD_DIR)) {
+      return res.status(403).json({ success: false, error: 'Access denied' });
+    }
+    
+    if (!fs.existsSync(filepath)) {
+      return res.status(404).json({ success: false, error: 'File not found' });
+    }
+    
+    res.download(filepath);
+  } catch (error: any) {
+    console.error('Error downloading file:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });

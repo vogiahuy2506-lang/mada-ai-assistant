@@ -422,6 +422,9 @@ function shouldShowProducts(message: string): boolean {
     'what products', 'what devices', 'which products', 'which devices',
     'có sản phẩm nào', 'có thiết bị nào', 'có gì', 'available products',
     'danh sách sản phẩm', 'danh sách thiết bị', 'list of products', 'list of devices',
+    // ⭐ THÊM: Đại từ chỉ định khi user yêu cầu hiển thị sản phẩm đã đề cập
+    'cho xem', 'hiển thị', 'đưa ra', 'liệt kê', 'giới thiệu',
+    'cho tôi xem', 'cho mình xem', 'show me', 'display', 'list them',
   ];
   
   if (explicitCommands.some(cmd => contentLower.includes(cmd))) {
@@ -436,11 +439,16 @@ function shouldShowProducts(message: string): boolean {
     'gợi ý', 'đề xuất', 'recommend', 'suggest', 'suggestion',
     'wheelchair', 'máy trợ', 'xe lăn', 'chân giả', 'tay giả', 'kính', 'nạng',
     'xe', 'ghế', 'giường', 'nệm', 'gậy', 'máy', 'thiết bị',
+    // ⭐ ĐẠI TỪ CHỈ ĐỊNH - quan trọng để bắt "chúng", "nó", "đó", "mấy cái"
+    // Khi user refer đến sản phẩm đã được nhắc đến trong conversation
+    'chúng', 'nó', 'đó', 'mấy', 'cái', 'những', 'các', 'một số', 'tất cả',
+    'cái đó', 'đồ này', 'thứ này', 'món này', 'sản phẩm đó', 'thiết bị đó',
+    'those', 'them', 'these', 'it', 'this one', 'that one',
     // ⭐ HÌNH ẢNH - THÊM ĐỂ BẮT "xem hình", "hình ảnh sp"
     'hình ảnh', 'hình', 'ảnh', 'coi hình', 'xem hình', 'pic', 'image', 'photo',
     'link', 'url', 'web', 'website', 'xem thêm',
     'tư vấn', 'chi tiết hơn', 'kĩ hơn', 'cụ thể hơn', 'more details', 'detailed',
-    'sp', 'sản phẩm', 'mẫu mã', 'kiểu dáng',
+    'sp', 'mẫu mã', 'kiểu dáng',
     // ⭐ THÊM các từ khóa về thiết bị cụ thể của MADA
     'inspiration', 'victor reader', 'orcam', 'jaws', 'nvda', 'zoomtext',
     'braille', 'brailler', 'tactile', 'tời', 'caption', 'fm system', 'roger',
@@ -945,199 +953,167 @@ async function getSuggestedProducts(ragSources: any[], message: string, effectiv
   // ⭐ FIX: CHỈ gợi ý sản phẩm từ RAG sources - KHÔNG fallback random
   // Strategy 2 và 3 đã bị disable vì nó gợi ý sản phẩm không liên quan
   
-  // ⭐ FIX: Filter - Giữ sản phẩm hợp lệ
-  // - Phải có image_url hợp lệ
-  // - URL phải là http(s)
-  // - Không phải bot entry
-  // - Không phải garbage title
-  // - Category khớp nếu có agentCategory VÀ sản phẩm không có image từ kb_products
-  suggestedProducts = suggestedProducts.filter((p: any) => {
-    // Phải có image_url hợp lệ (bao gồm placeholder images)
-    const hasImage = !!(p.image_url && p.image_url.startsWith('http'));
-    
-    // URL phải là http(s)
-    const url = p.product_url || '';
-    const isValidUrl = url.startsWith('http://') || url.startsWith('https://');
-    
-    // Không phải bot entry
-    const isBot = isBotEntry(p.title);
-    
-    // Có title hợp lệ (không phải test/garbage)
-    const titleLower = (p.title || '').toLowerCase();
-    const isGarbageTitle = /^(.)\1{3,}$/.test(titleLower) || /^(test|test123|abcd|qwerty)/i.test(titleLower);
-    
-    // ⭐ Category matching - LUÔN filter theo category nếu shouldFilterByCategory = true
-    // bot-regulatory (Thông tin bổ trợ) KHÔNG bị filter theo category - được xem TẤT CẢ sản phẩm
-    let categoryMatch = true;
-    if (shouldFilterByCategory && agentCategory) {
-      const productCategory = (p.category || '').toLowerCase();
-      const catLower = agentCategory.toLowerCase();
-      // Kiểm tra category khớp với agent
-      categoryMatch = 
-        productCategory.includes(catLower) || 
-        (agentCategory === 'sensory-hearing' && productCategory.includes('hearing')) ||
-        (agentCategory === 'sensory-vision' && productCategory.includes('vision')) ||
-        (agentCategory === 'voice-and-speech' && (
-          productCategory.includes('voice') || 
-          productCategory.includes('speech') || 
-          productCategory.includes('communication') ||
-          productCategory.includes('aac')
-        )) ||
-        (agentCategory === 'mobility-and-transportation' && (
-          productCategory.includes('mobility') || 
-          productCategory.includes('physical')
-        )) ||
-        (agentCategory === 'mental-cognitive' && (
-          productCategory.includes('cognitive') || 
-          productCategory.includes('mental')
-        )) ||
-        (agentCategory === 'neuromusculoskeletal-movement' && (
-          productCategory.includes('neuro') || 
-          productCategory.includes('musculoskeletal')
-        ));
-      if (!categoryMatch) console.log(`📦 [Filter OUT] "${p.title}" - category mismatch: ${productCategory} vs ${agentCategory}`);
-    }
-    
-    if (!hasImage) console.log(`📦 [Filter OUT] "${p.title}" - no valid image`);
-    if (!isValidUrl) console.log(`📦 [Filter OUT] "${p.title}" - invalid URL: ${url.slice(0, 50)}`);
-    if (isBot) console.log(`📦 [Filter OUT] "${p.title}" - is bot entry`);
-    if (isGarbageTitle) console.log(`📦 [Filter OUT] "${p.title}" - garbage title`);
-    
-    return hasImage && isValidUrl && !isBot && !isGarbageTitle && categoryMatch;
-  });
+  // ⭐ CRITICAL FIX: Đối với regulatory bot (Thông tin bổ trợ), LUÔN lấy TẤT CẢ sản phẩm từ database
+  // vì RAG sources chỉ chứa sản phẩm từ 1 category duy nhất
+  // Đối với các bot thường: fallback như bình thường
+  const hasEnoughProducts = suggestedProducts.length >= 3;
+  const needsAllProducts = isRegulatoryBot;
   
-  // ⭐ FIX: Fallback to kb_products khi không có sản phẩm từ RAG
-  // bot-regulatory (Thông tin bổ trợ) KHÔNG filter theo category - được xem TẤT CẢ sản phẩm
-  if (suggestedProducts.length === 0) {
-    console.log(`📦 [getSuggestedProducts] No valid products from RAG, checking kb_products directly...`);
+  if (needsAllProducts || suggestedProducts.length < 3) {
+    console.log(`📦 [getSuggestedProducts] ${isRegulatoryBot ? 'Regulatory bot - fetching ALL products' : 'Not enough products from RAG - fetching from database'}...`);
     
     // Fetch directly from kb_products by category (or all if regulatory bot)
     try {
       let dbQuery: string;
       let dbParams: any[];
       
-      if (shouldFilterByCategory && agentCategory) {
+      if (isRegulatoryBot) {
+        // ⭐ Regulatory bot: LẤY TẤT CẢ sản phẩm từ TẤT CẢ categories
+        dbQuery = `
+          SELECT * FROM kb_products 
+          WHERE status IN ('draft', 'published', 'archived')
+          AND image_url IS NOT NULL AND image_url != ''
+          ORDER BY category ASC, featured DESC, created_at DESC
+          LIMIT 24
+        `;
+        dbParams = [];
+        console.log(`📦 [getSuggestedProducts] Regulatory bot - fetching ALL products (up to 24)`);
+      } else if (shouldFilterByCategory && agentCategory) {
         // Các bot THƯỜNG: Chỉ lấy sản phẩm thuộc category của mình
         dbQuery = `
           SELECT * FROM kb_products 
           WHERE category = ? AND status IN ('draft', 'published', 'archived')
           AND image_url IS NOT NULL AND image_url != ''
           ORDER BY featured DESC, created_at DESC
-          LIMIT 6
+          LIMIT 12
         `;
         dbParams = [agentCategory];
       } else {
-        // bot-regulatory (Thông tin bổ trợ) HOẶC không có category → lấy TẤT CẢ sản phẩm
+        // Không có category → lấy tất cả
         dbQuery = `
           SELECT * FROM kb_products 
           WHERE status IN ('draft', 'published', 'archived')
           AND image_url IS NOT NULL AND image_url != ''
           ORDER BY featured DESC, created_at DESC
-          LIMIT 6
+          LIMIT 12
         `;
         dbParams = [];
-        console.log(`📦 [getSuggestedProducts] Regulatory bot or no category - fetching ALL products`);
       }
       
       const dbProducts = db.prepare(dbQuery).all(...dbParams) as any[];
       
-      console.log(`📦 [getSuggestedProducts] Found ${dbProducts.length} products from kb_products`);
-      
-      suggestedProducts = dbProducts.map((p: any) => {
-        // Determine category color for gradient
-        const categoryLower = (p.category || '').toLowerCase();
+      // Map dbProducts to product format
+      const mappedDbProducts: any[] = dbProducts.map((row: any) => {
+        const categoryLower = (row.category || '').toLowerCase();
         let categoryColor = 'from-blue-500 to-cyan-500';
-        if (categoryLower.includes('hearing')) {
+        if (categoryLower.includes('hearing') || categoryLower.includes('thính')) {
           categoryColor = 'from-cyan-500 to-blue-600';
-        } else if (categoryLower.includes('vision')) {
+        } else if (categoryLower.includes('vision') || categoryLower.includes('thị')) {
           categoryColor = 'from-purple-500 to-pink-500';
-        } else if (categoryLower.includes('mobility')) {
+        } else if (categoryLower.includes('mobility') || categoryLower.includes('vận')) {
           categoryColor = 'from-emerald-500 to-teal-500';
-        } else if (categoryLower.includes('cognitive') || categoryLower.includes('mental')) {
+        } else if (categoryLower.includes('cognitive') || categoryLower.includes('nhận')) {
           categoryColor = 'from-amber-500 to-orange-500';
         }
-        
         return {
-          id: p.id,
-          title: p.title,
-          title_en: p.title_en || p.title,
-          description: p.description || '',
-          category: p.category,
-          brand: p.brand || 'MADA Qatar AT Portal',
-          price_range: p.price_range || 'Liên hệ MADA Center',
-          product_url: p.product_url || p.source_url || '',
-          source_url: p.source_url || p.product_url || '',
-          image_url: toProxyImageUrl(p.image_url || ''),
-          confidence: 0.95, // High confidence for direct DB lookup
-          match_reason: getMatchReason(effectiveLanguage, 'found'),
-          mada_advice: '',
-          warranty: '',
-          features: [],
+          id: row.id || row.product_id,
+          title: row.title,
+          title_en: row.title_en || row.title,
+          description: row.description || '',
+          category: row.category || 'general',
+          brand: row.brand || 'MADA Qatar AT Portal',
+          price_range: row.price_range || 'Liên hệ MADA Center',
+          product_url: row.product_url || row.source_url || '',
+          source_url: row.source_url || '',
+          image_url: toProxyImageUrl(row.image_url || ''),
+          confidence: 0.85,
+          match_reason: getMatchReason(effectiveLanguage, 'category', row.category || ''),
+          mada_advice: row.mada_advice || '',
+          warranty: row.warranty || '',
+          features: (() => {
+            try {
+              if (Array.isArray(row.features)) return row.features;
+              if (typeof row.features === 'string') return JSON.parse(row.features);
+              return [];
+            } catch { return []; }
+          })(),
           categoryColor,
         };
-      }).filter((p: any) => {
-        // Filter: must have valid URL and image (including placeholders)
-        const url = p.product_url || '';
+      });
+      
+      // Filter mapped products
+      const filteredDbProducts = mappedDbProducts.filter((p: any) => {
+        // Phải có image_url hợp lệ
         const hasImage = !!(p.image_url && p.image_url.startsWith('http'));
+        // URL phải là http(s)
+        const url = p.product_url || '';
+        const isValidUrl = url.startsWith('http://') || url.startsWith('https://');
+        // Không phải bot entry
+        const isBot = isBotEntry(p.title);
+        // Title không phải garbage
+        const titleLower = (p.title || '').toLowerCase();
+        const isGarbageTitle = /^(.)\1{3,}$/.test(titleLower) || /^(test|test123|abcd|qwerty)/i.test(titleLower);
         
-        // ⭐ ALSO filter by category in fallback (same as RAG filter)
+        // ⭐ Category matching - MỖI BOT chỉ thấy sản phẩm thuộc category của mình
+        // bot-regulatory (Thông tin bổ trợ) KHÔNG bị filter - được xem TẤT CẢ sản phẩm
         let categoryMatch = true;
         if (shouldFilterByCategory && agentCategory) {
           const productCategory = (p.category || '').toLowerCase();
           const catLower = agentCategory.toLowerCase();
-          categoryMatch = 
-            productCategory.includes(catLower) || 
+          categoryMatch =
+            productCategory.includes(catLower) ||
             (agentCategory === 'sensory-hearing' && productCategory.includes('hearing')) ||
             (agentCategory === 'sensory-vision' && productCategory.includes('vision')) ||
             (agentCategory === 'voice-and-speech' && (
-              productCategory.includes('voice') || 
-              productCategory.includes('speech') || 
+              productCategory.includes('voice') ||
+              productCategory.includes('speech') ||
               productCategory.includes('communication') ||
               productCategory.includes('aac')
             )) ||
             (agentCategory === 'mobility-and-transportation' && (
-              productCategory.includes('mobility') || 
+              productCategory.includes('mobility') ||
               productCategory.includes('physical')
             )) ||
             (agentCategory === 'mental-cognitive' && (
-              productCategory.includes('cognitive') || 
+              productCategory.includes('cognitive') ||
               productCategory.includes('mental')
             )) ||
             (agentCategory === 'neuromusculoskeletal-movement' && (
-              productCategory.includes('neuro') || 
+              productCategory.includes('neuro') ||
               productCategory.includes('musculoskeletal')
             ));
-          if (!categoryMatch) console.log(`📦 [Fallback Filter OUT] "${p.title}" - category mismatch: ${productCategory} vs ${agentCategory}`);
+          if (!categoryMatch) console.log(`📦 [Filter OUT DB] "${p.title}" - category mismatch: ${productCategory} vs ${agentCategory}`);
         }
         
-        // ⭐ Filter out non-AT products in fallback
-        const productUrl = (p.product_url || '').toLowerCase();
-        const nonATDomains = ['hasaki.vn', 'thegioididong.com', 'cellphones.com.vn', 'fptshop.com.vn', 
-                             'dienmayxanh.com', 'tiki.vn', 'lazada.vn', 'shopee.vn', 'youtube.com', 
-                             'facebook.com', 'tiktok.com', 'instagram.com', 'amazon.com', 'lazada.', 'shopee.'];
-        const isFromNonATSite = nonATDomains.some(domain => productUrl.includes(domain));
-        const titleLower = (p.title || '').toLowerCase();
-        const isGeneralCategory = (p.category || '').toLowerCase() === 'general';
-        const genericTitles = ['sản phẩm về da', 'sản phẩm công nghệ', 'thế giới di động', 'cổng thông tin'];
-        const isGenericTitle = genericTitles.some(t => titleLower.includes(t));
-        const isGarbageTitle = /^(.)\1{3,}$/.test(titleLower);
+        if (!hasImage) console.log(`📦 [Filter OUT DB] "${p.title}" - no valid image`);
+        if (!isValidUrl) console.log(`📦 [Filter OUT DB] "${p.title}" - invalid URL: ${url.slice(0, 50)}`);
+        if (isBot) console.log(`📦 [Filter OUT DB] "${p.title}" - is bot entry`);
+        if (isGarbageTitle) console.log(`📦 [Filter OUT DB] "${p.title}" - garbage title`);
         
-        if (isFromNonATSite) console.log(`📦 [Fallback Filter OUT] "${p.title}" - non-AT site`);
-        if (isGeneralCategory) console.log(`📦 [Fallback Filter OUT] "${p.title}" - general category`);
-        if (isGenericTitle) console.log(`📦 [Fallback Filter OUT] "${p.title}" - generic title`);
-        if (isGarbageTitle) console.log(`📦 [Fallback Filter OUT] "${p.title}" - garbage title`);
-        
-        return hasImage && url.startsWith('http') && categoryMatch && !isFromNonATSite && !isGeneralCategory && !isGenericTitle && !isGarbageTitle;
+        return hasImage && isValidUrl && !isBot && !isGarbageTitle && categoryMatch;
       });
       
-      console.log(`📦 [getSuggestedProducts] Returning ${suggestedProducts.length} products from kb_products`);
-    } catch (dbErr) {
-      console.error(`❌ [getSuggestedProducts] kb_products error:`, dbErr);
+      console.log(`📦 [getSuggestedProducts] DB fetched: ${dbProducts.length}, after filter: ${filteredDbProducts.length}`);
+      
+      // ⭐ THÊM filteredDbProducts vào suggestedProducts (tránh trùng lặp)
+      for (const p of filteredDbProducts) {
+        const exists = suggestedProducts.some(
+          (sp: any) => sp.product_url === p.product_url || sp.source_url === p.source_url || sp.title === p.title
+        );
+        if (!exists) {
+          suggestedProducts.push(p);
+        }
+      }
+      
+    } catch (err) {
+      console.warn('⚠️ [getSuggestedProducts] DB fetch error:', err);
     }
   }
   
   console.log(`📦 [getSuggestedProducts] FINAL: ${suggestedProducts.length} products`);
-  return suggestedProducts.slice(0, 6); // Giới hạn 6 sản phẩm
+  // ⭐ Regulatory bot: trả về nhiều hơn (12), các bot thường: 6
+  const MAX_PRODUCTS = isRegulatoryBot ? 12 : 6;
+  return suggestedProducts.slice(0, MAX_PRODUCTS);
 }
 
 router.post('/', async (req, res) => {

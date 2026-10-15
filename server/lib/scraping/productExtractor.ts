@@ -124,7 +124,7 @@ class ProductExtractorService {
     if (apiKey && apiKey !== 'your_gemini_api_key_here') {
       this.genAI = new GoogleGenerativeAI(apiKey);
       this.model = this.genAI.getGenerativeModel({
-        model: 'gemini-3.5-flash',
+        model: 'gemini-2.5-flash',
         generationConfig: {
           temperature: 0.1,
           maxOutputTokens: 8192,

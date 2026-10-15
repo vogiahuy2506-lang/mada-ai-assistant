@@ -425,7 +425,7 @@ class RAGEngine {
       }
 
       const model = this.genAI.getGenerativeModel({
-        model: 'gemini-3.5-flash', // ⚡ Stable & Fast
+        model: 'gemini-2.5-flash', // ✅ Stable & Fast
         generationConfig: {
           temperature: 0.3, // Low temp = focused, faster
           maxOutputTokens: config.maxOutputTokens || 2048, // ⚡ Reduced for faster response
@@ -697,7 +697,7 @@ class RAGEngine {
     }
 
     const model = this.genAI.getGenerativeModel({
-      model: 'gemini-3.5-flash',
+      model: 'gemini-2.5-flash',
       generationConfig: {
         temperature: 0.3,
         maxOutputTokens: config.maxOutputTokens || 8192,

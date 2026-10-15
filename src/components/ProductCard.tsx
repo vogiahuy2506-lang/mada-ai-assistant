@@ -55,6 +55,9 @@ export function ProductCard({
   };
   const hasValidUrl = isValidUrl(product.product_url) || isValidUrl(product.source_url);
 
+  // ⭐ Track image error state at TOP LEVEL (not inside IIFE) - React Hooks Rules compliance
+  const [imageError, setImageError] = useState(false);
+
   // Đảm bảo contrast ratio ≥ 4.5:1 (WCAG 1.4.3)
   const getScoreColor = (score: number) => {
     if (score >= 85) return 'bg-gradient-to-br from-emerald-500 to-green-600';
@@ -119,8 +122,6 @@ export function ProductCard({
             <div className="w-36 h-36 lg:w-full lg:h-48 rounded-2xl overflow-hidden bg-white flex-shrink-0 border border-slate-100 shadow-sm relative group-hover:shadow-md transition-shadow">
               {(() => {
                 const safeUrl = getImageUrl(product.image_url);
-                // ⭐ Fix: Track image error state properly
-                const [imageError, setImageError] = useState(false);
                 if (!safeUrl || imageError) {
                   return (
                     <div
@@ -145,12 +146,13 @@ export function ProductCard({
                     referrerPolicy="no-referrer"
                     crossOrigin="anonymous"
                     onError={() => {
-                      console.warn(`[ProductCard] Failed to load image: ${product.image_url}`);
+                      console.warn(`[ProductCard] Failed to load image: ${safeUrl}`);
                       setImageError(true);
                     }}
                   />
                 );
               })()}
+            </div>
 
             {/* Match Score Badge */}
             {matchScore !== undefined && (

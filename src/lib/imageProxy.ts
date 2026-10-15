@@ -72,11 +72,76 @@ const ALLOWED_HOSTS = [
   'cloudfront.net',
   'stackpathdns.com',
   'cdn.jsdelivr.net',
+  // Unsplash (high-quality stock photos for AT products)
+  'images.unsplash.com',
+  'unsplash.com',
+  'plus.unsplash.com',
   // Other common CDNs
   'res.cloudinary.com',
   'cloudinary.com',
   'imgix.net',
   'images.unsplash.com',
+  
+  // ⭐ Assistive Technology (AT) Manufacturers & Distributors
+  // AbleNet
+  'ablenet.com',
+  'able-net.com',
+  'able2shop.com',
+  // Apple Accessibility
+  'apple.com',
+  'store.apple.com',
+  // Microsoft Accessibility  
+  'microsoft.com',
+  'microsoftstore.com',
+  // Eye tracking / AAC
+  'tobii.com',
+  'tobiidynavox.com',
+  'liberator.net.au',
+  // Wheelchairs & Mobility
+  'permobil.com',
+  'sunrisemedical.com',
+  'quickie-wheelchairs.com',
+  'invacare.com',
+  'pride医保.com',
+  'drive-devilbiss.com',
+  // Prosthetics & Orthotics
+  'ottobock.com',
+  'ossur.com',
+  'bebionic.com',
+  // Hearing
+  'phonak.com',
+  'resound.com',
+  'widex.com',
+  'signia.net',
+  'starkey.com',
+  // Vision
+  'orcam.com',
+  'enhancedvision.com',
+  'freedomScientific.com',
+  'optelec.com',
+  // Communication AAC
+  'prentrom.com',
+  ' Attribution.com',
+  'saltillo.com',
+  // Computer access
+  'mousehunter.com',
+  'keytail.com',
+  // Software
+  'texthelp.com',
+  'donjohnston.com',
+  'cricksoft.com',
+  // General AT distributors
+  'AssistiveWare.com',
+  ' Enablingdevices.com',
+  ' Adaptivation.com',
+  // Amazon (common for AT products)
+  'amazon.com',
+  'amazon.co.uk',
+  'amazonaws.com',
+  // Other CDNs commonly used
+  'cdn.loom.com',
+  'cdn.shopify.com',
+  'media.giphy.com',
 ];
 
 /**

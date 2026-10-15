@@ -4299,6 +4299,145 @@ Hãy trở thành người bạn đồng hành đáng tin cậy nhất của ng�
   );
 }
 
+// ============== PRODUCT CARD ITEM COMPONENT ==============
+// Fixed: Move useState out of map to avoid React hooks violation
+interface ProductCardItemProps {
+  product: SuggestedProduct;
+  language: string;
+  onRequestConsultation: () => void;
+}
+
+function ProductCardItem({ product, language, onRequestConsultation }: ProductCardItemProps) {
+  const [imageError, setImageError] = useState(false);
+  
+  // ⭐ Lấy image URL đã xử lý (có thể bị reject → trả về empty)
+  const processedImageUrl = getImageUrl(product.image_url);
+  
+  // Thông tin sản phẩm
+  const productTitle = language === 'en' && product.title_en ? product.title_en : product.title;
+  const productLink = product.product_url && /^https?:\/\//i.test(product.product_url)
+    ? product.product_url
+    : `/products/${product.id}`;
+  const isExternalLink = product.product_url && /^https?:\/\//i.test(product.product_url);
+  const brandDisplay = product.brand || 'MADA';
+  const madaAdvice = product.mada_advice || '';
+
+  // Xác định màu gradient dựa trên category
+  const categoryLower = (product.category || '').toLowerCase();
+  let gradientClass = 'from-blue-500 to-cyan-500';
+  if (categoryLower.includes('hearing') || categoryLower.includes('thính')) {
+    gradientClass = 'from-cyan-500 to-blue-600';
+  } else if (categoryLower.includes('vision') || categoryLower.includes('thị')) {
+    gradientClass = 'from-purple-500 to-pink-500';
+  } else if (categoryLower.includes('mobility') || categoryLower.includes('vận')) {
+    gradientClass = 'from-emerald-500 to-teal-500';
+  } else if (categoryLower.includes('cognition') || categoryLower.includes('nhận')) {
+    gradientClass = 'from-amber-500 to-orange-500';
+  }
+
+  return (
+    <div className="group block bg-white rounded-xl border border-slate-200 overflow-hidden hover:border-secondary/40 hover:shadow-lg hover:shadow-secondary/10 transition-all duration-200 hover:-translate-y-0.5">
+      {/* Hình ảnh sản phẩm - LỚN VÀ NỔI BẬT */}
+      <div className={`relative h-32 bg-gradient-to-br ${gradientClass} overflow-hidden`}>
+        {/* ⭐ Fix: Check processedImageUrl thay vì product.image_url */}
+        {processedImageUrl && !imageError ? (
+          <img
+            src={processedImageUrl}
+            alt={productTitle}
+            className="w-full h-full object-cover object-center"
+            loading="lazy"
+            referrerPolicy="no-referrer"
+            onError={() => {
+              console.warn(`[ProductImage] Failed to load: ${product.image_url} -> ${processedImageUrl}`);
+              setImageError(true);
+            }}
+          />
+        ) : (
+          <div className="w-full h-full flex flex-col items-center justify-center gap-2 bg-gradient-to-br from-slate-400 to-slate-600">
+            <Accessibility className="w-14 h-14 text-white/90" strokeWidth={1.5} />
+            <span className="text-[10px] text-white/70 font-medium">AT Product</span>
+          </div>
+        )}
+
+        {/* Badge brand */}
+        <div className="absolute top-2 left-2 px-2 py-0.5 bg-white/90 backdrop-blur-sm rounded-full">
+          <span className="text-[10px] font-semibold text-slate-700">{brandDisplay}</span>
+        </div>
+      </div>
+
+      {/* Info */}
+      <div className="p-3">
+        {/* Tên sản phẩm */}
+        <p className="text-[13px] font-semibold text-slate-800 line-clamp-2 group-hover:text-secondary transition-colors leading-tight">
+          {productTitle}
+        </p>
+
+        {/* Mô tả ngắn */}
+        {madaAdvice && (
+          <p className="text-[11px] text-slate-500 line-clamp-1 mt-1">
+            {madaAdvice.substring(0, 60)}{madaAdvice.length > 60 ? '...' : ''}
+          </p>
+        )}
+
+        {/* 2 Buttons như thiết kế */}
+        <div className="mt-3 flex flex-col gap-2">
+          {/* Nút chính: Xem chi tiết & Mua sản phẩm */}
+          <a
+            href={productLink}
+            target={isExternalLink ? '_blank' : '_self'}
+            rel={isExternalLink ? 'noopener noreferrer' : ''}
+            className="flex items-center justify-center gap-2 px-3 py-2.5 bg-gradient-to-r from-[#006D77] to-[#0A9396] hover:from-[#005A63] hover:to-[#087E8B] text-white text-xs font-semibold rounded-lg shadow-sm hover:shadow-md transition-all duration-200 active:scale-[0.98]"
+          >
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="9" cy="21" r="1" />
+              <circle cx="20" cy="21" r="1" />
+              <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+            </svg>
+            <span>{language === 'vi' ? 'Xem chi tiết & Mua sản phẩm' : language === 'en' ? 'View Details & Buy' : language === 'ar' ? 'عرض التفاصيل والشراء' : 'Voir détails et acheter'}</span>
+          </a>
+
+          {/* Nút phụ: Liên hệ tư vấn viên */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              onRequestConsultation();
+            }}
+            className="flex items-center justify-center gap-2 px-3 py-2 bg-white border-2 border-[#83C5BE]/50 hover:border-[#83C5BE] text-[#006D77] text-xs font-semibold rounded-lg transition-all duration-200 hover:bg-[#EDF6F9] active:scale-[0.98]"
+          >
+            <div className="w-5 h-5 rounded-full bg-gradient-to-br from-[#83C5BE] to-[#006D77] flex items-center justify-center">
+              <svg className="w-3 h-3 text-white" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/>
+              </svg>
+            </div>
+            <span>{language === 'vi' ? 'Liên hệ tư vấn viên chuyên khoa' : language === 'en' ? 'Contact Specialist Advisor' : language === 'ar' ? 'تواصل مع مستشار متخصص' : 'Contacter un conseiller'}</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============== PRODUCT CARDS GRID ==============
+function ProductCardsGrid({ products, language, onRequestConsultation }: {
+  products: SuggestedProduct[];
+  language: string;
+  onRequestConsultation: () => void;
+}) {
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+      {products.slice(0, 3).map((product, index) => (
+        <ProductCardItem
+          key={product.id || index}
+          product={product}
+          language={language}
+          onRequestConsultation={onRequestConsultation}
+        />
+      ))}
+    </div>
+  );
+}
+
 // Message Bubble Component - SIMPLIFIED UI với Smart Product Suggestions & Feedback
 function MessageBubble({
   message,
@@ -4604,10 +4743,10 @@ function MessageBubble({
         {/* ⭐ LUÔN hiển thị khi có sản phẩm - không chờ đủ context */}
         {message.suggestedProducts && message.suggestedProducts.length > 0 && (
           <div className="mt-4" dir="ltr" role="region" aria-label="Sản phẩm được giới thiệu">
-            
+
             {/* ⭐ Text giới thiệu TỰ NHIÊN - Như lời chatbot nói */}
             <p className="text-[13px] text-on-surface-variant leading-relaxed mb-3">
-              {language === 'vi' 
+              {language === 'vi'
                 ? `Với các biểu hiện trên của bạn thì tôi khuyên bạn nên tham khảo các sản phẩm dưới đây nhé:`
                 : language === 'en'
                 ? `Based on your description, I recommend checking out these products:`
@@ -4616,154 +4755,31 @@ function MessageBubble({
                 : `Selon votre description, je vous recommande de consulter ces produits:`}
             </p>
 
-            {/* ⭐ Product Cards Grid - HIỂN THỊ CARD LỚN VỚI HÌNH ẢNH ĐẸP */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {message.suggestedProducts.slice(0, 3).map((product: SuggestedProduct, index: number) => {
-                // Thông tin sản phẩm
-                const productTitle = language === 'en' && product.title_en ? product.title_en : product.title;
-                const productLink = product.product_url && /^https?:\/\//i.test(product.product_url) 
-                  ? product.product_url 
-                  : `/products/${product.id}`;
-                const isExternalLink = product.product_url && /^https?:\/\//i.test(product.product_url);
-                const brandDisplay = product.brand || 'MADA';
-                const madaAdvice = product.mada_advice || '';
-                
-                // Xác định màu gradient dựa trên category
-                const categoryLower = (product.category || '').toLowerCase();
-                let gradientClass = 'from-blue-500 to-cyan-500';
-                if (categoryLower.includes('hearing') || categoryLower.includes('thính')) {
-                  gradientClass = 'from-cyan-500 to-blue-600';
-                } else if (categoryLower.includes('vision') || categoryLower.includes('thị')) {
-                  gradientClass = 'from-purple-500 to-pink-500';
-                } else if (categoryLower.includes('mobility') || categoryLower.includes('vận')) {
-                  gradientClass = 'from-emerald-500 to-teal-500';
-                } else if (categoryLower.includes('cognition') || categoryLower.includes('nhận')) {
-                  gradientClass = 'from-amber-500 to-orange-500';
-                }
-                
-                // ⭐ Fix: Track image load error state per product
-                const [imageError, setImageError] = useState(false);
-                
-                return (
-                  <div
-                    key={product.id || index}
-                    className="group block bg-white rounded-xl border border-slate-200 overflow-hidden hover:border-secondary/40 hover:shadow-lg hover:shadow-secondary/10 transition-all duration-200 hover:-translate-y-0.5"
-                  >
-                    {/* Hình ảnh sản phẩm - LỚN VÀ NỔI BẬT */}
-                    <div className={`relative h-32 bg-gradient-to-br ${gradientClass} overflow-hidden`}>
-                      {/* ⭐ Fix: Hiển thị fallback KHI image_url trống HOẶC KHI load lỗi */}
-                      {product.image_url && !imageError ? (
-                        <img 
-                          src={getImageUrl(product.image_url)} 
-                          alt={productTitle}
-                          className="w-full h-full object-cover object-center"
-                          loading="lazy"
-                          referrerPolicy="no-referrer"
-                          onError={() => {
-                            console.warn(`[ProductImage] Failed to load: ${product.image_url}`);
-                            setImageError(true);
-                          }}
-                        />
-                      ) : (
-                        /* ⭐ Enhanced fallback: Gradient background + centered icon */
-                        <div className="w-full h-full flex flex-col items-center justify-center gap-2 bg-gradient-to-br from-slate-400 to-slate-600">
-                          <Accessibility className="w-14 h-14 text-white/90" strokeWidth={1.5} />
-                          <span className="text-[10px] text-white/70 font-medium">AT Product</span>
-                        </div>
-                      )}
-                      
-                      {/* Badge brand */}
-                      <div className="absolute top-2 left-2 px-2 py-0.5 bg-white/90 backdrop-blur-sm rounded-full">
-                        <span className="text-[10px] font-semibold text-slate-700">{brandDisplay}</span>
-                      </div>
-                    </div>
-                    
-                    {/* Info */}
-                    <div className="p-3">
-                      {/* Tên sản phẩm */}
-                      <p className="text-[13px] font-semibold text-slate-800 line-clamp-2 group-hover:text-secondary transition-colors leading-tight">
-                        {productTitle}
-                      </p>
-                      
-                      {/* Mô tả ngắn */}
-                      {madaAdvice && (
-                        <p className="text-[11px] text-slate-500 line-clamp-1 mt-1">
-                          {madaAdvice.substring(0, 60)}{madaAdvice.length > 60 ? '...' : ''}
-                        </p>
-                      )}
-                      
-                      {/* ⭐ 2 Buttons như thiết kế */}
-                      <div className="mt-3 flex flex-col gap-2">
-                        {/* Nút chính: Xem chi tiết & Mua sản phẩm */}
-                        <a
-                          href={productLink}
-                          target={isExternalLink ? '_blank' : '_self'}
-                          rel={isExternalLink ? 'noopener noreferrer' : ''}
-                          className="flex items-center justify-center gap-2 px-3 py-2.5 bg-gradient-to-r from-[#006D77] to-[#0A9396] hover:from-[#005A63] hover:to-[#087E8B] text-white text-xs font-semibold rounded-lg shadow-sm hover:shadow-md transition-all duration-200 active:scale-[0.98]"
-                        >
-                          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <circle cx="9" cy="21" r="1" />
-                            <circle cx="20" cy="21" r="1" />
-                            <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
-                          </svg>
-                          <span>{language === 'vi' ? 'Xem chi tiết & Mua sản phẩm' : language === 'en' ? 'View Details & Buy' : language === 'ar' ? 'عرض التفاصيل والشراء' : 'Voir détails et acheter'}</span>
-                        </a>
-                        
-                        {/* Nút phụ: Liên hệ tư vấn viên */}
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            onRequestConsultation();
-                          }}
-                          className="flex items-center justify-center gap-2 px-3 py-2 bg-white border-2 border-[#83C5BE]/50 hover:border-[#83C5BE] text-[#006D77] text-xs font-semibold rounded-lg transition-all duration-200 hover:bg-[#EDF6F9] active:scale-[0.98]"
-                        >
-                          <div className="w-5 h-5 rounded-full bg-gradient-to-br from-[#83C5BE] to-[#006D77] flex items-center justify-center">
-                            <svg className="w-3 h-3 text-white" viewBox="0 0 24 24" fill="currentColor">
-                              <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/>
-                            </svg>
-                          </div>
-                          <span>{language === 'vi' ? 'Liên hệ tư vấn viên chuyên khoa' : language === 'en' ? 'Contact Specialist Advisor' : language === 'ar' ? 'تواصل مع مستشار متخصص' : 'Contacter un conseiller'}</span>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-              
-            </div>
-            
-            {/* ⭐ Nút Tư vấn chung - Ẩn vì mỗi card đã có nút riêng */}
-            {/*
-            <div className="mt-4 flex justify-start">
-              <button
-                onClick={onRequestConsultation}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 text-amber-900 text-[11px] font-semibold rounded-full shadow-sm hover:shadow-md transition-all active:scale-95"
-              >
-                <span className="material-symbols-outlined text-[12px]">support_agent</span>
-                <span>{t('chat.moreAdvice')}</span>
-              </button>
-            </div>
-            */}
+            {/* ⭐ Product Cards Grid - Sử dụng component để tránh hooks violation */}
+            <ProductCardsGrid
+              products={message.suggestedProducts}
+              language={language}
+              onRequestConsultation={onRequestConsultation}
+            />
           </div>
         )}
-      </div>
 
-      {/* ⭐ NEW DISLIKE FEEDBACK FORM */}
-      <DislikeFeedbackForm
-        isOpen={showDislikeReason}
-        onClose={() => {
-          setShowDislikeReason(false);
-          setFeedback('dislike');
-        }}
-        onSubmit={() => {
-          setShowDislikeReason(false);
-        }}
-        messageContent={message.content}
-        messageId={dislikeMessageId}
-        conversationId={activeConversationId || ''}
-        language={language}
-      />
+        {/* ⭐ NEW DISLIKE FEEDBACK FORM */}
+        <DislikeFeedbackForm
+          isOpen={showDislikeReason}
+          onClose={() => {
+            setShowDislikeReason(false);
+            setFeedback('dislike');
+          }}
+          onSubmit={() => {
+            setShowDislikeReason(false);
+          }}
+          messageContent={message.content}
+          messageId={dislikeMessageId}
+          conversationId={activeConversationId || ''}
+          language={language}
+        />
+      </div>
     </div>
   );
 }

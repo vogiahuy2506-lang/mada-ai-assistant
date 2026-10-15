@@ -4475,7 +4475,7 @@ app.post('/api/consultation', async (req, res) => {
 
         await transporter.sendMail({
           from: process.env.MAIL_FROM || 'MADA AI <noreply@mada.org.qa>',
-          to: process.env.CONSULTATION_EMAIL || 'contact@mada.org.qa',
+          to: process.env.CONSULTATION_EMAIL || process.env.ADMIN_NOTIFICATION_EMAIL || 'hotro.digibook@gmail.com',
           subject: `[MADA] New Consultation Request from ${name}`,
           html: `
 <!DOCTYPE html>
@@ -4581,7 +4581,7 @@ Please respond to the user within 24-48 hours.
           `,
         });
 
-        logActivity('success', `Email notification sent to ${process.env.CONSULTATION_EMAIL || 'contact@mada.org.qa'}`, 'Consultation');
+        logActivity('success', `Email notification sent to ${process.env.CONSULTATION_EMAIL || process.env.ADMIN_NOTIFICATION_EMAIL || 'hotro.digibook@gmail.com'}`, 'Consultation');
       } catch (emailError) {
         logActivity('warn', `Failed to send email: ${emailError}`, 'Consultation');
       }

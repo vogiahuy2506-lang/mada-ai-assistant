@@ -104,13 +104,14 @@ router.post('/', async (req, res) => {
     );
 
     // ========== SEND EMAIL NOTIFICATION ==========
-    // Get admin email from settings or use CONSULTATION_EMAIL env / superadmin@mada.vn
-    let adminEmail = 'superadmin@mada.vn'; // Default
-    
-    // Try to get from environment
-    if (process.env.CONSULTATION_EMAIL) {
-      adminEmail = process.env.CONSULTATION_EMAIL;
-    }
+    // Resolve admin email in this order:
+    //   1. CONSULTATION_EMAIL env (highest priority)
+    //   2. ADMIN_NOTIFICATION_EMAIL env
+    //   3. Default: hotro.digibook@gmail.com
+    const adminEmail =
+      process.env.CONSULTATION_EMAIL ||
+      process.env.ADMIN_NOTIFICATION_EMAIL ||
+      'hotro.digibook@gmail.com';
     
     // Send email notification if SMTP is configured
     if (process.env.MAIL_HOST && process.env.MAIL_USERNAME) {

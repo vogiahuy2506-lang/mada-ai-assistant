@@ -201,10 +201,27 @@ jobs:
             # Kill any existing processes on port 3000
             sudo fuser -k 3000/tcp 2>/dev/null || true
             
-            # Start without sudo first (PM2 handles its own permissions)
+            # Delete any existing app first
             $PM2_BIN delete mada-app 2>/dev/null || true
+            
+            # Start with pm2-startup to ensure PM2 survives reboots
             PORT=3000 $PM2_BIN start dist/server.mjs --name mada-app
-            $PM2_BIN save
+            
+            # Wait for process to start
+            sleep 3
+            
+            # Ensure PM2 will restart on reboot
+            $PM2_BIN startup 2>/dev/null || true
+            $PM2_BIN save 2>/dev/null || true
+            
+            # Verify process is running
+            if ! $PM2_BIN describe mada-app > /dev/null 2>&1; then
+              echo "❌ PM2 failed to start mada-app"
+              $PM2_BIN logs mada-app --nostream --lines 30
+              exit 1
+            fi
+            
+            echo "PM2 process started, PID: $($PM2_BIN jlist 2>/dev/null | grep -o '"pid":[0-9]*' | head -1 | cut -d: -f2)"
 
             echo "=== Step 15: Health check (max 180s) ==="
             COUNTER=0

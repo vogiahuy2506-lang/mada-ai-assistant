@@ -130,36 +130,6 @@ async function autoScrapeUrlsFromMessage(
  * - Shop VN, wikimedia → load trực tiếp
  * - Các URL khác → load trực tiếp
  */
-/**
- * Generate themed placeholder image URL using external service
- * Uses picsum.photos with stable seed for consistent category-based images
- * Falls back to CSS gradient if external service fails
- */
-function getPlaceholderImageUrl(category: string, _title: string): string {
-  // Determine seed based on category - using numeric seed for picsum.photos
-  const categoryLower = (category || '').toLowerCase();
-  let seedNum = 100; // Default seed
-  
-  if (categoryLower.includes('hearing') || categoryLower.includes('thính')) {
-    seedNum = 1001; // Hearing devices
-  } else if (categoryLower.includes('vision') || categoryLower.includes('thị')) {
-    seedNum = 1002; // Vision aids
-  } else if (categoryLower.includes('mobility') || categoryLower.includes('vận') || categoryLower.includes('wheelchair')) {
-    seedNum = 1003; // Mobility
-  } else if (categoryLower.includes('cognitive') || categoryLower.includes('nhận') || categoryLower.includes('memory')) {
-    seedNum = 1004; // Cognitive
-  } else if (categoryLower.includes('communication') || categoryLower.includes('giao tiếp') || categoryLower.includes('speech')) {
-    seedNum = 1005; // Communication
-  } else if (categoryLower.includes('daily') || categoryLower.includes('living')) {
-    seedNum = 1006; // Daily living
-  } else if (categoryLower.includes('education') || categoryLower.includes('học')) {
-    seedNum = 1007; // Education
-  }
-  
-  // picsum.photos uses numeric IDs (1-1084 for default collection)
-  // Using stable seed numbers that are known to exist
-  return `https://picsum.photos/seed/${seedNum}/400/300`;
-}
 
 function toProxyImageUrl(madaUrl: string): string {
   // Chỉ accept valid URLs
@@ -901,11 +871,9 @@ async function getSuggestedProducts(ragSources: any[], message: string, effectiv
       };
       
       // Build full product object
-      // Use actual image, or fallback to themed placeholder
+      // Use actual image from MADA only - NO picsum fallback
       const actualImage = toProxyImageUrl(thumbnail);
-      const productCategory = kbProduct?.category || meta.category || dbItem.category || 'general';
-      const productTitle = kbProduct?.title || meta.title || dbItem.title || '';
-      const image_url = actualImage || getPlaceholderImageUrl(productCategory, productTitle);
+      const image_url = actualImage || '';
       
       return {
         id: kbProduct?.id || src.id || dbItem.id || `src-${idx}`,
@@ -918,7 +886,6 @@ async function getSuggestedProducts(ragSources: any[], message: string, effectiv
         product_url: finalProductUrl,
         source_url: finalProductUrl,
         image_url,
-        isPlaceholder: !actualImage, // Flag to indicate this is a placeholder
         confidence: src.score || 0.7,
         match_reason: getMatchReason(effectiveLanguage, 'found'),
         // Detailed fields
@@ -986,7 +953,7 @@ async function getSuggestedProducts(ragSources: any[], message: string, effectiv
   // - Category khớp nếu có agentCategory VÀ sản phẩm không có image từ kb_products
   suggestedProducts = suggestedProducts.filter((p: any) => {
     // Phải có image_url hợp lệ (bao gồm placeholder images)
-    const hasImage = !!(p.image_url && (p.image_url.startsWith('http') || p.image_url.includes('picsum.photos')));
+    const hasImage = !!(p.image_url && p.image_url.startsWith('http'));
     
     // URL phải là http(s)
     const url = p.product_url || '';
@@ -1111,7 +1078,7 @@ async function getSuggestedProducts(ragSources: any[], message: string, effectiv
       }).filter((p: any) => {
         // Filter: must have valid URL and image (including placeholders)
         const url = p.product_url || '';
-        const hasImage = !!(p.image_url && (p.image_url.startsWith('http') || p.image_url.includes('picsum.photos')));
+        const hasImage = !!(p.image_url && p.image_url.startsWith('http'));
         
         // ⭐ ALSO filter by category in fallback (same as RAG filter)
         let categoryMatch = true;

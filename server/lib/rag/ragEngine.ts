@@ -743,8 +743,10 @@ class RAGEngine {
           yield { text: () => text };
         }
       } catch (error) {
+        // ⭐ FIX: throw lỗi để caller xử lý (không nuốt lỗi như trước)
+        // Trước đây yield chuỗi rỗng → AI "im lặng", sources rỗng → không gợi ý sản phẩm
         console.error('❌ Stream generation error:', error);
-        yield { text: () => '' };
+        throw error;
       }
     })();
 

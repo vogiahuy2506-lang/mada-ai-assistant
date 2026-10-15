@@ -840,6 +840,15 @@ export let ragInitialized = false;
  * toàn 'draft' → vector store rỗng.
  */
 async function syncKnowledgeBaseToVectorStore(): Promise<void> {
+  // Skip sync if RAG is disabled or no network
+  const skipSync = process.env.SKIP_RAG_SYNC === 'true' || 
+                   process.env.RAG_ENABLED !== 'true';
+  
+  if (skipSync) {
+    console.log('📚 [Sync KB] Skipped (RAG disabled or SKIP_RAG_SYNC=true)');
+    return;
+  }
+
   try {
     const db = (await import('./lib/db')).default;
 
@@ -880,16 +889,26 @@ async function syncKnowledgeBaseToVectorStore(): Promise<void> {
     // Bulk add - tự chunk để tránh rate limit
     const CHUNK_SIZE = 20;
     let synced = 0;
+    let failedChunks = 0;
     for (let i = 0; i < documents.length; i += CHUNK_SIZE) {
       const chunk = documents.slice(i, i + CHUNK_SIZE);
       try {
-        await vectorStore.addDocuments(chunk);
+        await Promise.race([
+          vectorStore.addDocuments(chunk),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 10000))
+        ]);
         synced += chunk.length;
         if (i % 100 === 0) {
           console.log(`   ${synced}/${documents.length}...`);
         }
       } catch (err) {
+        failedChunks++;
         console.warn(`   ⚠️ Chunk ${i}-${i + CHUNK_SIZE} failed:`, (err as Error).message);
+        // Stop syncing if too many failures (network issue)
+        if (failedChunks >= 3) {
+          console.log(`   ⚠️ Stopping sync after ${failedChunks} failed chunks (network issue?)`);
+          break;
+        }
       }
     }
 

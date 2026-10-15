@@ -12,9 +12,9 @@ interface ErrorBoundaryState {
 
 // Default translations when store is not available
 const defaultTranslations: Record<string, string> = {
-  title: 'An error occurred',
-  unknown: 'Unknown error',
-  clearAndReload: 'Clear data and reload',
+  'error.title': 'An error occurred',
+  'error.unknown': 'Unknown error',
+  'error.clearAndReload': 'Clear data and reload',
 };
 
 export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {

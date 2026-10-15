@@ -37,7 +37,7 @@ async function sendApprovalEmail(user: UserRow, approved: boolean): Promise<void
     },
   });
 
-  const statusText = approved ? 'đã được phê duyệt' : 'đã bị từ chối';
+  const statusText = approved ? 'has been approved' : 'has been rejected';
   const statusColor = approved ? '#10B981' : '#EF4444';
   const statusIcon = approved ? '✅' : '❌';
 
@@ -45,7 +45,7 @@ async function sendApprovalEmail(user: UserRow, approved: boolean): Promise<void
     await transporter.sendMail({
       from: process.env.MAIL_FROM || 'MADA AI <noreply@mada.ai>',
       to: user.email,
-      subject: `[MADA AI] Tài khoản của bạn ${statusText}`,
+      subject: `[MADA AI] Your Account ${statusText}`,
       html: `
         <!DOCTYPE html>
         <html>
@@ -64,38 +64,38 @@ async function sendApprovalEmail(user: UserRow, approved: boolean): Promise<void
           <div class="container">
             <div class="header">
               <h1>🤖 MADA AI Assistant</h1>
-              <p>Hỗ trợ Công nghệ Hỗ trợ (AT)</p>
+              <p>Assistive Technology Support</p>
             </div>
             <div class="content">
-              <p>Xin chào <strong>${user.name}</strong>,</p>
+              <p>Hello <strong>${user.name}</strong>,</p>
               
-              <p>${statusIcon} <strong>Tài khoản của bạn ${statusText}!</strong></p>
+              <p>${statusIcon} <strong>Your account ${statusText}!</strong></p>
               
               <p style="text-align: center; margin: 30px 0;">
                 <span class="status" style="background-color: ${statusColor};">
-                  ${approved ? '✅ ĐÃ PHÊ DUYỆT' : '❌ ĐÃ TỪ CHỐI'}
+                  ${approved ? '✅ APPROVED' : '❌ REJECTED'}
                 </span>
               </p>
               
               ${approved ? `
-                <p>Chúc mừng bạn! Tài khoản của bạn đã được kích hoạt.</p>
-                <p>Bạn có thể đăng nhập ngay và bắt đầu sử dụng MADA AI Assistant.</p>
+                <p>Congratulations! Your account has been activated.</p>
+                <p>You can now log in and start using MADA AI Assistant.</p>
                 <p style="text-align: center; margin-top: 20px;">
-                  <a href="${process.env.APP_URL || 'https://mada.ai'}/login" style="background-color: #667eea; color: white; padding: 12px 30px; text-decoration: none; border-radius: 25px; display: inline-block;">Đăng nhập ngay</a>
+                  <a href="${process.env.APP_URL || 'https://mada.ai'}/login" style="background-color: #667eea; color: white; padding: 12px 30px; text-decoration: none; border-radius: 25px; display: inline-block;">Login Now</a>
                 </p>
               ` : `
-                <p>Rất tiếc, tài khoản của bạn không được chấp thuận.</p>
-                <p>Nếu bạn có thắc mắc, vui lòng liên hệ với chúng tôi.</p>
+                <p>We're sorry, your account has not been approved at this time.</p>
+                <p>If you have any questions, please contact us for more information.</p>
               `}
               
               <p style="margin-top: 30px; color: #666;">
-                Trân trọng,<br>
-                <strong>Đội ngũ MADA AI</strong>
+                Best regards,<br>
+                <strong>The MADA AI Team</strong>
               </p>
             </div>
             <div class="footer">
-              <p>Email này được gửi tự động từ MADA AI Assistant</p>
-              <p>© 2026 MADA AI. Mọi quyền được bảo lưu.</p>
+              <p>This is an automated email from MADA AI Assistant</p>
+              <p>© ${new Date().getFullYear()} MADA AI. All rights reserved.</p>
             </div>
           </div>
         </body>

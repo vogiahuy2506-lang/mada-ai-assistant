@@ -1,29 +1,18 @@
-📦 SQLite database initialized at /Users/vohuy/Downloads/MADA AI ASSISTANT/data/mada.db
-✅ Knowledge items translation columns added
-✅ KB Products translation columns added
-🌱 Seeded 9 KB categories (4 languages: VI/EN/AR/FR)
-🤖 admin_agents already has 7 rows — skipping seed
-📋 admin_prompts already has 10 rows — skipping seed
-📋 prompt_templates already has 10 rows — skipping seed
-✅ Migrated suggested_prompts to correct values
-✅ Schema created
-✅ Users table schema is up-to-date
-👤 Admin already exists: admin@mada.vn
-🔑 SuperAdmin password verified: superadmin@mada.vn
-⚠️  Using default JWT_SECRET. Set JWT_SECRET env var in production!
-ℹ️ [System] MADA AI Server started on port 3008
-ℹ️ [RAG Engine] Vector store initialized with 65 documents
-✅ [Auth Service] Auth service configured (SQLite + JWT + bcrypt)
-ℹ️ [Security] CORS policy: any localhost port allowed (dev)
-🔧 Initializing services...
-✅ Using Gemini embeddings: AQ.Ab8RN6I...
-⚠️  Frontend build not found at /Users/vohuy/Downloads/MADA AI ASSISTANT/dist/client
-✅ Permissions schema initialized
-📋 Permissions already seeded (48 rows) — skipping
-🚀 MADA AI Server running on http://0.0.0.0:3008
-📚 API Documentation: http://localhost:3008/api/health
-🌐 Frontend: http://localhost:3008/
-⚡ RAG Enabled: false
-🤖 Gemini Configured: true
-🛡️  Guardrails: Active
-🔐 Auth: SQLite + bcrypt + JWT (admin: admin@mada.vn)
+
+> mada-ai-assistant@1.0.0 dev
+> vite
+
+Port 5181 is in use, trying another one...
+Port 5182 is in use, trying another one...
+Port 5183 is in use, trying another one...
+Port 5184 is in use, trying another one...
+Port 5185 is in use, trying another one...
+Port 5186 is in use, trying another one...
+Port 5187 is in use, trying another one...
+error when starting dev server:
+SystemError [ERR_SYSTEM_ERROR]: A system error occurred: uv_interface_addresses returned Unknown system error 1 (Unknown system error 1)
+    at Object.networkInterfaces (node:os:218:16)
+    at resolveServerUrls (file:///Users/vohuy/Downloads/MADA%20AI%20ASSISTANT/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:17354:24)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async Object.listen (file:///Users/vohuy/Downloads/MADA%20AI%20ASSISTANT/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:63136:31)
+    at async CAC.<anonymous> (file:///Users/vohuy/Downloads/MADA%20AI%20ASSISTANT/node_modules/vite/dist/node/cli.js:749:5)

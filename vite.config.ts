@@ -9,14 +9,12 @@ export default defineConfig({
     }),
   ],
   optimizeDeps: {
-    include: ['react', 'react-dom', 'zustand', 'zustand/middleware', 'use-sync-external-store'],
+    include: ['react', 'react-dom', 'zustand', 'zustand/shallow', 'zustand/middleware', 'zustand/context', 'use-sync-external-store', 'use-sync-external-store/shim', 'use-sync-external-store/shim/with-selector'],
     exclude: ['chunk-DRWLMN53', 'chunk-PJEEZAML'],
   },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
-      'react': path.resolve(__dirname, 'node_modules/react'),
-      'react-dom': path.resolve(__dirname, 'node_modules/react-dom'),
     },
     dedupe: ['react', 'react-dom', 'react-router-dom', 'zustand', 'use-sync-external-store'],
   },

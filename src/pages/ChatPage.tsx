@@ -2231,7 +2231,17 @@ Hãy trở thành người bạn đồng hành đáng tin cậy nhất của ng�
       // Map viewMode ('end_user' | 'at_specialist') → userMode ('endUser' | 'specialist')
       const userMode: 'endUser' | 'specialist' = viewMode === 'at_specialist' ? 'specialist' : 'endUser';
       // ⭐ Dùng omni prompt khi là "Trò chuyện mới" (chưa chọn agent cụ thể)
-      const isOmniChat = !selectedAgentId || selectedAgentId === defaultAgent?.id;
+      // ⭐ FIX: Chỉ dùng omni prompt khi KHÔNG CÓ selectedAgentId
+      const isOmniChat = !selectedAgentId;
+      // Debug log to trace agent selection
+      console.log('[Chat] Agent debug:', {
+        selectedAgentId,
+        defaultAgentId: defaultAgent?.id,
+        isOmniChat,
+        selectedAgentName: selectedAgent?.name,
+        hasSystemPrompt: !!selectedAgent?.systemPrompt,
+        systemPromptPreview: selectedAgent?.systemPrompt?.substring(0, 80),
+      });
       const chatBody: any = {
         message: fullMessage,
         language,
@@ -2687,8 +2697,19 @@ Hãy trở thành người bạn đồng hành đáng tin cậy nhất của ng�
     const savedMessages = getMessagesForConversation(id);
     if (savedMessages.length > 0) {
       useChatStore.getState().setMessages(savedMessages);
+      
+      // ⭐ FIX: Infer agentId from messages metadata and update selectedAgentId
+      const firstUserMsg = savedMessages.find(m => m.role === 'user');
+      if (firstUserMsg && (firstUserMsg as any).agentId) {
+        useSelectedAgentStore.getState().setSelectedAgentId((firstUserMsg as any).agentId);
+      } else {
+        // Fallback: clear agent selection so it uses default
+        useSelectedAgentStore.getState().setSelectedAgentId(null);
+      }
     } else {
       clearMessages();
+      // New empty conversation - use default agent
+      useSelectedAgentStore.getState().setSelectedAgentId(null);
     }
 
     setActiveConversationId(id);

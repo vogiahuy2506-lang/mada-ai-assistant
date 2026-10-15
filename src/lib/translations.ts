@@ -1,9 +1,6 @@
 // Translation system for MADA AI Assistant
 // Supports: Vietnamese (vi), English (en), Arabic (ar), French (fr)
 
-import { useLanguageStore } from '@/stores';
-import { useMemo } from 'react';
-
 export type Language = 'vi' | 'en' | 'ar' | 'fr';
 
 export const translations = {
@@ -4668,12 +4665,6 @@ export const translations = {
   },
 };
 
-// Translation helper function - exported for use in components
-export function t(key: string, language?: Language): string {
-  const lang = (language || useLanguageStore.getState().language || 'vi') as Language;
-  return (translations as Record<Language, Record<string, string>>)[lang]?.[key] || (translations as Record<Language, Record<string, string>>).vi[key] || key;
-}
-
 // Hook for components that need reactive translations
 export function useTranslation() {
   const language = useLanguageStore((s) => s.language ?? 'vi') as Language;
@@ -4686,4 +4677,31 @@ export function useTranslation() {
   }, [language]);
   
   return { language, t };
+}
+
+// ============== t() helper ==============
+// Non-hook translation helper for use in callbacks, render props, and non-component code
+// Falls back to 'vi' when language is not available or localStorage is inaccessible
+export function t(key: string, lang?: Language): string {
+  // Try to read persisted language from localStorage (zustand persist key)
+  let currentLang: Language = 'vi';
+  try {
+    const raw = localStorage.getItem('mada-language');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed.state?.language && ['vi', 'en', 'ar', 'fr'].includes(parsed.state.language)) {
+        currentLang = parsed.state.language;
+      }
+    }
+  } catch {
+    // localStorage unavailable or parse error — use default 'vi'
+  }
+
+  const effectiveLang = lang ?? currentLang;
+  const typedTranslations = translations as Record<Language, Record<string, string>>;
+  return (
+    typedTranslations[effectiveLang]?.[key] ||
+    typedTranslations.vi?.[key] ||
+    key
+  );
 }

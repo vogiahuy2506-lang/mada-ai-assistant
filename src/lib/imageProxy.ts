@@ -1,7 +1,8 @@
 /**
  * Helper để render ảnh sản phẩm an toàn
  *
- * - Nếu là MADA image (mada.org.qa) → route qua /api/mada-image proxy để bypass hotlink
+ * - Nếu là MADA CDN (cdn.at.mada.org.qa, cdn.mada.org.qa) → route qua /api/mada-image proxy
+ * - Nếu là MADA website (at.mada.org.qa) → load trực tiếp
  * - Nếu là shop VN (tgdd, cellphones, fptshop, dienmayxanh) → load trực tiếp
  * - Nếu là URL khác (CDN trung tính) → load trực tiếp
  * - Nếu là URL rác (broken/demo/placeholder) → trả empty để fallback gradient
@@ -16,11 +17,10 @@
  *   - Tự detect URL rác (demo, broken, dead domain)
  */
 
-// PROXY_REQUIRED_HOSTS: Chỉ proxy các domain mà browser không thể access trực tiếp
-// Lưu ý: at.mada.org.qa được remove khỏi đây vì browser có thể load trực tiếp
+// PROXY_REQUIRED_HOSTS: Chỉ proxy các domain cần thiết
+// Lưu ý: 'mada.org.qa' KHÔNG có ở đây vì browser có thể load trực tiếp
 // (server proxy không hoạt động do sandbox restriction)
 const PROXY_REQUIRED_HOSTS = [
-  'mada.org.qa',
   'cdn.at.mada.org.qa',
   'cdn.mada.org.qa',
 ];

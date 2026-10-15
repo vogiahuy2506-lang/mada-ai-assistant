@@ -340,10 +340,12 @@ router.post('/quick-recommend', async (req, res) => {
           imageUrl = parsedMeta.thumbnailUrl || parsedMeta.imageUrl || parsedMeta.galleryImages?.[0] || '';
         } catch { /* ignore */ }
 
-        // Apply proxy for MADA images
+        // Apply proxy for MADA CDN images only (cdn.at.mada.org.qa, cdn.mada.org.qa)
+        // KHÔNG proxy at.mada.org.qa vì browser có thể load trực tiếp
+        // (server proxy không hoạt động do sandbox restriction)
         let finalImageUrl = '';
         if (imageUrl) {
-          if (imageUrl.includes('mada.org.qa') || imageUrl.includes('cdn.at.mada.org.qa')) {
+          if (imageUrl.includes('cdn.at.mada.org.qa') || imageUrl.includes('cdn.mada.org.qa')) {
             finalImageUrl = `/api/mada-image?url=${encodeURIComponent(imageUrl)}`;
           } else {
             finalImageUrl = imageUrl;

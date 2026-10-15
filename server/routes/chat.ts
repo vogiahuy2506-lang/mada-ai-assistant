@@ -130,6 +130,37 @@ async function autoScrapeUrlsFromMessage(
  * - Shop VN, wikimedia → load trực tiếp
  * - Các URL khác → load trực tiếp
  */
+/**
+ * Generate themed placeholder image URL using external service
+ * Uses a category-specific seed to get consistent images for the same category
+ */
+function getPlaceholderImageUrl(category: string, title: string): string {
+  // Determine seed based on category and title
+  const categoryLower = (category || '').toLowerCase();
+  let seed = 'assistive-technology';
+  
+  if (categoryLower.includes('hearing') || categoryLower.includes('thính')) {
+    seed = 'hearing-aid-ear'; // Hearing devices
+  } else if (categoryLower.includes('vision') || categoryLower.includes('thị')) {
+    seed = 'magnifying-glass'; // Vision aids
+  } else if (categoryLower.includes('mobility') || categoryLower.includes('vận') || categoryLower.includes('wheelchair')) {
+    seed = 'wheelchair-accessibility';
+  } else if (categoryLower.includes('cognitive') || categoryLower.includes('nhận') || categoryLower.includes('memory')) {
+    seed = 'brain-memory';
+  } else if (categoryLower.includes('communication') || categoryLower.includes('giao tiếp') || categoryLower.includes('speech')) {
+    seed = 'communication-speaking';
+  } else if (categoryLower.includes('daily') || categoryLower.includes('living')) {
+    seed = 'daily-living-home';
+  } else if (categoryLower.includes('education') || categoryLower.includes('học')) {
+    seed = 'education-learning';
+  }
+  
+  // Use picsum.photos with category-specific seed for consistent images
+  // This ensures same category gets similar themed images
+  const seedHash = Array.from(seed).reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  return `https://picsum.photos/seed/${seedHash}/400/300`;
+}
+
 function toProxyImageUrl(madaUrl: string): string {
   // Chỉ accept valid URLs
   if (!madaUrl || typeof madaUrl !== 'string' || !madaUrl.startsWith('http')) {
@@ -772,23 +803,24 @@ async function getSuggestedProducts(ragSources: any[], message: string, effectiv
       const sourceUrl = normalizeUrl(rawSourceUrl);
       const dbItem = dbDataMap[sourceUrl] || dbDataMap[rawSourceUrl] || {};
       
-      // ⭐ LUÔN ƯU TIÊN URL từ kb_products nếu có, ngược lại dùng URL từ database hoặc metadata
-      const finalProductUrl = kbProduct?.source_url || kbProduct?.product_url || dbItem.url || sourceUrl || meta.productUrl || '';
-      
       // Get thumbnail: try metadata first (thumbnailUrl OR image_url), then kb_products table
       let thumbnail = meta.thumbnailUrl || meta.image_url || '';
       console.log(`📷 [Product ${idx}] title="${meta.title || 'N/A'}" sourceUrl="${sourceUrl.slice(0,60)}"`);
       console.log(`📷 [Product ${idx}] dbItem found: ${!!dbItem.id}, dbItem.url="${(dbItem.url || '').slice(0,60)}"`);
       
       // Also get full product data from kb_products for additional fields
-      let kbProduct = getProductFromDb(finalProductUrl);
-      console.log(`📷 [Product ${idx}] getProductFromDb(${finalProductUrl?.slice(0,40)}...) = ${kbProduct ? 'FOUND' : 'NOT FOUND'}`);
+      // ⭐ LUÔN ƯU TIÊN URL từ kb_products nếu có, ngược lại dùng URL từ database hoặc metadata
+      let kbProduct = getProductFromDb(dbItem.url || sourceUrl || meta.productUrl || '');
+      console.log(`📷 [Product ${idx}] getProductFromDb(${dbItem.url?.slice(0,40) || sourceUrl?.slice(0,40) || 'N/A'}...) = ${kbProduct ? 'FOUND' : 'NOT FOUND'}`);
       
       // Fallback: try to find by title if URL lookup failed
       if (!kbProduct && meta.title) {
         console.log(`📷 [Product ${idx}] Trying getProductByTitle("${meta.title}")`);
         kbProduct = getProductByTitle(meta.title);
       }
+      
+      // Get the final URL after we know if kbProduct exists
+      const finalProductUrl = kbProduct?.source_url || kbProduct?.product_url || dbItem.url || sourceUrl || meta.productUrl || '';
       
       if (kbProduct) {
         console.log(`📷 [Product ${idx}] ✓ Found: ${kbProduct.title}, image=${kbProduct.image_url ? 'YES' : 'NO'}`);
@@ -819,17 +851,24 @@ async function getSuggestedProducts(ragSources: any[], message: string, effectiv
       };
       
       // Build full product object
+      // Use actual image, or fallback to themed placeholder
+      const actualImage = toProxyImageUrl(thumbnail);
+      const productCategory = kbProduct?.category || meta.category || dbItem.category || 'general';
+      const productTitle = kbProduct?.title || meta.title || dbItem.title || '';
+      const image_url = actualImage || getPlaceholderImageUrl(productCategory, productTitle);
+      
       return {
         id: kbProduct?.id || src.id || dbItem.id || `src-${idx}`,
         title: kbProduct?.title || meta.title || dbItem.title || 'Assistive Technology',
         title_en: kbProduct?.title_en || meta.title_en || meta.title || dbItem.title || 'Assistive Technology',
         description: kbProduct?.description || (src.content || dbItem.content || '').slice(0, 300),
-        category: kbProduct?.category || meta.category || dbItem.category || 'general',
+        category: productCategory,
         brand: merged.brand,
         price_range: merged.price_range,
         product_url: finalProductUrl,
         source_url: finalProductUrl,
-        image_url: toProxyImageUrl(thumbnail),
+        image_url,
+        isPlaceholder: !actualImage, // Flag to indicate this is a placeholder
         confidence: src.score || 0.7,
         match_reason: getMatchReason(effectiveLanguage, 'found'),
         // Detailed fields
@@ -878,8 +917,8 @@ async function getSuggestedProducts(ragSources: any[], message: string, effectiv
   // - Không phải garbage title
   // - Category khớp nếu có agentCategory VÀ sản phẩm không có image từ kb_products
   suggestedProducts = suggestedProducts.filter((p: any) => {
-    // Phải có image_url hợp lệ
-    const hasImage = !!(p.image_url && p.image_url.startsWith('http'));
+    // Phải có image_url hợp lệ (bao gồm placeholder images)
+    const hasImage = !!(p.image_url && (p.image_url.startsWith('http') || p.image_url.includes('picsum.photos')));
     
     // URL phải là http(s)
     const url = p.product_url || '';
@@ -982,9 +1021,9 @@ async function getSuggestedProducts(ragSources: any[], message: string, effectiv
           categoryColor,
         };
       }).filter((p: any) => {
-        // Filter: must have valid URL and image
+        // Filter: must have valid URL and image (including placeholders)
         const url = p.product_url || '';
-        const hasImage = !!(p.image_url && p.image_url.startsWith('http'));
+        const hasImage = !!(p.image_url && (p.image_url.startsWith('http') || p.image_url.includes('picsum.photos')));
         return hasImage && url.startsWith('http');
       });
       

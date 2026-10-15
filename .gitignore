@@ -106,3 +106,6 @@ test-*.cjs
 
 # Local test images
 mada-ai-assistant:local-test
+
+# Google Cloud SDK (should not be in repo)
+"exec -l /bin/zsh/"

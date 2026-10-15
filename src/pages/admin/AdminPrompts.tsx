@@ -629,6 +629,18 @@ export function AdminPrompts() {
   // Add URL Modal
   const [showAddUrlModal, setShowAddUrlModal] = useState(false);
   const [urlModalInput, setUrlModalInput] = useState('');
+  
+  // Crawl Mode: 'instant' | 'deep' | 'scheduled'
+  const [crawlMode, setCrawlMode] = useState<'instant' | 'deep' | 'scheduled'>('instant');
+  // Deep Scrape options cho modal Thêm URL
+  const [deepScrapeDepth, setDeepScrapeDepth] = useState(3);
+  const [deepScrapeMaxPages, setDeepScrapeMaxPages] = useState(20);
+  const [scrapeLoading, setScrapeLoading] = useState(false);
+  const [scrapeResult, setScrapeResult] = useState<{ success: boolean; message: string; docs?: number } | null>(null);
+
+  // Derive values from crawlMode for API
+  const scrapeImmediately = crawlMode !== 'scheduled';
+  const deepScrapeEnabled = crawlMode === 'deep';
 
   // Add Question Modal
   const [showAddQuestionModal, setShowAddQuestionModal] = useState(false);
@@ -647,11 +659,6 @@ export function AdminPrompts() {
   const [isResizing, setIsResizing] = useState(false);
 
   // Modal states
-  const [showTestSandbox, setShowTestSandbox] = useState(false);
-  const [testMessage, setTestMessage] = useState('');
-  const [testResponse, setTestResponse] = useState('');
-  const [testLoading, setTestLoading] = useState(false);
-
   const [showVersionHistory, setShowVersionHistory] = useState(false);
   const [versionHistory, setVersionHistory] = useState<{ id: string; version: string; date: string; changes: string; author: string }[]>([]);
 
@@ -940,6 +947,7 @@ export function AdminPrompts() {
   };
 
   const selectAgent = (agent: Agent) => {
+    console.log('[selectAgent] Selecting agent:', agent.id, agent.name);
     setSelectedAgent(agent);
     // Use localized name and description for MADA bots
     const madaBot = agent.bot_id ? MADA_BOTS.find(b => b.id === agent.bot_id) : null;
@@ -988,17 +996,47 @@ export function AdminPrompts() {
     }
   };
 
+  // Helper: map mada_category to valid database category
+  const mapToValidCategory = (madaCategory: string | undefined): string => {
+    if (!madaCategory) return 'general';
+    const mapping: Record<string, string> = {
+      'sensory-hearing': 'hearing',
+      'sensory-vision': 'vision',
+      'voice-and-speech': 'communication',
+      'mental-cognitive': 'cognition',
+      'neuromusculoskeletal-movement': 'mobility',
+      'mobility-and-transportation': 'mobility',
+      'regulatory-standards': 'general',
+      'sensory': 'general',
+      'hearing': 'hearing',
+      'vision': 'vision',
+      'mobility': 'mobility',
+      'cognition': 'cognition',
+      'communication': 'communication',
+      'daily_living': 'daily_living',
+      'education': 'education',
+      'general': 'general',
+    };
+    return mapping[madaCategory] || 'general';
+  };
+
   const fetchQuestions = async (agentId: string) => {
     try {
       const token = getAccessToken();
-      const res = await fetch(`/api/admin/suggested-questions?agent_id=${agentId}`, {
+      console.log('[fetchQuestions] Fetching questions for agent:', agentId);
+      const res = await fetch(`/api/admin/suggested-questions?agent_id=${encodeURIComponent(agentId)}`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
+      console.log('[fetchQuestions] Response status:', res.status);
       if (res.ok) {
         const data = await res.json();
+        console.log('[fetchQuestions] Data received:', data);
         if (data.success && data.data) {
           setQuestions(data.data);
         }
+      } else {
+        const errorText = await res.text();
+        console.error('[fetchQuestions] Error response:', res.status, errorText);
       }
     } catch (err) {
       console.error('Failed to fetch questions:', err);
@@ -1024,6 +1062,7 @@ export function AdminPrompts() {
           avatar_url: formData.avatar_url,
           system_prompt: formData.system_prompt,
           knowledge_url: formData.knowledge_url,
+          is_active: formData.is_active,
         }),
       });
       if (res.ok) {
@@ -1080,7 +1119,7 @@ export function AdminPrompts() {
         },
         body: JSON.stringify({
           agent_id: selectedAgent.id,
-          category: (selectedAgent as any).mada_category || 'general',
+          category: mapToValidCategory((selectedAgent as any).mada_category),
           question: newQuestion.trim(),
           sort_order: questions.length + 1,
           is_active: true,
@@ -1170,8 +1209,22 @@ export function AdminPrompts() {
   };
 
   // Add URL from Modal
-  const handleAddUrlFromModal = () => {
-    if (!urlModalInput.trim()) return;
+  // Reset modal state when opening
+  const openAddUrlModal = () => {
+    setUrlModalInput('');
+    setCrawlMode('instant');
+    setDeepScrapeDepth(3);
+    setDeepScrapeMaxPages(20);
+    setScrapeResult(null);
+    setScrapeLoading(false);
+    setShowAddUrlModal(true);
+  };
+
+  // Add URL from Modal - với tùy chọn crawl ngay và deep scrape
+  const handleAddUrlFromModal = async () => {
+    if (!urlModalInput.trim() || !selectedAgent) return;
+    
+    // Thêm URL vào danh sách trước
     const newEntry: KnowledgeUrl = {
       id: `kb-${Date.now()}`,
       url: urlModalInput.trim(),
@@ -1180,13 +1233,82 @@ export function AdminPrompts() {
     const updatedUrls = [...knowledgeUrls, newEntry];
     setKnowledgeUrls(updatedUrls);
     setFormData({ ...formData, knowledge_url: updatedUrls.map(u => u.url).join('\n') });
-    setUrlModalInput('');
+    
+    // Đóng modal
     setShowAddUrlModal(false);
+    setScrapeResult(null);
+    
+    // Nếu chọn crawl ngay (instant hoặc deep)
+    if (crawlMode !== 'scheduled') {
+      setScrapeLoading(true);
+      try {
+        const token = getAccessToken();
+        const res = await fetch(`/api/admin/agents/${selectedAgent.id}/crawl-sources`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({
+            knowledge_url: updatedUrls.map(u => u.url).join('\n'),
+            product_urls: [urlModalInput.trim()],
+            crawl_follow_links: crawlMode === 'deep',
+            crawl_max_depth: crawlMode === 'deep' ? deepScrapeDepth : undefined,
+            crawl_max_pages: crawlMode === 'deep' ? deepScrapeMaxPages : undefined,
+          }),
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success) {
+            // Cập nhật status của URL thành vectorized
+            setKnowledgeUrls(prev => prev.map(u => 
+              u.id === newEntry.id 
+                ? { ...u, status: 'vectorized' as const, pages_count: data.data?.totalDocs || 1 }
+                : u
+            ));
+            setScrapeResult({ 
+              success: true, 
+              message: language === 'vi' 
+                ? `✅ Đã cào thành công ${data.data?.totalDocs || 0} documents!`
+                : `✅ Successfully scraped ${data.data?.totalDocs || 0} documents!`,
+              docs: data.data?.totalDocs 
+            });
+            
+            const successMsg = language === 'vi'
+              ? `Đã thêm URL & cào ngay ${data.data?.totalDocs || 0} documents!`
+              : `Added URL & scraped ${data.data?.totalDocs || 0} documents!`;
+            setToast({ message: successMsg, type: 'success' });
+          } else {
+            setScrapeResult({ success: false, message: data.error || 'Scrape failed' });
+          }
+        } else {
+          setScrapeResult({ success: false, message: `Error ${res.status}` });
+        }
+      } catch (err) {
+        console.error('Scrape failed:', err);
+        setScrapeResult({ success: false, message: 'Connection error' });
+      } finally {
+        setScrapeLoading(false);
+      }
+    } else {
+      const infoMsg = language === 'vi'
+        ? 'Đã thêm URL. Hệ thống sẽ tự động cào trong 24h.'
+        : 'URL added. System will auto-scrape in 24h.';
+      setToast({ message: infoMsg, type: 'info' });
+    }
+    
+    // Reset input
+    setUrlModalInput('');
   };
 
   // Add Question from Modal
   const handleAddQuestionFromModal = async () => {
-    if (!questionModalInput.trim() || !selectedAgent) return;
+    console.log('[handleAddQuestionFromModal] question:', questionModalInput, 'agent:', selectedAgent?.id);
+    if (!questionModalInput.trim() || !selectedAgent) {
+      console.log('[handleAddQuestionFromModal] Early return');
+      return;
+    }
     try {
       const token = getAccessToken();
       const res = await fetch('/api/admin/suggested-questions', {
@@ -1197,14 +1319,16 @@ export function AdminPrompts() {
         },
         body: JSON.stringify({
           agent_id: selectedAgent.id,
-          category: (selectedAgent as any).mada_category || 'general',
+          category: mapToValidCategory((selectedAgent as any).mada_category),
           question: questionModalInput.trim(),
           sort_order: questions.length + 1,
           is_active: true,
         }),
       });
+      console.log('[handleAddQuestionFromModal] Status:', res.status);
       if (res.ok) {
         const data = await res.json();
+        console.log('[handleAddQuestionFromModal] Response:', data);
         if (data.success) {
           setQuestions([...questions, data.data]);
           broadcastQuestionsChange(selectedAgent.id, (selectedAgent as any).mada_category || 'general');
@@ -1213,6 +1337,10 @@ export function AdminPrompts() {
                             language === 'fr' ? 'Question ajoutée!' : 'Question added!';
           setToast({ message: successMsg, type: 'success' });
         }
+      } else {
+        const errText = await res.text();
+        console.error('[handleAddQuestionFromModal] Error:', res.status, errText);
+        setToast({ message: `Lỗi ${res.status}`, type: 'error' });
       }
     } catch (err) {
       console.error('Failed to add question:', err);
@@ -1256,39 +1384,6 @@ export function AdminPrompts() {
       setError(t('uploadFailed'));
     } finally {
       setAvatarUploading(false);
-    }
-  };
-
-  // Test Sandbox handler
-  const handleTestSandbox = async () => {
-    if (!testMessage.trim()) return;
-    setTestLoading(true);
-    setTestResponse('');
-    try {
-      const token = getAccessToken();
-      const res = await fetch('/api/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({
-          agent_id: selectedAgent?.id,
-          message: testMessage,
-          system_prompt: formData.system_prompt,
-        }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setTestResponse(data.response || data.message || data.content || JSON.stringify(data, null, 2));
-      } else {
-        const err = await res.json().catch(() => ({}));
-        setTestResponse(`Lỗi ${res.status}: ${err.error || res.statusText}`);
-      }
-    } catch (err) {
-      setTestResponse(language === 'vi' ? 'Không thể kết nối server. Vui lòng thử lại.' : language === 'ar' ? 'لا يمكن الاتصال بالخادم.' : language === 'fr' ? 'Impossible de se connecter au serveur.' : 'Cannot connect to server. Please try again.');
-    } finally {
-      setTestLoading(false);
     }
   };
 
@@ -1748,15 +1843,6 @@ export function AdminPrompts() {
 
           {/* Quick Actions & User */}
           <div className="flex items-center gap-2.5 sm:gap-3 -ml-2 pr-1">
-            {/* Test Sandbox */}
-            <button
-              onClick={() => selectedAgent ? setShowTestSandbox(true) : setError(t('selectAgentError'))}
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-700 hover:text-brand-800 bg-slate-50 hover:bg-brand-50/60 px-3.5 py-2 rounded-xl border border-slate-200/90 hover:border-brand-300 transition shadow-xs"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-brand-600" />
-              <span className="hidden sm:inline">{t('testSandbox')}</span>
-            </button>
-
             {/* Notifications */}
             <button className="relative p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors">
               <Bell className="w-4 h-4" />
@@ -2124,13 +2210,6 @@ export function AdminPrompts() {
                     <span>{t('versionHistory')}</span>
                   </button>
                   <button
-                    onClick={() => setShowTestSandbox(true)}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold text-brand-800 bg-brand-50 hover:bg-brand-100 border border-brand-200 rounded-xl transition shadow-xs"
-                  >
-                    <Play className="w-3 h-3 text-brand-600" />
-                    <span>{t('testThisSandbox')}</span>
-                  </button>
-                  <button
                     onClick={() => setShowPublishConfirm(true)}
                     className="inline-flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold text-white bg-brand-700 hover:bg-brand-800 rounded-xl shadow-sm transition hover:shadow focus:ring-2 focus:ring-brand-700"
                   >
@@ -2430,15 +2509,60 @@ export function AdminPrompts() {
                       <span className="text-[11px] text-slate-400 font-medium">{t('showOnNewChat')}</span>
                     </div>
 
-                    {/* Add Question Button */}
-                    <button
-                      type="button"
-                      onClick={() => { setQuestionModalInput(''); setShowAddQuestionModal(true); }}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-brand-700 hover:bg-brand-800 text-white rounded-lg text-xs font-semibold shadow-sm transition"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>{t('addQuestion')}</span>
-                    </button>
+                    {/* Add Question Button - Inline Form */}
+                    {showAddQuestionModal ? (
+                      <div className="flex gap-2 items-center bg-brand-50 p-2 rounded-lg border-2 border-brand-300">
+                        <input
+                          type="text"
+                          value={questionModalInput}
+                          onChange={(e) => setQuestionModalInput(e.target.value)}
+                          placeholder="Nhập câu hỏi mới..."
+                          className="flex-1 px-3 py-1.5 text-xs border border-brand-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-700/30 focus:border-brand-700"
+                          autoFocus
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              handleAddQuestionFromModal();
+                            } else if (e.key === 'Escape') {
+                              setShowAddQuestionModal(false);
+                              setQuestionModalInput('');
+                            }
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={handleAddQuestionFromModal}
+                          className="px-3 py-1.5 bg-brand-700 hover:bg-brand-800 text-white rounded-lg text-xs font-semibold transition flex items-center gap-1"
+                          title="Thêm câu hỏi"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>Thêm</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { setShowAddQuestionModal(false); setQuestionModalInput(''); }}
+                          className="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-xs font-semibold transition flex items-center gap-1"
+                          title="Hủy"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                          <span>Hủy</span>
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          console.log('[Add Question] Button clicked, current agent:', selectedAgent?.id);
+                          setQuestionModalInput('');
+                          setShowAddQuestionModal(true);
+                          console.log('[Add Question] Modal should now be shown, state:', true);
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-brand-700 hover:bg-brand-800 text-white rounded-lg text-xs font-semibold shadow-sm transition"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>{t('addQuestion')}</span>
+                      </button>
+                    )}
 
                     {/* Questions List */}
                     <div className="space-y-2 pt-1">
@@ -2570,60 +2694,392 @@ export function AdminPrompts() {
         </div>
       )}
 
-      {/* ===== ADD URL MODAL ===== */}
+      {/* ===== ADD URL MODAL - NEW UI/UX ===== */}
       {showAddUrlModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-            <div className="p-5 border-b border-slate-200 flex items-center justify-between bg-gradient-to-r from-brand-700 to-teal-600">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
-                  <Database className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-bold text-white">Thêm URL Knowledge</h2>
-                  <p className="text-xs text-white/80">Thêm nguồn kiến thức mới cho Agent</p>
-                </div>
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-6">
+          <div className="bg-white rounded-3xl shadow-modal border border-white/80 w-full max-w-[620px] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-300">
+            {/* Header */}
+            <div className="relative px-7 pt-7 pb-5 bg-gradient-to-b from-brand-50/50 via-white to-white border-b border-slate-100 flex items-start gap-4">
+              {/* Header Icon */}
+              <div className="flex-shrink-0 w-12 h-12 rounded-2xl bg-gradient-to-tr from-brand-700 to-brand-500 text-white flex items-center justify-center shadow-md shadow-brand-700/25 ring-4 ring-brand-50">
+                <Database className="w-6 h-6" />
               </div>
-              <button
-                onClick={() => setShowAddUrlModal(false)}
-                className="p-2 hover:bg-white/20 rounded-xl transition-colors"
-              >
-                <X className="w-5 h-5 text-white" />
-              </button>
-            </div>
-            <div className="flex-1 p-5 flex flex-col gap-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-2">URL Document</label>
-                <input
-                  type="url"
-                  value={urlModalInput}
-                  onChange={(e) => setUrlModalInput(e.target.value)}
-                  placeholder="https://example.com/document..."
-                  className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-700/20 focus:border-brand-700 transition-all text-sm"
-                  autoFocus
-                />
-              </div>
-              <div className="bg-brand-50 rounded-xl p-3 border border-brand-100">
-                <p className="text-xs text-brand-700 flex items-start gap-2">
-                  <Database className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                  <span>URL sẽ được hệ thống tự động crawl và vector hóa để phục vụ RAG trong 24h.</span>
+              {/* Header Titles & Badges */}
+              <div className="flex-1 pr-8">
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  <h2 className="text-xl font-bold tracking-tight text-slate-900 leading-snug">Thêm URL Knowledge</h2>
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-brand-100 text-brand-800 border border-brand-200/70">Web Crawler</span>
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">MADA-v2.4</span>
+                </div>
+                <p className="text-sm text-slate-500 mt-1 leading-relaxed">
+                  Cào dữ liệu website & đồng bộ vào kho tri thức vector phục vụ huấn luyện trợ lý AI.
                 </p>
               </div>
+              {/* Close Button */}
+              <button
+                onClick={() => { setShowAddUrlModal(false); setScrapeResult(null); }}
+                className="absolute top-6 right-6 text-slate-400 hover:text-slate-600 hover:bg-slate-100 p-2 rounded-xl transition-all"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
-            <div className="p-5 border-t border-slate-200 flex gap-3 justify-end">
+            
+            {/* Body */}
+            <div className="px-7 py-5 overflow-y-auto custom-scroll max-h-[calc(88vh-160px)] space-y-6">
+              {/* Field 1: Input URL Document */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="inline-flex items-center gap-1.5 text-sm font-bold text-slate-800 tracking-tight">
+                    <svg className="w-4 h-4 text-brand-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path>
+                    </svg>
+                    URL Document <span className="text-rose-500 font-semibold">*</span>
+                  </label>
+                  <span className="text-xs font-medium text-slate-400 flex items-center gap-1">
+                    <svg className="w-3.5 h-3.5 text-emerald-600" fill="currentColor" viewBox="0 0 20 20">
+                      <path clipRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" fillRule="evenodd"></path>
+                    </svg>
+                    Hỗ trợ HTTPS / HTTP
+                  </span>
+                </div>
+                {/* Input with Icon and Paste Button */}
+                <div className="relative rounded-2xl shadow-sm transition-all duration-200 group focus-within:ring-2 focus-within:ring-brand-700 focus-within:border-brand-700">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 group-focus-within:text-brand-700 transition-colors">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path>
+                    </svg>
+                  </div>
+                  <input
+                    type="url"
+                    value={urlModalInput}
+                    onChange={(e) => setUrlModalInput(e.target.value)}
+                    placeholder="https://example.com/tai-lieu-tro-nang-ai..."
+                    className="block w-full pl-11 pr-24 py-3.5 text-sm font-medium text-slate-800 placeholder-slate-400 bg-white border border-slate-300 rounded-2xl focus:outline-none focus:border-brand-700 transition-all"
+                    autoFocus
+                  />
+                  <div className="absolute inset-y-0 right-1.5 flex items-center gap-1 pr-2">
+                    <button
+                      onClick={async () => {
+                        try {
+                          if (navigator.clipboard) {
+                            const text = await navigator.clipboard.readText();
+                            if (text) setUrlModalInput(text);
+                          }
+                        } catch (err) {
+                          console.warn('Clipboard access denied');
+                        }
+                      }}
+                      className="px-2.5 py-1 text-xs font-semibold text-brand-700 bg-brand-50 hover:bg-brand-100 rounded-lg transition-colors border border-brand-200/60"
+                    >
+                      Dán URL
+                    </button>
+                  </div>
+                </div>
+                <p className="text-[12px] text-slate-500 flex items-center gap-1.5 pl-1">
+                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                  Đã kiểm tra liên kết hợp lệ & có thể truy cập công khai.
+                </p>
+              </div>
+              
+              {/* Field 2: Crawl Mode Selection - Card Selectors */}
+              <div className="space-y-3">
+                <div className="text-sm font-bold text-slate-800 flex items-center justify-between">
+                  <span>Phương thức cào dữ liệu:</span>
+                  <span className="text-xs font-normal text-slate-400">Chọn 1 trong 3 chế độ</span>
+                </div>
+                
+                {/* Mode 1: Instant Crawl */}
+                <label className={`relative flex items-start p-4 rounded-2xl border-2 cursor-pointer transition-all duration-200 group ${crawlMode === 'instant' ? 'border-brand-700 bg-tealSurface/70 shadow-card-active' : 'border-slate-200 bg-white hover:border-brand-300'}`}>
+                  <div className="flex items-center h-6 mr-3.5 mt-0.5">
+                    <input
+                      type="radio"
+                      name="crawl_mode"
+                      value="instant"
+                      checked={crawlMode === 'instant'}
+                      onChange={() => setCrawlMode('instant')}
+                      className="w-5 h-5 text-brand-700 border-slate-300 focus:ring-brand-700 focus:ring-offset-2"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="w-6 h-6 rounded-lg bg-brand-700 text-white flex items-center justify-center text-xs shadow-sm">
+                          <Sparkles className="w-3.5 h-3.5" />
+                        </span>
+                        <span className="text-sm font-bold text-brand-900 group-hover:text-brand-800">Cào ngay lập tức</span>
+                        <span className="text-xs text-slate-500 font-medium">(Instant Crawl)</span>
+                      </div>
+                      {crawlMode === 'instant' && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-bold tracking-wider rounded-md uppercase bg-brand-700 text-white shadow-xs">
+                          <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3"></path>
+                          </svg>
+                          ACTIVE
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-2 text-xs text-brand-900/90 leading-relaxed">
+                      URL sẽ được crawl, trích xuất nội dung và đánh chỉ mục (index) ngay lập tức. Phù hợp nhất cho tài liệu độc lập, 1 bài viết hoặc 1 landing page.
+                    </p>
+                    <div className="mt-2.5 flex items-center gap-4 text-[11px] text-brand-800/80 font-medium">
+                      <span className="inline-flex items-center gap-1">
+                        <svg className="w-3.5 h-3.5 text-brand-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path>
+                        </svg>
+                        Thời gian: ~10 - 25 giây
+                      </span>
+                      <span className="inline-flex items-center gap-1 text-emerald-700">
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path>
+                        </svg>
+                        Ưu tiên tài nguyên cao nhất
+                      </span>
+                    </div>
+                  </div>
+                </label>
+                
+                {/* Mode 2: Deep Scrape */}
+                <label className={`relative flex items-start p-4 rounded-2xl border-2 cursor-pointer transition-all duration-200 group ${crawlMode === 'deep' ? 'border-purple-600 bg-purple-50/40 shadow-card-active' : 'border-slate-200 bg-white hover:border-purple-300'}`}>
+                  <div className="flex items-center h-6 mr-3.5 mt-0.5">
+                    <input
+                      type="radio"
+                      name="crawl_mode"
+                      value="deep"
+                      checked={crawlMode === 'deep'}
+                      onChange={() => setCrawlMode('deep')}
+                      className="w-5 h-5 text-purple-600 border-slate-300 focus:ring-purple-500 focus:ring-offset-2"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="w-6 h-6 rounded-lg bg-purple-100 text-purple-700 flex items-center justify-center text-xs">
+                          <Wand2 className="w-3.5 h-3.5" />
+                        </span>
+                        <span className="text-sm font-bold text-slate-800 group-hover:text-purple-900">Cào sâu nhiều tầng</span>
+                        <span className="text-xs text-purple-600 font-medium">(Deep Scrape)</span>
+                      </div>
+                      {crawlMode === 'deep' && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-bold tracking-wider rounded-md uppercase bg-purple-600 text-white shadow-xs">
+                          <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3"></path>
+                          </svg>
+                          ACTIVE
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-2 text-xs text-slate-500 leading-relaxed group-hover:text-slate-600">
+                      Hệ thống tự động khám phá và thu thập tất cả các liên kết con (sub-pages) cùng domain để xây dựng bộ kiến thức toàn diện cho AI.
+                    </p>
+                    
+                    {/* Deep Scrape Config */}
+                    {crawlMode === 'deep' && (
+                      <div className="mt-4 pt-4 border-t border-purple-200/50 space-y-4">
+                        {/* Max Depth */}
+                        <div>
+                          <div className="flex items-center justify-between mb-1.5">
+                            <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                              <svg className="w-3.5 h-3.5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path>
+                              </svg>
+                              Độ sâu tối đa
+                            </label>
+                            <span className="text-xs font-bold text-purple-700 bg-purple-100 px-2 py-0.5 rounded-md font-mono">{deepScrapeDepth} cấp</span>
+                          </div>
+                          <input
+                            type="range"
+                            min="1"
+                            max="5"
+                            value={deepScrapeDepth}
+                            onChange={(e) => setDeepScrapeDepth(parseInt(e.target.value))}
+                            className="w-full h-2 bg-purple-200 rounded-lg appearance-none cursor-pointer accent-purple-600"
+                          />
+                          <div className="flex justify-between text-[10px] text-slate-500 mt-1">
+                            <span>1 (Chỉ trang hiện tại)</span>
+                            <span>5 (Cào sâu nhất)</span>
+                          </div>
+                        </div>
+                        
+                        {/* Max Pages */}
+                        <div>
+                          <div className="flex items-center justify-between mb-1.5">
+                            <label className="text-xs font-semibold text-slate-700">Số trang tối đa</label>
+                            <span className="text-xs font-bold text-purple-700 bg-purple-100 px-2 py-0.5 rounded-md font-mono">{deepScrapeMaxPages} trang</span>
+                          </div>
+                          <input
+                            type="range"
+                            min="5"
+                            max="100"
+                            step="5"
+                            value={deepScrapeMaxPages}
+                            onChange={(e) => setDeepScrapeMaxPages(parseInt(e.target.value))}
+                            className="w-full h-2 bg-purple-200 rounded-lg appearance-none cursor-pointer accent-purple-600"
+                          />
+                          <div className="flex justify-between text-[10px] text-slate-500 mt-1">
+                            <span>5 trang</span>
+                            <span>100 trang</span>
+                          </div>
+                        </div>
+                        
+                        {/* Quick Presets */}
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-[10px] text-slate-500 font-medium">Presets:</span>
+                          <button
+                            onClick={() => { setDeepScrapeDepth(1); setDeepScrapeMaxPages(5); }}
+                            className={`px-2 py-1 text-[10px] font-medium rounded-md border transition ${deepScrapeDepth === 1 && deepScrapeMaxPages === 5 ? 'bg-purple-100 border-purple-300 text-purple-700' : 'bg-white border-slate-200 text-slate-600 hover:border-purple-300'}`}
+                          >
+                            Nhanh (5 trang)
+                          </button>
+                          <button
+                            onClick={() => { setDeepScrapeDepth(2); setDeepScrapeMaxPages(20); }}
+                            className={`px-2 py-1 text-[10px] font-medium rounded-md border transition ${deepScrapeDepth === 2 && deepScrapeMaxPages === 20 ? 'bg-purple-100 border-purple-300 text-purple-700' : 'bg-white border-slate-200 text-slate-600 hover:border-purple-300'}`}
+                          >
+                            Trung bình (20 trang)
+                          </button>
+                          <button
+                            onClick={() => { setDeepScrapeDepth(3); setDeepScrapeMaxPages(50); }}
+                            className={`px-2 py-1 text-[10px] font-medium rounded-md border transition ${deepScrapeDepth === 3 && deepScrapeMaxPages === 50 ? 'bg-purple-100 border-purple-300 text-purple-700' : 'bg-white border-slate-200 text-slate-600 hover:border-purple-300'}`}
+                          >
+                            Sâu (50 trang)
+                          </button>
+                          <button
+                            onClick={() => { setDeepScrapeDepth(5); setDeepScrapeMaxPages(100); }}
+                            className={`px-2 py-1 text-[10px] font-medium rounded-md border transition ${deepScrapeDepth === 5 && deepScrapeMaxPages === 100 ? 'bg-purple-100 border-purple-300 text-purple-700' : 'bg-white border-slate-200 text-slate-600 hover:border-purple-300'}`}
+                          >
+                            Toàn bộ (100 trang)
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </label>
+                
+                {/* Mode 3: Scheduled Auto Scrape */}
+                <label className={`relative flex items-start p-4 rounded-2xl border-2 cursor-pointer transition-all duration-200 group ${crawlMode === 'scheduled' ? 'border-amber-500 bg-amber-50/40 shadow-card-active' : 'border-slate-200 bg-white hover:border-amber-300'}`}>
+                  <div className="flex items-center h-6 mr-3.5 mt-0.5">
+                    <input
+                      type="radio"
+                      name="crawl_mode"
+                      value="scheduled"
+                      checked={crawlMode === 'scheduled'}
+                      onChange={() => setCrawlMode('scheduled')}
+                      className="w-5 h-5 text-amber-600 border-slate-300 focus:ring-amber-500 focus:ring-offset-2"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="w-6 h-6 rounded-lg bg-amber-100 text-amber-600 flex items-center justify-center text-xs">
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path>
+                          </svg>
+                        </span>
+                        <span className="text-sm font-bold text-slate-800 group-hover:text-amber-900">Lên lịch tự động</span>
+                        <span className="text-xs text-amber-600 font-medium">(Auto Scrape 24h)</span>
+                      </div>
+                      {crawlMode === 'scheduled' && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-bold tracking-wider rounded-md uppercase bg-amber-500 text-white shadow-xs">
+                          <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3"></path>
+                          </svg>
+                          ACTIVE
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-2 text-xs text-slate-500 leading-relaxed group-hover:text-slate-600">
+                      URL sẽ được lưu vào hàng đợi và hệ thống sẽ tự động crawl trong vòng 24 giờ. Phù hợp khi thêm nhiều URL cùng lúc.
+                    </p>
+                    <div className="mt-2.5 flex items-center gap-4 text-[11px] text-slate-600 font-medium">
+                      <span className="inline-flex items-center gap-1 text-amber-700">
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path>
+                        </svg>
+                        Tiết kiệm tài nguyên server
+                      </span>
+                    </div>
+                  </div>
+                </label>
+              </div>
+              
+              {/* Field 3: Info Notice Box */}
+              <div className="p-4 rounded-2xl bg-amber-50/60 border border-amber-200/70 text-amber-900/90 text-xs space-y-2 leading-relaxed">
+                <div className="flex items-center gap-2 font-bold text-amber-950">
+                  <svg className="w-4 h-4 text-amber-600 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path clipRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" fillRule="evenodd"></path>
+                  </svg>
+                  <span>Quy trình xử lý dữ liệu tự động</span>
+                </div>
+                <ul className="list-disc list-inside space-y-1 text-slate-700 pl-0.5">
+                  <li><strong className="text-slate-800">Cào ngay:</strong> Crawl & index dữ liệu trực tiếp để AI có thể trích xuất ngữ nghĩa và trả lời tức thì.</li>
+                  <li><strong className="text-slate-800">Cào sâu:</strong> Tự động bóc tách các liên kết nội bộ (internal links) cùng tên miền.</li>
+                </ul>
+                <div className="pt-1 flex items-center gap-1.5 text-amber-800 font-medium">
+                  <svg className="w-3.5 h-3.5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path>
+                  </svg>
+                  <span><strong>Lưu ý:</strong> Chế độ cào sâu có thể mất vài phút tùy vào số lượng và dung lượng các trang con.</span>
+                </div>
+              </div>
+              
+              {/* Scrape Result */}
+              {scrapeResult && (
+                <div className={`rounded-xl p-3 border flex items-start gap-2 ${scrapeResult.success ? 'bg-emerald-50 border-emerald-200' : 'bg-rose-50 border-rose-200'}`}>
+                  {scrapeResult.success ? (
+                    <Check className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
+                  ) : (
+                    <X className="w-4 h-4 text-rose-600 flex-shrink-0 mt-0.5" />
+                  )}
+                  <span className={`text-xs font-medium ${scrapeResult.success ? 'text-emerald-700' : 'text-rose-700'}`}>
+                    {scrapeResult.message}
+                  </span>
+                </div>
+              )}
+            </div>
+            
+            {/* Footer */}
+            <div className="px-7 py-4 bg-slate-50/90 border-t border-slate-200/80 flex flex-col-reverse sm:flex-row items-center justify-between gap-3">
+              {/* Test Link Button */}
               <button
-                onClick={() => setShowAddUrlModal(false)}
-                className="px-5 py-2.5 text-slate-600 hover:bg-slate-100 rounded-xl transition-colors font-medium"
+                onClick={() => {
+                  if (urlModalInput) window.open(urlModalInput, '_blank');
+                }}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 bg-white hover:bg-slate-100 border border-slate-200 rounded-xl transition-all shadow-xs"
               >
-                Hủy
+                <svg className="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path>
+                </svg>
+                Kiểm tra liên kết
               </button>
-              <button
-                onClick={handleAddUrlFromModal}
-                className="px-5 py-2.5 bg-gradient-to-r from-brand-700 to-teal-700 text-white rounded-xl font-semibold hover:from-brand-800 hover:to-teal-800 transition-all flex items-center gap-2"
-              >
-                <Plus className="w-4 h-4" />
-                Thêm URL
-              </button>
+              {/* Right Actions */}
+              <div className="w-full sm:w-auto flex items-center justify-end gap-2.5">
+                <button
+                  onClick={() => { setShowAddUrlModal(false); setScrapeResult(null); }}
+                  className="w-1/2 sm:w-auto px-5 py-2.5 text-sm font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-200/70 rounded-xl transition-colors text-center"
+                >
+                  Hủy bỏ
+                </button>
+                <button
+                  onClick={handleAddUrlFromModal}
+                  disabled={!urlModalInput.trim() || scrapeLoading}
+                  className="w-1/2 sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-2.5 text-sm font-bold text-white bg-brand-700 hover:bg-brand-800 active:scale-[0.98] rounded-xl shadow-lg shadow-brand-700/30 hover:shadow-brand-700/40 transition-all focus:outline-none focus:ring-2 focus:ring-brand-700 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {scrapeLoading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Đang khởi tạo crawler...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4 text-brand-200" />
+                      <span>
+                        {crawlMode === 'instant' && 'Thêm & Cào ngay'}
+                        {crawlMode === 'deep' && 'Thêm & Cào sâu'}
+                        {crawlMode === 'scheduled' && 'Thêm URL'}
+                      </span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -2631,8 +3087,8 @@ export function AdminPrompts() {
 
       {/* ===== ADD QUESTION MODAL ===== */}
       {showAddQuestionModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4" onClick={() => console.log('[Add Question Modal] Backdrop clicked')}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200" onClick={(e) => { e.stopPropagation(); console.log('[Add Question Modal] Modal clicked'); }}>
             <div className="p-5 border-b border-slate-200 flex items-center justify-between bg-gradient-to-r from-brand-700 to-teal-600">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
@@ -2683,59 +3139,6 @@ export function AdminPrompts() {
                 <Plus className="w-4 h-4" />
                 Thêm câu hỏi
               </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ===== TEST SANDBOX MODAL ===== */}
-      {showTestSandbox && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
-            <div className="p-5 border-b border-slate-200 flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                  <Sparkles className="w-5 h-5 text-brand-700" />
-                  {t('testSandbox')}
-                </h2>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Agent: <span className="font-semibold">{selectedAgent ? getLocalizedAgentName(selectedAgent) : ''}</span>
-                </p>
-              </div>
-              <button
-                onClick={() => { setShowTestSandbox(false); setTestMessage(''); setTestResponse(''); }}
-                className="p-2 hover:bg-slate-100 rounded-xl transition-colors"
-              >
-                <X className="w-5 h-5 text-slate-500" />
-              </button>
-            </div>
-            <div className="flex-1 p-5 flex flex-col gap-4 overflow-y-auto">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">{t('testMessage')}</label>
-                <textarea
-                  value={testMessage}
-                  onChange={(e) => setTestMessage(e.target.value)}
-                  placeholder={language === 'vi' ? 'Nhập tin nhắn để test Agent...' : 'Enter a message to test the Agent...'}
-                  rows={3}
-                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-700/20 focus:border-brand-700 transition text-sm resize-none"
-                />
-              </div>
-              <button
-                onClick={handleTestSandbox}
-                disabled={testLoading || !testMessage.trim()}
-                className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-brand-700 hover:bg-brand-800 disabled:bg-slate-300 text-white rounded-xl text-xs font-bold transition"
-              >
-                {testLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
-                {testLoading ? t('processing') : t('sendTest')}
-              </button>
-              {testResponse && (
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5">{t('agentResponse')}</label>
-                  <div className="w-full px-4 py-3 border border-slate-200 rounded-xl bg-slate-50 text-sm text-slate-700 whitespace-pre-wrap font-mono leading-relaxed max-h-64 overflow-y-auto">
-                    {testResponse}
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         </div>

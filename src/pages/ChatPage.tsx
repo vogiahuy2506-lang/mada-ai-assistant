@@ -28,6 +28,33 @@ import { onAgentChange } from '@/lib/agentBroadcast';
 import { onSettingsChange } from '@/lib/settingsBroadcast';
 import { MADA_BOTS } from '@/lib/madaBots';
 
+// ⭐ Helper: Staggered fetch with retry to avoid 429 rate limiting
+async function staggeredFetch(url: string, delayMs: number = 100, retries: number = 3): Promise<Response> {
+  await new Promise(resolve => setTimeout(resolve, delayMs));
+  let lastError: Error | null = null;
+  
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const res = await fetch(url);
+      if (res.status === 429 && attempt < retries) {
+        const retryDelay = Math.min(500 * Math.pow(2, attempt), 3000); // exponential backoff, max 3s
+        console.warn(`[staggeredFetch] 429 received for ${url}, retrying in ${retryDelay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+        continue;
+      }
+      return res;
+    } catch (err) {
+      lastError = err as Error;
+      if (attempt < retries) {
+        const retryDelay = Math.min(500 * Math.pow(2, attempt), 3000);
+        console.warn(`[staggeredFetch] Error for ${url}: ${err}, retrying in ${retryDelay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+      }
+    }
+  }
+  throw lastError || new Error(`Failed to fetch ${url} after ${retries + 1} attempts`);
+}
+
 // ⭐ Map botId → ATCategory (dùng để sync thứ tự agent ↔ sidebar)
 // NOTE: bot-neuro → mobility (neuromuscular), bot-mobility → daily_living
 const BOT_ID_TO_CATEGORY: Record<string, ATCategory> = {
@@ -861,93 +888,158 @@ export function ChatPage() {
     fetchFileQuota();
   }, [fetchFileQuota]);
 
-  // ⭐ Sync agents from backend on mount + when window regains focus
+  // ⭐ Sync agents from backend on mount + when window regains focus (STAGGERED to avoid 429)
   const loadAgents = useAgentStore((s) => s.loadAgents);
-  useEffect(() => {
-    // ⭐ Force reload từ backend - xóa cache localStorage trước để luôn lấy dữ liệu mới nhất
-    // Đây là nguyên nhân chính: persist middleware đọc từ localStorage cũ khiến sidebar không cập nhật
+  
+  // Helper: Map backend agent to frontend format (reused for direct API calls)
+  const mapBackendAgent = (a: any) => ({
+    id: a.id,
+    name: a.name,
+    description: a.description || '',
+    avatar: a.avatar || '🤖',
+    systemPrompt: a.system_prompt || a.systemPrompt || '',
+    capabilities: Array.isArray(a.capabilities) ? a.capabilities : [],
+    isActive: a.isActive === true || a.is_active === 1,
+    createdBy: a.created_by === 'admin' || a.createdBy === 'admin' ? 'admin' : 'user',
+    createdAt: a.createdAt ? new Date(a.createdAt).getTime()
+      : a.created_at ? new Date(a.created_at).getTime()
+      : Date.now(),
+    updatedAt: a.updatedAt ? new Date(a.updatedAt).getTime()
+      : a.updated_at ? new Date(a.updated_at).getTime()
+      : Date.now(),
+    madaCategory: a.mada_category || a.madaCategory,
+    botId: a.bot_id || a.botId,
+    promptId: a.promptId || a.prompt_id || undefined,
+    avatarUrl: a.avatar_url || a.avatarUrl,
+    knowledgeUrl: a.knowledge_url || a.knowledgeUrl,
+    productUrl: a.product_url || a.productUrl,
+    sortOrder: a.sort_order ?? a.sortOrder ?? 0,
+  });
+  
+  // Helper: Fetch agents directly from API and update store
+  const fetchAgentsDirectly = useCallback(() => {
+    // Xóa cache trước khi fetch
     try {
-      const storageKey = 'mada-agents'; // key của persist middleware
+      const storageKey = 'mada-agents';
       const raw = localStorage.getItem(storageKey);
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (parsed.state?.agents && parsed.state.agents.length > 0) {
-          console.log('[ChatPage] Clearing stale agent cache from localStorage before fresh fetch...');
-          // Xóa agents cũ trong persist storage để force fetch từ API
+        if ((parsed.state?.agents && parsed.state.agents.length > 0) || parsed.state?.lastSynced) {
+          console.log('[ChatPage] 🔄 Clearing cache before direct fetch...');
           const newState = { ...parsed, state: { ...parsed.state, agents: [], lastSynced: null } };
           localStorage.setItem(storageKey, JSON.stringify(newState));
-          // Đồng thời xóa trong store hiện tại
-          useAgentStore.setState({ agents: [], lastSynced: null });
         }
       }
-    } catch (e) {
-      console.warn('[ChatPage] Could not clear agent cache:', e);
-    }
-
-    console.log('[ChatPage] Loading agents from backend...');
-    loadAgents().then(() => {
-      const count = useAgentStore.getState().agents.length;
-      console.log('[ChatPage] Agents loaded, count:', count);
-      if (count > 0) {
-        useAgentStore.getState().agents.forEach((a, i) => {
-          console.log(`  [${i}] "${a.name}" sortOrder=${a.sortOrder ?? '?'} botId=${a.botId || 'none'}`);
-        });
-      }
-    }).catch((err) => {
-      console.error('[ChatPage] Failed to load agents:', err);
-    });
-    const onFocus = () => {
-      console.log('[ChatPage] Window focus - reloading agents...');
-      // Xóa cache trước khi reload
-      try {
-        const storageKey = 'mada-agents';
-        const raw = localStorage.getItem(storageKey);
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          if (parsed.state?.agents?.length > 0) {
-            const newState = { ...parsed, state: { ...parsed.state, agents: [], lastSynced: null } };
-            localStorage.setItem(storageKey, JSON.stringify(newState));
-            useAgentStore.setState({ agents: [], lastSynced: null });
-          }
+    } catch (_) {}
+    
+    // Xóa store state TRƯỚC KHI gọi API để tránh persist rehydrate ghi đè
+    useAgentStore.setState({ agents: [], lastSynced: null });
+    
+    return fetch('/api/public/agents')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && Array.isArray(data.data)) {
+          const freshAgents = data.data.map(mapBackendAgent);
+          console.log('[ChatPage] ✅ Agents fetched directly:', freshAgents.length, 'active:', freshAgents.filter(a => a.isActive).length);
+          freshAgents.forEach((a, i) => console.log(`  [${i}] "${a.name}" isActive=${a.isActive}`));
+          useAgentStore.setState({
+            agents: freshAgents,
+            lastSynced: Date.now(),
+            backendConnected: true,
+            isLoading: false,
+            isSyncing: false,
+          });
         }
-      } catch (_) {}
-      loadAgents();
-    };
-    window.addEventListener('focus', onFocus);
-    return () => window.removeEventListener('focus', onFocus);
+      })
+      .catch(err => {
+        console.error('[ChatPage] ❌ Direct fetch failed:', err);
+        // Fallback to loadAgents
+        loadAgents();
+      });
   }, [loadAgents]);
 
-  // ⭐ Sync system settings (categoryOrder) from backend on mount + when window regains focus
+  useEffect(() => {
+    // ⭐ Stagger delay to avoid 429 rate limiting on initial load
+    const timer = setTimeout(() => {
+      console.log('[ChatPage] Loading agents from backend (direct)...');
+      fetchAgentsDirectly();
+    }, 200); // 200ms delay to avoid initial burst
+    
+    const onFocus = () => {
+      console.log('[ChatPage] Window focus - reloading agents...');
+      fetchAgentsDirectly();
+    };
+    window.addEventListener('focus', onFocus);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, [fetchAgentsDirectly]);
+
+  // ⭐ Sync system settings (categoryOrder) from backend on mount + when window regains focus (STAGGERED)
   const loadSystemSettings = useSystemSettingsStore((s) => s.loadFromBackend);
   useEffect(() => {
-    console.log('[ChatPage] Loading system settings from backend...');
-    loadSystemSettings().then(() => {
-      console.log('[ChatPage] System settings loaded, categoryOrder:', useSystemSettingsStore.getState().categoryOrder);
-    }).catch((err) => {
-      console.error('[ChatPage] Failed to load system settings:', err);
-    });
+    // ⭐ Stagger delay to avoid 429
+    const timer = setTimeout(() => {
+      console.log('[ChatPage] Loading system settings from backend...');
+      loadSystemSettings().then(() => {
+        console.log('[ChatPage] System settings loaded, categoryOrder:', useSystemSettingsStore.getState().categoryOrder);
+      }).catch((err) => {
+        console.error('[ChatPage] Failed to load system settings:', err);
+      });
+    }, 100); // 100ms delay
     const onFocus = () => {
       console.log('[ChatPage] Window focus - reloading system settings...');
       loadSystemSettings();
     };
     window.addEventListener('focus', onFocus);
-    return () => window.removeEventListener('focus', onFocus);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('focus', onFocus);
+    };
   }, [loadSystemSettings]);
 
-  // ⭐ Fetch custom questions from API on mount
+  // ⭐ Fetch custom questions from API on mount - ONE REQUEST for all categories (STAGGERED)
   useEffect(() => {
-    const categories: ATCategory[] = ['vision', 'hearing', 'mobility', 'cognition', 'communication', 'daily_living', 'education'];
-    categories.forEach(cat => {
-      fetch(`/api/admin/suggested-questions?category=${cat}&view_mode=end_user&language=${language}&is_active=true`)
-        .then(res => res.json())
-        .then(data => {
-          if (data.success && data.data) {
-            const questions = data.data.map((q: any) => q.question).slice(0, 4);
-            setCustomQuestions(prev => ({ ...prev, [cat]: questions }));
-          }
-        })
-        .catch(err => console.error('[ChatPage] Failed to fetch custom questions:', err));
-    });
+    const controller = new AbortController();
+    
+    // ⭐ Stagger delay to avoid 429 on initial load
+    const timer = setTimeout(async () => {
+      try {
+        const res = await staggeredFetch(
+          `/api/admin/suggested-questions?view_mode=end_user&language=${language}&is_active=true`,
+          0, // no initial delay since we have setTimeout
+          2  // 2 retries for 429
+        );
+        
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        
+        if (data.success && data.data) {
+          // Group questions by category, take only 4 per category
+          const grouped: Record<string, string[]> = {};
+          const categories: ATCategory[] = ['vision', 'hearing', 'mobility', 'cognition', 'communication', 'daily_living', 'education'];
+          categories.forEach(cat => grouped[cat] = []);
+          
+          data.data.forEach((q: any) => {
+            if (q.category && grouped[q.category] && grouped[q.category].length < 4) {
+              grouped[q.category].push(q.question);
+            }
+          });
+          
+          setCustomQuestions(grouped);
+        }
+      } catch (err) {
+        if (err instanceof Error && err.name !== 'AbortError') {
+          console.error('[ChatPage] Failed to fetch custom questions:', err);
+        }
+      }
+    }, 150); // 150ms delay
+    
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
   }, [language]);
 
   // ⭐ Load conversation from URL session parameter
@@ -968,7 +1060,7 @@ export function ChatPage() {
   // ⭐ Lắng nghe broadcast từ AdminAgents - cập nhật agents ngay khi admin thêm/sửa/xóa bot
   useEffect(() => {
     const cleanup = onAgentChange((event) => {
-      console.log('[ChatPage] 📡 Received agent change broadcast:', event.type, event);
+      console.log('[ChatPage] 📡 Received agent change broadcast:', event.type, event.agentId || '');
 
       // ⭐ Xử lý thay đổi category order (từ AdminSettings)
       if (event.type === 'category-order-changed') {
@@ -977,57 +1069,110 @@ export function ChatPage() {
         return;
       }
 
-      // Reload agents ngay lập tức khi có thay đổi từ Admin
+      // ⭐ Xử lý thay đổi questions
+      if (event.type === 'questions-changed') {
+        const catsToFetch: ATCategory[] = event.category ? [event.category as ATCategory] : ['vision', 'hearing', 'mobility', 'cognition', 'communication', 'daily_living', 'education'];
+        
+        staggeredFetch(`/api/admin/suggested-questions?view_mode=end_user&language=${language}&is_active=true`, 0, 2)
+          .then(res => res.json())
+          .then(data => {
+            if (data.success && data.data) {
+              const grouped: Record<string, string[]> = {};
+              catsToFetch.forEach(cat => grouped[cat] = []);
+              data.data.forEach((q: any) => {
+                if (q.category && grouped[q.category] && grouped[q.category].length < 4) {
+                  grouped[q.category].push(q.question);
+                }
+              });
+              setCustomQuestions(grouped);
+            }
+          })
+          .catch(err => console.error('[ChatPage] Failed to fetch questions on broadcast:', err));
+        return;
+      }
+
+      // ⭐ Reload agents ngay lập tức khi có thay đổi từ Admin (bao gồm agent-toggled)
       // Dùng getState() để đảm bảo luôn gọi đúng phiên bản mới nhất của loadAgents
       // ⭐ Xóa cache localStorage TRƯỚC khi reload để đảm bảo không dùng dữ liệu cũ
+      
+      // Helper: Map backend agent to frontend format
+      const mapBackendAgent = (a: any) => ({
+        id: a.id,
+        name: a.name,
+        description: a.description || '',
+        avatar: a.avatar || '🤖',
+        systemPrompt: a.system_prompt || a.systemPrompt || '',
+        capabilities: Array.isArray(a.capabilities) ? a.capabilities : [],
+        isActive: a.isActive === true || a.is_active === 1,
+        createdBy: a.created_by === 'admin' || a.createdBy === 'admin' ? 'admin' : 'user',
+        createdAt: a.createdAt ? new Date(a.createdAt).getTime()
+          : a.created_at ? new Date(a.created_at).getTime()
+          : Date.now(),
+        updatedAt: a.updatedAt ? new Date(a.updatedAt).getTime()
+          : a.updated_at ? new Date(a.updated_at).getTime()
+          : Date.now(),
+        madaCategory: a.mada_category || a.madaCategory,
+        botId: a.bot_id || a.botId,
+        promptId: a.promptId || a.prompt_id || undefined,
+        avatarUrl: a.avatar_url || a.avatarUrl,
+        knowledgeUrl: a.knowledge_url || a.knowledgeUrl,
+        productUrl: a.product_url || a.productUrl,
+        sortOrder: a.sort_order ?? a.sortOrder ?? 0,
+      });
+      
       const clearCache = () => {
         try {
           const storageKey = 'mada-agents';
           const raw = localStorage.getItem(storageKey);
           if (raw) {
             const parsed = JSON.parse(raw);
-            if (parsed.state?.agents?.length > 0) {
+            // Xóa agents cũ trong persist storage để force fetch từ API
+            // Luôn xóa nếu có data (kể cả agents rỗng) để đảm bảo fresh fetch
+            if (parsed.state?.agents !== undefined || parsed.state?.lastSynced) {
               console.log('[ChatPage] 🔄 Clearing localStorage cache before broadcast reload...');
               const newState = { ...parsed, state: { ...parsed.state, agents: [], lastSynced: null } };
               localStorage.setItem(storageKey, JSON.stringify(newState));
-              useAgentStore.setState({ agents: [], lastSynced: null });
             }
           }
         } catch (_) {}
+        // Xóa trong store hiện tại TRƯỚC KHI gọi API để tránh persist rehydrate ghi đè
+        useAgentStore.setState({ agents: [], lastSynced: null });
       };
       clearCache();
 
-      console.log('[ChatPage] 🔄 Calling loadAgents() due to broadcast...');
-      useAgentStore.getState().loadAgents().then(() => {
-        const agents = useAgentStore.getState().agents;
-        console.log('[ChatPage] ✅ loadAgents complete. agents count:', agents.length);
-        agents.forEach((a, i) => console.log(`  [${i}] ${a.name} (sortOrder: ${a.sortOrder})`));
-      });
-      
-      // ⭐ Nếu là thay đổi questions, fetch lại questions từ API
-      if (event.type === 'questions-changed') {
-        const categories: ATCategory[] = ['vision', 'hearing', 'mobility', 'cognition', 'communication', 'daily_living', 'education'];
-        const catsToFetch = event.category ? [event.category as ATCategory] : categories;
-        
-        catsToFetch.forEach(cat => {
-          fetch(`/api/admin/suggested-questions?category=${cat}&view_mode=end_user&language=${language}&is_active=true`)
-            .then(res => res.json())
-            .then(data => {
-              if (data.success && data.data) {
-                const questions = data.data.map((q: any) => q.question).slice(0, 4);
-                setCustomQuestions(prev => ({ ...prev, [cat]: questions }));
-              }
-            })
-            .catch(err => console.error('[ChatPage] Failed to fetch custom questions:', err));
+      // Gọi API trực tiếp thay vì qua loadAgents() để tránh race condition với persist
+      console.log('[ChatPage] 🔄 Fetching agents directly from /public/agents...');
+      fetch('/api/public/agents')
+        .then(res => res.json())
+        .then(data => {
+          if (data.success && Array.isArray(data.data)) {
+            const freshAgents = data.data.map(mapBackendAgent);
+            console.log('[ChatPage] ✅ Fresh agents fetched:', freshAgents.length, 'active:', freshAgents.filter(a => a.isActive).length);
+            // Cập nhật store trực tiếp với dữ liệu mới
+            useAgentStore.setState({
+              agents: freshAgents,
+              lastSynced: Date.now(),
+              backendConnected: true,
+              isLoading: false,
+              isSyncing: false,
+            });
+          }
+        })
+        .catch(err => {
+          console.error('[ChatPage] ❌ Failed to fetch agents:', err);
+          // Fallback: gọi loadAgents nếu fetch trực tiếp thất bại
+          useAgentStore.getState().loadAgents();
         });
-      }
     });
     return cleanup;
   }, [language]);
 
-  // Load chat settings from backend on mount
+  // Load chat settings from backend on mount (STAGGERED to avoid 429)
   useEffect(() => {
-    loadChatSettings();
+    const timer = setTimeout(() => {
+      loadChatSettings();
+    }, 50); // Small delay
+    return () => clearTimeout(timer);
   }, [loadChatSettings]);
 
   // ⭐ Lắng nghe broadcast từ Admin - cập nhật settings ngay khi admin thay đổi
@@ -1355,19 +1500,56 @@ Mô tả: ${agent.description || 'Chuyên gia hỗ trợ'}
 System Prompt: ${agent.systemPrompt || 'Bạn là một trợ lý hữu ích.'}`;
     });
 
-    return `Bạn là TRỢ LÝ TỔNG HỢP của MADA AI Assistant - cổng thông tin hỗ trợ người khuyết tật rộng lớn nhất.
+    return `Bạn là TRỢ LÝ TỔNG HỢP CỦA MADA AI - thư viện tri thức và ngân hàng kiến thức khổng lồ về công nghệ hỗ trợ người khuyết tật.
 
 Bạn có quyền truy cập kiến thức từ ${activeAgents.length} chuyên gia sau:
 ${agentContexts.join('\n\n')}
 
-QUY TẮC ỨNG XỬ:
-1. Khi user hỏi về lĩnh vực cụ thể → hãy cung cấp câu trả lời chi tiết dựa trên kiến thức chuyên môn của bot phù hợp nhất
-2. Khi user hỏi chung chung → tổng hợp thông tin từ nhiều bot liên quan
-3. Khi user hỏi ngoài lĩnh vực hỗ trợ người khuyết tật → lịch sự hướng dẫn họ đến các chuyên gia phù hợp hoặc từ chối nhẹ nhàng
-4. Luôn thể hiện sự đồng cảm và chuyên nghiệp
-5. Ưu tiên cung cấp thông tin chính xác, cập nhật từ knowledge base nếu có
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎯 VAI TRÒ & KHẢ NĂNG CỦA BẠN
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Bạn là một "THƯ VIỆN TRI THỨC SỐNG" - tương tự như một thủ thư uyên bác nhất thế giới, kết hợp với ngân hàng kiến thức khổng lồ. Bạn có thể:
 
-Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
+✅ HIỂU và TRẢ LỜI bất kỳ câu hỏi nào về công nghệ hỗ trợ người khuyết tật
+✅ ĐI SÂU vào chi tiết kỹ thuật, giá cả, đánh giá, so sánh sản phẩm
+✅ ĐỀ XUẤT giải pháp phù hợp dựa trên mô tả triệu chứng/tình trạng của người dùng
+✅ TƯ VẤN về tiêu chuẩn quốc tế (ISO, WCAG, UNCRPD)
+✅ HƯỚNG DẪN cách sử dụng thiết bị, phần mềm hỗ trợ
+✅ GIẢI THÍCH các khái niệm phức tạp bằng ngôn ngữ dễ hiểu
+✅ KỂ CHUYỆN và đưa ra ví dụ thực tế
+✅ SUY NGHĨ like a human expert - không chỉ trả lời máy móc
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+💡 PHONG CÁCH TRẢ LỜI
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+- KHI NGƯỜI DÙNG HỎI CHUNG: Cung cấp câu trả lời tổng hợp từ nhiều chuyên gia, đầy đủ và chi tiết
+- KHI NGƯỜI DÙNG HỎI CỤ THỂ: Đi sâu vào chi tiết, có thể kể tên sản phẩm, so sánh, đưa ra ưu/nhược điểm
+- KHI NGƯỜI DÙNG MÔ TẢ TRIỆU CHỨNG: Phân tích và đề xuất giải pháp thiết bị phù hợp nhất
+- KHI CÓ SẢN PHẨM TRONG KB: Nhắc đến tên sản phẩm cụ thể kèm theo hình ảnh và thông tin chi tiết
+- LUÔN thể hiện sự đồng cảm, kiên nhẫn và chuyên nghiệp
+- KHÔNG bao giờ nói "tôi không biết" hoặc "tôi chỉ là AI" - bạn LÀ chuyên gia
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📚 CÁC LĨNH VỰC BẠN CHUYÊN SÂU
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+• Thị giác: Máy đọc màn hình, phóng to, Braille, OrCam, JAWS, NVDA, ZoomText
+• Thính giác: Máy trợ thính, FM system, Roger, phụ đề real-time, thiết bị alerting
+• Vận động: Xe lăn điện, prosthetic, orthotic, bàn phím thay thế, switch access
+• Nhận thức: Ứng dụng nhắc nhở, AAC, thiết bị cho tự kỷ/ADHD/Alzheimer
+• Giao tiếp: Thiết bị AAC, ngôn ngữ ký hiệu, ứng dụng giao tiếp
+• Giáo dục: Hỗ trợ học tập, UDL, WCAG, tiêu chuẩn AT quốc tế
+• Sinh hoạt: Thiết bị ăn uống, nhà tắm, nhà bếp, grab bar, xe lăn
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚡ LUẬT VÀNG
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. BẠN LÀ THƯ VIỆN: Luôn cố gắng trả lời đầy đủ nhất có thể từ kiến thức của bạn
+2. NẾU KHÔNG CHẮC: Dùng cụm từ "Theo thông tin tôi có..." thay vì "Tôi không biết"
+3. LUÔN HỎI THÊM: Nếu thông tin chưa đủ, hỏi người dùng để tư vấn chính xác hơn
+4. ĐỀ XUẤT SẢN PHẨM: Khi phù hợp, gợi ý sản phẩm cụ thể từ MADA Knowledge Base
+5. NGÔN NGỮ: Trả lời bằng ngôn ngữ mà user đang sử dụng
+
+Hãy trở thành người bạn đồng hành đáng tin cậy nhất của người dùng!`;
   };
 
   // ⭐ Kiểm tra xem có phải "Trò chuyện mới" không (chưa chọn agent cụ thể)
@@ -2395,12 +2577,26 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
           content: t('chat.cannotProcess'),
         });
       }
-    } catch (error) {
-      console.error('Chat error:', error);
-      addMessage({
-        role: 'assistant',
-        content: t('chat.connectionError'),
-      });
+    } catch (error: any) {
+      // Don't show error message if this was an abort (user clicked stop button)
+      // AbortError is thrown when signal.abort() is called
+      const isAbortError = 
+        error?.name === 'AbortError' || 
+        error?.name === 'CanceledError' || 
+        error?.code === 'ERR_CANCELED' ||
+        error?.message?.includes('abort') ||
+        error?.message?.includes('canceled');
+      
+      if (!isAbortError) {
+        console.error('Chat error:', error);
+        addMessage({
+          role: 'assistant',
+          content: t('chat.connectionError'),
+        });
+      } else {
+        console.log('Request was aborted (stopped by user)');
+        // Don't add error message - handleStopGeneration already handles this with "Phản hồi đã bị dừng"
+      }
     } finally {
       // Refund quota if API failed so user doesn't lose a turn
       if (!apiSuccess) {
@@ -3036,14 +3232,14 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
                 const isActive = activeCategory === category;
                 const label = CATEGORY_LABELS[category];
 
-                const categoryColors: Record<ATCategory, { bg: string; icon: string; active: string }> = {
-                  vision: { bg: 'bg-violet-100', icon: 'text-violet-600', active: 'bg-violet-500 text-white' },
-                  hearing: { bg: 'bg-indigo-100', icon: 'text-indigo-600', active: 'bg-indigo-500 text-white' },
-                  mobility: { bg: 'bg-emerald-100', icon: 'text-emerald-600', active: 'bg-emerald-500 text-white' },
-                  cognition: { bg: 'bg-rose-100', icon: 'text-rose-500', active: 'bg-rose-500 text-white' },
-                  communication: { bg: 'bg-amber-100', icon: 'text-amber-600', active: 'bg-amber-500 text-white' },
-                  daily_living: { bg: 'bg-purple-100', icon: 'text-purple-600', active: 'bg-purple-500 text-white' },
-                  education: { bg: 'bg-teal-100', icon: 'text-teal-600', active: 'bg-teal-500 text-white' },
+                const categoryColors: Record<ATCategory, { bg: string; icon: string; active: string; activeText: string; activeIconBg: string }> = {
+                  vision: { bg: 'bg-violet-100', icon: 'text-violet-600', active: 'bg-violet-50 ring-1 ring-violet-400', activeText: 'text-violet-700', activeIconBg: 'bg-violet-100' },
+                  hearing: { bg: 'bg-indigo-100', icon: 'text-indigo-600', active: 'bg-indigo-50 ring-1 ring-indigo-400', activeText: 'text-indigo-700', activeIconBg: 'bg-indigo-100' },
+                  mobility: { bg: 'bg-emerald-100', icon: 'text-emerald-600', active: 'bg-emerald-50 ring-1 ring-emerald-400', activeText: 'text-emerald-700', activeIconBg: 'bg-emerald-100' },
+                  cognition: { bg: 'bg-rose-100', icon: 'text-rose-500', active: 'bg-rose-50 ring-1 ring-rose-400', activeText: 'text-rose-700', activeIconBg: 'bg-rose-100' },
+                  communication: { bg: 'bg-amber-100', icon: 'text-amber-600', active: 'bg-amber-50 ring-1 ring-amber-400', activeText: 'text-amber-700', activeIconBg: 'bg-amber-100' },
+                  daily_living: { bg: 'bg-purple-100', icon: 'text-purple-600', active: 'bg-purple-50 ring-1 ring-purple-400', activeText: 'text-purple-700', activeIconBg: 'bg-purple-100' },
+                  education: { bg: 'bg-teal-100', icon: 'text-teal-600', active: 'bg-teal-50 ring-1 ring-teal-400', activeText: 'text-teal-700', activeIconBg: 'bg-teal-100' },
                 };
                 const colors = categoryColors[category];
 
@@ -3089,22 +3285,25 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
                   )}>
                   <div className={clsx(
                     'w-7 h-7 rounded-lg flex items-center justify-center transition-colors flex-shrink-0',
-                    isActive ? 'bg-white/20' : colors.bg
+                    isActive ? colors.activeIconBg : colors.bg
                   )}>
                     <span className={clsx(
                       'material-symbols-outlined text-sm',
-                      isActive ? 'text-white' : colors.icon
+                      isActive ? colors.icon : colors.icon
                     )}>
                       {CATEGORY_ICONS[category]}
                     </span>
                   </div>
                   <div className="flex-1 min-w-0 text-left">
-                    <p className="text-[11px] font-bold uppercase tracking-tight leading-tight">
+                    <p className={clsx(
+                      'text-[11px] font-bold uppercase tracking-tight leading-tight',
+                      isActive ? colors.activeText : 'text-slate-600'
+                    )}>
                       {language === 'vi' ? label.title : language === 'en' ? label.titleEn : language === 'ar' ? label.titleAr : label.titleFr}
                     </p>
                     <p className={clsx(
                       'text-[10px] truncate mt-0.5',
-                      isActive ? 'text-white/70' : 'text-slate-400'
+                      isActive ? 'text-slate-500' : 'text-slate-400'
                     )}>
                       {language === 'vi' ? label.desc : language === 'en' ? label.descEn : language === 'ar' ? label.descAr : label.descFr}
                     </p>
@@ -3243,29 +3442,32 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
                   }
                 }}
                 className={clsx(
-                  'w-full flex items-center gap-4 px-5 py-4 transition-colors rounded-2xl group',
+                  'w-full flex items-center gap-4 px-5 py-3.5 transition-colors rounded-xl group',
                   isActive
-                    ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white'
+                    ? 'bg-orange-50 ring-1 ring-orange-300'
                     : 'text-slate-500 hover:bg-surface-container-low hover:text-on-background'
                 )}
               >
                 <div className={clsx(
-                  'w-11 h-11 rounded-xl flex items-center justify-center transition-colors text-xl',
-                  isActive ? 'bg-white/20' : 'bg-orange-100'
+                  'w-10 h-10 rounded-xl flex items-center justify-center transition-colors text-lg',
+                  isActive ? 'bg-orange-100' : 'bg-orange-100'
                 )}>
                   <span className={clsx(
-                    isActive ? 'text-white' : 'text-orange-600'
+                    isActive ? 'text-orange-600' : 'text-orange-600'
                   )}>
                     {agent.avatar}
                   </span>
                 </div>
                 <div className="flex-1 min-w-0 text-left">
-                  <p className="text-sm font-bold uppercase tracking-tight">
+                  <p className={clsx(
+                    'text-sm font-bold uppercase tracking-tight',
+                    isActive ? 'text-orange-700' : 'text-slate-700'
+                  )}>
                     {getAgentDisplayName(agent.id, agent.name, language)}
                   </p>
                   <p className={clsx(
                     'text-xs truncate',
-                    isActive ? 'text-white/70' : 'text-on-surface-variant'
+                    isActive ? 'text-orange-500' : 'text-on-surface-variant'
                   )}>
                     {agent.description || t('chat.customAgent')}
                   </p>
@@ -3686,10 +3888,11 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
 
         {/* ============== INPUT AREA - Sticky Bottom Bar ============== */}
         <div className="bg-[#f9f9ff] pt-4 pb-6 px-4 md:px-8 border-t border-slate-200/50">
-          <div className="max-w-3xl mx-auto relative flex flex-col gap-3">
+          <div className="max-w-3xl mx-auto relative flex flex-col">
 
             {/* File upload status with limits */}
             {fileAttachmentEnabled && selectedFiles.length > 0 && (
+              <div className="mb-3">
               <div className="bg-[#eff6ff] border border-[#bfdbfe] rounded-full px-4 py-2 flex flex-col gap-1 w-full relative overflow-hidden">
                 <div className="flex justify-between items-center w-full z-10 text-[11px] text-[#3b82f6] font-medium">
                   <div className="flex items-center gap-1">
@@ -3704,6 +3907,7 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
                     style={{ width: `${Math.min((selectedFiles.length / MAX_FILES_PER_SESSION) * 100, 100)}%` }}
                   />
                 </div>
+              </div>
               </div>
             )}
 
@@ -3871,10 +4075,13 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
                 </div>
               </div>
 
-              {/* Shadow Layer - Fixed to not overflow */}
-              <div className="absolute inset-[2px] bg-slate-900 rounded-full translate-y-[3px] -z-10"></div>
+              {/* Shadow Layer */}
+              <div className="absolute inset-0 bg-slate-900 rounded-full translate-y-[2px] -z-10"></div>
               
-              <div className="bg-white border-[3px] border-on-background rounded-full p-1.5 flex items-center gap-2 relative z-10">
+              <div className={clsx(
+                'bg-white border-[3px] border-on-background rounded-full flex items-center gap-2 relative z-10',
+                fileAttachmentEnabled ? 'p-1.5' : 'px-3 py-1.5'
+              )}>
                 {/* Left Icons - Attachment Button */}
                 {fileAttachmentEnabled && (
                 <div className="flex items-center gap-1 pl-1 relative" ref={attachmentMenuRef}>
@@ -4003,7 +4210,7 @@ Hãy trả lời bằng ngôn ngữ mà user đang sử dụng.`;
                   onKeyDown={handleKeyDown}
                   placeholder={isEndUser ? t('chat.messageMadaAi') : t('chat.askAtSpecialist')}
                   rows={1}
-                  className="flex-1 border-none focus:ring-0 text-on-background bg-transparent py-2.5 text-sm placeholder:text-on-surface-variant/60 resize-none leading-relaxed"
+                  className="flex-1 border-none focus:border-transparent focus:outline-none focus:ring-0 text-on-background bg-transparent py-2 text-sm placeholder:text-on-surface-variant/60 resize-none leading-relaxed outline-none"
                   style={{ minHeight: '40px', maxHeight: '100px' }}
                 />
 

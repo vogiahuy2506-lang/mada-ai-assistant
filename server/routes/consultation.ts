@@ -183,71 +183,123 @@ router.post('/', consultationUpload.array('attachments', 5), async (req: any, re
       process.env.CONSULTATION_EMAIL ||
       process.env.ADMIN_NOTIFICATION_EMAIL ||
       'hotro.digibook@gmail.com';
-    
-    // DEBUG: Check env vars
-    console.log('📧 [EMAIL DEBUG] MAIL_HOST:', process.env.MAIL_HOST);
-    console.log('📧 [EMAIL DEBUG] MAIL_USERNAME:', process.env.MAIL_USERNAME);
-    console.log('📧 [EMAIL DEBUG] MAIL_PASSWORD set:', !!process.env.MAIL_PASSWORD);
-    console.log('📧 [EMAIL DEBUG] Attachments:', attachments.length);
-    
+
+    // Resolve site URLs (for links in email)
+    const adminBaseUrl =
+      process.env.ADMIN_URL ||
+      process.env.BASE_URL ||
+      process.env.FRONTEND_URL ||
+      process.env.SITE_URL ||
+      'https://mada.vn';
+    const siteUrl =
+      process.env.FRONTEND_URL ||
+      process.env.SITE_URL ||
+      process.env.BASE_URL ||
+      'https://mada.vn';
+
+    // ========== HTML SANITIZATION ==========
+    // Escape HTML special characters to prevent XSS in email content
+    function escapeHtml(text: string): string {
+      const map: Record<string, string> = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;',
+      };
+      return String(text).replace(/[&<>"']/g, (m) => map[m]);
+    }
+
+    // Generate reference code: REQ-XXXX (last 4 chars of UUID, uppercase)
+    const refCode = `REQ-${id.slice(-4).toUpperCase()}`;
+    const formattedDate = new Date(now).toLocaleString('vi-VN', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZoneName: 'short',
+    });
+    const formattedDateShort = new Date(now).toLocaleString('vi-VN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+
+    // Sanitize user input for email
+    const safeName = escapeHtml(name);
+    const safeEmail = escapeHtml(email);
+    const safePhone = escapeHtml(phone || '');
+    const safeMessage = escapeHtml(message);
+
+    // Build attachments list for HTML email
+    const attachmentsListHtml =
+      attachments.length > 0
+        ? `<div style="background: #f8f9ff; padding: 16px 20px; border-radius: 10px; margin-bottom: 24px; border: 1px solid #e8edff;">
+            <p style="margin: 0 0 12px; color: #333; font-size: 14px; font-weight: 600;">📎 Đính kèm (${attachments.length} tệp)</p>
+            ${attachments
+              .map(
+                (att: any) =>
+                  `<p style="margin: 4px 0; font-size: 13px; color: #555;">• ${escapeHtml(att.filename || att.name)} (${((att.size || 0) / 1024).toFixed(1)} KB)</p>`
+              )
+              .join('')}
+          </div>`
+        : '';
+
+    const attachmentsListText =
+      attachments.length > 0
+        ? `\n📎 Đính kèm (${attachments.length} tệp):\n${attachments
+            .map(
+              (att: any) =>
+                `  • ${att.filename || att.name} (${((att.size || 0) / 1024).toFixed(1)} KB)`
+            )
+            .join('\n')}`
+        : '';
+
     // Build email attachments array for nodemailer
     const emailAttachments: any[] = [];
     for (const att of attachments) {
+      // Handle file path (multipart upload from disk)
       if (att.filepath && fs.existsSync(att.filepath)) {
         emailAttachments.push({
-          filename: att.filename,
+          filename: att.filename || att.name,
           path: att.filepath,
-          contentType: att.mimetype,
+          contentType: att.mimetype || att.contentType || undefined,
         });
+        console.log('📧 [EMAIL] Added file from disk:', att.filename || att.name);
+      }
+      // Handle base64 (JSON upload from frontend)
+      else if (att.base64 && (att.name || att.filename)) {
+        try {
+          const filename = att.name || att.filename;
+          let base64Data = att.base64;
+          // Remove data URL prefix if present
+          if (base64Data.includes(',')) {
+            base64Data = base64Data.split(',')[1];
+          }
+          const buffer = Buffer.from(base64Data, 'base64');
+          console.log('📧 [EMAIL] Added base64 file:', filename, '- Size:', buffer.length, 'bytes');
+
+          emailAttachments.push({
+            filename: filename,
+            content: buffer,
+            contentType: att.type || att.contentType || 'application/octet-stream',
+          });
+        } catch (e) {
+          console.error('⚠️ Failed to process base64 attachment:', att.name || att.filename, e);
+        }
+      }
+      // Handle URL-based attachments
+      else if (att.url && att.url.startsWith('/api/')) {
+        console.log('📧 [EMAIL] URL reference found:', att.url, '->', att.filename || att.name);
       }
     }
-    
-    // Send email notification if SMTP is configured
-    if (process.env.MAIL_HOST && process.env.MAIL_USERNAME) {
-      try {
-        const nodemailer = await import('nodemailer');
-        const transporter = nodemailer.createTransport({
-          host: process.env.MAIL_HOST,
-          port: parseInt(process.env.MAIL_PORT || '465'),
-          secure: process.env.MAIL_SECURE === 'true',
-          requireTLS: process.env.MAIL_TLS === 'true',
-          auth: {
-            user: process.env.MAIL_USERNAME,
-            pass: process.env.MAIL_PASSWORD,
-          },
-        });
 
-        const adminBaseUrl = process.env.ADMIN_URL || process.env.BASE_URL || 'https://mada.vn';
-        const viewLink = `${adminBaseUrl}/admin/consultations`;
-        // Generate a human-readable reference code: REQ-XXXX (last 4 chars of UUID)
-        const refCode = `REQ-${id.slice(-4).toUpperCase()}`;
-        const formattedDate = new Date(now).toLocaleString('en-US', {
-          weekday: 'long',
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-          timeZoneName: 'short',
-        });
-        
-        // Build attachments list for email
-        const attachmentsListHtml = attachments.length > 0
-          ? `<div style="background: #f8f9ff; padding: 16px 20px; border-radius: 10px; margin-bottom: 24px; border: 1px solid #e8edff;">
-              <p style="margin: 0 0 12px; color: #333; font-size: 14px; font-weight: 600;">📎 Attachments (${attachments.length} file${attachments.length > 1 ? 's' : ''})</p>
-              ${attachments.map(att => `<p style="margin: 4px 0; font-size: 13px; color: #555;">• ${att.filename} (${(att.size / 1024).toFixed(1)} KB)</p>`).join('')}
-            </div>`
-          : '';
-        
-        const attachmentsListText = attachments.length > 0
-          ? `\nAttachments (${attachments.length} file${attachments.length > 1 ? 's' : ''}):\n${attachments.map(att => `  • ${att.filename} (${(att.size / 1024).toFixed(1)} KB)`).join('\n')}`
-          : '';
-
-        await transporter.sendMail({
-          from: process.env.MAIL_FROM || 'MADA AI <noreply@mada.vn>',
-          to: adminEmail,
-          subject: `[MADA] New Consultation Request from ${name}${attachments.length > 0 ? ` [${attachments.length} attachment(s)]` : ''}`,
-          html: `
+    // Admin email HTML template
+    const adminEmailHtml = `
 <!DOCTYPE html>
 <html>
 <head>
@@ -255,123 +307,313 @@ router.post('/', consultationUpload.array('attachments', 5), async (req: any, re
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f4f7fe;">
-  
-  <!-- Header -->
   <div style="background: linear-gradient(135deg, #0047ff 0%, #0052cc 100%); padding: 28px 24px; border-radius: 12px 12px 0 0; text-align: center;">
-    <h1 style="color: white; margin: 0; font-size: 22px; font-weight: 700;">🆕 New Consultation Request</h1>
-    <p style="color: rgba(255,255,255,0.88); margin: 8px 0 0; font-size: 14px;">MADA AI - Assistive Technology for People with Disabilities</p>
+    <h1 style="color: white; margin: 0; font-size: 22px; font-weight: 700;">🆕 Yêu Cầu Tư Vấn Mới</h1>
+    <p style="color: rgba(255,255,255,0.88); margin: 8px 0 0; font-size: 14px;">MADA AI - Công nghệ hỗ trợ người khuyết tật</p>
   </div>
-  
-  <!-- Content -->
   <div style="background: white; padding: 24px 28px; border-radius: 0 0 12px 12px; box-shadow: 0 4px 16px rgba(0,71,255,0.10);">
-    
-    <!-- Reference Code -->
     <div style="background: linear-gradient(135deg, #f0f4ff 0%, #e8edff 100%); padding: 16px 20px; border-radius: 10px; margin-bottom: 24px; border-left: 4px solid #0047ff;">
-      <p style="margin: 0; font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">Reference Code</p>
+      <p style="margin: 0; font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">Mã tham chiếu</p>
       <p style="margin: 6px 0 0; font-size: 26px; color: #0047ff; font-weight: 800; letter-spacing: 2px;">${refCode}</p>
     </div>
-    
-    <!-- Greeting -->
     <p style="margin: 0 0 20px; font-size: 15px; color: #444; line-height: 1.6;">
       Dear MADA AI Support Team,<br>
-      A <strong>new consultation request</strong> has been submitted${attachments.length > 0 ? ` with <strong>${attachments.length} attachment(s)</strong>` : ''}. Please review the details below and respond promptly.
+      Một <strong>yêu cầu tư vấn mới</strong> đã được gửi${attachments.length > 0 ? ` kèm theo <strong>${attachments.length} tệp đính kèm</strong>` : ''}. Vui lòng xem chi tiết bên dưới và phản hồi kịp thời.
     </p>
-    
-    <!-- Contact Information -->
-    <h2 style="font-size: 15px; color: #333; margin: 0 0 14px; padding-bottom: 10px; border-bottom: 2px solid #0047ff; font-weight: 700;">📋 Contact Information</h2>
-    
+    <h2 style="font-size: 15px; color: #333; margin: 0 0 14px; padding-bottom: 10px; border-bottom: 2px solid #0047ff; font-weight: 700;">📋 Thông Tin Liên Hệ</h2>
     <table style="width: 100%; border-collapse: collapse; margin-bottom: 24px;">
       <tr>
-        <td style="padding: 10px 0; color: #888; width: 110px; font-size: 14px;">Name:</td>
-        <td style="padding: 10px 0; font-weight: 600; color: #222; font-size: 15px;">${name}</td>
+        <td style="padding: 10px 0; color: #888; width: 110px; font-size: 14px;">Họ tên:</td>
+        <td style="padding: 10px 0; font-weight: 600; color: #222; font-size: 15px;">${safeName}</td>
       </tr>
       <tr style="border-bottom: 1px solid #f0f0f0;">
         <td style="padding: 10px 0; color: #888; font-size: 14px;">Email:</td>
         <td style="padding: 10px 0; font-size: 14px;">
-          <a href="mailto:${email}" style="color: #0047ff; text-decoration: none; font-weight: 600;">${email}</a>
+          <a href="mailto:${safeEmail}" style="color: #0047ff; text-decoration: none; font-weight: 600;">${safeEmail}</a>
         </td>
       </tr>
       <tr style="border-bottom: 1px solid #f0f0f0;">
-        <td style="padding: 10px 0; color: #888; font-size: 14px;">Phone:</td>
-        <td style="padding: 10px 0; color: #333; font-size: 14px; ${!phone ? 'font-style: italic; color: #bbb;' : ''}">${phone || 'Not provided'}</td>
+        <td style="padding: 10px 0; color: #888; font-size: 14px;">Điện thoại:</td>
+        <td style="padding: 10px 0; color: #333; font-size: 14px; ${!phone ? 'font-style: italic; color: #bbb;' : ''}">${safePhone || 'Không cung cấp'}</td>
       </tr>
       <tr>
-        <td style="padding: 10px 0; color: #888; font-size: 14px;">Submitted:</td>
+        <td style="padding: 10px 0; color: #888; font-size: 14px;">Thời gian:</td>
         <td style="padding: 10px 0; color: #555; font-size: 14px;">${formattedDate}</td>
       </tr>
+      <tr>
+        <td style="padding: 10px 0; color: #888; font-size: 14px;">Mã yêu cầu:</td>
+        <td style="padding: 10px 0; color: #555; font-size: 14px; font-family: monospace;">${id}</td>
+      </tr>
     </table>
-    
-    <!-- Attachments -->
     ${attachmentsListHtml}
-    
-    <!-- Request Details -->
-    <h2 style="font-size: 15px; color: #333; margin: 0 0 14px; padding-bottom: 10px; border-bottom: 2px solid #0047ff; font-weight: 700;">💬 Request Details</h2>
+    <h2 style="font-size: 15px; color: #333; margin: 0 0 14px; padding-bottom: 10px; border-bottom: 2px solid #0047ff; font-weight: 700;">💬 Nội Dung Yêu Cầu</h2>
     <div style="background: #f8f9ff; padding: 16px 20px; border-radius: 10px; margin-bottom: 24px; border: 1px solid #e8edff;">
-      <p style="margin: 0; color: #333; line-height: 1.7; font-size: 14px; white-space: pre-wrap;">${message}</p>
+      <p style="margin: 0; color: #333; line-height: 1.7; font-size: 14px; white-space: pre-wrap; word-break: break-word;">${safeMessage}</p>
     </div>
-    
-    <!-- Chat History Link -->
     <div style="background: #f8f9ff; padding: 16px 20px; border-radius: 10px; margin-bottom: 24px; border: 1px solid #e8edff;">
-      <p style="margin: 0 0 8px; color: #333; font-size: 14px; font-weight: 600;">🔗 Chat History</p>
-      <p style="margin: 0; color: #555; font-size: 13px;">Click the button below to view the user's complete chat history and conversation logs.</p>
+      <p style="margin: 0 0 8px; color: #333; font-size: 14px; font-weight: 600;">🔗 Lịch sử trò chuyện</p>
+      <p style="margin: 0; color: #555; font-size: 13px;">Nhấn nút bên dưới để xem lịch sử trò chuyện và nhật ký hội thoại của người dùng.</p>
       <div style="text-align: center; margin-top: 12px;">
-        <a href="${viewLink}" style="display: inline-block; background: #0047ff; color: white; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 13px;">
-          View Chat History
-        </a>
+        <a href="${adminBaseUrl}/admin/consultations" style="display: inline-block; background: #0047ff; color: white; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 13px;">Xem lịch sử trò chuyện</a>
       </div>
     </div>
-    
-    <!-- Action Button -->
     <div style="text-align: center; margin-top: 28px;">
-      <a href="${viewLink}" style="display: inline-block; background: linear-gradient(135deg, #0047ff, #0032cc); color: white; padding: 14px 32px; border-radius: 10px; text-decoration: none; font-weight: 700; font-size: 15px; box-shadow: 0 4px 12px rgba(0,71,255,0.3);">
-        ⚡ View & Respond Now
-      </a>
+      <a href="${adminBaseUrl}/admin/consultations" style="display: inline-block; background: linear-gradient(135deg, #0047ff, #0032cc); color: white; padding: 14px 32px; border-radius: 10px; text-decoration: none; font-weight: 700; font-size: 15px; box-shadow: 0 4px 12px rgba(0,71,255,0.3);">⚡ Xem &amp; Phản Hồi Ngay</a>
     </div>
-    
-    <!-- Priority note -->
-    <p style="margin: 20px 0 0; font-size: 12px; color: #f39c12; text-align: center; font-weight: 600;">
-      ⏰ Please respond within 24 hours to ensure the best user experience.
-    </p>
+    <p style="margin: 20px 0 0; font-size: 12px; color: #f39c12; text-align: center; font-weight: 600;">⏰ Vui lòng phản hồi trong vòng 24 giờ để đảm bảo trải nghiệm tốt nhất cho người dùng.</p>
   </div>
-  
-  <!-- Footer -->
   <div style="text-align: center; padding: 20px; color: #aaa; font-size: 12px;">
-    <p style="margin: 0 0 4px;">This is an automated email from the MADA AI system. Please do not reply directly to this email.</p>
-    <p style="margin: 0; color: #ccc; font-size: 11px;">© ${new Date().getFullYear()} MADA AI - Assistive Technology</p>
+    <p style="margin: 0 0 4px;">Email này được gửi tự động từ hệ thống MADA AI. Vui lòng không trả lời trực tiếp email này.</p>
+    <p style="margin: 0; color: #ccc; font-size: 11px;">© ${new Date().getFullYear()} MADA AI - Công nghệ hỗ trợ người khuyết tật</p>
   </div>
 </body>
-</html>
-          `,
-          text: `
-NEW CONSULTATION REQUEST
-========================
+</html>`;
 
-Reference Code: ${refCode}
+    const adminEmailText = `
+YÊU CẦU TƯ VẤN MỚI
+==================
+
+Mã tham chiếu: ${refCode}
 ID: ${id}
 
-Contact Information:
-  Name:     ${name}
-  Email:    ${email}
-  Phone:    ${phone || 'Not provided'}
-  Submitted: ${formattedDate}
+📋 Thông tin liên hệ:
+  Họ tên:    ${name}
+  Email:     ${email}
+  Điện thoại: ${phone || 'Không cung cấp'}
+  Thời gian:  ${formattedDate}
 ${attachmentsListText}
 
-Request Details:
+💬 Nội dung yêu cầu:
 ${message}
 
-View Chat History: ${viewLink}
-View & Respond: ${viewLink}
-          `,
+🔗 Xem chi tiết: ${adminBaseUrl}/admin/consultations
+⚡ Phản hồi ngay: ${adminBaseUrl}/admin/consultations/${id}
+
+⏰ Vui lòng phản hồi trong vòng 24 giờ.
+`;
+
+// User auto-reply email HTML template
+    const userAutoReplyHtml = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f4f7fe;">
+  <div style="background: linear-gradient(135deg, #0047ff 0%, #0052cc 100%); padding: 28px 24px; border-radius: 12px 12px 0 0; text-align: center;">
+    <h1 style="color: white; margin: 0; font-size: 22px; font-weight: 700;">✅ Chúng Tôi Đã Nhận Được Yêu Cầu</h1>
+    <p style="color: rgba(255,255,255,0.88); margin: 8px 0 0; font-size: 14px;">MADA AI - Công nghệ hỗ trợ người khuyết tật</p>
+  </div>
+  <div style="background: white; padding: 24px 28px; border-radius: 0 0 12px 12px; box-shadow: 0 4px 16px rgba(0,71,255,0.10);">
+    <p style="margin: 0 0 20px; font-size: 15px; color: #444; line-height: 1.6;">Xin chào <strong>${safeName}</strong>,</p>
+    <p style="margin: 0 0 20px; font-size: 15px; color: #444; line-height: 1.6;">Cảm ơn bạn đã liên hệ với MADA AI. Chúng tôi đã nhận được yêu cầu tư vấn của bạn và sẽ phản hồi trong vòng <strong>24 giờ</strong>.</p>
+    <div style="background: linear-gradient(135deg, #f0f4ff 0%, #e8edff 100%); padding: 16px 20px; border-radius: 10px; margin-bottom: 24px; border-left: 4px solid #0047ff;">
+      <p style="margin: 0; font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">Mã tham chiếu của bạn</p>
+      <p style="margin: 6px 0 0; font-size: 26px; color: #0047ff; font-weight: 800; letter-spacing: 2px;">${refCode}</p>
+    </div>
+    <p style="margin: 0 0 12px; font-size: 14px; color: #555; font-weight: 600;">📋 Tóm tắt yêu cầu:</p>
+    <table style="width: 100%; border-collapse: collapse; margin-bottom: 24px;">
+      <tr style="border-bottom: 1px solid #f0f0f0;">
+        <td style="padding: 10px 0; color: #888; font-size: 14px;">Thời gian gửi:</td>
+        <td style="padding: 10px 0; color: #333; font-size: 14px;">${formattedDateShort}</td>
+      </tr>
+      <tr>
+        <td style="padding: 10px 0; color: #888; font-size: 14px;">Trạng thái:</td>
+        <td style="padding: 10px 0;"><span style="display: inline-block; background: #fff3cd; color: #856404; padding: 4px 12px; border-radius: 20px; font-size: 13px; font-weight: 600;">⏳ Đang chờ xử lý</span></td>
+      </tr>
+    </table>
+    <p style="margin: 0 0 20px; font-size: 15px; color: #444; line-height: 1.6;">Trong lúc chờ đợi, bạn có thể:</p>
+    <ul style="margin: 0 0 24px; padding-left: 20px; color: #444; font-size: 14px; line-height: 2;">
+      <li>Truy cập <a href="${siteUrl}" style="color: #0047ff; text-decoration: none; font-weight: 600;">trang chủ MADA AI</a> để tìm hiểu thêm về sản phẩm</li>
+      <li>Xem <a href="${siteUrl}/faq" style="color: #0047ff; text-decoration: none; font-weight: 600;">câu hỏi thường gặp (FAQ)</a></li>
+      <li>Liên hệ trực tiếp qua hotline nếu cần hỗ trợ khẩn cấp</li>
+    </ul>
+    <div style="text-align: center; margin-top: 28px;">
+      <a href="${siteUrl}" style="display: inline-block; background: linear-gradient(135deg, #0047ff, #0032cc); color: white; padding: 14px 32px; border-radius: 10px; text-decoration: none; font-weight: 700; font-size: 15px; box-shadow: 0 4px 12px rgba(0,71,255,0.3);">Khám Phá MADA AI</a>
+    </div>
+  </div>
+  <div style="text-align: center; padding: 20px; color: #aaa; font-size: 12px;">
+    <p style="margin: 0 0 4px;">Nếu bạn có bất kỳ câu hỏi nào, vui lòng reply email này hoặc liên hệ hotline hỗ trợ.</p>
+    <p style="margin: 0; color: #ccc; font-size: 11px;">© ${new Date().getFullYear()} MADA AI - Công nghệ hỗ trợ người khuyết tật</p>
+  </div>
+</body>
+</html>`;
+
+    const userAutoReplyText = `
+CHUNG TOI DA NHAN DUOC YEU CAU CUA BAN
+=====================================
+
+Xin chao ${name},
+
+Cam on ban da lien he voi MADA AI. Chung toi da nhan duoc yeu cau tu van cua ban va se phan hoi trong vong 24 gio.
+
+Ma tham chieu: ${refCode}
+Thoi gian gui: ${formattedDateShort}
+Trang thai: Dang cho xu ly
+
+Trong luc cho doi, ban co the:
+  - Truy cap trang chu MADA AI de tim hieu them ve san pham
+  - Xem cau hoi thuong gap (FAQ)
+  - Lien he truc tiep qua hotline neu can ho tro khan cap
+
+${siteUrl}
+`;
+
+    // Send email notification if SMTP is configured
+    if (process.env.MAIL_HOST && process.env.MAIL_USERNAME) {
+      try {
+        const nodemailer = await import('nodemailer');
+
+        // Build transporter with connection settings
+        const mailPort = parseInt(process.env.MAIL_PORT || '465', 10);
+        const transporter = nodemailer.createTransport({
+          host: process.env.MAIL_HOST,
+          port: mailPort,
+          secure: mailPort === 465, // auto-detect based on port
+          requireTLS: process.env.MAIL_TLS === 'true',
+          tls: {
+            rejectUnauthorized: process.env.MAIL_TLS_REJECT_UNAUTHORIZED !== 'false',
+          },
+          auth: {
+            user: process.env.MAIL_USERNAME,
+            pass: process.env.MAIL_PASSWORD,
+          },
+          pool: true,
+          maxConnections: 5,
+          maxMessages: 100,
+          rateLimit: 10, // max 10 emails per second
+        } as any);
+
+        // Verify connection first (only in debug mode to avoid slowing down)
+        if (process.env.MAIL_DEBUG === 'true') {
+          try {
+            await transporter.verify();
+            console.log('✅ [EMAIL] SMTP connection verified');
+          } catch (verifyErr) {
+            console.error('⚠️ [EMAIL] SMTP connection verification failed:', verifyErr);
+          }
+        }
+
+        // Resolve MAIL_FROM from env, fallback to admin email
+        const mailFrom =
+          process.env.MAIL_FROM ||
+          (adminEmail.includes('@')
+            ? `MADA AI <${adminEmail}>`
+            : 'MADA AI <noreply@mada.vn>');
+
+        // === 1. Send admin notification email ===
+        const adminMailOptions = {
+          from: mailFrom,
+          to: adminEmail,
+          subject: `[MADA] Yêu cầu tư vấn mới từ ${name}${attachments.length > 0 ? ` [${attachments.length} đính kèm]` : ''}`,
+          html: adminEmailHtml,
+          text: adminEmailText,
           attachments: emailAttachments,
-        });
-        
-        console.log(`✅ Email notification sent to ${adminEmail} for consultation ${id} with ${emailAttachments.length} attachment(s)`);
-      } catch (emailError) {
-        console.error('⚠️ Failed to send email notification:', emailError);
-        // Don't fail the request if email fails
+          // Reply-To: set to user's email so admin can reply directly
+          replyTo: email,
+          // Add custom headers for tracking
+          headers: {
+            'X-Priority': '1',
+            'X-Mailer': 'MADA AI Consultation System',
+            'X-Reference-Code': refCode,
+            'X-Consultation-ID': id,
+            'List-Unsubscribe': `<mailto:${adminEmail}?subject=Unsubscribe>`,
+          },
+        };
+
+        let adminEmailSent = false;
+        let adminEmailError: any = null;
+
+        try {
+          const adminInfo = await transporter.sendMail(adminMailOptions);
+          adminEmailSent = true;
+          console.log(`✅ [EMAIL] Admin notification sent to ${adminEmail}, messageId: ${adminInfo.messageId}`);
+        } catch (sendErr: any) {
+          adminEmailError = sendErr;
+          console.error('⚠️ [EMAIL] Failed to send admin notification:', sendErr?.message || sendErr);
+          // Log detailed error for debugging
+          if (process.env.NODE_ENV === 'development') {
+            console.error('📧 [EMAIL ERROR DETAILS]', {
+              host: process.env.MAIL_HOST,
+              port: mailPort,
+              user: process.env.MAIL_USERNAME,
+              to: adminEmail,
+              hasAttachments: emailAttachments.length,
+              error: sendErr?.message,
+              code: sendErr?.code,
+              command: sendErr?.command,
+            });
+          }
+        }
+
+        // === 2. Send auto-reply confirmation email to user ===
+        // Only send if user provided a valid email
+        if (email && email.includes('@') && email.includes('.')) {
+          try {
+            const userMailOptions = {
+              from: mailFrom,
+              to: email,
+              subject: `✅ MADA AI đã nhận được yêu cầu của bạn - Mã: ${refCode}`,
+              html: userAutoReplyHtml,
+              text: userAutoReplyText,
+              headers: {
+                'X-Priority': '3',
+                'X-Mailer': 'MADA AI Consultation System',
+                'X-Reference-Code': refCode,
+                'X-Consultation-ID': id,
+              },
+            };
+
+            const userInfo = await transporter.sendMail(userMailOptions);
+            console.log(`✅ [EMAIL] Auto-reply sent to user ${email}, messageId: ${userInfo.messageId}`);
+          } catch (userEmailErr: any) {
+            // Don't fail the whole request if user auto-reply fails
+            console.warn('⚠️ [EMAIL] Failed to send auto-reply to user:', userEmailErr?.message || userEmailErr);
+          }
+        } else {
+          console.log('📧 [EMAIL] Skipping user auto-reply: no valid email provided');
+        }
+
+        // Log system event
+        if (!adminEmailSent) {
+          // Log failure
+          db.prepare(`
+            INSERT INTO admin_system_logs (id, level, source, message, details, timestamp)
+            VALUES (?, 'warn', 'consultation', ?, ?, ?)
+          `).run(
+            uuidv4(),
+            `Email notification failed for consultation ${id} from ${email}`,
+            JSON.stringify({ id, email, error: adminEmailError?.message, refCode }),
+            now
+          );
+        } else {
+          db.prepare(`
+            INSERT INTO admin_system_logs (id, level, source, message, details, timestamp)
+            VALUES (?, 'info', 'consultation', ?, ?, ?)
+          `).run(
+            uuidv4(),
+            `Email notification sent for consultation ${id}`,
+            JSON.stringify({
+              id,
+              email,
+              refCode,
+              adminEmail,
+              adminSent: adminEmailSent,
+              attachmentsCount: attachments.length,
+            }),
+            now
+          );
+        }
+      } catch (emailError: any) {
+        console.error('⚠️ [EMAIL] Critical error in email module:', emailError?.message || emailError);
+        // Don't fail the consultation request if email module fails
+        // The consultation is already saved to database above
       }
     } else {
-      console.log(`📧 Email not configured (MAIL_HOST not set), skipping notification. Admin email would be: ${adminEmail}`);
+      console.log(`📧 [EMAIL] SMTP not configured (MAIL_HOST not set). Admin email would be: ${adminEmail}`);
+      console.log(`📧 [EMAIL] User auto-reply would be sent to: ${email}`);
+      console.log(`📧 [EMAIL] To enable emails, set MAIL_HOST, MAIL_USERNAME, MAIL_PASSWORD in .env`);
     }
     // ========== END EMAIL NOTIFICATION ==========
     

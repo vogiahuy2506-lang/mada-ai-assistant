@@ -317,39 +317,43 @@ Je peux vous aider avec:
 3. 📋 Effectuer les examens nécessaires`,
 };
 
-const OUT_OF_SCOPE_RESPONSE_VI = `🤖 **Mình có thể giúp gì cho bạn?**
+const OUT_OF_SCOPE_RESPONSE_VI = `⚠️ **Câu hỏi nằm ngoài phạm vi tư vấn**
 
 Câu hỏi của bạn có thể hơi khác so với các chủ đề chuyên sâu của MADA, nhưng mình vẫn có thể gợi ý một số hướng:
 
 **Các chủ đề MADA có thể hỗ trợ:**
-- 🖥️ Thiết bị AT cho người khuyết tật (thị giác, thính giác, vận động...)
-- 📚 Tiêu chuẩn accessibility (WCAG, ISO 9999)
+- 🖥️ Thiết bị AT cho người khuyết tật (thị giác, thính giác, vận động, giao tiếp, nhận thức, sinh hoạt)
+- 📚 Tiêu chuẩn accessibility (WCAG 2.2, ISO 9999:2022, WHO GATE)
 - 🔧 Giới thiệu sản phẩm công nghệ hỗ trợ
+- 🏥 Hỗ trợ người khuyết tật tiếp cận công trình công cộng
 
 **Bạn có thể thử hỏi cụ thể hơn:**
 - "Có thiết bị nào cho người khiếm thị đọc sách không?"
 - "Máy trợ thính giá bao nhiêu?"
 - "Xe lăn điện có những loại nào?"
+- "Phần mềm nào giúp người cận thị sử dụng máy tính?"
 
 Mình sẵn sàng tư vấn về **thiết bị công nghệ hỗ trợ** bất cứ lúc nào! 😊`;
 
-const OUT_OF_SCOPE_RESPONSE_EN = `🤖 **How Can I Help You?**
+const OUT_OF_SCOPE_RESPONSE_EN = `⚠️ **Out of Scope**
 
 Your question might be slightly different from MADA's core topics, but I can still suggest some directions:
 
 **MADA topics I can support:**
-- 🖥️ AT devices for people with disabilities (vision, hearing, mobility...)
-- 📚 Accessibility standards (WCAG, ISO 9999)
+- 🖥️ AT devices for people with disabilities (vision, hearing, mobility, communication, cognition, daily living)
+- 📚 Accessibility standards (WCAG 2.2, ISO 9999:2022, WHO GATE)
 - 🔧 Assistive technology product recommendations
+- 🏥 Accessibility support for public facilities
 
 **Try asking more specifically:**
 - "What devices help visually impaired people read books?"
 - "How much do hearing aids cost?"
 - "What types of wheelchairs are available?"
+- "Which software helps nearsighted people use computers?"
 
 I'm ready to consult on **assistive technology** anytime! 😊`;
 
-const OUT_OF_SCOPE_RESPONSE_AR = `🤖 **كيف يمكنني مساعدتك؟**
+const OUT_OF_SCOPE_RESPONSE_AR = `⚠️ **خارج النطاق**
 
 سؤالك قد يختلف قليلاً عن الموضوعات الأساسية لمادا، لكن لا يزال بإمكاني تقديم بعض الاقتراحات:
 
@@ -364,7 +368,7 @@ const OUT_OF_SCOPE_RESPONSE_AR = `🤖 **كيف يمكنني مساعدتك؟**
 
 أنا مستعد للاستشارة في **التكنولوجيا المساعدة** في أي وقت! 😊`;
 
-const OUT_OF_SCOPE_RESPONSE_FR = `🤖 **Comment puis-je vous aider?**
+const OUT_OF_SCOPE_RESPONSE_FR = `⚠️ **Hors périmètre**
 
 Votre question peut être légèrement différente des sujets principaux de MADA, mais je peux toujours vous suggérer quelques directions:
 

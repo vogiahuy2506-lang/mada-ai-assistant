@@ -168,6 +168,10 @@ router.post('/', requireAdmin, (req: Request, res: Response) => {
       return res.status(400).json({ success: false, error: 'category and question are required' });
     }
     
+    // Validate category against allowed values
+    const VALID_CATEGORIES = ['vision', 'hearing', 'mobility', 'cognition', 'communication', 'daily_living', 'education', 'general'];
+    const validCategory = VALID_CATEGORIES.includes(category) ? category : 'general';
+    
     const now = new Date().toISOString();
     const id = `sq_${uuidv4().slice(0, 8)}`;
     
@@ -177,7 +181,7 @@ router.post('/', requireAdmin, (req: Request, res: Response) => {
     `).run(
       id,
       agent_id || null,
-      category,
+      validCategory,
       view_mode || 'end_user',
       language || 'vi',
       question,

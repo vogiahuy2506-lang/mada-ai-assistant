@@ -143,7 +143,7 @@ app.use('/api/admin/scraper', (_req, _res, next) => next());
 // Rate limit chặt hơn cho các endpoint đắt tài nguyên (chat, recommend, rag)
 const heavyApiRateLimiter = createRateLimiter({
   windowMs: 60 * 1000,
-  max: 60, // 60 requests / phút / IP cho AI endpoints (tăng từ 30)
+  max: 200, // 200 requests / phút / IP cho AI endpoints
 });
 app.use('/api/recommend', heavyApiRateLimiter);
 app.use('/api/chat', heavyApiRateLimiter);
@@ -2601,14 +2601,42 @@ app.post('/api/chat', async (req, res) => {
     const validUserMode: 'endUser' | 'specialist' = userMode === 'specialist' ? 'specialist' : 'endUser';
     const agentInstruction = getSystemInstruction(effectiveLanguage, agentPrompt, validUserMode);
 
-    // ⭐ MỚI: Lấy botId/madaCategory từ agentId
-    const madaMapping = agentId ? AGENT_TO_MADA[agentId] : null;
+    // ⭐ FIX: Lấy botId/madaCategory từ DATABASE (không chỉ từ hardcoded mapping)
+    // Ưu tiên: DB của agent → fallback AGENT_TO_MADA mapping
+    let botId: string | null = null;
+    let madaCategory: string | null = null;
+    
+    if (agentId) {
+      // Bước 1: Thử lấy từ DB của agent
+      try {
+        const agentRow = db.prepare('SELECT bot_id, mada_category FROM admin_agents WHERE id = ?').get(agentId) as any;
+        if (agentRow) {
+          botId = agentRow.bot_id || null;
+          madaCategory = agentRow.mada_category || null;
+          console.log(`🔍 [Chat] Agent "${agentId}" found in DB: botId=${botId}, madaCategory=${madaCategory}`);
+        }
+      } catch (err) {
+        console.warn('⚠️ [Chat] Failed to lookup agent from DB:', err);
+      }
+      
+      // Bước 2: Fallback sang AGENT_TO_MADA mapping nếu DB không có
+      if (!botId || !madaCategory) {
+        const madaMapping = AGENT_TO_MADA[agentId];
+        if (madaMapping) {
+          botId = botId || madaMapping.botId;
+          madaCategory = madaCategory || madaMapping.madaCategory;
+          console.log(`🔍 [Chat] Using AGENT_TO_MADA mapping for "${agentId}": botId=${botId}, madaCategory=${madaCategory}`);
+        }
+      }
+    }
 
     const ragConfig: any = { systemInstruction: agentInstruction, language: effectiveLanguage };
-    if (madaMapping) {
-      ragConfig.botId = madaMapping.botId;
-      ragConfig.madaCategory = madaMapping.madaCategory;
-      ragConfig.priority = true;  // Ưu tiên KB của bot, fallback toàn bộ
+    if (botId || madaCategory) {
+      ragConfig.botId = botId;
+      ragConfig.madaCategory = madaCategory;
+      ragConfig.agentId = agentId; // ⭐ Luôn pass agentId để filter chính xác
+      ragConfig.priority = true;  // Ưu tiên KB của bot, fallback toàn bộ nếu cần
+      console.log(`🤖 [Chat] RAG config: botId=${botId}, madaCategory=${madaCategory}, agentId=${agentId}, priority=true`);
     }
 
     // Query RAG engine with agent context
@@ -2706,114 +2734,19 @@ app.post('/api/chat', async (req, res) => {
         console.log('🔵 /api/chat Suggested from RAG sources:', suggestedProducts.length, 'with thumbnails:', suggestedProducts.filter((p: any) => p.image_url).length);
       }
 
-      if (suggestedProducts.length === 0) {
-        const contentLower = message.toLowerCase();
-        const categoryKeywords: Record<string, string[]> = {
-          hearing: ['deaf', 'hear', 'ear', 'sound', 'điếc', 'thính', 'thính giác', 'hearing loss', 'audio', 'fm system', 'microphone', 'amplifier'],
-          vision: ['blind', 'visual', 'eye', 'sight', 'mắt', 'thị giác', 'blindness', 'low vision'],
-          mobility: ['wheelchair', 'walk', 'move', 'physical', 'mobility', 'vận động', 'di chuyển'],
-          communication: ['speak', 'talk', 'communicate', 'voice', 'speech', 'giao tiếp', 'ngôn ngữ', 'aac'],
-          cognition: ['memory', 'learn', 'cognitive', 'think', 'nhận thức', 'học tập'],
-          daily_living: ['daily', 'living', 'self-care', 'sinh hoạt', 'ăn uống'],
-          education: ['education', 'school', 'study', 'giáo dục', 'học'],
-        };
-        let detectedCat: string | null = null;
-        for (const [cat, keywords] of Object.entries(categoryKeywords)) {
-          if (keywords.some(kw => contentLower.includes(kw.toLowerCase()))) {
-            detectedCat = cat;
-            break;
-          }
-        }
-        if (detectedCat) {
-          try {
-            const madaItems = db.prepare(`
-              SELECT id, title, content, source, url, category, language, metadata
-              FROM knowledge_items
-              WHERE category = ? AND source LIKE '%mada.org.qa%' AND status IN ('draft','published','approved')
-              ORDER BY confidence DESC, created_at DESC
-              LIMIT 4
-            `).all(detectedCat) as any[];
-
-            suggestedProducts = madaItems.map((item: any) => {
-              const url = item.url || item.source || '';
-              // ✅ Extract thumbnailUrl from metadata JSON
-              let thumbnail = '';
-              try {
-                const meta = typeof item.metadata === 'string' ? JSON.parse(item.metadata) : item.metadata;
-                thumbnail = meta?.thumbnailUrl || '';
-                // Validate URL
-                if (thumbnail && !thumbnail.startsWith('http')) thumbnail = '';
-              } catch { /* ignore */ }
-
-              return {
-                id: item.id,
-                title: item.title,
-                title_en: item.title,
-                description: (item.content || '').slice(0, 200),
-                description_en: (item.content || '').slice(0, 200),
-                category: item.category,
-                brand: 'MADA Qatar AT Portal',
-                price_range: 'Contact MADA Center',
-                product_url: url,
-                source_url: url,
-                image_url: toProxyImageUrl(thumbnail),
-                confidence: 0.7,
-                match_reason: `Phù hợp category: ${detectedCat}`,
-              };
-            });
-            
-            // ⭐ DEDUPLICATE: Chỉ giữ lại sản phẩm duy nhất theo product_url
-            const seenUrls = new Set<string>();
-            suggestedProducts = suggestedProducts.filter((p: any) => {
-              if (seenUrls.has(p.product_url)) return false;
-              seenUrls.add(p.product_url);
-              return true;
-            });
-            
-            console.log('🔵 /api/chat Suggested from MADA KB items:', suggestedProducts.length);
-          } catch (dbErr) {
-            console.log('⚠️ DB query for MADA items failed:', dbErr);
-          }
-        }
-      }
-
-      // ✅ Strategy 3: Always ensure we have at least 1 product (random MADA item)
-      if (suggestedProducts.length === 0) {
-        try {
-          const randomMada = db.prepare(`
-            SELECT id, title, content, source, url, category, language, metadata
-            FROM knowledge_items
-            WHERE source LIKE '%mada.org.qa%' AND status IN ('draft','published','approved')
-            ORDER BY RANDOM()
-            LIMIT 4
-          `).all() as any[];
-          suggestedProducts = randomMada.map((item: any) => {
-            const url = item.url || item.source || '';
-            let thumbnail = '';
-            try {
-              const meta = typeof item.metadata === 'string' ? JSON.parse(item.metadata) : item.metadata;
-              thumbnail = meta?.thumbnailUrl || '';
-              if (thumbnail && !thumbnail.startsWith('http')) thumbnail = '';
-            } catch { /* ignore */ }
-            return {
-              id: item.id,
-              title: item.title,
-              title_en: item.title,
-              description: (item.content || '').slice(0, 200),
-              category: item.category,
-              brand: 'MADA Qatar AT Portal',
-              price_range: 'Contact MADA Center',
-              product_url: url,
-              source_url: url,
-              image_url: toProxyImageUrl(thumbnail),
-              confidence: 0.6,
-              match_reason: getMatchReason(effectiveLanguage, 'found'),
-            };
-          });
-          console.log('🔵 /api/chat Suggested from random MADA:', suggestedProducts.length);
-        } catch (dbErr) {
-          console.log('⚠️ Random MADA query failed:', dbErr);
-        }
+      // ⭐ FIX: CHỈ gợi ý sản phẩm từ RAG sources - KHÔNG fallback random
+      // Filter: Chỉ giữ lại sản phẩm có URL hợp lệ từ MADA website
+      suggestedProducts = suggestedProducts.filter((p: any) => {
+        const url = p.product_url || '';
+        const isMadaUrl = url.includes('at.mada.org.qa') || url.includes('mada.org.qa');
+        if (!isMadaUrl) console.log(`📦 [Filter OUT] "${p.title}" - not MADA URL: ${url.slice(0, 50)}`);
+        return isMadaUrl;
+      });
+      
+      // ⭐ Nếu không có sản phẩm từ RAG → TRẢ VỀ MẢNG RỖNG (không fallback)
+      if (ragSources.length === 0) {
+        console.log(`📦 No RAG sources → returning empty (no fallback)`);
+        suggestedProducts = [];
       }
     } catch (err) {
       console.log('⚠️ Could not get product suggestions:', err);
@@ -3230,64 +3163,19 @@ SELECT url, source, json_extract(metadata, '$.thumbnailUrl') as thumbnail
         console.log('🔵 Suggested from RAG sources:', suggestedProducts.length);
       }
 
-      // Strategy 2: If still empty, query MADA KB items directly by category detection
-      if (suggestedProducts.length === 0) {
-        const contentLower = (message + ' ' + (fileContext || '').slice(0, 1000)).toLowerCase();
-        const categoryKeywords: Record<string, string[]> = {
-          hearing: ['deaf', 'hear', 'ear', 'sound', 'điếc', 'thính', 'thính giác', 'hearing loss', 'audio', 'fm system', 'microphone', 'amplifier'],
-          vision: ['blind', 'visual', 'eye', 'sight', 'mắt', 'thị giác', 'blindness', 'low vision'],
-          mobility: ['wheelchair', 'walk', 'move', 'physical', 'mobility', 'vận động', 'di chuyển', 'standing'],
-          communication: ['speak', 'talk', 'communicate', 'voice', 'speech', 'giao tiếp', 'ngôn ngữ', 'aac'],
-          cognition: ['memory', 'learn', 'cognitive', 'think', 'nhận thức', 'học tập', 'learning', 'dementia'],
-          daily_living: ['daily', 'living', 'self-care', 'eat', 'dress', 'sinh hoạt', 'ăn uống'],
-          education: ['education', 'school', 'study', 'giáo dục', 'học', 'reading'],
-        };
-
-        let detectedCat: string | null = null;
-        for (const [cat, keywords] of Object.entries(categoryKeywords)) {
-          if (keywords.some(kw => contentLower.includes(kw.toLowerCase()))) {
-            detectedCat = cat;
-            break;
-          }
-        }
-        if (detectedCat) {
-          const madaItems = db.prepare(`
-            SELECT id, title, content, source, url, category, language
-            FROM knowledge_items
-            WHERE category = ? AND source LIKE '%mada.org.qa%' AND status IN ('draft','published','approved')
-            ORDER BY confidence DESC, created_at DESC
-            LIMIT 4
-          `).all(detectedCat) as any[];
-
-          suggestedProducts = madaItems.map((item: any) => {
-            const url = item.url || item.source || '';
-            return {
-              id: item.id,
-              title: item.title,
-              title_en: item.title,
-              description: (item.content || '').slice(0, 200),
-              description_en: (item.content || '').slice(0, 200),
-              category: item.category,
-              brand: 'MADA Qatar AT Portal',
-              price_range: 'Contact MADA Center',
-              product_url: url,
-              source_url: url,
-              image_url: '',
-              confidence: 0.7,
-              match_reason: `Phù hợp category: ${detectedCat}`,
-            };
-          });
-          
-          // ⭐ DEDUPLICATE: Chỉ giữ lại sản phẩm duy nhất theo product_url
-          const seenUrls = new Set<string>();
-          suggestedProducts = suggestedProducts.filter((p) => {
-            if (seenUrls.has(p.product_url)) return false;
-            seenUrls.add(p.product_url);
-            return true;
-          });
-          
-          console.log('🔵 Suggested from MADA KB items:', suggestedProducts.length);
-        }
+      // ⭐ FIX: CHỈ gợi ý sản phẩm từ RAG sources - KHÔNG fallback random
+      // Filter: Chỉ giữ lại sản phẩm có URL hợp lệ từ MADA website
+      suggestedProducts = suggestedProducts.filter((p: any) => {
+        const url = p.product_url || '';
+        const isMadaUrl = url.includes('at.mada.org.qa') || url.includes('mada.org.qa');
+        if (!isMadaUrl) console.log(`📦 [Filter OUT] "${p.title}" - not MADA URL: ${url.slice(0, 50)}`);
+        return isMadaUrl;
+      });
+      
+      // ⭐ Nếu không có sản phẩm từ RAG → TRẢ VỀ MẢNG RỖNG (không fallback)
+      if (ragSources.length === 0) {
+        console.log(`📦 No RAG sources → returning empty (no fallback)`);
+        suggestedProducts = [];
       }
     } catch (err) {
       console.log('⚠️ Could not get product suggestions:', err);
@@ -3418,12 +3306,39 @@ app.post('/api/chat/stream', async (req: any, res: any) => {
       // (đã merge trong getSystemInstruction ở trên)
     }
 
-    // ⭐ MỚI: Lấy botId/madaCategory từ agentId cho RAG filter
-    const madaMapping = agentId ? AGENT_TO_MADA[agentId] : null;
-    if (madaMapping) {
-      ragConfig.botId = madaMapping.botId;
-      ragConfig.madaCategory = madaMapping.madaCategory;
-      ragConfig.priority = true;  // Ưu tiên KB của bot, fallback toàn bộ
+    // ⭐ FIX: Lấy botId/madaCategory từ DATABASE (không chỉ từ hardcoded mapping)
+    // Ưu tiên: DB của agent → fallback AGENT_TO_MADA mapping
+    let botId: string | null = null;
+    let madaCategory: string | null = null;
+    
+    if (agentId) {
+      // Bước 1: Thử lấy từ DB của agent
+      try {
+        const agentRow = db.prepare('SELECT bot_id, mada_category FROM admin_agents WHERE id = ?').get(agentId) as any;
+        if (agentRow) {
+          botId = agentRow.bot_id || null;
+          madaCategory = agentRow.mada_category || null;
+        }
+      } catch (err) {
+        console.warn('⚠️ [chat/stream] Failed to lookup agent from DB:', err);
+      }
+      
+      // Bước 2: Fallback sang AGENT_TO_MADA mapping nếu DB không có
+      if (!botId || !madaCategory) {
+        const madaMapping = AGENT_TO_MADA[agentId];
+        if (madaMapping) {
+          botId = botId || madaMapping.botId;
+          madaCategory = madaCategory || madaMapping.madaCategory;
+        }
+      }
+    }
+    
+    if (botId || madaCategory) {
+      ragConfig.botId = botId;
+      ragConfig.madaCategory = madaCategory;
+      ragConfig.agentId = agentId; // ⭐ Luôn pass agentId để filter chính xác
+      ragConfig.priority = true;  // Ưu tiên KB của bot, fallback toàn bộ nếu cần
+      console.log(`🤖 [chat/stream] RAG config: botId=${botId}, madaCategory=${madaCategory}, agentId=${agentId}`);
     }
 
     // Check if Gemini is configured (wait for init if server just started)
@@ -3563,32 +3478,8 @@ suggestedProducts = ragSources.slice(0, 4).map((src: any, idx: number) => {
           }
         }
 
-        // Strategy 3: Random MADA item
-        if (suggestedProducts.length === 0) {
-          const randomMada = db.prepare(`
-            SELECT id, title, content, source, url, category, language, metadata
-            FROM knowledge_items
-            WHERE source LIKE '%mada.org.qa%' AND status IN ('draft','published','approved')
-            ORDER BY RANDOM() LIMIT 4
-          `).all() as any[];
-          suggestedProducts = randomMada.map((item: any) => {
-            const url = item.url || item.source || '';
-            let thumbnail = '';
-            try {
-              const meta = typeof item.metadata === 'string' ? JSON.parse(item.metadata) : item.metadata;
-              thumbnail = meta?.thumbnailUrl || '';
-              if (thumbnail && !thumbnail.startsWith('http')) thumbnail = '';
-            } catch { /* ignore */ }
-            return {
-              id: item.id, title: item.title, title_en: item.title,
-              description: (item.content || '').slice(0, 200),
-              category: item.category, brand: 'MADA Qatar AT Portal',
-              price_range: 'Contact MADA Center', product_url: url, source_url: url,
-              image_url: toProxyImageUrl(thumbnail), confidence: 0.6,
-              match_reason: getMatchReason(effectiveLanguage, 'found'),
-            };
-          });
-        }
+        // ⭐ FIX: KHÔNG fallback random - chỉ gợi ý từ RAG sources
+        // Strategy 2 và 3 đã bị disable
 
         if (suggestedProducts.length > 0) {
           sendEvent({ type: 'suggestedProducts', suggestedProducts });

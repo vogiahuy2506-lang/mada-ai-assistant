@@ -24,28 +24,136 @@ import { chatHistory, waitForRagReady } from '../lib/chat-context';
 import { logActivity } from '../index';
 import { parseAttachment } from '../lib/fileProcessor';
 import { translateContent } from '../lib/translationService';
+import { productExtractor, type ExtractedProduct } from '../lib/scraping/productExtractor';
 
 const router = express.Router();
 
 // ============== HELPERS ==============
 
 /**
+ * ⭐ AUTO-SCRAPE URLS FROM MESSAGE
+ * Khi user gửi message chứa URL, tự động scrape và trả về product cards
+ */
+async function autoScrapeUrlsFromMessage(
+  message: string,
+  language: string
+): Promise<{ scrapedProducts: any[]; cleanedMessage: string }> {
+  const scrapedProducts: any[] = [];
+  
+  // Extract URLs from message
+  const urlRegex = /https?:\/\/[^\s<>"{}|\\^`\[\]]+/gi;
+  const urls = message.match(urlRegex) || [];
+  
+  // Only process if message is mostly a URL (90%+ of content is URL)
+  const isUrlOnly = urls.length > 0 && urls.join('').length > message.length * 0.7;
+  
+  // Also check for explicit URL keywords
+  const urlKeywords = ['xem sản phẩm', 'xem sp', 'link', 'url', 'trang', 'web', 'website'];
+  const hasUrlKeyword = urlKeywords.some(kw => message.toLowerCase().includes(kw));
+  
+  if (urls.length === 0 || (!isUrlOnly && !hasUrlKeyword)) {
+    return { scrapedProducts: [], cleanedMessage: message };
+  }
+  
+  console.log(`🔗 [AutoScrape] Found ${urls.length} URL(s) in message: ${urls.join(', ')}`);
+  
+  // Scrape each URL (limit to first 3 to avoid too many requests)
+  for (const url of urls.slice(0, 3)) {
+    try {
+      console.log(`🕷️ [AutoScrape] Scraping: ${url}`);
+      
+      const result = await productExtractor.extractFromUrl(url, undefined, {
+        mode: 'preview',
+        language: language === 'ar' ? 'ar' : 'en',
+      });
+      
+      if (result.success && result.products.length > 0) {
+        // Take first product from each URL (usually it's the main product)
+        const product = result.products[0];
+        
+        // Get category color
+        const categoryLower = (product.category || '').toLowerCase();
+        let categoryColor = 'from-blue-500 to-cyan-500';
+        if (categoryLower.includes('hearing')) categoryColor = 'from-cyan-500 to-blue-600';
+        else if (categoryLower.includes('vision')) categoryColor = 'from-purple-500 to-pink-500';
+        else if (categoryLower.includes('mobility')) categoryColor = 'from-emerald-500 to-teal-500';
+        else if (categoryLower.includes('cognitive') || categoryLower.includes('mental')) categoryColor = 'from-amber-500 to-orange-500';
+        
+        // Build product card
+        const productCard = {
+          id: product.id || `scraped-${Date.now()}`,
+          title: product.name,
+          title_en: product.name,
+          description: product.description || '',
+          category: product.category || 'general',
+          brand: product.brand || 'Unknown',
+          price_range: product.price > 0 
+            ? `${product.price.toLocaleString()} ${product.currency}` 
+            : 'Liên hệ MADA Center',
+          product_url: product.url || url,
+          source_url: product.url || url,
+          image_url: toProxyImageUrl(product.imageUrl || product.images?.[0] || ''),
+          confidence: 1.0, // High confidence - direct scrape
+          match_reason: 'Tự động trích xuất từ URL bạn cung cấp',
+          mada_advice: '',
+          warranty: '',
+          features: [],
+          specifications: product.specifications || {},
+          in_stock: product.inStock,
+          galleryImages: product.images?.length > 1 ? product.images.slice(1).map((img: string) => toProxyImageUrl(img)) : [],
+          categoryColor,
+          isScraped: true, // Flag to indicate this was auto-scraped
+        };
+        
+        scrapedProducts.push(productCard);
+        console.log(`✅ [AutoScrape] Scraped: ${product.name} | image: ${productCard.image_url ? 'YES' : 'NO'}`);
+      } else {
+        console.log(`⚠️ [AutoScrape] No products found for: ${url}`);
+      }
+    } catch (err) {
+      console.error(`❌ [AutoScrape] Error scraping ${url}:`, err);
+    }
+  }
+  
+  // Clean message: remove URLs for RAG processing
+  const cleanedMessage = message.replace(urlRegex, '').trim();
+  
+  return { scrapedProducts, cleanedMessage };
+}
+
+/**
  * Convert MADA image URL to proxy URL
+ * 
+ * Logic giống hệt index.ts:
+ * - cdn.at.mada.org.qa, cdn.mada.org.qa → proxy qua /api/mada-image
+ * - at.mada.org.qa, mada.org.qa → load trực tiếp (server proxy không access được do sandbox)
+ * - Shop VN, wikimedia → load trực tiếp
+ * - Các URL khác → load trực tiếp
  */
 function toProxyImageUrl(madaUrl: string): string {
+  // Chỉ accept valid URLs
   if (!madaUrl || typeof madaUrl !== 'string' || !madaUrl.startsWith('http')) {
     return '';
   }
-  if (madaUrl.includes('mada.org.qa') || madaUrl.includes('cdn.at.mada.org.qa')) {
+
+  // Proxy chỉ các domain cần thiết (cdn.at.mada.org.qa, cdn.mada.org.qa)
+  // KHÔNG proxy at.mada.org.qa vì server proxy không hoạt động do sandbox restriction
+  if (madaUrl.includes('cdn.at.mada.org.qa') || madaUrl.includes('cdn.mada.org.qa')) {
     return `/api/mada-image?url=${encodeURIComponent(madaUrl)}`;
   }
+
+  // at.mada.org.qa: load trực tiếp (browser có thể access)
+  if (madaUrl.includes('at.mada.org.qa') || madaUrl.includes('mada.org.qa')) {
+    return madaUrl;
+  }
+
+  // Shop VN và các domain khác: load trực tiếp
   const shopDomains = ['tgdd.vn', 'cellphones.com.vn', 'fptshop.com.vn', 'dienmayxanh.com', 'hstatic.net', 'viettelstore.vn'];
   if (shopDomains.some(d => madaUrl.includes(d))) {
     return madaUrl;
   }
-  if (madaUrl.includes('upload.wikimedia.org')) {
-    return madaUrl;
-  }
+
+  // Wikimedia và các domain khác → load trực tiếp
   return madaUrl;
 }
 
@@ -88,14 +196,13 @@ async function getProductsByCategory(madaCategory: string | null, _language: str
     let params: any[];
     
     if (madaCategory && MADA_CATEGORY_TO_DB[madaCategory]) {
-      // Lấy products theo category cụ thể
+      // Lấy products theo category cụ thể từ kb_products
       const dbCategory = MADA_CATEGORY_TO_DB[madaCategory];
       query = `
-        SELECT p.*, ki.category as ki_category, ki.confidence
+        SELECT p.*
         FROM kb_products p
-        LEFT JOIN knowledge_items ki ON p.source_url = ki.url OR p.product_url = ki.url
-        WHERE ki.category = ? AND ki.status IN ('draft', 'published', 'approved')
-        ORDER BY ki.confidence DESC, p.created_at DESC
+        WHERE p.category = ? AND p.status IN ('draft', 'published', 'archived')
+        ORDER BY p.featured DESC, p.created_at DESC
         LIMIT ?
       `;
       params = [dbCategory, limit];
@@ -103,11 +210,10 @@ async function getProductsByCategory(madaCategory: string | null, _language: str
     } else {
       // Lấy tất cả products (bot tổng)
       query = `
-        SELECT p.*, ki.category as ki_category, ki.confidence
+        SELECT p.*
         FROM kb_products p
-        LEFT JOIN knowledge_items ki ON p.source_url = ki.url OR p.product_url = ki.url
-        WHERE ki.status IN ('draft', 'published', 'approved')
-        ORDER BY ki.confidence DESC, p.created_at DESC
+        WHERE p.status IN ('draft', 'published', 'archived')
+        ORDER BY p.featured DESC, p.created_at DESC
         LIMIT ?
       `;
       params = [limit];
@@ -120,7 +226,7 @@ async function getProductsByCategory(madaCategory: string | null, _language: str
     // Map to suggestedProducts format
     products = rows.map((row: any) => {
       // Determine category color for gradient
-      const categoryLower = (row.category || row.ki_category || '').toLowerCase();
+      const categoryLower = (row.category || '').toLowerCase();
       let categoryColor = 'from-blue-500 to-cyan-500';
       if (categoryLower.includes('hearing') || categoryLower.includes('thính')) {
         categoryColor = 'from-cyan-500 to-blue-600';
@@ -137,18 +243,17 @@ async function getProductsByCategory(madaCategory: string | null, _language: str
         title: row.title,
         title_en: row.title_en || row.title,
         description: row.description || '',
-        category: row.category || row.ki_category || 'general',
+        category: row.category || 'general',
         brand: row.brand || 'MADA Qatar AT Portal',
         price_range: row.price_range || 'Liên hệ MADA Center',
         product_url: row.product_url || row.source_url || '',
         source_url: row.source_url || '',
         image_url: toProxyImageUrl(row.image_url || ''),
-        confidence: row.confidence || 0.7,
+        confidence: 0.9,
         mada_advice: row.mada_advice || '',
         warranty: row.warranty || '',
         features: (() => {
           try {
-            // Check if already an array, try to parse if string
             if (Array.isArray(row.features)) return row.features;
             if (typeof row.features === 'string') return JSON.parse(row.features);
             return [];
@@ -156,7 +261,7 @@ async function getProductsByCategory(madaCategory: string | null, _language: str
             return [];
           }
         })(),
-        categoryColor, // For UI gradient
+        categoryColor,
       };
     });
     
@@ -191,6 +296,115 @@ function getMatchReason(lang: string, kind: 'found' | 'category', context?: stri
 }
 
 // ============== PRODUCT DETECTION ==============
+
+// ============== PRODUCT DETECTION ==============
+
+/**
+ * ⭐ FEATURE 1: Find a specific product by detecting product name in user message.
+ * If user mentions a specific product (e.g. "Victor Reader", "OrCam MyEye"),
+ * return ONLY that product instead of showing all products in the category.
+ */
+function findProductByMessage(message: string, _effectiveLanguage: string): any | null {
+  if (!message || message.length < 3) return null;
+
+  try {
+    // Remove common query words to isolate product name
+    const cleaned = message
+      .replace(/^(cho tôi|cho mình|tôi muốn|mình muốn|tìm|xem|hiển thị|show|find|what is|what's|what are|tell me|about|the|a|an|thiết bị|sản phẩm|máy|device|product|with|for|about|là gì|giá|demo|review|price|cost)/gi, ' ')
+      .replace(/[?.,!;:]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    // Extract key phrases (3-5 words) that might be product names
+    const words = cleaned.split(' ').filter(w => w.length > 2);
+    const phrases: string[] = [];
+
+    // Generate 2-4 word phrases
+    for (let i = 0; i < words.length; i++) {
+      for (let len = 2; len <= Math.min(4, words.length - i); len++) {
+        const phrase = words.slice(i, i + len).join(' ');
+        if (phrase.length >= 5) phrases.push(phrase);
+      }
+    }
+
+    // Also try full cleaned message as single phrase
+    if (cleaned.length >= 4) phrases.unshift(cleaned);
+
+    console.log(`🔍 [findProductByMessage] Searching for phrases:`, phrases.slice(0, 5));
+
+    // Search kb_products for matching titles
+    for (const phrase of phrases) {
+      if (phrase.length < 3) continue;
+
+      const searchTerms = [
+        phrase,
+        phrase.replace(/[®™©°]/g, '').trim(),
+        phrase.replace(/[-_]/g, ' '),
+      ];
+
+      for (const term of searchTerms) {
+        if (term.length < 3) continue;
+
+        // Exact match first
+        let product = db.prepare(`
+          SELECT * FROM kb_products
+          WHERE (title = ? COLLATE NOCASE OR title_en = ? COLLATE NOCASE
+              OR REPLACE(title, '®', '') = ? COLLATE NOCASE
+              OR REPLACE(title_en, '®', '') = ? COLLATE NOCASE)
+            AND image_url IS NOT NULL AND image_url != ''
+          LIMIT 1
+        `).get(term, term, term, term) as any;
+
+        // Partial match
+        if (!product) {
+          product = db.prepare(`
+            SELECT * FROM kb_products
+            WHERE (title LIKE ? COLLATE NOCASE ESCAPE '/' OR title_en LIKE ? COLLATE NOCASE ESCAPE '/')
+              AND image_url IS NOT NULL AND image_url != ''
+            ORDER BY featured DESC, created_at DESC
+            LIMIT 1
+          `).get(`%${term}%`, `%${term}%`) as any;
+        }
+
+        if (product) {
+          console.log(`✅ [findProductByMessage] MATCHED: "${term}" → "${product.title}"`);
+
+          const categoryLower = (product.category || '').toLowerCase();
+          let categoryColor = 'from-blue-500 to-cyan-500';
+          if (categoryLower.includes('hearing')) categoryColor = 'from-cyan-500 to-blue-600';
+          else if (categoryLower.includes('vision')) categoryColor = 'from-purple-500 to-pink-500';
+          else if (categoryLower.includes('mobility')) categoryColor = 'from-emerald-500 to-teal-500';
+          else if (categoryLower.includes('cognitive') || categoryLower.includes('mental')) categoryColor = 'from-amber-500 to-orange-500';
+
+          return {
+            id: product.id,
+            title: product.title,
+            title_en: product.title_en || product.title,
+            description: product.description || '',
+            category: product.category || 'general',
+            brand: product.brand || 'MADA Qatar AT Portal',
+            price_range: product.price_range || 'Liên hệ MADA Center',
+            product_url: product.product_url || product.source_url || '',
+            source_url: product.source_url || product.product_url || '',
+            image_url: toProxyImageUrl(product.image_url || ''),
+            confidence: 1.0, // High confidence - exact match
+            match_reason: getMatchReason(_effectiveLanguage, 'found'),
+            mada_advice: product.mada_advice || '',
+            warranty: product.warranty || '',
+            features: [],
+            categoryColor,
+          };
+        }
+      }
+    }
+
+    console.log(`🔍 [findProductByMessage] No specific product found`);
+    return null;
+  } catch (err) {
+    console.warn('[findProductByMessage] Error:', err);
+    return null;
+  }
+}
 
 /**
  * Detect if user message is asking about products/devices
@@ -400,10 +614,23 @@ function extractStructuredDataFromContent(content: string, lang: string): any {
   return result;
 }
 
-// Get suggested products from RAG sources
-async function getSuggestedProducts(ragSources: any[], message: string, effectiveLanguage: string): Promise<any[]> {
+// Get suggested products from RAG sources (and agent category if specified)
+async function getSuggestedProducts(ragSources: any[], message: string, effectiveLanguage: string, agentId?: string): Promise<any[]> {
   let suggestedProducts: any[] = [];
-  
+
+  // ⭐ FEATURE 1: Try to detect a SPECIFIC product name from user message FIRST
+  // If user mentions "Victor Reader", "OrCam", etc. → return ONLY that product
+  const specificProduct = findProductByMessage(message, effectiveLanguage);
+  if (specificProduct) {
+    console.log(`🎯 [getSuggestedProducts] Specific product detected: "${specificProduct.title}" - returning only this product`);
+    return [specificProduct];
+  }
+
+  // ⭐ Get agent's MADA category if agentId provided
+  const madaMapping = agentId ? AGENT_TO_MADA[agentId] : null;
+  const agentCategory = madaMapping?.madaCategory || null;
+  console.log(`📦 [getSuggestedProducts] agentId=${agentId}, agentCategory=${agentCategory}`);
+
   // Helper: Check if URL is valid for product
   const isValidProductUrl = (url: string): boolean => {
     if (!url) return false;
@@ -502,24 +729,41 @@ async function getSuggestedProducts(ragSources: any[], message: string, effectiv
     
     if (sourceUrls.length > 0) {
       try {
-        // Also normalize URLs for lookup
-        const normalizedUrls = sourceUrls.map(normalizeUrl);
-        const placeholders = normalizedUrls.map(() => '?').join(',');
+        // Lookup knowledge_items by URL (exact match and with trailing slash removed)
+        // NOTE: We only remove trailing slash for matching, NOT all slashes
+        const placeholders = sourceUrls.map(() => '?').join(',');
         const rows = db.prepare(`
           SELECT id, title, content, source, url, category, language, metadata
           FROM knowledge_items
-          WHERE REPLACE(url, '/', '') IN (${placeholders}) OR REPLACE(source, '/', '') IN (${placeholders})
-        `).all(...normalizedUrls, ...normalizedUrls) as any[];
+          WHERE url IN (${placeholders}) OR source IN (${placeholders})
+        `).all(...sourceUrls) as any[];
         
-        for (const row of rows) {
-          // Store with both original and normalized keys
+        // Also try with trailing slash removed for both
+        const normalizedSourceUrls = sourceUrls.map(url => url.replace(/\/$/, ''));
+        const normalizedPlaceholders = normalizedSourceUrls.map(() => '?').join(',');
+        const normalizedRows = db.prepare(`
+          SELECT id, title, content, source, url, category, language, metadata
+          FROM knowledge_items
+          WHERE url IN (${normalizedPlaceholders}) OR source IN (${normalizedPlaceholders})
+        `).all(...normalizedSourceUrls) as any[];
+        
+        // Merge all rows
+        const allRows = [...rows, ...normalizedRows];
+        const seen = new Set<string>();
+        
+        for (const row of allRows) {
           const key = row.url || row.source || '';
-          if (key) {
+          if (key && !seen.has(key)) {
+            seen.add(key);
             dbDataMap[key] = row;
             dbDataMap[normalizeUrl(key)] = row; // Also store normalized
           }
         }
-      } catch (e) { /* ignore */ }
+        
+        console.log(`📦 [getSuggestedProducts] Found ${dbDataMap.length || Object.keys(dbDataMap).length} knowledge_items for ${sourceUrls.length} sources`);
+      } catch (e) { 
+        console.error('[getSuggestedProducts] knowledge_items lookup error:', (e as Error).message);
+      }
     }
     
     suggestedProducts = ragSources.slice(0, 8).map((src: any, idx: number) => {
@@ -528,8 +772,8 @@ async function getSuggestedProducts(ragSources: any[], message: string, effectiv
       const sourceUrl = normalizeUrl(rawSourceUrl);
       const dbItem = dbDataMap[sourceUrl] || dbDataMap[rawSourceUrl] || {};
       
-      // ⭐ LUÔN ƯU TIÊN URL từ database (url column) vì metadata có thể trống
-      const finalProductUrl = dbItem.url || sourceUrl || meta.productUrl || '';
+      // ⭐ LUÔN ƯU TIÊN URL từ kb_products nếu có, ngược lại dùng URL từ database hoặc metadata
+      const finalProductUrl = kbProduct?.source_url || kbProduct?.product_url || dbItem.url || sourceUrl || meta.productUrl || '';
       
       // Get thumbnail: try metadata first (thumbnailUrl OR image_url), then kb_products table
       let thumbnail = meta.thumbnailUrl || meta.image_url || '';
@@ -548,9 +792,12 @@ async function getSuggestedProducts(ragSources: any[], message: string, effectiv
       
       if (kbProduct) {
         console.log(`📷 [Product ${idx}] ✓ Found: ${kbProduct.title}, image=${kbProduct.image_url ? 'YES' : 'NO'}`);
-        thumbnail = kbProduct.image_url || '';
+        // ⭐ FIX: Ưu tiên kbProduct.image_url, fallback về metadata thumbnailUrl
+        thumbnail = kbProduct.image_url || thumbnail || '';
       } else {
-        console.log(`📷 [Product ${idx}] ✗ NOT found in kb_products`);
+        console.log(`📷 [Product ${idx}] ✗ NOT found in kb_products, using metadata thumbnail`);
+        // Nếu không có kbProduct, vẫn giữ thumbnail từ metadata
+        thumbnail = thumbnail || '';
       }
       
       console.log(`📷 [Product ${idx}] FINAL image=${thumbnail ? 'HAS IMAGE' : 'NO IMAGE'}`);
@@ -577,7 +824,7 @@ async function getSuggestedProducts(ragSources: any[], message: string, effectiv
         title: kbProduct?.title || meta.title || dbItem.title || 'Assistive Technology',
         title_en: kbProduct?.title_en || meta.title_en || meta.title || dbItem.title || 'Assistive Technology',
         description: kbProduct?.description || (src.content || dbItem.content || '').slice(0, 300),
-        category: meta.category || dbItem.category || 'general',
+        category: kbProduct?.category || meta.category || dbItem.category || 'general',
         brand: merged.brand,
         price_range: merged.price_range,
         product_url: finalProductUrl,
@@ -621,236 +868,134 @@ async function getSuggestedProducts(ragSources: any[], message: string, effectiv
     console.log(`📦 [getSuggestedProducts] Strategy 1 result: ${suggestedProducts.length} products (after filtering)`);
   }
   
-  // Strategy 2: By category keyword (run ALWAYS if category detected, add more products)
-  const contentLower = message.toLowerCase();
-  const categoryKeywords: Record<string, string[]> = {
-    hearing: ['deaf', 'hear', 'ear', 'sound', 'điếc', 'thính', 'thính giác', 'hearing loss', 'audio', 'fm system', 'amplifier', 'microphone', 'streamer', 'signia', 'oticon', 'resound'],
-    vision: ['blind', 'visual', 'eye', 'sight', 'mắt', 'thị giác', 'blindness', 'low vision', 'magnif', 'braille'],
-    mobility: ['wheelchair', 'walk', 'move', 'physical', 'mobility', 'vận động', 'di chuyển', 'crutch', 'cane'],
-    communication: ['speak', 'talk', 'communicate', 'voice', 'speech', 'giao tiếp', 'ngôn ngữ', 'aac'],
-    cognition: ['memory', 'learn', 'cognitive', 'think', 'nhận thức', 'học tập'],
-    daily_living: ['daily', 'living', 'self-care', 'sinh hoạt', 'ăn uống'],
-    education: ['education', 'school', 'study', 'giáo dục', 'học'],
-  };
+  // ⭐ FIX: CHỈ gợi ý sản phẩm từ RAG sources - KHÔNG fallback random
+  // Strategy 2 và 3 đã bị disable vì nó gợi ý sản phẩm không liên quan
   
-  // Map detected category keyword to actual database category
-  const DETECTED_TO_DB_CATEGORY: Record<string, string> = {
-    hearing: 'sensory-hearing',
-    vision: 'sensory-vision',
-    mobility: 'mobility-and-transportation',
-    communication: 'voice-and-speech',
-    cognition: 'mental-cognitive',
-    daily_living: 'daily-living',
-    education: 'education',
-  };
-  
-  let detectedCat: string | null = null;
-  let detectedDbCategory: string | null = null;
-  for (const [cat, keywords] of Object.entries(categoryKeywords)) {
-    if (keywords.some(kw => contentLower.includes(kw.toLowerCase()))) {
-      detectedCat = cat;
-      detectedDbCategory = DETECTED_TO_DB_CATEGORY[cat] || cat;
-      break;
+  // ⭐ FIX: Filter - Giữ sản phẩm hợp lệ
+  // - Phải có image_url hợp lệ
+  // - URL phải là http(s)
+  // - Không phải bot entry
+  // - Không phải garbage title
+  // - Category khớp nếu có agentCategory VÀ sản phẩm không có image từ kb_products
+  suggestedProducts = suggestedProducts.filter((p: any) => {
+    // Phải có image_url hợp lệ
+    const hasImage = !!(p.image_url && p.image_url.startsWith('http'));
+    
+    // URL phải là http(s)
+    const url = p.product_url || '';
+    const isValidUrl = url.startsWith('http://') || url.startsWith('https://');
+    
+    // Không phải bot entry
+    const isBot = isBotEntry(p.title);
+    
+    // Có title hợp lệ (không phải test/garbage)
+    const titleLower = (p.title || '').toLowerCase();
+    const isGarbageTitle = /^(.)\1{3,}$/.test(titleLower) || /^(test|test123|abcd|qwerty)/i.test(titleLower);
+    
+    // ⭐ Category matching - chỉ kiểm tra nếu có agentCategory VÀ sản phẩm KHÔNG có image
+    // Nếu sản phẩm có image (từ kb_products) thì bỏ qua category check
+    let categoryMatch = true;
+    if (agentCategory && !hasImage) {
+      const productCategory = (p.category || '').toLowerCase();
+      categoryMatch = productCategory.includes(agentCategory.toLowerCase()) || 
+                     (agentCategory === 'sensory-hearing' && productCategory.includes('hearing')) ||
+                     (agentCategory === 'sensory-vision' && productCategory.includes('vision')) ||
+                     (agentCategory === 'voice-and-speech' && (productCategory.includes('voice') || productCategory.includes('speech') || productCategory.includes('communication'))) ||
+                     (agentCategory === 'mobility-and-transportation' && (productCategory.includes('mobility') || productCategory.includes('physical'))) ||
+                     (agentCategory === 'mental-cognitive' && (productCategory.includes('cognitive') || productCategory.includes('mental')));
+      if (!categoryMatch) console.log(`📦 [Filter OUT] "${p.title}" - category mismatch: ${productCategory} vs ${agentCategory}`);
     }
-  }
+    
+    if (!hasImage) console.log(`📦 [Filter OUT] "${p.title}" - no valid image`);
+    if (!isValidUrl) console.log(`📦 [Filter OUT] "${p.title}" - invalid URL: ${url.slice(0, 50)}`);
+    if (isBot) console.log(`📦 [Filter OUT] "${p.title}" - is bot entry`);
+    if (isGarbageTitle) console.log(`📦 [Filter OUT] "${p.title}" - garbage title`);
+    
+    return hasImage && isValidUrl && !isBot && !isGarbageTitle && categoryMatch;
+  });
   
-  if (detectedCat && detectedDbCategory) {
-    console.log(`📦 [getSuggestedProducts] Strategy 2: Detected keyword "${detectedCat}" → DB category "${detectedDbCategory}", adding more products`);
+  // ⭐ FIX: Fallback to kb_products khi không có sản phẩm từ RAG (bất kể ragSources có hay không)
+  // Điều kiện cũ sai: `ragSources.length === 0` không bao giờ đúng khi có RAG sources
+  // nhưng kb_products không match (URL không khớp)
+  if (suggestedProducts.length === 0) {
+    console.log(`📦 [getSuggestedProducts] No valid products from RAG, checking kb_products directly...`);
     
-    // Collect existing product URLs to avoid duplicates
-    const existingUrls = new Set(suggestedProducts.map((p: any) => p.product_url?.replace(/\/$/, '')));
-    console.log(`📦 [Strategy2] existingUrls:`, [...existingUrls]);
-    
+    // Fetch directly from kb_products by category (or all if no category)
     try {
-      // Use the mapped DB category
-      const madaItems = db.prepare(`
-        SELECT id, title, content, source, url, category, language, metadata
-        FROM knowledge_items
-        WHERE category = ? AND source LIKE '%MADA%' AND status IN ('draft','published','approved')
-        ORDER BY confidence DESC, created_at DESC LIMIT 10
-      `).all(detectedDbCategory) as any[];
+      let dbQuery: string;
+      let dbParams: any[];
       
-      console.log(`📦 [Strategy2] Query for category "${detectedDbCategory}" returned ${madaItems.length} items`);
+      if (agentCategory) {
+        dbQuery = `
+          SELECT * FROM kb_products 
+          WHERE category = ? AND status IN ('draft', 'published', 'archived')
+          AND image_url IS NOT NULL AND image_url != ''
+          ORDER BY featured DESC, created_at DESC
+          LIMIT 6
+        `;
+        dbParams = [agentCategory];
+      } else {
+        dbQuery = `
+          SELECT * FROM kb_products 
+          WHERE status IN ('draft', 'published', 'archived')
+          AND image_url IS NOT NULL AND image_url != ''
+          ORDER BY featured DESC, created_at DESC
+          LIMIT 6
+        `;
+        dbParams = [];
+      }
       
-      console.log(`📦 [Strategy2] Query returned ${madaItems.length} items`);
+      const dbProducts = db.prepare(dbQuery).all(...dbParams) as any[];
       
-      const isValidTitle = (title: string): boolean => {
-        if (!title || title.length < 3) return false;
-        const lower = title.toLowerCase();
-        if (/^(.)\1+$/.test(lower)) return false;
-        if (/^(test|test123|abcd|qwerty)/i.test(lower)) return false;
-        return true;
-      };
+      console.log(`📦 [getSuggestedProducts] Found ${dbProducts.length} products from kb_products`);
       
-      const newProducts = madaItems
-        .filter((item: any) => {
-          const urlKey = (item.url || item.source || '').replace(/\/$/, '');
-          const isValid = isValidTitle(item.title) && !existingUrls.has(urlKey);
-          if (!isValid) {
-            console.log(`📦 [Strategy2 Filter OUT] "${item.title}" - validTitle=${isValidTitle(item.title)}, inExisting=${existingUrls.has(urlKey)}, url="${urlKey}"`);
-          }
-          return isValid;
-        })
-        .map((item: any) => {
-          const url = item.url || item.source || '';
-          let thumbnail = '';
-          try {
-            const meta = typeof item.metadata === 'string' ? JSON.parse(item.metadata) : item.metadata;
-            thumbnail = meta?.thumbnailUrl || meta?.image_url || '';
-            if (thumbnail && !thumbnail.startsWith('http')) thumbnail = '';
-          } catch { /* ignore */ }
-          if (!thumbnail && url) {
-            thumbnail = getProductFromDb(url)?.image_url || '';
-          }
-          
-          const detailedMeta = parseDetailedMetadata(item.metadata);
-          const contentData = extractStructuredDataFromContent(item.content || '', effectiveLanguage);
-          const merged = { ...detailedMeta, ...contentData };
-          
-          return {
-            id: item.id,
-            title: item.title,
-            title_en: item.title,
-            description: (item.content || '').slice(0, 300),
-            category: item.category,
-            brand: 'MADA Qatar AT Portal',
-            price_range: 'Contact MADA Center',
-            product_url: url,
-            source_url: url,
-            image_url: toProxyImageUrl(thumbnail),
-            confidence: 0.6,
-            match_reason: getMatchReason(effectiveLanguage, 'category', detectedDbCategory!),
-            patient_indications: merged.patient_indications || [],
-            medical_indications: merged.medical_indications || [],
-            contraindications: merged.contraindications || [],
-            specifications: merged.specifications || [],
-            compatibility: merged.compatibility || [],
-            financial_support: merged.financial_support || [],
-            insurance_coverage: merged.insurance_coverage || [],
-            mada_advice: merged.mada_advice || '',
-            warranty: merged.warranty || '',
-            features: merged.features || [],
-            standards: merged.standards || [],
-          };
-        });
-      
-      // Add new products to existing list
-      suggestedProducts.push(...newProducts);
-      
-      // Final deduplicate and filter
-      const seenUrls = new Set<string>();
-      suggestedProducts = suggestedProducts.filter((p: any) => {
-        const urlKey = (p.product_url || '').replace(/\/$/, '');
-        if (seenUrls.has(urlKey)) return false;
-        seenUrls.add(urlKey);
-        if (isBotEntry(p.title)) return false;
-        if (!isValidProductUrl(p.product_url)) return false;
-        return true;
+      suggestedProducts = dbProducts.map((p: any) => {
+        // Determine category color for gradient
+        const categoryLower = (p.category || '').toLowerCase();
+        let categoryColor = 'from-blue-500 to-cyan-500';
+        if (categoryLower.includes('hearing')) {
+          categoryColor = 'from-cyan-500 to-blue-600';
+        } else if (categoryLower.includes('vision')) {
+          categoryColor = 'from-purple-500 to-pink-500';
+        } else if (categoryLower.includes('mobility')) {
+          categoryColor = 'from-emerald-500 to-teal-500';
+        } else if (categoryLower.includes('cognitive') || categoryLower.includes('mental')) {
+          categoryColor = 'from-amber-500 to-orange-500';
+        }
+        
+        return {
+          id: p.id,
+          title: p.title,
+          title_en: p.title_en || p.title,
+          description: p.description || '',
+          category: p.category,
+          brand: p.brand || 'MADA Qatar AT Portal',
+          price_range: p.price_range || 'Liên hệ MADA Center',
+          product_url: p.product_url || p.source_url || '',
+          source_url: p.source_url || p.product_url || '',
+          image_url: toProxyImageUrl(p.image_url || ''),
+          confidence: 0.95, // High confidence for direct DB lookup
+          match_reason: getMatchReason(effectiveLanguage, 'found'),
+          mada_advice: '',
+          warranty: '',
+          features: [],
+          categoryColor,
+        };
+      }).filter((p: any) => {
+        // Filter: must have valid URL and image
+        const url = p.product_url || '';
+        const hasImage = !!(p.image_url && p.image_url.startsWith('http'));
+        return hasImage && url.startsWith('http');
       });
       
-      // Limit to max 12 products
-      suggestedProducts = suggestedProducts.slice(0, 12);
-      
-      console.log(`📦 [getSuggestedProducts] Strategy 2: Added ${newProducts.length} products, total: ${suggestedProducts.length}`);
+      console.log(`📦 [getSuggestedProducts] Returning ${suggestedProducts.length} products from kb_products`);
     } catch (dbErr) {
-      console.log('⚠️ Strategy 2 error:', dbErr);
+      console.error(`❌ [getSuggestedProducts] kb_products error:`, dbErr);
     }
   }
   
   console.log(`📦 [getSuggestedProducts] FINAL: ${suggestedProducts.length} products`);
-
-  // ⭐ Strategy 3: Featured MADA items (only if still empty)
-  if (suggestedProducts.length === 0) {
-    console.log(`📦 [getSuggestedProducts] Strategy 3: Trying featured MADA items`);
-    try {
-      // Get featured products first, then fallback to most recent
-      const featuredMada = db.prepare(`
-        SELECT id, title, content, source, url, category, language, metadata
-        FROM knowledge_items
-        WHERE source LIKE '%MADA%' AND status IN ('draft','published','approved')
-        ORDER BY confidence DESC, created_at DESC
-        LIMIT 12
-      `).all() as any[];
-      
-      // ⭐ Filter out test/invalid titles
-      const isValidTitle = (title: string): boolean => {
-        if (!title || title.length < 3) return false;
-        const lower = title.toLowerCase();
-        if (/^(.)\1+$/.test(lower)) return false; // 'aaaa', 'kkkk'
-        if (/^(test|test123|abcd|qwerty)/i.test(lower)) return false;
-        if (/^[a-z]{1,2}$/.test(lower) && !['tv', 'pc', 'ai', 'at', 'it', 'ok', 'ip'].includes(lower)) return false;
-        return true;
-      };
-      
-      const validProducts = featuredMada.filter((item: any) => isValidTitle(item.title));
-      
-      // Only show products if we have valid ones
-      if (validProducts.length > 0) {
-        suggestedProducts = validProducts.map((item: any) => {
-          const url = item.url || item.source || '';
-          let thumbnail = '';
-          try {
-            const meta = typeof item.metadata === 'string' ? JSON.parse(item.metadata) : item.metadata;
-            thumbnail = meta?.thumbnailUrl || meta?.image_url || '';
-            if (thumbnail && !thumbnail.startsWith('http')) thumbnail = '';
-          } catch { /* ignore */ }
-          // Fallback: look up image from kb_products table
-          if (!thumbnail && url) {
-            thumbnail = getProductFromDb(url)?.image_url || '';
-          }
-          
-          // Parse detailed metadata
-          const detailedMeta = parseDetailedMetadata(item.metadata);
-          
-          // Extract from content
-          const contentData = extractStructuredDataFromContent(item.content || '', effectiveLanguage);
-          const merged = { ...detailedMeta, ...contentData };
-          
-          return {
-            id: item.id,
-            title: item.title,
-            title_en: item.title,
-            description: (item.content || '').slice(0, 300),
-            category: item.category,
-            brand: 'MADA Qatar AT Portal',
-            price_range: 'Contact MADA Center',
-            product_url: url,
-            source_url: url,
-            image_url: toProxyImageUrl(thumbnail),
-            confidence: 0.6,
-            match_reason: getMatchReason(effectiveLanguage, 'found'),
-            // Detailed fields
-            patient_indications: merged.patient_indications || [],
-            medical_indications: merged.medical_indications || [],
-            contraindications: merged.contraindications || [],
-            specifications: merged.specifications || [],
-            compatibility: merged.compatibility || [],
-            financial_support: merged.financial_support || [],
-            insurance_coverage: merged.insurance_coverage || [],
-            mada_advice: merged.mada_advice || '',
-            warranty: merged.warranty || '',
-            features: merged.features || [],
-            standards: merged.standards || [],
-          };
-        });
-        
-        // ⭐ Filter out invalid products (bots, invalid URLs)
-        suggestedProducts = suggestedProducts.filter((p: any) => {
-          if (isBotEntry(p.title)) return false;
-          if (!isValidProductUrl(p.product_url)) return false;
-          return true;
-        });
-      }
-      console.log(`📦 [getSuggestedProducts] Strategy 3: ${validProducts.length} valid items, ${featuredMada.length} total`);
-      // If no valid products found, return empty array (don't show garbage)
-    } catch (dbErr) { /* ignore */ }
-  }
-  
-  // Final cap at 12 products
-  suggestedProducts = suggestedProducts.slice(0, 12);
-  
-  console.log(`📦 [getSuggestedProducts] FINAL: ${suggestedProducts.length} products`);
-  return suggestedProducts;
+  return suggestedProducts.slice(0, 6); // Giới hạn 6 sản phẩm
 }
 
 router.post('/', async (req, res) => {
@@ -886,6 +1031,36 @@ router.post('/', async (req, res) => {
           redirected: true,
           redirectReason: guardrailsResult.detectedPattern,
           conversationId: conversationId || uuidv4(),
+        },
+      });
+    }
+    
+    // ⭐ AUTO-SCRAPE URLS: Nếu message chứa URL, tự động scrape và trả về product cards
+    const { scrapedProducts, cleanedMessage } = await autoScrapeUrlsFromMessage(message, effectiveLanguage);
+    
+    // Nếu có scraped products và message chủ yếu là URL → trả về ngay không cần RAG
+    const isUrlOnly = scrapedProducts.length > 0 && cleanedMessage.length < 10;
+    if (isUrlOnly) {
+      console.log(`🔗 [Chat] URL-only message detected, returning scraped products directly`);
+      
+      const responseTexts: Record<string, string> = {
+        vi: 'Đây là thông tin sản phẩm tôi trích xuất từ URL bạn cung cấp:',
+        en: 'Here is the product information I extracted from the URL you provided:',
+        ar: 'فيما يلي معلومات المنتج التي استخرجتها من عنوان URL الذي قدمته:',
+        fr: 'Voici les informations sur le produit que j\'ai extraites de l\'URL que vous avez fournie:',
+      };
+      
+      return res.json({
+        success: true,
+        data: {
+          answer: responseTexts[effectiveLanguage] || responseTexts.vi,
+          confidence: 0.95,
+          sources: scrapedProducts.map((p: any) => ({ content: p.title, source: p.product_url })),
+          contextUsed: false,
+          conversationId: conversationId || uuidv4(),
+          detectedLanguage: effectiveLanguage,
+          suggestedProducts: scrapedProducts,
+          autoScraped: true,
         },
       });
     }
@@ -937,22 +1112,45 @@ router.post('/', async (req, res) => {
     // Build RAG config
     const validUserMode: 'endUser' | 'specialist' = userMode === 'specialist' ? 'specialist' : 'endUser';
     const agentInstruction = getSystemInstruction(effectiveLanguage, agentPrompt, validUserMode);
-    const madaMapping = agentId ? AGENT_TO_MADA[agentId] : null;
+    
+    // ⭐ FIX: Lấy botId/madaCategory từ DATABASE (không chỉ từ hardcoded mapping)
+    let botId: string | null = null;
+    let madaCategory: string | null = null;
+    
+    if (agentId) {
+      // Bước 1: Thử lấy từ DB của agent
+      try {
+        const agentRow = db.prepare('SELECT bot_id, mada_category FROM admin_agents WHERE id = ?').get(agentId) as any;
+        if (agentRow) {
+          botId = agentRow.bot_id || null;
+          madaCategory = agentRow.mada_category || null;
+        }
+      } catch (err) {
+        console.warn('⚠️ [Chat] Failed to lookup agent from DB:', err);
+      }
+      
+      // Bước 2: Fallback sang AGENT_TO_MADA mapping nếu DB không có
+      if (!botId || !madaCategory) {
+        const madaMapping = AGENT_TO_MADA[agentId];
+        if (madaMapping) {
+          botId = botId || madaMapping.botId;
+          madaCategory = madaCategory || madaMapping.madaCategory;
+        }
+      }
+    }
     
     const ragConfig: any = { systemInstruction: agentInstruction, language: effectiveLanguage };
-    if (madaMapping) {
-      ragConfig.botId = madaMapping.botId;
-      ragConfig.madaCategory = madaMapping.madaCategory;
-      ragConfig.priority = true;
-    } else if (agentId) {
-      // ⭐ Custom agent: filter by agentId to get agent's own KB docs
-      ragConfig.agentId = agentId;
+    if (botId || madaCategory || agentId) {
+      if (botId) ragConfig.botId = botId;
+      if (madaCategory) ragConfig.madaCategory = madaCategory;
+      ragConfig.agentId = agentId; // ⭐ Luôn pass agentId để filter chính xác
       ragConfig.priority = true;
     }
     
     console.log('🤖 Chat RAG config:', { 
       agentId, 
-      isMadaBot: !!madaMapping, 
+      botId,
+      madaCategory,
       ragConfig: { 
         hasAgentId: !!ragConfig.agentId, 
         hasBotId: !!ragConfig.botId,
@@ -991,7 +1189,7 @@ router.post('/', async (req, res) => {
     const suggestedProducts: any[] = [];
     if (shouldShowProducts(message)) {
       try {
-        const products = await getSuggestedProducts(ragResponse.sources || [], message, effectiveLanguage);
+        const products = await getSuggestedProducts(ragResponse.sources || [], message, effectiveLanguage, agentId);
         suggestedProducts.push(...products);
       } catch (suggErr) {
         console.log('⚠️ suggestedProducts error:', suggErr);
@@ -1002,6 +1200,15 @@ router.post('/', async (req, res) => {
     chatHistory.get(convId)!.push({ role: 'assistant', content: ragResponse.answer });
     
     logActivity('info', `Chat: ${agentId || 'default'} - "${message.slice(0, 50)}..."`, 'Chat');
+    
+    // ⭐ Merge scraped products with suggested products (avoid duplicates by URL)
+    const allProducts = [...scrapedProducts];
+    for (const p of suggestedProducts) {
+      const exists = allProducts.some((ap: any) => ap.product_url === p.product_url || ap.source_url === p.source_url);
+      if (!exists) {
+        allProducts.push(p);
+      }
+    }
     
     res.json({
       success: true,
@@ -1014,7 +1221,8 @@ router.post('/', async (req, res) => {
         safetyScore,
         agentId,
         detectedLanguage: effectiveLanguage,
-        suggestedProducts,
+        suggestedProducts: allProducts,
+        autoScraped: scrapedProducts.length > 0,
       },
     });
   } catch (error) {
@@ -1272,6 +1480,41 @@ router.post('/stream', async (req: any, res: any) => {
       return res.end();
     }
     
+    // ⭐ AUTO-SCRAPE URLS: Nếu message chứa URL, tự động scrape và trả về product cards
+    const { scrapedProducts, cleanedMessage } = await autoScrapeUrlsFromMessage(message, effectiveLanguage);
+    
+    // Nếu có scraped products và message chủ yếu là URL → trả về ngay không cần RAG
+    const isUrlOnly = scrapedProducts.length > 0 && cleanedMessage.length < 10;
+    if (isUrlOnly) {
+      console.log(`🔗 [Stream] URL-only message detected, returning scraped products directly`);
+      
+      const responseTexts: Record<string, string> = {
+        vi: 'Đây là thông tin sản phẩm tôi trích xuất từ URL bạn cung cấp:',
+        en: 'Here is the product information I extracted from the URL you provided:',
+        ar: 'فيما يلي معلومات المنتج التي استخرجتها من عنوان URL الذي قدمته:',
+        fr: 'Voici les informations sur le produit que j\'ai extraites de l\'URL que vous avez fournie:',
+      };
+      
+      const responseText = responseTexts[effectiveLanguage] || responseTexts.vi;
+      
+      sendEvent({ type: 'chunk', chunk: responseText });
+      
+      if (scrapedProducts.length > 0) {
+        sendEvent({ type: 'suggestedProducts', suggestedProducts: scrapedProducts, autoScraped: true });
+      }
+      
+      sendEvent({
+        type: 'done',
+        conversationId: conversationId || uuidv4(),
+        confidence: 0.95,
+        sources: scrapedProducts.map((p: any) => ({ content: p.title, source: p.product_url })),
+        detectedLanguage: effectiveLanguage,
+        autoScraped: true,
+      });
+      
+      return res.end();
+    }
+    
     // ⭐ Handle MADA_PRODUCT_REQUEST - Trả về sản phẩm theo category của bot
     const isProductRequest = message.includes('[MADA_PRODUCT_REQUEST]');
     if (isProductRequest) {
@@ -1325,22 +1568,45 @@ router.post('/stream', async (req: any, res: any) => {
     // Build RAG config
     const validUserMode: 'endUser' | 'specialist' = userMode === 'specialist' ? 'specialist' : 'endUser';
     const agentInstruction = getSystemInstruction(effectiveLanguage, agentPrompt, validUserMode);
-    const madaMapping = agentId ? AGENT_TO_MADA[agentId] : null;
+    
+    // ⭐ FIX: Lấy botId/madaCategory từ DATABASE (không chỉ từ hardcoded mapping)
+    let botId: string | null = null;
+    let madaCategory: string | null = null;
+    
+    if (agentId) {
+      // Bước 1: Thử lấy từ DB của agent
+      try {
+        const agentRow = db.prepare('SELECT bot_id, mada_category FROM admin_agents WHERE id = ?').get(agentId) as any;
+        if (agentRow) {
+          botId = agentRow.bot_id || null;
+          madaCategory = agentRow.mada_category || null;
+        }
+      } catch (err) {
+        console.warn('⚠️ [chat/stream] Failed to lookup agent from DB:', err);
+      }
+      
+      // Bước 2: Fallback sang AGENT_TO_MADA mapping nếu DB không có
+      if (!botId || !madaCategory) {
+        const madaMapping = AGENT_TO_MADA[agentId];
+        if (madaMapping) {
+          botId = botId || madaMapping.botId;
+          madaCategory = madaCategory || madaMapping.madaCategory;
+        }
+      }
+    }
     
     let ragConfig: any = { systemInstruction: agentInstruction, language: effectiveLanguage };
-    if (madaMapping) {
-      ragConfig.botId = madaMapping.botId;
-      ragConfig.madaCategory = madaMapping.madaCategory;
-      ragConfig.priority = true;
-    } else if (agentId) {
-      // ⭐ Custom agent: filter by agentId to get agent's own KB docs
-      ragConfig.agentId = agentId;
+    if (botId || madaCategory || agentId) {
+      if (botId) ragConfig.botId = botId;
+      if (madaCategory) ragConfig.madaCategory = madaCategory;
+      ragConfig.agentId = agentId; // ⭐ Luôn pass agentId để filter chính xác
       ragConfig.priority = true;
     }
     
     console.log('🤖 Stream Chat RAG config:', { 
       agentId, 
-      isMadaBot: !!madaMapping, 
+      botId,
+      madaCategory,
       ragConfig: { 
         hasAgentId: !!ragConfig.agentId, 
         hasBotId: !!ragConfig.botId,
@@ -1378,14 +1644,27 @@ router.post('/stream', async (req: any, res: any) => {
       console.log(`🔍 [STREAM] shouldShowProducts check: ${shouldShow} for message: "${message.substring(0, 80)}..."`);
       if (shouldShow) {
         try {
-          const suggestedProducts = await getSuggestedProducts(streamResult.sources || [], message, effectiveLanguage);
+          let allProducts = [...scrapedProducts]; // Start with scraped products
+          const suggestedProducts = await getSuggestedProducts(streamResult.sources || [], message, effectiveLanguage, agentId);
           console.log(`📦 [STREAM] suggestedProducts count: ${suggestedProducts.length}, first title: ${suggestedProducts[0]?.title || 'N/A'}`);
-          if (suggestedProducts.length > 0) {
-            sendEvent({ type: 'suggestedProducts', suggestedProducts });
+          
+          // Merge without duplicates
+          for (const p of suggestedProducts) {
+            const exists = allProducts.some((ap: any) => ap.product_url === p.product_url || ap.source_url === p.source_url);
+            if (!exists) {
+              allProducts.push(p);
+            }
+          }
+          
+          if (allProducts.length > 0) {
+            sendEvent({ type: 'suggestedProducts', suggestedProducts: allProducts, autoScraped: scrapedProducts.length > 0 });
           }
         } catch (suggErr) {
           console.log('⚠️ suggestedProducts error:', suggErr);
         }
+      } else if (scrapedProducts.length > 0) {
+        // Still send scraped products even if shouldShow is false (URLs in message)
+        sendEvent({ type: 'suggestedProducts', suggestedProducts: scrapedProducts, autoScraped: true });
       }
       // Stream response
       if (streamResult.stream) {
@@ -1508,7 +1787,7 @@ router.post('/stream', async (req: any, res: any) => {
         // ⭐ FALLBACK: Vẫn gửi suggestedProducts nếu user hỏi về thiết bị/sản phẩm
         if (shouldShowProducts(message)) {
           try {
-            const suggestedProducts = await getSuggestedProducts([], message, effectiveLanguage);
+            const suggestedProducts = await getSuggestedProducts([], message, effectiveLanguage, agentId);
             if (suggestedProducts.length > 0) {
               sendEvent({ type: 'suggestedProducts', suggestedProducts });
             }
@@ -1914,7 +2193,7 @@ router.post('/products', async (req, res) => {
     }
     
     // Get products
-    const products = await getSuggestedProducts([], message, effectiveLanguage);
+    const products = await getSuggestedProducts([], message, effectiveLanguage, agentId);
     
     console.log(`📦 [Products API] Found ${products.length} products for: "${message.slice(0, 50)}..."`);
     

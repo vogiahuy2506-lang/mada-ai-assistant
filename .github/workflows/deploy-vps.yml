@@ -175,6 +175,15 @@ jobs:
             sudo npm run build:server
             sudo npm run build:client
 
+            echo "=== Step 12b: Run AAC products import script ==="
+            cd $APP_DIR
+            if [ -f "scripts/insert-aac-products.ts" ]; then
+              npx tsx scripts/insert-aac-products.ts
+              echo "✅ AAC products imported"
+            else
+              echo "⚠️ insert-aac-products.ts not found, skipping"
+            fi
+
             echo "=== Step 13: Install/Update PM2 ==="
             export NPM_CONFIG_PREFIX="$HOME/.npm-global"
             export PATH="$HOME/.npm-global/bin:$PATH"

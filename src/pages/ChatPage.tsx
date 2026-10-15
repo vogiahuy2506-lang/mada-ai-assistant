@@ -4665,8 +4665,10 @@ function MessageBubble({
                           }}
                         />
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <Accessibility className="w-12 h-12 text-white/80" />
+                        /* ⭐ Enhanced fallback: Gradient background + centered icon */
+                        <div className="w-full h-full flex flex-col items-center justify-center gap-2 bg-gradient-to-br from-slate-400 to-slate-600">
+                          <Accessibility className="w-14 h-14 text-white/90" strokeWidth={1.5} />
+                          <span className="text-[10px] text-white/70 font-medium">AT Product</span>
                         </div>
                       )}
                       

@@ -182,6 +182,11 @@ class DataIngestionService {
             const scrapeResult = await this.scrapeWebContentDetailed(source.source, scrapeOpts);
             content = this.formatDetailedContent(scrapeResult);
             // Gắn metadata từ scrape
+            // ⭐ Chọn thumbnail: ưu tiên từ scrapeResult.images hoặc OG:image metadata
+            const ogImage = scrapeResult.metadata?.['og:image'] || scrapeResult.metadata?.['twitter:image'] || '';
+            const firstImage = scrapeResult.images?.[0]?.url || '';
+            const thumbnailUrl = ogImage || firstImage || source.metadata?.thumbnailUrl || '';
+            
             source.metadata = {
               ...source.metadata,
               scrapeMetadata: scrapeResult.metadata,
@@ -190,6 +195,8 @@ class DataIngestionService {
               images: scrapeResult.images,
               faqs: scrapeResult.faqs,
               structuredData: scrapeResult.structuredData,
+              thumbnailUrl, // ⭐ Lưu thumbnailUrl để getSuggestedProducts hiển thị hình ảnh
+              galleryImages: scrapeResult.images?.map((img: any) => img.url).filter(Boolean) || [],
             };
           }
           break;

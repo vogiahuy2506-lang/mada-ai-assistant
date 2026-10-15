@@ -880,7 +880,7 @@ async function getSuggestedProducts(ragSources: any[], message: string, effectiv
         title: kbProduct?.title || meta.title || dbItem.title || 'Assistive Technology',
         title_en: kbProduct?.title_en || meta.title_en || meta.title || dbItem.title || 'Assistive Technology',
         description: kbProduct?.description || (src.content || dbItem.content || '').slice(0, 300),
-        category: productCategory,
+        category: kbProduct?.category || dbItem.category || 'general',
         brand: merged.brand,
         price_range: merged.price_range,
         product_url: finalProductUrl,
@@ -1150,7 +1150,7 @@ router.post('/', async (req, res) => {
     
     const detectedLanguage = detectMessageLanguage(message);
     // ⭐ Ưu tiên detect từ message - nếu người dùng hỏi tiếng Anh thì reply tiếng Anh
-    const effectiveLanguage = (detectedLanguage && detectedLanguage !== 'unknown') ? detectedLanguage : ((uiLanguage && ['vi', 'en', 'ar', 'fr'].includes(uiLanguage)) ? uiLanguage : 'vi');
+    const effectiveLanguage = uiLanguage && ['vi', 'en', 'ar', 'fr'].includes(uiLanguage) ? uiLanguage : detectedLanguage;
     
     console.log('🌍 Language settings:', { uiLanguage, detectedLanguage, effectiveLanguage, messagePreview: message?.slice(0, 30) });
     
@@ -1391,7 +1391,7 @@ router.post('/with-file', async (req, res) => {
     }
     
     const detectedLanguage = detectMessageLanguage(message);
-    const effectiveLanguage = (detectedLanguage && detectedLanguage !== 'unknown') ? detectedLanguage : ((uiLanguage && ['vi', 'en', 'ar', 'fr'].includes(uiLanguage)) ? uiLanguage : 'vi');
+    const effectiveLanguage = uiLanguage && ['vi', 'en', 'ar', 'fr'].includes(uiLanguage) ? uiLanguage : detectedLanguage;
     
     console.log('📎 Chat with files:', { message: message?.slice(0, 50), fileCount: attachments?.length || 0, effectiveLanguage });
     
@@ -1613,7 +1613,7 @@ router.post('/stream', async (req: any, res: any) => {
     
     // Language detection
     const detectedLanguage = detectMessageLanguage(message);
-    const effectiveLanguage = (detectedLanguage && detectedLanguage !== 'unknown') ? detectedLanguage : ((uiLanguage && ['vi', 'en', 'ar', 'fr'].includes(uiLanguage)) ? uiLanguage : 'vi');
+    const effectiveLanguage = uiLanguage && ['vi', 'en', 'ar', 'fr'].includes(uiLanguage) ? uiLanguage : detectedLanguage;
     
     // Guardrails check
     const guardrailsResult = guardrails.analyzeQuery(message, effectiveLanguage);
@@ -2292,7 +2292,7 @@ router.post('/products', async (req, res) => {
     
     // ⭐ Detect language from message for product recommendations
     const detectedLanguage = detectMessageLanguage(message);
-    const effectiveLanguage = (detectedLanguage && detectedLanguage !== 'unknown') ? detectedLanguage : (['vi', 'en', 'ar', 'fr'].includes(language) ? language : 'vi');
+    const effectiveLanguage = ['vi', 'en', 'ar', 'fr'].includes(language) ? language : detectedLanguage;
     
     // ⭐ Handle MADA_PRODUCT_REQUEST
     const isProductRequest = message?.includes('[MADA_PRODUCT_REQUEST]');
@@ -2393,7 +2393,7 @@ router.post('/consultation', async (req, res) => {
     }
     
     const detectedLanguage = detectMessageLanguage(message);
-    const effectiveLanguage = (detectedLanguage && detectedLanguage !== 'unknown') ? detectedLanguage : ((uiLanguage && ['vi', 'en', 'ar', 'fr'].includes(uiLanguage)) ? uiLanguage : 'vi');
+    const effectiveLanguage = uiLanguage && ['vi', 'en', 'ar', 'fr'].includes(uiLanguage) ? uiLanguage : detectedLanguage;
     
     // Create consultation session
     const { sessionId, session } = createConsultationSession(message, effectiveLanguage);
@@ -2445,7 +2445,7 @@ router.post('/consultation/direct', async (req, res) => {
     }
     
     const detectedLanguage = detectMessageLanguage(message);
-    const effectiveLanguage = (detectedLanguage && detectedLanguage !== 'unknown') ? detectedLanguage : ((uiLanguage && ['vi', 'en', 'ar', 'fr'].includes(uiLanguage)) ? uiLanguage : 'vi');
+    const effectiveLanguage = uiLanguage && ['vi', 'en', 'ar', 'fr'].includes(uiLanguage) ? uiLanguage : detectedLanguage;
     
     // Check for consultation trigger keywords
     const consultTriggers = [

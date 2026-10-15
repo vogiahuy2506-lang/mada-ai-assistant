@@ -959,9 +959,8 @@ async function bootstrap(): Promise<void> {
   }
 }
 
-bootstrap();
-
-// ============== IN-MEMORY STORAGE ==============
+// bootstrap() is now called inside the listen() block below so we can await
+// service initialization before accepting traffic.
 const consultations: any[] = [];
 const chatHistory: Map<string, any[]> = new Map();
 
@@ -970,10 +969,11 @@ const chatHistory: Map<string, any[]> = new Map();
 const HOST = '0.0.0.0';
 
 // @ts-ignore - Express listen overload conflict (kept as Server for graceful shutdown)
-// Defer listen() so ALL routes are registered before server starts accepting connections.
-// Without this, routes registered after this line would be unreachable because the
-// HTTP server starts before those route registration calls execute.
-setImmediate(() => {
+// Wait for bootstrap() to complete (initializeServices includes ragEngine.initialize +
+// syncKnowledgeBaseToVectorStore) BEFORE accepting connections. Without this, requests
+// can race ahead of RAG init and hit "Hệ thống đang khởi tạo" even though the engine
+// is healthy seconds later.
+bootstrap().then(() => {
   const server = app.listen(Number(PORT), HOST, () => {
     console.log(`🚀 MADA AI Server running on http://${HOST}:${PORT}`);
     console.log(`📚 API Documentation: http://localhost:${PORT}/api/health`);
@@ -984,6 +984,9 @@ setImmediate(() => {
     console.log(`🔐 Auth: SQLite + bcrypt + JWT (admin: ${process.env.ADMIN_EMAIL || 'admin@mada.vn'})`);
   });
   void server; // intentionally kept for graceful shutdown support
+}).catch((err) => {
+  console.error('❌ Bootstrap failed, cannot start server:', err);
+  process.exit(1);
 });
 
 // ============== MAPPING AGENT TO MADA ==============

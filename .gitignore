@@ -48,7 +48,7 @@ Thumbs.db
 .temp/
 
 # Data (keep structure but ignore content)
-data/
+# data/
 !data/.gitkeep
 !data/chroma/.gitkeep
 
@@ -65,8 +65,8 @@ backend/data/standards/
 # Vector database files
 data/chroma/*
 data/ingestion_log.json
-*.db
-*.sqlite
+# *.db
+# *.sqlite
 
 # Docker
 .dockerignore

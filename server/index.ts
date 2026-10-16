@@ -377,10 +377,19 @@ app.use(cors({
     console.log('[CORS] Checking origin:', origin);
     if (/^https:\/\/[a-zA-Z0-9.-]+\.run\.app$/.test(origin)) return callback(null, true);
 
+    // Allow direct IP access (with or without port)
+    // Matches: https://123.456.789.012, https://123.456.789.012:3000
+    if (/^https?:\/\/\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(:\d+)?$/.test(origin)) return callback(null, true);
+
     // Production domains (hardcoded + env)
     const productionDomains = [
       'https://mada.digiso.vn',
       'https://www.mada.digiso.vn',
+      // Allow direct IP access for server deployments
+      'https://34.143.248.174',
+      'http://34.143.248.174',
+      'https://34.143.248.174:3000',
+      'http://34.143.248.174:3000',
     ];
 
     // Production origins (set via env)

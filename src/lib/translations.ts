@@ -1,6 +1,9 @@
 // Translation system for MADA AI Assistant
 // Supports: Vietnamese (vi), English (en), Arabic (ar), French (fr)
 
+import { useMemo } from 'react';
+import { useLanguageStore } from '@/stores';
+
 export type Language = 'vi' | 'en' | 'ar' | 'fr';
 
 export const translations = {

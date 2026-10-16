@@ -43,7 +43,7 @@ interface DislikeFeedbackFormProps {
 }
 
 // Icon mapping for each question type
-const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
+const iconMap: Record<string, React.ComponentType<{ className?: string; strokeWidth?: number | string }>> = {
   'alert-circle': AlertTriangle,
   'target': Target,
   'message-square': MessageSquare,

@@ -900,7 +900,7 @@ export function ChatPage() {
     systemPrompt: a.system_prompt || a.systemPrompt || '',
     capabilities: Array.isArray(a.capabilities) ? a.capabilities : [],
     isActive: a.isActive === true || a.is_active === 1,
-    createdBy: a.created_by === 'admin' || a.createdBy === 'admin' ? 'admin' : 'user',
+    createdBy: (a.created_by === 'admin' || a.createdBy === 'admin' ? 'admin' : 'user') as 'admin' | 'user',
     createdAt: a.createdAt ? new Date(a.createdAt).getTime()
       : a.created_at ? new Date(a.created_at).getTime()
       : Date.now(),
@@ -937,9 +937,9 @@ export function ChatPage() {
     
     return fetch('/api/public/agents')
       .then(res => res.json())
-      .then(data => {
+      .then((data: { success: boolean; data: unknown[] }) => {
         if (data.success && Array.isArray(data.data)) {
-          const freshAgents = data.data.map(mapBackendAgent);
+          const freshAgents = data.data.map((item: unknown) => mapBackendAgent(item));
           console.log('[ChatPage] ✅ Agents fetched directly:', freshAgents.length, 'active:', freshAgents.filter(a => a.isActive).length);
           freshAgents.forEach((a, i) => console.log(`  [${i}] "${a.name}" isActive=${a.isActive}`));
           useAgentStore.setState({
@@ -1060,7 +1060,8 @@ export function ChatPage() {
   // ⭐ Lắng nghe broadcast từ AdminAgents - cập nhật agents ngay khi admin thêm/sửa/xóa bot
   useEffect(() => {
     const cleanup = onAgentChange((event) => {
-      console.log('[ChatPage] 📡 Received agent change broadcast:', event.type, event.agentId || '');
+      const agentId = 'agentId' in event ? event.agentId : ('agentIds' in event ? event.agentIds?.join(',') : '');
+      console.log('[ChatPage] 📡 Received agent change broadcast:', event.type, agentId || '');
 
       // ⭐ Xử lý thay đổi category order (từ AdminSettings)
       if (event.type === 'category-order-changed') {
@@ -1104,7 +1105,7 @@ export function ChatPage() {
         systemPrompt: a.system_prompt || a.systemPrompt || '',
         capabilities: Array.isArray(a.capabilities) ? a.capabilities : [],
         isActive: a.isActive === true || a.is_active === 1,
-        createdBy: a.created_by === 'admin' || a.createdBy === 'admin' ? 'admin' : 'user',
+        createdBy: (a.created_by === 'admin' || a.createdBy === 'admin' ? 'admin' : 'user') as 'admin' | 'user',
         createdAt: a.createdAt ? new Date(a.createdAt).getTime()
           : a.created_at ? new Date(a.created_at).getTime()
           : Date.now(),
@@ -1144,9 +1145,9 @@ export function ChatPage() {
       console.log('[ChatPage] 🔄 Fetching agents directly from /public/agents...');
       fetch('/api/public/agents')
         .then(res => res.json())
-        .then(data => {
-          if (data.success && Array.isArray(data.data)) {
-            const freshAgents = data.data.map(mapBackendAgent);
+        .then((fetchData: { success: boolean; data: unknown[] }) => {
+          if (fetchData.success && Array.isArray(fetchData.data)) {
+            const freshAgents = fetchData.data.map((item: unknown) => mapBackendAgent(item));
             console.log('[ChatPage] ✅ Fresh agents fetched:', freshAgents.length, 'active:', freshAgents.filter(a => a.isActive).length);
             // Cập nhật store trực tiếp với dữ liệu mới
             useAgentStore.setState({

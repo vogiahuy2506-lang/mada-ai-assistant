@@ -3,7 +3,7 @@ import { AdminLayout } from './AdminLayout';
 import { getAccessToken, validateLocalToken, clearTokens } from '@/lib/api';
 import clsx from 'clsx';
 import {
-  ThumbsUp, ThumbsDown, MessageSquare,
+  ThumbsUp, ThumbsDown, MessageSquare, MessageCircle,
   BarChart2, Calendar, TrendingUp, TrendingDown,
   Loader2, ExternalLink, History,
   Filter, Eye, RefreshCw,
@@ -578,7 +578,7 @@ export default function AdminFeedback() {
                   >
                     {getSatisfactionRate() > 15 && (
                       <span className="flex items-center gap-1.5 px-3">
-                        <ThumbUpIcon className="w-4 h-4" />
+                        <ThumbsUp className="w-4 h-4" />
                         {getSatisfactionRate()}%
                       </span>
                     )}
@@ -589,7 +589,7 @@ export default function AdminFeedback() {
                   >
                     {100 - getSatisfactionRate() > 15 && (
                       <span className="flex items-center gap-1.5 px-3">
-                        <ThumbDownIcon className="w-4 h-4" />
+                        <ThumbsDown className="w-4 h-4" />
                         {100 - getSatisfactionRate()}%
                       </span>
                     )}
@@ -771,7 +771,7 @@ export default function AdminFeedback() {
                                     className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
                                     title={t('viewChatHistory')}
                                   >
-                                    <ChatBubbleOutline className="w-4 h-4" />
+                                    <MessageCircle className="w-4 h-4" />
                                     <span className="hidden lg:inline">Xem chat</span>
                                   </button>
                                   <a
@@ -850,7 +850,7 @@ export default function AdminFeedback() {
                 </>
               ) : (
                 <div className="flex flex-col items-center justify-center py-16 text-slate-500">
-                  <ChatBubbleOutline className="w-16 h-16 mb-4 opacity-30" />
+                  <MessageCircle className="w-16 h-16 mb-4 opacity-30" />
                   <p className="text-lg font-medium">{t('noFeedback')}</p>
                   <p className="text-sm text-slate-400 mt-1">{t('noData')}</p>
                 </div>
@@ -951,7 +951,7 @@ export default function AdminFeedback() {
                     }}
                     className="flex items-center justify-center gap-2 w-full px-4 py-3 bg-gradient-to-r from-indigo-500 to-violet-500 text-white rounded-xl font-semibold hover:from-indigo-600 hover:to-violet-600 transition-all shadow-md hover:shadow-lg"
                   >
-                    <ChatBubbleOutline className="w-5 h-5" />
+                    <MessageCircle className="w-5 h-5" />
                     {t('viewChatHistory')}
                   </button>
                   <a
@@ -982,7 +982,7 @@ export default function AdminFeedback() {
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500 flex items-center justify-center text-white shadow-lg shadow-indigo-200">
-                  <ChatBubbleOutline className="w-5 h-5" />
+                  <MessageCircle className="w-5 h-5" />
                 </div>
                 <div>
                   <h3 className="font-bold text-slate-900">{t('chatHistory')}</h3>
@@ -1037,7 +1037,7 @@ export default function AdminFeedback() {
                 ))
               ) : (
                 <div className="flex flex-col items-center justify-center py-12 text-slate-500">
-                  <ChatBubbleOutline className="w-16 h-16 mb-4 opacity-30" />
+                  <MessageCircle className="w-16 h-16 mb-4 opacity-30" />
                   <p className="text-sm font-medium">Không có tin nhắn nào</p>
                   <p className="text-xs text-slate-400 mt-1">Lịch sử chat không khả dụng</p>
                 </div>

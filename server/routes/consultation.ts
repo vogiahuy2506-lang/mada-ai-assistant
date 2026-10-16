@@ -481,20 +481,22 @@ ${siteUrl}
             user: process.env.MAIL_USERNAME,
             pass: process.env.MAIL_PASSWORD,
           },
+          connectionTimeout: 10000,
+          greetingTimeout: 10000,
+          socketTimeout: 30000,
           pool: true,
           maxConnections: 5,
           maxMessages: 100,
           rateLimit: 10, // max 10 emails per second
         });
 
-        // Verify connection first (only in debug mode to avoid slowing down)
-        if (process.env.MAIL_DEBUG === 'true') {
-          try {
-            await transporter.verify();
-            console.log('✅ [EMAIL] SMTP connection verified');
-          } catch (verifyErr) {
-            console.error('⚠️ [EMAIL] SMTP connection verification failed:', verifyErr);
-          }
+        // Always verify connection before sending (not just in debug mode)
+        try {
+          await transporter.verify();
+          console.log('✅ [EMAIL] SMTP connection verified');
+        } catch (verifyErr) {
+          console.error('⚠️ [EMAIL] SMTP connection verification failed:', verifyErr);
+          // Continue anyway - some servers don't allow verification before first mail
         }
 
         // Resolve MAIL_FROM from env, fallback to admin email

@@ -128,6 +128,18 @@ jobs:
               echo "⚠️ mada.db not found in repo, keeping existing VPS database"
             fi
 
+            echo "=== Step 8c: Sync products and categories SQL ==="
+            if [ -f "$TEMP_DIR/data/products-sync.sql" ]; then
+              echo "Syncing products from SQL file..."
+              sudo sqlite3 $APP_DIR/data/mada.db < $TEMP_DIR/data/products-sync.sql
+              echo "✅ Synced products ($(wc -l < $TEMP_DIR/data/products-sync.sql | tr -d ' ') rows)"
+            fi
+            if [ -f "$TEMP_DIR/data/categories-sync.sql" ]; then
+              echo "Syncing categories from SQL file..."
+              sudo sqlite3 $APP_DIR/data/mada.db < $TEMP_DIR/data/categories-sync.sql
+              echo "✅ Synced categories ($(wc -l < $TEMP_DIR/data/categories-sync.sql | tr -d ' ') rows)"
+            fi
+
             sudo rm -rf $TEMP_DIR
 
             echo "=== Step 9: Configure environment ==="

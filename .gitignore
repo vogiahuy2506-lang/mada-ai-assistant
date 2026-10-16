@@ -65,8 +65,15 @@ backend/data/standards/
 # Vector database files
 data/chroma/*
 data/ingestion_log.json
-# *.db
-# *.sqlite
+# Database files - NEVER commit binary SQLite databases
+data/*.db
+data/*.db-shm
+data/*.db-wal
+*.db
+*.sqlite
+*.sqlite3
+*.db-shm
+*.db-wal
 
 # Docker
 .dockerignore

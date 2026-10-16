@@ -1,0 +1,1374 @@
+{
+  "categoryAgents": [
+    {
+      "id": "sensory-hearing",
+      "nameEn": "Sensory - Hearing",
+      "nameAr": "الحسي - السمع",
+      "nameVi": "Cảm giác - Thính giác",
+      "nameFr": "Sensoriel - Audition",
+      "icon": "Ear",
+      "descriptionEn": "Hearing aids, tactile feedback devices, and visual alert systems.",
+      "descriptionAr": "المعينات السمعية، أجهزة التغذية الراجعة اللمسية، وأنظمة التنبيه البصري.",
+      "descriptionVi": "Máy trợ thính, thiết bị phản hồi xúc giác và hệ thống cảnh báo bằng ánh sáng.",
+      "descriptionFr": "Prothèses auditives, dispositifs tactiles et systèmes d'alerte visuelle."
+    },
+    {
+      "id": "sensory-vision",
+      "nameEn": "Sensory - Vision",
+      "nameAr": "الحسي - البصر",
+      "nameVi": "Cảm giác - Thị giác",
+      "nameFr": "Sensoriel - Vision",
+      "icon": "Eye",
+      "descriptionEn": "Screen readers, braille displays, and digital magnifying systems.",
+      "descriptionAr": "قارئات الشاشة، شاشات برايل، وأنظمة التكبير الرقمية.",
+      "descriptionVi": "Phần mềm đọc màn hình, màn hình chữ nổi và hệ thống kính lúp kỹ thuật số.",
+      "descriptionFr": "Lecteurs d'écran, plages braille et systèmes de loupe numérique."
+    },
+    {
+      "id": "voice-speech",
+      "nameEn": "Voice and Speech",
+      "nameAr": "الصوت والنطق",
+      "nameVi": "Giọng nói và Lời nói",
+      "nameFr": "Voix et Parole",
+      "icon": "Volume2",
+      "descriptionEn": "Augmentative & Alternative Communication (AAC) devices and speech synthesizers.",
+      "descriptionAr": "أجهزة الاتصال البديل والمعزز (AAC) ومخلقات الصوت.",
+      "descriptionVi": "Thiết bị giao tiếp tăng cường & thay thế (AAC) và bộ tổng hợp giọng nói.",
+      "descriptionFr": "Appareils de communication alternative (AAC) et synthétiseurs vocaux."
+    },
+    {
+      "id": "mental-cognitive",
+      "nameEn": "Mental - Cognitive",
+      "nameAr": "العقلي - المعرفي",
+      "nameVi": "Tâm thần - Nhận thức",
+      "nameFr": "Mental - Cognitif",
+      "icon": "Brain",
+      "descriptionEn": "Memory aids, task organizers, and cognitive training software.",
+      "descriptionAr": "مساعدات الذاكرة، منظمات المهام، وبرامج التدريب المعرفي.",
+      "descriptionVi": "Thiết bị hỗ trợ trí nhớ, sắp xếp công việc và phần mềm luyện tập nhận thức.",
+      "descriptionFr": "Aides à la mémoire, planificateurs et logiciels d'entraînement cognitif."
+    },
+    {
+      "id": "movement",
+      "nameEn": "Neuromusculoskeletal",
+      "nameAr": "الحركة والعضلات",
+      "nameVi": "Vận động Thần kinh - Cơ xương",
+      "nameFr": "Neuromusculosquelettique",
+      "icon": "Activity",
+      "descriptionEn": "Robotic orthoses, alternative keyboards, switches, and posture supports.",
+      "descriptionAr": "المقوامات الروبوتية، لوحات المفاتيح البديلة، والمفاتيح، ودعامات الوضعية.",
+      "descriptionVi": "Nẹp chỉnh hình robot, bàn phím thay thế, công tắc phụ trợ và hỗ trợ tư thế.",
+      "descriptionFr": "Orthèses robotisées, claviers alternatifs, contacteurs et supports de posture."
+    },
+    {
+      "id": "mobility-transport",
+      "nameEn": "Mobility & Transport",
+      "nameAr": "الحركة والنقل",
+      "nameVi": "Di chuyển và Giao thông",
+      "nameFr": "Mobilité & Transport",
+      "icon": "Truck",
+      "descriptionEn": "Smart wheelchairs, vehicle modifications, and adaptive navigation GPS.",
+      "descriptionAr": "الكراسي المتحركة الذكية، تعديلات المركبات، ونظام الملاحة التكيفي.",
+      "descriptionVi": "Xe lăn thông minh, cải tiến phương tiện giao thông và GPS định vị thích ứng.",
+      "descriptionFr": "Fauteuils roulants intelligents, adaptations de véhicules et GPS adaptés."
+    },
+    {
+      "id": "regulatory-standards",
+      "nameEn": "Regulatory & Standards",
+      "nameAr": "اللوائح والمعايير",
+      "nameVi": "Thông tin bổ trợ & Tiêu chuẩn",
+      "nameFr": "Réglementations & Normes",
+      "icon": "ShieldAlert",
+      "descriptionEn": "MADA Assistive Technology standards, ISO accessibility certifications, and guidelines.",
+      "descriptionAr": "معايير مدى للتكنولوجيا المساعدة، وشهادات إمكانية الوصول ISO والإرشادات.",
+      "descriptionVi": "Tiêu chuẩn Công nghệ hỗ trợ MADA, chứng chỉ tiếp cận ISO và hướng dẫn quy chuẩn.",
+      "descriptionFr": "Normes MADA, certifications d'accessibilité ISO et directives réglementaires."
+    }
+  ],
+  "qaData": [
+    {
+      "category": "sensory-hearing",
+      "mode": "user",
+      "lang": "en",
+      "question": "I am looking for hearing assistance or sound-to-light visual alert devices for better daily interaction. What options exist?",
+      "answer": "For individuals needing hearing assistance, we recommend modern, comfortable digital hearing devices or non-invasive sound-to-light warning systems. These devices are certified under MADA standards to guarantee acoustic comfort, signal clarity, and absolute ease of use.",
+      "confidence": 94,
+      "devices": [
+        {
+          "name": "Phonak Lyric Invisible Hearing Device",
+          "description": "An advanced, 100% comfortable hearing device placed discreetly, providing clear natural acoustics for daily activities.",
+          "image": "https://images.unsplash.com/photo-1590650516494-0c8e4a4dd67e?w=150&auto=format&fit=crop&q=60",
+          "link": "https://at.mada.org.qa/technology-category/body-function/sensory-hearing/"
+        },
+        {
+          "name": "Bellman & Symfon Sound-to-Light Alert",
+          "description": "An advanced visual alerting receiver that flashes bright light signals to notify of doorbells, alarms, or phone rings.",
+          "image": "https://images.unsplash.com/photo-1590650153855-d9e808231d41?w=150&auto=format&fit=crop&q=60",
+          "link": "https://at.mada.org.qa/technology-category/body-function/sensory-hearing/"
+        }
+      ],
+      "standards": [
+        "IEC 60118-4 compliant",
+        "ISO 8253-1 Audiometric Standard",
+        "ISO 9999 Class 22.06",
+        "WHO Priority Assistive Products List"
+      ]
+    },
+    {
+      "category": "sensory-hearing",
+      "mode": "expert",
+      "lang": "en",
+      "question": "When evaluating hearing assist solutions, what acoustic accessibility and ISO/IEC safety standards should an AT specialist verify?",
+      "answer": "When evaluating assistive fitting protocols, AT technical guidelines specify IEC 60118-compliant acoustic systems. Safe sound amplification curves must maintain strict output boundaries below 110 dB SPL to ensure user safety while optimizing high-frequency speech consonantal intelligibility.",
+      "confidence": 98,
+      "devices": [
+        {
+          "name": "MADA Auditory Diagnostic & Calibration Console",
+          "description": "Assistive technology testing suite with strict noise floor controls and automated IEC 60118 safety boundary enforcement.",
+          "image": "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=150&auto=format&fit=crop&q=60",
+          "link": "https://at.mada.org.qa/technology-category/body-function/sensory-hearing/"
+        }
+      ],
+      "standards": [
+        "IEC 60118-4 compliant",
+        "ISO 8253-1 Audiometric Standard",
+        "ISO 9999 Class 22.06",
+        "WHO Priority Assistive Products List"
+      ]
+    },
+    {
+      "category": "sensory-hearing",
+      "mode": "user",
+      "lang": "vi",
+      "question": "Tôi đang tìm kiếm giải pháp trợ thính hoặc thiết bị cảnh báo bằng ánh sáng/xúc giác phục vụ sinh hoạt hàng ngày. Có lựa chọn nào phù hợp?",
+      "answer": "Đối với nhu cầu hỗ trợ thính giác, các thiết bị trợ thính siêu nhỏ đeo gọn gàng hoặc hệ thống cảnh báo bằng ánh sáng/xúc giác (nhấp nháy đèn khi có chuông) là những giải pháp công nghệ vô cùng tiện lợi và hiệu quả. Tất cả thiết bị đều đạt chứng nhận quy chuẩn quốc tế và phân phối qua cổng MADA.",
+      "confidence": 95,
+      "devices": [
+        {
+          "name": "Máy trợ thính Phonak Lyric siêu nhỏ",
+          "description": "Thiết bị nhỏ gọn thiết kế tinh tế, đem lại trải nghiệm âm thanh rõ ràng tự nhiên và sử dụng dễ dàng.",
+          "image": "https://images.unsplash.com/photo-1590650516494-0c8e4a4dd67e?w=150&auto=format&fit=crop&q=60",
+          "link": "https://at.mada.org.qa/technology-category/body-function/sensory-hearing/"
+        },
+        {
+          "name": "Hệ thống cảnh báo ánh sáng Bellman",
+          "description": "Chuyển tín hiệu âm thanh (chuông cửa, chuông điện thoại, báo thức) thành các xung ánh sáng LED nhấp nháy công suất cao.",
+          "image": "https://images.unsplash.com/photo-1590650153855-d9e808231d41?w=150&auto=format&fit=crop&q=60",
+          "link": "https://at.mada.org.qa/technology-category/body-function/sensory-hearing/"
+        }
+      ],
+      "standards": [
+        "Tiêu chuẩn quốc tế IEC 60118-4",
+        "ISO 8253-1 (Kiểm định Thính học)",
+        "ISO 9999 Phân loại Thiết bị Hỗ trợ",
+        "Quy chuẩn Tiếp cận Quốc gia Qatar"
+      ]
+    },
+    {
+      "category": "sensory-hearing",
+      "mode": "expert",
+      "lang": "vi",
+      "question": "Khi tư vấn thiết bị trợ thính cho người dùng, chuyên gia CNHT cần thẩm định những tiêu chuẩn kỹ thuật và quy chuẩn âm học nào?",
+      "answer": "Đối với người dùng cần hỗ trợ thính giác, chuyên gia CNHT cần bám sát tiêu chuẩn an toàn âm học <b>IEC 60118</b> và phân loại <b>ISO 9999</b>. Cần đảm bảo giới hạn ngưỡng nén đầu ra tối đa (MPO) an toàn tuyệt đối, loại bỏ nhiễu và tích hợp công nghệ chống hú tự động.",
+      "confidence": 97,
+      "devices": [
+        {
+          "name": "Hệ thống kiểm định thính học MADA Console",
+          "description": "Bàn kiểm định kỹ thuật thính học hiệu chuẩn tự động, hỗ trợ phân tích đáp ứng tần số âm thanh thực tế.",
+          "image": "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=150&auto=format&fit=crop&q=60",
+          "link": "https://at.mada.org.qa/technology-category/body-function/sensory-hearing/"
+        }
+      ],
+      "standards": [
+        "Tiêu chuẩn quốc tế IEC 60118-4",
+        "ISO 8253-1 (Kiểm định Thính học)",
+        "ISO 9999 Phân loại Thiết bị Hỗ trợ",
+        "Quy chuẩn Tiếp cận Quốc gia Qatar"
+      ]
+    },
+    {
+      "category": "sensory-hearing",
+      "mode": "user",
+      "lang": "ar",
+      "question": "أبحث عن معينات سمعية أو أجهزة تنبيه ضوئي واهتزازية مناسبة ومريحة للاستخدام اليومي. ما هي الخيارات المتاحة؟",
+      "answer": "نوصي بمعينات السمع الرقمية الحديثة المريحة أو أنظمة الإنذار الضوئية واللمسية المعتمدة من مركز مدى، لضمان أعلى مستويات الراحة والأمان السمعي والسهولة المطلقة في الاستخدام اليومي.",
+      "confidence": 94,
+      "devices": [
+        {
+          "name": "معين السمع غير المرئي Phonak Lyric",
+          "description": "معين سمع صغير ومخفي تمامًا يوضع بأسلوب مريح لتقديم صوت طبيعي نقي على مدار الساعة.",
+          "image": "https://images.unsplash.com/photo-1590650516494-0c8e4a4dd67e?w=150&auto=format&fit=crop&q=60",
+          "link": "https://at.mada.org.qa/technology-category/body-function/sensory-hearing/"
+        }
+      ],
+      "standards": [
+        "معيار الأمان السمعي IEC 60118-4",
+        "معيار فحص السمع ISO 8253-1",
+        "تصنيف ISO 9999 للتكنولوجيا المساعدة"
+      ]
+    },
+    {
+      "category": "sensory-hearing",
+      "mode": "expert",
+      "lang": "ar",
+      "question": "عند تقييم حلول التكنولوجيا المساعدة للسمع، ما هي المعايير التقنية ومعايير الأمان السمعي الواجب التحقق منها؟",
+      "answer": "عند ملاءمة أجهزة السمع المساعدة، يجب التحقق من امتثالها لمعايير اللجنة الكهرتقنية الدولية IEC 60118 وتصنيف ISO 9999 وضمان ألا يتجاوز حد التضخيم الأقصى المسموح به لضمان راحة وسلامة المستخدم.",
+      "confidence": 98,
+      "devices": [
+        {
+          "name": "نظام التحقق السمعي MADA Inspection Console",
+          "description": "وحدة فحص فنية لمعايرة المعينات السمعية ومطابقتها لمعايير الأمان العالمية واللوائح المعتمدة.",
+          "image": "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=150&auto=format&fit=crop&q=60",
+          "link": "https://at.mada.org.qa/technology-category/body-function/sensory-hearing/"
+        }
+      ],
+      "standards": [
+        "معيار الأمان السمعي IEC 60118-4",
+        "معيار فحص السمع ISO 8253-1",
+        "تصنيف ISO 9999 للتكنولوجيا المساعدة"
+      ]
+    },
+    {
+      "category": "sensory-hearing",
+      "mode": "user",
+      "lang": "fr",
+      "question": "Je cherche des appareils auditifs ou d'alerte adaptés et sûrs.",
+      "answer": "Pour une déficience auditive légère, les aides auditives micro-RIC ou les systèmes d'alerte lumineuse et vibratoire Bellman sont idéaux. Ils garantissent un grand confort sonore au quotidien et une sécurité absolue, certifiés par le pôle MADA.",
+      "confidence": 94,
+      "devices": [
+        {
+          "name": "Aide auditive invisible Phonak Lyric",
+          "description": "Placée en profondeur dans le conduit, elle offre une audition naturelle sans entretien quotidien.",
+          "image": "https://images.unsplash.com/photo-1590650516494-0c8e4a4dd67e?w=150&auto=format&fit=crop&q=60",
+          "link": "https://at.mada.org.qa/technology-category/body-function/sensory-hearing/"
+        }
+      ],
+      "standards": [
+        "Conformité IEC 60118-4",
+        "Norme d'évaluation ISO 8253-1",
+        "Classification ISO 9999"
+      ]
+    },
+    {
+      "category": "sensory-hearing",
+      "mode": "expert",
+      "lang": "fr",
+      "question": "Quelles sont les normes de sécurité audiométriques et les exigences techniques à vérifier pour les aides auditives ?",
+      "answer": "L'adaptation d'appareils auditifs pour déficience légère doit respecter la norme IEC 60118. Il convient de vérifier le niveau de compression de sortie pour prévenir tout traumatisme sonore secondaire tout en préservant l'intelligibilité de la parole.",
+      "confidence": 97,
+      "devices": [
+        {
+          "name": "Console de vérification auditive MADA",
+          "description": "Plateforme de contrôle technique automatisée pour l'évaluation et la calibration précise selon la norme ISO 8253-1.",
+          "image": "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=150&auto=format&fit=crop&q=60",
+          "link": "https://at.mada.org.qa/technology-category/body-function/sensory-hearing/"
+        }
+      ],
+      "standards": [
+        "Conformité IEC 60118-4",
+        "Norme d'évaluation ISO 8253-1",
+        "Classification ISO 9999"
+      ]
+    },
+    {
+      "category": "sensory-vision",
+      "mode": "user",
+      "lang": "en",
+      "question": "I have severe visual impairment and need a screen reader or digital magnifying tool to read computer screens.",
+      "answer": "For severe visual impairment, we highly recommend <b>NVDA (NonVisual Desktop Access)</b>, a free and powerful screen reader, alongside electronic digital magnifiers. These tools work in unison to announce or magnify on-screen elements, ensuring complete access to computers, web portals, and office systems.",
+      "confidence": 96,
+      "devices": [
+        {
+          "name": "NVDA Screen Reader",
+          "description": "Excellent lightweight open-source screen reader for Windows. Supports high-speed synthesized speech and real-time Braille displays.",
+          "image": "https://images.unsplash.com/photo-1587831990711-23ca6441447b?w=150&auto=format&fit=crop&q=60",
+          "link": "https://at.mada.org.qa/technology-category/body-function/sensory-vision/"
+        },
+        {
+          "name": "Ruby HD Portable Digital Magnifier",
+          "description": "High-definition portable electronic magnifier with customizable high-contrast color modes and built-in screen capture.",
+          "image": "https://images.unsplash.com/photo-1547082299-de196ea013d6?w=150&auto=format&fit=crop&q=60",
+          "link": "https://at.mada.org.qa/technology-category/body-function/sensory-vision/"
+        }
+      ],
+      "standards": [
+        "WCAG 2.2 AA compliance",
+        "ISO 9241-171 Software Accessibility",
+        "EN 301 549 European Standard",
+        "Section 508 US Access Board"
+      ]
+    },
+    {
+      "category": "sensory-vision",
+      "mode": "expert",
+      "lang": "en",
+      "question": "When selecting screen readers and digital magnification software for visually impaired users, which technical standards should be verified?",
+      "answer": "For technical and accessibility recommendations, software accessibility must strictly align with <b>WCAG 2.2 AA</b>, <b>EN 301 549</b>, and <b>ISO 9241-171</b>. Hardware components must comply with USB-HID protocols to ensure driverless braille output compatibility across major operating systems.",
+      "confidence": 98,
+      "devices": [
+        {
+          "name": "Focus 40 Blue Tactile Braille Display",
+          "description": "USB-HID standard compliant paper-like Braille display, verified under global electronic access regulations.",
+          "image": "https://images.unsplash.com/photo-1563986768609-322da13575f3?w=150&auto=format&fit=crop&q=60",
+          "link": "https://at.mada.org.qa/technology-category/body-function/sensory-vision/"
+        }
+      ],
+      "standards": [
+        "WCAG 2.2 AA compliance",
+        "ISO 9241-171 Software Accessibility",
+        "EN 301 549 European Standard",
+        "Section 508 US Access Board"
+      ]
+    },
+    {
+      "category": "sensory-vision",
+      "mode": "user",
+      "lang": "vi",
+      "question": "Tôi bị khiếm thị nặng, tôi cần công cụ đọc màn hình hoặc kính lúp điện tử nào tốt?",
+      "answer": "Đối với người bị khiếm thị hoặc giảm thị lực nặng, hai giải pháp hỗ trợ vượt trội hàng đầu là phần mềm đọc màn hình <b>NVDA</b> (hoàn toàn miễn phí, hỗ trợ tiếng Việt rất tốt) kết hợp cùng kính lúp điện tử cầm tay thông minh (như Ruby HD). Bộ đôi công cụ này giúp bạn dễ dàng độc lập làm chủ máy tính và tài liệu giấy.",
+      "confidence": 95,
+      "devices": [
+        {
+          "name": "Phần mềm đọc màn hình NVDA",
+          "description": "Giải pháp đọc màn hình máy tính Windows bằng giọng nói tổng hợp hoặc chuyển ngữ sang chữ nổi Braille.",
+          "image": "https://images.unsplash.com/photo-1587831990711-23ca6441447b?w=150&auto=format&fit=crop&q=60",
+          "link": "https://at.mada.org.qa/technology-category/body-function/sensory-vision/"
+        },
+        {
+          "name": "Kính lúp điện tử cầm tay Ruby HD",
+          "description": "Màn hình độ nét cao hỗ trợ phóng to văn bản giấy lên tới 14 lần, tích hợp nhiều bộ lọc tương phản tối ưu thị giác.",
+          "image": "https://images.unsplash.com/photo-1547082299-de196ea013d6?w=150&auto=format&fit=crop&q=60",
+          "link": "https://at.mada.org.qa/technology-category/body-function/sensory-vision/"
+        }
+      ],
+      "standards": [
+        "Nguyên lý WCAG 2.2 AA",
+        "ISO 9241-171 (Khả năng tiếp cận phần mềm)",
+        "Tiêu chuẩn kỹ thuật EN 301 549",
+        "US Section 508 Compliant"
+      ]
+    },
+    {
+      "category": "sensory-vision",
+      "mode": "expert",
+      "lang": "vi",
+      "question": "Người dùng khiếm thị cần công cụ đọc màn hình, các chứng chỉ và tiêu chuẩn công nghệ hỗ trợ nào cần quan tâm?",
+      "answer": "Khi thẩm định các công cụ đọc màn hình và thiết bị hiển thị cho người khiếm thị nặng, các chuyên gia CNHT cần đặc biệt lưu ý tính tương thích với chuẩn tiếp cận nội dung số <b>WCAG 2.2 AA</b>, tiêu chuẩn phần mềm <b>ISO 9241-171</b> và các thiết bị phần cứng đạt chuẩn giao tiếp driverless qua giao thức USB-HID.",
+      "confidence": 98,
+      "devices": [
+        {
+          "name": "Thiết bị hiển thị chữ nổi Focus 40 Blue",
+          "description": "Màn hình chữ nổi 40 ký tự đạt chuẩn ISO và WCAG, đồng bộ tức thời với trình đọc màn hình NVDA/JAWS.",
+          "image": "https://images.unsplash.com/photo-1563986768609-322da13575f3?w=150&auto=format&fit=crop&q=60",
+          "link": "https://at.mada.org.qa/technology-category/body-function/sensory-vision/"
+        }
+      ],
+      "standards": [
+        "Nguyên lý WCAG 2.2 AA",
+        "ISO 9241-171 (Khả năng tiếp cận phần mềm)",
+        "Tiêu chuẩn kỹ thuật EN 301 549",
+        "US Section 508 Compliant"
+      ]
+    },
+    {
+      "category": "sensory-vision",
+      "mode": "user",
+      "lang": "ar",
+      "question": "أنا أعاني من ضعف بصر شديد وأحتاج إلى قارئ شاشة أو أداة تكبير رقمية لقراءة شاشة الكمبيوتر والملفات.",
+      "answer": "لضعاف البصر والمكفوفين، نوصي بشدة ببرنامج قارئ الشاشة <b>NVDA</b> المجاني والمفتوح المصدر للكمبيوتر، إلى جانب المكبرات الإلكترونية المحمولة لتكبير النصوص المكتوبة بدقة تامة.",
+      "confidence": 96,
+      "devices": [
+        {
+          "name": "قارئ الشاشة NVDA",
+          "description": "قارئ شاشة ممتاز ومجاني لنظام التشغيل Windows يدعم اللغة العربية وآلات النطق المتعددة وسطور برايل.",
+          "image": "https://images.unsplash.com/photo-1587831990711-23ca6441447b?w=150&auto=format&fit=crop&q=60",
+          "link": "https://at.mada.org.qa/technology-category/body-function/sensory-vision/"
+        }
+      ],
+      "standards": [
+        "توافقية WCAG 2.2 AA",
+        "معايير برمجيات ISO 9241-171",
+        "المعيار الأوروبي الموحد EN 301 549"
+      ]
+    },
+    {
+      "category": "sensory-vision",
+      "mode": "expert",
+      "lang": "ar",
+      "question": "خبير تكنولوجيا مساعدة يبحث عن قارئ شاشة لمستخدم ضعيف البصر. ما هي المعايير الرقمية التي يجب التحقق منها؟",
+      "answer": "يجب توافق جميع حلول الوصول الرقمية الموصى بها مع معايير إمكانية الوصول إلى محتوى الويب WCAG 2.2 AA والمعيار الأوروبي EN 301 549 لضمان تكامل البرمجيات الآمن.",
+      "confidence": 98,
+      "devices": [
+        {
+          "name": "سطر برايل الإلكتروني Focus 40 Blue",
+          "description": "شاشة قراءة لغة برايل تدعم الاتصال اللاسلكي ومتوافقة مع معايير الأمان الرقمية العالمية.",
+          "image": "https://images.unsplash.com/photo-1563986768609-322da13575f3?w=150&auto=format&fit=crop&q=60",
+          "link": "https://at.mada.org.qa/technology-category/body-function/sensory-vision/"
+        }
+      ],
+      "standards": [
+        "توافقية WCAG 2.2 AA",
+        "معايير برمجيات ISO 9241-171",
+        "المعيار الأوروبي الموحد EN 301 549"
+      ]
+    },
+    {
+      "category": "sensory-vision",
+      "mode": "user",
+      "lang": "fr",
+      "question": "J'ai une déficience visuelle sévère et j'ai besoin d'un lecteur d'écran ou d'une loupe numérique pour travailler sur ordinateur.",
+      "answer": "Pour les personnes malvoyantes, nous recommandons le lecteur d'écran performant <b>NVDA</b> associé à une loupe électronique portable pour une navigation simplifiée.",
+      "confidence": 95,
+      "devices": [
+        {
+          "name": "Lecteur d'écran NVDA",
+          "description": "Lecteur d'écran open-source sous Windows, léger et traduisant instantanément en voix synthétique ou en braille.",
+          "image": "https://images.unsplash.com/photo-1587831990711-23ca6441447b?w=150&auto=format&fit=crop&q=60",
+          "link": "https://at.mada.org.qa/technology-category/body-function/sensory-vision/"
+        }
+      ],
+      "standards": [
+        "Recommandations WCAG 2.2 AA",
+        "Accessibilité logicielle ISO 9241-171",
+        "Réglementation européenne EN 301 549"
+      ]
+    },
+    {
+      "category": "sensory-vision",
+      "mode": "expert",
+      "lang": "fr",
+      "question": "Un utilisateur malvoyant a besoin d'un lecteur d'écran. Quelles normes d'accès et spécifications faut-il vérifier ?",
+      "answer": "Les solutions d'accès pour déficients visuels doivent s'aligner sur les exigences de la norme WCAG 2.2 AA et d'accessibilité logicielle ISO 9241-171 afin de garantir une parfaite compatibilité.",
+      "confidence": 98,
+      "devices": [
+        {
+          "name": "Afficheur Braille Focus 40 Blue",
+          "description": "Plage braille haut de gamme connectée sans fil, conforme aux réglementations d'accessibilité internationales.",
+          "image": "https://images.unsplash.com/photo-1563986768609-322da13575f3?w=150&auto=format&fit=crop&q=60",
+          "link": "https://at.mada.org.qa/technology-category/body-function/sensory-vision/"
+        }
+      ],
+      "standards": [
+        "Recommandations WCAG 2.2 AA",
+        "Accessibilité logicielle ISO 9241-171",
+        "Réglementation européenne EN 301 549"
+      ]
+    },
+    {
+      "category": "voice-speech",
+      "mode": "user",
+      "lang": "en",
+      "question": "My child experiences speech challenges and struggles to communicate in class. What AAC devices or speech aids can help?",
+      "answer": "For individuals who face speech challenges, Augmentative and Alternative Communication (AAC) devices provide remarkable assistance. Solutions like Tobii Dynavox use eye-tracking or custom switch buttons to translate selections into crystal-clear synthesized voices, helping students participate actively in class and social settings.",
+      "confidence": 93,
+      "devices": [
+        {
+          "name": "Tobii Dynavox I-Series Speech Tablet",
+          "description": "An advanced, rugged speech tablet powered by industry-leading eye-trackers, letting non-verbal users speak and study using their eyes.",
+          "image": "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=150&auto=format&fit=crop&q=60",
+          "link": "https://at.mada.org.qa/technology-category/body-function/voice-and-speech/"
+        },
+        {
+          "name": "Proloquo2Go Symbol AAC App",
+          "description": "A highly intuitive, symbol-supported tablet application that easily converts symbol presses into high-quality spoken words.",
+          "image": "https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?w=150&auto=format&fit=crop&q=60",
+          "link": "https://at.mada.org.qa/technology-category/body-function/voice-and-speech/"
+        }
+      ],
+      "standards": [
+        "ISO 9999 Class 22.21 AAC Systems",
+        "W3C Voice Interaction Standards",
+        "ISO 13485 Quality Management",
+        "Data Privacy & Accessibility Compliant"
+      ]
+    },
+    {
+      "category": "voice-speech",
+      "mode": "expert",
+      "lang": "en",
+      "question": "How can AT specialists integrate alternative communication (AAC) devices with school and institutional accessibility management systems?",
+      "answer": "Technical integration of high-tech AAC equipment utilizes <b>API interoperability protocols</b> and open data standards. Device usage analytics, eye-gaze accuracy metrics, and vocabulary customization progress can be logged securely for ongoing assistive technology evaluation and educational adaptation.",
+      "confidence": 96,
+      "devices": [
+        {
+          "name": "Tobii Dynavox Interoperable System",
+          "description": "AAC speech aid equipped with secure API endpoints to export communication progress reports directly to AT specialist dashboards.",
+          "image": "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=150&auto=format&fit=crop&q=60",
+          "link": "https://at.mada.org.qa/technology-category/body-function/voice-and-speech/"
+        }
+      ],
+      "standards": [
+        "ISO 9999 Class 22.21 AAC Systems",
+        "W3C Voice Interaction Standards",
+        "ISO 13485 Quality Management",
+        "Data Privacy & Accessibility Compliant"
+      ]
+    },
+    {
+      "category": "voice-speech",
+      "mode": "user",
+      "lang": "vi",
+      "question": "Con tôi khó giao tiếp ở lớp học, có thiết bị giao tiếp hỗ trợ AAC nào giúp bé hòa nhập tốt không?",
+      "answer": "Đối với người dùng gặp khó khăn khi phát âm tự nhiên, hệ thống giao tiếp tăng cường và thay thế <b>AAC</b> (như Tobii Dynavox tích hợp camera theo dõi ánh mắt hoặc phần mềm biểu tượng Proloquo2Go) là giải pháp vô cùng tuyệt vời. Thiết bị giúp người dùng chỉ cần nhìn hoặc chạm nhẹ vào hình ảnh để máy tự động phát ra tiếng nói rõ ràng.",
+      "confidence": 94,
+      "devices": [
+        {
+          "name": "Máy giao tiếp Tobii Dynavox I-Series",
+          "description": "Thiết bị chuyên dụng siêu bền tích hợp camera bám đuổi ánh mắt độ chính xác cao, cho phép nói và tương tác học tập bằng mắt.",
+          "image": "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=150&auto=format&fit=crop&q=60",
+          "link": "https://at.mada.org.qa/technology-category/body-function/voice-and-speech/"
+        },
+        {
+          "name": "Phần mềm biểu tượng Proloquo2Go",
+          "description": "Ứng dụng chuyên sâu trên máy tính bảng sử dụng hệ thống thẻ giao tiếp hình ảnh thông minh tự động phát âm thanh tiếng nói rõ ràng.",
+          "image": "https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?w=150&auto=format&fit=crop&q=60",
+          "link": "https://at.mada.org.qa/technology-category/body-function/voice-and-speech/"
+        }
+      ],
+      "standards": [
+        "Tiêu chuẩn ISO 9999 (22.21 Thiết bị AAC)",
+        "Quy chuẩn tiếp cận tương tác giọng nói W3C",
+        "Tiêu chuẩn quản lý chất lượng ISO 13485"
+      ]
+    },
+    {
+      "category": "voice-speech",
+      "mode": "expert",
+      "lang": "vi",
+      "question": "Làm thế nào để tích hợp thiết bị giao tiếp hỗ trợ (AAC) với hệ thống quản lý dữ liệu tiếp cận và đánh giá nhu cầu?",
+      "answer": "Để tích hợp dữ liệu đánh giá tiến trình giao tiếp AAC, thiết bị hỗ trợ các chuẩn xuất dữ liệu mở và giao thức an toàn. Các chỉ số tần suất dùng biểu tượng, tốc độ chọn từ và phản xạ ánh mắt sẽ được lưu trữ phân tích để chuyên gia CNHT điều chỉnh kho từ vựng và thuật toán hỗ trợ phù hợp.",
+      "confidence": 96,
+      "devices": [
+        {
+          "name": "Hệ thống quản lý dữ liệu tương tác Tobii AAC",
+          "description": "Module kết nối dữ liệu chuyên dụng hỗ trợ xuất báo cáo tiến trình giao tiếp cho chuyên gia công nghệ hỗ trợ.",
+          "image": "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=150&auto=format&fit=crop&q=60",
+          "link": "https://at.mada.org.qa/technology-category/body-function/voice-and-speech/"
+        }
+      ],
+      "standards": [
+        "Tiêu chuẩn ISO 9999 (22.21 Thiết bị AAC)",
+        "Quy chuẩn tiếp cận tương tác giọng nói W3C",
+        "Tiêu chuẩn quản lý chất lượng ISO 13485"
+      ]
+    },
+    {
+      "category": "voice-speech",
+      "mode": "user",
+      "lang": "ar",
+      "question": "طفلي يجد صعوبة في التواصل والنطق في الصف الدراسي. ما هي أجهزة AAC المساعدة المتاحة؟",
+      "answer": "نوصي بأجهزة الاتصال البديل والمعزز (AAC) التي تتيح للمستخدم التحدث باستخدام تتبع العين أو الرموز المصورة لإنتاج كلام واضح ومفهوم في الصف والمحيط الاجتماعي.",
+      "confidence": 93,
+      "devices": [
+        {
+          "name": "جهاز النطق وتتبع العين Tobii Dynavox I-Series",
+          "description": "كمبيوتر نطق لوحي متطور يدعم تتبع حركة العين بدقة، مما يسمح للتحدث والدراسة باستخدام العينين بسهولة.",
+          "image": "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=150&auto=format&fit=crop&q=60",
+          "link": "https://at.mada.org.qa/technology-category/body-function/voice-and-speech/"
+        }
+      ],
+      "standards": [
+        "تصنيف ISO 9999 لأجهزة AAC",
+        "معايير W3C للتفاعل الصوتي",
+        "معايير الجودة ISO 13485"
+      ]
+    },
+    {
+      "category": "voice-speech",
+      "mode": "expert",
+      "lang": "ar",
+      "question": "كيف يمكن لأخصائي التكنولوجيا المساعدة دمج أجهزة الاتصال البديل والمعزز (AAC) مع أنظمة إدارة الوصول والتقييم؟",
+      "answer": "يتم دمج أجهزة AAC مع منصات التقييم عبر بروتوكولات البيانات المفتوحة لتسهيل نقل التقارير وتحليل تقدم مهارات الاتصال اللفظي والبصري بشكل آمن وموثوق.",
+      "confidence": 96,
+      "devices": [
+        {
+          "name": "نظام Tobii AAC لإدارة التقارير المتقدمة",
+          "description": "نظام اتصالات معزز يدعم تصدير سجلات الأداء والتردد اللفظي إلى لوحة متابعة أخصائي التكنولوجيا المساعدة.",
+          "image": "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=150&auto=format&fit=crop&q=60",
+          "link": "https://at.mada.org.qa/technology-category/body-function/voice-and-speech/"
+        }
+      ],
+      "standards": [
+        "تصنيف ISO 9999 لأجهزة AAC",
+        "معايير W3C للتفاعل الصوتي",
+        "معايير الجودة ISO 13485"
+      ]
+    },
+    {
+      "category": "voice-speech",
+      "mode": "user",
+      "lang": "fr",
+      "question": "Mon enfant a du mal à s'exprimer et à communiquer en classe. Quels appareils AAC peuvent l'aider ?",
+      "answer": "Les solutions de communication alternative (AAC) basées sur l'oculométrie ou les tablettes de symboles vocaux sont idéales pour l'expression et l'inclusion en classe.",
+      "confidence": 93,
+      "devices": [
+        {
+          "name": "Tablette de communication Tobii Dynavox I-Series",
+          "description": "Dispositif d'oculométrie robuste permettant de s'exprimer de manière fluide uniquement avec les yeux.",
+          "image": "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=150&auto=format&fit=crop&q=60",
+          "link": "https://at.mada.org.qa/technology-category/body-function/voice-and-speech/"
+        }
+      ],
+      "standards": [
+        "Classification ISO 9999 (22.21)",
+        "Normes d'interaction vocale W3C",
+        "Gestion de la qualité ISO 13485"
+      ]
+    },
+    {
+      "category": "voice-speech",
+      "mode": "expert",
+      "lang": "fr",
+      "question": "Comment intégrer des dispositifs de communication alternative (AAC) avec les systèmes de suivi d'accessibilité ?",
+      "answer": "L'interopérabilité des dispositifs AAC s'appuie sur des standards d'échange de données ouverts, facilitant le suivi sécurisé des progrès d'expression de l'utilisateur.",
+      "confidence": 96,
+      "devices": [
+        {
+          "name": "Dispositif Tobii Interopérable",
+          "description": "Solution d'assistance vocale dotée d'exportation de données d'usage pour les spécialistes en technologies d'assistance.",
+          "image": "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=150&auto=format&fit=crop&q=60",
+          "link": "https://at.mada.org.qa/technology-category/body-function/voice-and-speech/"
+        }
+      ],
+      "standards": [
+        "Classification ISO 9999 (22.21)",
+        "Normes d'interaction vocale W3C",
+        "Gestion de la qualité ISO 13485"
+      ]
+    },
+    {
+      "category": "mental-cognitive",
+      "mode": "user",
+      "lang": "en",
+      "question": "My elderly relative often forgets daily tasks or schedule items. What cognitive memory and task planning tools can help?",
+      "answer": "To assist family members experiencing memory challenges or age-related forgetfulness, we recommend highly visual daily schedule organizers and smart automated organizers. These tools sound alarms or display clear visual prompts to keep daily routines, reminders, and schedules structured and stress-free.",
+      "confidence": 91,
+      "devices": [
+        {
+          "name": "MADA Smart Medelert Locked Dispenser",
+          "description": "An automated locked organizer carousel that rotates and sounds a loud alarm at scheduled times, keeping items organized and secure.",
+          "image": "https://images.unsplash.com/photo-1508962914676-134849a727f0?w=150&auto=format&fit=crop&q=60",
+          "link": "https://at.mada.org.qa/technology-category/body-function/mental-cognitive/"
+        },
+        {
+          "name": "Time Timer Plus Visual Clock",
+          "description": "A practical clock with a highly visible disappearing red disk to represent time intuitively, reducing temporal anxiety.",
+          "image": "https://images.unsplash.com/photo-1542751371-adc38448a05e?w=150&auto=format&fit=crop&q=60",
+          "link": "https://at.mada.org.qa/technology-category/body-function/mental-cognitive/"
+        }
+      ],
+      "standards": [
+        "WHO Priority Assistive Products List",
+        "ISO 13485:2016 Certified",
+        "ISO 9999 Class 22.27 Cognitive Aids",
+        "Software Safety & Usability Standards"
+      ]
+    },
+    {
+      "category": "mental-cognitive",
+      "mode": "expert",
+      "lang": "en",
+      "question": "Which cognitive accessibility support tools and memory aids are recognized under the WHO Priority Assistive Products list?",
+      "answer": "Cognitive assistive technology solutions targeting memory, task organization, and orientation are recognized by the WHO Priority Assistive Products List. These tools focus on intuitive prompt generation, structured schedule reinforcement, and sensor-based safety tracking for independent living.",
+      "confidence": 95,
+      "devices": [
+        {
+          "name": "Neofect SaMD Cognitive Suite",
+          "description": "Cognitive training and evaluation software designed for structured brain exercise and cognitive assessment in accessibility centers.",
+          "image": "https://images.unsplash.com/photo-1576091160550-2173dba999ef?w=150&auto=format&fit=crop&q=60",
+          "link": "https://at.mada.org.qa/technology-category/body-function/mental-cognitive/"
+        }
+      ],
+      "standards": [
+        "WHO Priority Assistive Products List",
+        "ISO 13485:2016 Certified",
+        "ISO 9999 Class 22.27 Cognitive Aids",
+        "Software Safety & Usability Standards"
+      ]
+    },
+    {
+      "category": "mental-cognitive",
+      "mode": "user",
+      "lang": "vi",
+      "question": "Bố tôi là người cao tuổi hay quên lịch trình sinh hoạt hàng ngày, có công cụ hỗ trợ ghi nhớ nào an toàn dễ dùng không?",
+      "answer": "Đối với người cao tuổi thường xuyên hay quên hoặc gặp khó khăn về trí nhớ, giải pháp thiết thực nhất là các hộp nhắc nhở thông minh tự động (như Medelert) và đồng hồ trực quan hiển thị thời gian bằng màu sắc. Thiết bị sẽ phát cảnh báo giọng nói/âm thanh đúng giờ để nhắc nhở công việc, loại bỏ căng thẳng và nhầm lẫn.",
+      "confidence": 93,
+      "devices": [
+        {
+          "name": "Hộp nhắc nhở thông minh tự động Medelert",
+          "description": "Hộp xoay tự động khóa chặt, chỉ mở đúng ngăn theo giờ cài đặt sẵn kèm còi báo âm lượng lớn giúp ghi nhớ lịch trình.",
+          "image": "https://images.unsplash.com/photo-1508962914676-134849a727f0?w=150&auto=format&fit=crop&q=60",
+          "link": "https://at.mada.org.qa/technology-category/body-function/mental-cognitive/"
+        },
+        {
+          "name": "Đồng hồ hiển thị trực quan Time Timer",
+          "description": "Giúp người cao tuổi dễ dàng hình dung thời gian trôi qua nhờ một đĩa màu đỏ co lại dần, loại bỏ áp lực temporal.",
+          "image": "https://images.unsplash.com/photo-1542751371-adc38448a05e?w=150&auto=format&fit=crop&q=60",
+          "link": "https://at.mada.org.qa/technology-category/body-function/mental-cognitive/"
+        }
+      ],
+      "standards": [
+        "Danh mục Thiết bị Hỗ trợ Ưu tiên WHO",
+        "Phân loại ISO 9999 (22.27 Hỗ trợ Nhận thức)",
+        "Tiêu chuẩn quản lý chất lượng ISO 13485:2016"
+      ]
+    },
+    {
+      "category": "mental-cognitive",
+      "mode": "expert",
+      "lang": "vi",
+      "question": "Chuyên gia CNHT cần tham khảo các công cụ hỗ trợ nhận thức và ghi nhớ nào được WHO công nhận?",
+      "answer": "Đối với các trường hợp suy giảm trí nhớ ở người cao tuổi, WHO khuyến nghị ứng dụng các hệ thống trợ giúp trực quan, nhắc nhở nhiệm vụ tự động và phần mềm rèn luyện nhận thức đạt tiêu chuẩn chất lượng ISO 13485 và phân loại ISO 9999.",
+      "confidence": 95,
+      "devices": [
+        {
+          "name": "Hệ thống rèn luyện nhận thức Neofect Cognitive Suite",
+          "description": "Phần mềm tập luyện nhận thức được chứng nhận, hỗ trợ đánh giá khả năng tập trung và trí nhớ cho người cao tuổi.",
+          "image": "https://images.unsplash.com/photo-1576091160550-2173dba999ef?w=150&auto=format&fit=crop&q=60",
+          "link": "https://at.mada.org.qa/technology-category/body-function/mental-cognitive/"
+        }
+      ],
+      "standards": [
+        "Danh mục Thiết bị Hỗ trợ Ưu tiên WHO",
+        "Phân loại ISO 9999 (22.27 Hỗ trợ Nhận thức)",
+        "Tiêu chuẩn quản lý chất lượng ISO 13485:2016"
+      ]
+    },
+    {
+      "category": "mental-cognitive",
+      "mode": "user",
+      "lang": "ar",
+      "question": "والدي شخص كبر في السن وينسى مواعيده اليومية، هل هناك أدوات مساعدة للتذكر والتنظيم سهلة الاستخدام؟",
+      "answer": "نوصي بالموزعات والمذكرات الذكية المقفلة تلقائيًا وأجهزة التنبيه البصرية لضمان تذكر كبار السن لمواعيدهم اليومية بأمان تام ودون قلق.",
+      "confidence": 91,
+      "devices": [
+        {
+          "name": "موزع المنبهات الذكي المقفل Medelert",
+          "description": "موزع دائري مغلق يفتح تلقائيًا مع رنين منبه قوي في الوقت المحدد لضمان التذكر والتنظيم.",
+          "image": "https://images.unsplash.com/photo-1508962914676-134849a727f0?w=150&auto=format&fit=crop&q=60",
+          "link": "https://at.mada.org.qa/technology-category/body-function/mental-cognitive/"
+        }
+      ],
+      "standards": [
+        "قائمة منظمة الصحة العالمية للمعينات",
+        "تصنيف ISO 9999 للمساعدات الإدراكية",
+        "معيار الجودة ISO 13485"
+      ]
+    },
+    {
+      "category": "mental-cognitive",
+      "mode": "expert",
+      "lang": "ar",
+      "question": "ما هي أدوات الدعم الإدراكي والمساعدات التذكرية المعترف بها في قائمة منتجات المساعدة ذات الأولوية لمنظمة الصحة العالمية (WHO)؟",
+      "answer": "الأنظمة الإدراكية للمساعدة في التذكر وتنظيم المهام يجب أن تكون متوافقة مع معايير جودة التكنولوجيا المساعدة ISO 13485 وتصنيف ISO 9999 لتعزيز استقلالية المستخدم.",
+      "confidence": 95,
+      "devices": [
+        {
+          "name": "برنامج Neofect للتأهيل الإدراكي والتذكر",
+          "description": "برمجية متخصصة لتقييم المهارات الإدراكية والتحفيز الذهني للمستخدمين بشكل متكامل.",
+          "image": "https://images.unsplash.com/photo-1576091160550-2173dba999ef?w=150&auto=format&fit=crop&q=60",
+          "link": "https://at.mada.org.qa/technology-category/body-function/mental-cognitive/"
+        }
+      ],
+      "standards": [
+        "قائمة منظمة الصحة العالمية للمعينات",
+        "تصنيف ISO 9999 للمساعدات الإدراكية",
+        "معيار الجودة ISO 13485"
+      ]
+    },
+    {
+      "category": "mental-cognitive",
+      "mode": "user",
+      "lang": "fr",
+      "question": "Mon parent âgé oublie souvent ses tâches quotidiennes. Quels outils de mémoire et de planification de tâches peuvent aider ?",
+      "answer": "Pour les personnes âgées souffrant d'oublis fréquents, nous préconisons des rappels électroniques automatisés et sécurisés ainsi que des minuteurs visuels.",
+      "confidence": 91,
+      "devices": [
+        {
+          "name": "Rappel électronique sécurisé Medelert",
+          "description": "Organiseur rotatif verrouillé qui ne s'ouvre qu'à l'heure exacte programmée avec alertes sonores.",
+          "image": "https://images.unsplash.com/photo-1508962914676-134849a727f0?w=150&auto=format&fit=crop&q=60",
+          "link": "https://at.mada.org.qa/technology-category/body-function/mental-cognitive/"
+        }
+      ],
+      "standards": [
+        "Liste d'assistance OMS",
+        "Classification CIM-11 6D7Z",
+        "Réglementation SaMD IEC 62304"
+      ]
+    },
+    {
+      "category": "mental-cognitive",
+      "mode": "expert",
+      "lang": "fr",
+      "question": "Quelles aides cognitives sont reconnues dans la liste des produits d'assistance prioritaires de l'OMS ?",
+      "answer": "Les solutions de stimulation cognitive et d'aide à la mémoire doivent être certifiées selon la norme ISO 13485 et enregistrées sous la classification ISO 9999.",
+      "confidence": 95,
+      "devices": [
+        {
+          "name": "Suite logicielle Neofect Cognitive",
+          "description": "Dispositif logiciel basé sur des exercices de neuroplasticité pour stimuler la mémoire et l'attention.",
+          "image": "https://images.unsplash.com/photo-1576091160550-2173dba999ef?w=150&auto=format&fit=crop&q=60",
+          "link": "https://at.mada.org.qa/technology-category/body-function/mental-cognitive/"
+        }
+      ],
+      "standards": [
+        "Liste d'assistance OMS",
+        "Classification CIM-11 6D7Z",
+        "Réglementation SaMD IEC 62304"
+      ]
+    },
+    {
+      "category": "movement",
+      "mode": "user",
+      "lang": "en",
+      "question": "I am looking for fine motor skill aids or hand/limb movement assistive devices for computer navigation.",
+      "answer": "For individuals needing fine motor skill support or limb movement assistance, we recommend smart gloves or pneumatic, mouth-controlled mouse units. These devices allow users to navigate computers safely without requiring hand or arm mobility.",
+      "confidence": 95,
+      "devices": [
+        {
+          "name": "IntegraMouse Plus Mouth-Operated Mouse",
+          "description": "An incredibly hygienic oral joystick. Sucking or sipping air triggers left and right clicks with zero hand/arm movement required.",
+          "image": "https://images.unsplash.com/photo-1615663245857-ac93bb7c39e7?w=150&auto=format&fit=crop&q=60",
+          "link": "https://at.mada.org.qa/technology-category/body-function/neuromusculoskeletal-movement/"
+        },
+        {
+          "name": "Neofect Smart Assistive Glove",
+          "description": "A sensor-embedded elastic glove that turns active hand/wrist training movements into engaging visual feedback exercises.",
+          "image": "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=150&auto=format&fit=crop&q=60",
+          "link": "https://at.mada.org.qa/technology-category/body-function/neuromusculoskeletal-movement/"
+        }
+      ],
+      "standards": [
+        "ISO 10993-1 Biocompatibility",
+        "ISO 9999 Class 24.13 Input Devices",
+        "IEC Ergonomic Safety",
+        "MADA Physical Accessibility Guidelines"
+      ]
+    },
+    {
+      "category": "movement",
+      "mode": "expert",
+      "lang": "en",
+      "question": "What technical specifications and material safety guidelines govern movement assistance and mouth-operated input devices?",
+      "answer": "Under AT technical protocols, motor assistance aids are evaluated under active input biofeedback schemas. High-tech smart switches and sip-and-puff interfaces comply with <b>ISO 10993-1 biocompatibility</b> and ergonomic safety rules to guarantee user safety during extended daily use.",
+      "confidence": 96,
+      "devices": [
+        {
+          "name": "IntegraMouse Active Interface",
+          "description": "Biocompatible oral controller featuring hygienic disposable nozzles for safe, continuous daily operation.",
+          "image": "https://images.unsplash.com/photo-1615663245857-ac93bb7c39e7?w=150&auto=format&fit=crop&q=60",
+          "link": "https://at.mada.org.qa/technology-category/body-function/neuromusculoskeletal-movement/"
+        }
+      ],
+      "standards": [
+        "ISO 10993-1 Biocompatibility",
+        "ISO 9999 Class 24.13 Input Devices",
+        "IEC Ergonomic Safety",
+        "MADA Physical Accessibility Guidelines"
+      ]
+    },
+    {
+      "category": "movement",
+      "mode": "user",
+      "lang": "vi",
+      "question": "Tôi cần dụng cụ hỗ trợ cử động tay/chi hoặc hỗ trợ vận động tinh để dùng máy tính.",
+      "answer": "Đối với người dùng cần hỗ trợ cử động tay hoặc vận động tinh ở bàn tay, giải pháp công nghệ hiệu quả là găng tay cảm biến thông minh (như Neofect) hoặc chuột điều khiển bằng miệng (như IntegraMouse). Thiết bị giúp làm việc độc lập trên máy tính mà không cần cử động cánh tay.",
+      "confidence": 94,
+      "devices": [
+        {
+          "name": "Chuột điều khiển bằng miệng IntegraMouse Plus",
+          "description": "Cần điều khiển bằng miệng có tính kháng khuẩn cao, thực hiện thao tác nhấp chuột hoàn toàn bằng lực hút/thổi hơi nhẹ.",
+          "image": "https://images.unsplash.com/photo-1615663245857-ac93bb7c39e7?w=150&auto=format&fit=crop&q=60",
+          "link": "https://at.mada.org.qa/technology-category/body-function/neuromusculoskeletal-movement/"
+        },
+        {
+          "name": "Găng tay tập vận động thông minh Neofect",
+          "description": "Găng tay đàn hồi tích hợp các cảm biến gia tốc thông minh biến các cử động xoay cổ tay/ngón tay thành trò chơi tương tác hấp dẫn.",
+          "image": "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=150&auto=format&fit=crop&q=60",
+          "link": "https://at.mada.org.qa/technology-category/body-function/neuromusculoskeletal-movement/"
+        }
+      ],
+      "standards": [
+        "Chỉ số tương thích sinh học ISO 10993-1",
+        "ISO 9999 (24.13 Thiết bị điều khiển máy tính)",
+        "Quy chuẩn kỹ thuật tiếp cận vật lý Qatar"
+      ]
+    },
+    {
+      "category": "movement",
+      "mode": "expert",
+      "lang": "vi",
+      "question": "Chuyên gia CNHT cần tham khảo các tiêu chuẩn kỹ thuật và độ an toàn vật liệu của thiết bị hỗ trợ vận động thần kinh - cơ xương nào?",
+      "answer": "Đối với các thiết bị công nghệ hỗ trợ vận động và công cụ nhập liệu khí nén như IntegraMouse, thiết bị cần đáp ứng tiêu chuẩn tương thích sinh học vật liệu <b>ISO 10993-1</b> và tiêu chuẩn an toàn công nghệ hỗ trợ ISO 9999 nhằm bảo đảm vệ sinh tuyệt đối.",
+      "confidence": 96,
+      "devices": [
+        {
+          "name": "Chuột ngậm IntegraMouse Technical Edition",
+          "description": "Chuột ngậm chất liệu nhựa thân thiện sinh học tuyệt đối, đầu ống ngậm vệ sinh tháo lắp tiện lợi.",
+          "image": "https://images.unsplash.com/photo-1615663245857-ac93bb7c39e7?w=150&auto=format&fit=crop&q=60",
+          "link": "https://at.mada.org.qa/technology-category/body-function/neuromusculoskeletal-movement/"
+        }
+      ],
+      "standards": [
+        "Chỉ số tương thích sinh học ISO 10993-1",
+        "ISO 9999 (24.13 Thiết bị điều khiển máy tính)",
+        "Quy chuẩn kỹ thuật tiếp cận vật lý Qatar"
+      ]
+    },
+    {
+      "category": "movement",
+      "mode": "user",
+      "lang": "ar",
+      "question": "أحتاج إلى أدوات مساعدة للحركة الدقيقة أو أجهزة مساعدة لحركة الأطراف لاستخدام الكمبيوتر.",
+      "answer": "لمستخدمي التكنولوجيا المساعدة، نوصي بالقفازات الذكية وأجهزة التحكم الفموية بالكمبيوتر التي لا تتطلب حركة الذراعين.",
+      "confidence": 95,
+      "devices": [
+        {
+          "name": "ماوس التحكم عن طريق الفم IntegraMouse Plus",
+          "description": "ماوس يدار بحركات الفم والنفخ/الرشف لتسهيل التحكم الكامل بالكمبيوتر دون الحاجة لحركة اليدين.",
+          "image": "https://images.unsplash.com/photo-1615663245857-ac93bb7c39e7?w=150&auto=format&fit=crop&q=60",
+          "link": "https://at.mada.org.qa/technology-category/body-function/neuromusculoskeletal-movement/"
+        }
+      ],
+      "standards": [
+        "معيار التوافق الحيوي ISO 10993-1",
+        "تصنيف ISO 9999 لأجهزة التحكم",
+        "المعايير المعتمدة من مدى"
+      ]
+    },
+    {
+      "category": "movement",
+      "mode": "expert",
+      "lang": "ar",
+      "question": "ما هي المعايير التقنية وإرشادات السلامة التي تحكم أجهزة الحركة وأدوات الفم الهوائية؟",
+      "answer": "تؤكد لوائح التكنولوجيا المساعدة ضرورة خضوع أجهزة التحكم الفموية لمعايير التوافق الحيوي الصارمة ISO 10993-1 وتصنيف ISO 9999.",
+      "confidence": 96,
+      "devices": [
+        {
+          "name": "ماوس الفم IntegraMouse Technical Edition",
+          "description": "جهاز تحكم فموي حيوي متوافق مع معايير الأمان ومزود بفوهات صحية قابلة للاستبدال.",
+          "image": "https://images.unsplash.com/photo-1615663245857-ac93bb7c39e7?w=150&auto=format&fit=crop&q=60",
+          "link": "https://at.mada.org.qa/technology-category/body-function/neuromusculoskeletal-movement/"
+        }
+      ],
+      "standards": [
+        "معيار التوافق الحيوي ISO 10993-1",
+        "تصنيف ISO 9999 لأجهزة التحكم",
+        "المعايير المعتمدة من مدى"
+      ]
+    },
+    {
+      "category": "movement",
+      "mode": "user",
+      "lang": "fr",
+      "question": "J'ai besoin d'aides à la motricité fine ou de dispositifs d'assistance aux mouvements des membres pour utiliser un ordinateur.",
+      "answer": "Pour le soutien de la motricité, nous suggérons des gants d'assistance interactifs ou des souris buccales pneumatiques.",
+      "confidence": 95,
+      "devices": [
+        {
+          "name": "Souris buccale IntegraMouse Plus",
+          "description": "Contrôleur buccal étanche et ultra-hygiénique permettant de cliquer par simples aspirations/expirations d'air.",
+          "image": "https://images.unsplash.com/photo-1615663245857-ac93bb7c39e7?w=150&auto=format&fit=crop&q=60",
+          "link": "https://at.mada.org.qa/technology-category/body-function/neuromusculoskeletal-movement/"
+        }
+      ],
+      "standards": [
+        "Biocompatibilité ISO 10993-1",
+        "Classification ISO 9999 (24.13)",
+        "Exigences d'accessibilité Mada"
+      ]
+    },
+    {
+      "category": "movement",
+      "mode": "expert",
+      "lang": "fr",
+      "question": "Quelles normes techniques et directives d'efficacité régissent les dispositifs d'assistance neuromusculosquelettique ?",
+      "answer": "Les dispositifs d'assistance motrice doivent respecter les normes de biocompatibilité ISO 10993-1 et la classification ISO 9999.",
+      "confidence": 96,
+      "devices": [
+        {
+          "name": "IntegraMouse Édition Biocompatible",
+          "description": "Dispositif buccal certifié ISO 10993-1 avec embouts hygiéniques interchangeables.",
+          "image": "https://images.unsplash.com/photo-1615663245857-ac93bb7c39e7?w=150&auto=format&fit=crop&q=60",
+          "link": "https://at.mada.org.qa/technology-category/body-function/neuromusculoskeletal-movement/"
+        }
+      ],
+      "standards": [
+        "Biocompatibilité ISO 10993-1",
+        "Classification ISO 9999 (24.13)",
+        "Exigences d'accessibilité Mada"
+      ]
+    },
+    {
+      "category": "mobility-transport",
+      "mode": "user",
+      "lang": "en",
+      "question": "I live in a small apartment and need a compact smart wheelchair, walker, or navigational cane.",
+      "answer": "For active users living in smaller indoor settings, selecting compact-turn wheelchairs and smart navigational aids is crucial. Advanced options like the Scewo Bro stair-climbing smart wheelchair, or lightweight foldable walkers with ultra-small turning radii, provide premium independence in restricted environments.",
+      "confidence": 96,
+      "devices": [
+        {
+          "name": "Scewo Bro Stair-Climbing Wheelchair",
+          "description": "An incredibly compact self-balancing power wheelchair that climbs stairs, elevates the seat to eye-level, and has a tiny turning footprint.",
+          "image": "https://images.unsplash.com/photo-1544025162-d76694265947?w=150&auto=format&fit=crop&q=60",
+          "link": "https://at.mada.org.qa/technology-category/activities-and-participation/mobility-and-transportation/"
+        },
+        {
+          "name": "BraunAbility Vehicle Platform Lift",
+          "description": "Robust automated hydraulic side lift designed to effortlessly load power chairs and scooters into family transport vehicles.",
+          "image": "https://images.unsplash.com/photo-1516594798947-e65505dbb29d?w=150&auto=format&fit=crop&q=60",
+          "link": "https://at.mada.org.qa/technology-category/activities-and-participation/mobility-and-transportation/"
+        }
+      ],
+      "standards": [
+        "ISO 7176-19 Crash Safety",
+        "ISO 9999 Class 12.22 Wheelchairs",
+        "ADA Clear Turn Envelope (1500mm)",
+        "FMVSS 403/404 Vehicle Lift Regulation"
+      ]
+    },
+    {
+      "category": "mobility-transport",
+      "mode": "expert",
+      "lang": "en",
+      "question": "What technical transport standards and tight-space indoor dimensions apply to intelligent smart wheelchairs?",
+      "answer": "When recommending intelligent wheelchairs for high-density indoor dwellings, compliance with <b>ISO 7176-19</b> (crash-testing standards) and international technical accessibility directives is crucial. Turn circle envelopes must conform to universal accessibility codes (recommending a 1500mm clear circle clearance).",
+      "confidence": 95,
+      "devices": [
+        {
+          "name": "Scewo Bro Active Chassis",
+          "description": "ISO 7176-19 crash-tested self-balancing wheelchair, optimized with a narrow 65cm width for absolute indoor clearance.",
+          "image": "https://images.unsplash.com/photo-1544025162-d76694265947?w=150&auto=format&fit=crop&q=60",
+          "link": "https://at.mada.org.qa/technology-category/activities-and-participation/mobility-and-transportation/"
+        }
+      ],
+      "standards": [
+        "ISO 7176-19 Crash Safety",
+        "ISO 9999 Class 12.22 Wheelchairs",
+        "ADA Clear Turn Envelope (1500mm)",
+        "FMVSS 403/404 Vehicle Lift Regulation"
+      ]
+    },
+    {
+      "category": "mobility-transport",
+      "mode": "user",
+      "lang": "vi",
+      "question": "Tôi sống trong căn hộ diện tích nhỏ, cần tìm xe lăn, khung tập đi hoặc gậy thông minh phù hợp để di chuyển.",
+      "answer": "Nếu đang sinh sống trong căn hộ diện tích hẹp, bạn nên lựa chọn các mẫu xe lăn điện có vòng xoay siêu nhỏ hoặc gậy định vị thông minh hỗ trợ cảm biến vật cản. Các thiết bị này (như xe lăn tự cân bằng Scewo Bro hoặc khung di chuyển nhỏ gọn) được tối ưu hóa bề ngang giúp bạn dễ dàng đi qua cửa phòng và ngóc ngách hẹp.",
+      "confidence": 95,
+      "devices": [
+        {
+          "name": "Xe lăn leo cầu thang Scewo Bro",
+          "description": "Xe lăn điện tự cân bằng siêu nhỏ gọn, dễ dàng xoay tròn tại chỗ 360 độ, leo cầu thang an toàn và nâng ghế ngang tầm mắt.",
+          "image": "https://images.unsplash.com/photo-1544025162-d76694265947?w=150&auto=format&fit=crop&q=60",
+          "link": "https://at.mada.org.qa/technology-category/activities-and-participation/mobility-and-transportation/"
+        },
+        {
+          "name": "Khung di chuyển thông minh gập gọn",
+          "description": "Khung tập đi hợp kim siêu nhẹ có bánh xe chống trượt, bán kính vòng cua nhỏ, gập lại gọn gàng chỉ bằng một nút nhấn.",
+          "image": "https://images.unsplash.com/photo-1516594798947-e65505dbb29d?w=150&auto=format&fit=crop&q=60",
+          "link": "https://at.mada.org.qa/technology-category/activities-and-participation/mobility-and-transportation/"
+        }
+      ],
+      "standards": [
+        "Thử nghiệm đâm va ISO 7176-19",
+        "ISO 9999 (12.22 Xe lăn điện)",
+        "Quy chuẩn ADA (Vòng quay tối thiểu 1.5m)",
+        "Hợp chuẩn FMVSS 403 nâng hạ"
+      ]
+    },
+    {
+      "category": "mobility-transport",
+      "mode": "expert",
+      "lang": "vi",
+      "question": "Người dùng ở căn hộ nhỏ cần gậy thông minh/xe lăn, các tiêu chuẩn kỹ thuật an toàn và thông số không gian là gì?",
+      "answer": "Đối với người dùng ở căn hộ nhỏ, xe lăn điện thông minh phải tuân thủ nghiêm ngặt tiêu chuẩn chống lật va chạm <b>ISO 7176-19</b> và chứng chỉ tiếp cận vật lý quốc tế. Bề rộng xe không vượt quá 65cm để đảm bảo vượt hành lang an toàn.",
+      "confidence": 95,
+      "devices": [
+        {
+          "name": "Khung gầm Scewo Bro đạt chuẩn ISO",
+          "description": "Khung gầm xe lăn điện thông minh vượt thử nghiệm đâm va ISO 7176-19, thích ứng tốt với cửa hẹp căn hộ gia đình.",
+          "image": "https://images.unsplash.com/photo-1544025162-d76694265947?w=150&auto=format&fit=crop&q=60",
+          "link": "https://at.mada.org.qa/technology-category/activities-and-participation/mobility-and-transportation/"
+        }
+      ],
+      "standards": [
+        "Thử nghiệm đâm va ISO 7176-19",
+        "ISO 9999 (12.22 Xe lăn điện)",
+        "Quy chuẩn ADA (Vòng quay tối thiểu 1.5m)",
+        "Hợp chuẩn FMVSS 403 nâng hạ"
+      ]
+    },
+    {
+      "category": "mobility-transport",
+      "mode": "user",
+      "lang": "ar",
+      "question": "أعيش في شقة صغيرة وأحتاج إلى كرسي متحرك ذكي مدمج أو مشاية أو عصا توجيه لتسهيل التنقل.",
+      "answer": "للمساحات الصغيرة، نوصي بالكراسي المتحركة ذات نصف قطر الدوران الصغير للغاية أو عصا التوجيه الذكية لتسهيل التنقل داخل الغرف والأبواب الضيقة.",
+      "confidence": 96,
+      "devices": [
+        {
+          "name": "الكرسي الذكي متوازن الحركة Scewo Bro",
+          "description": "كرسي متحرك مدمج يعتمد على التوازن الذاتي وصعود السلالم مع ميزة الالتفاف حول نفسه 360 درجة في أضيق الممرات.",
+          "image": "https://images.unsplash.com/photo-1544025162-d76694265947?w=150&auto=format&fit=crop&q=60",
+          "link": "https://at.mada.org.qa/technology-category/activities-and-participation/mobility-and-transportation/"
+        }
+      ],
+      "standards": [
+        "معايير التصادم ISO 7176-19",
+        "تصنيف ISO 9999 للكراسي المتحركة",
+        "معايير النقل البري الفيدرالية FMVSS"
+      ]
+    },
+    {
+      "category": "mobility-transport",
+      "mode": "expert",
+      "lang": "ar",
+      "question": "ما هي معايير السلامة وأبعاد المساحات الضيقة التي تنطبق على الكراسي المتحركة الذكية للمستخدمين؟",
+      "answer": "الأجهزة الحركية المخصصة للمساحات الضيقة يجب أن تجتاز اختبارات التصادم القياسية وفقاً لمعيار ISO 7176-19 لضمان سلامة الاستخدام اليومي.",
+      "confidence": 95,
+      "devices": [
+        {
+          "name": "هيكل Scewo Bro المعتمد تقنياً",
+          "description": "هيكل نشط متوافق مع معيار ISO 7176-19 لسلامة النقل وتجاوز الممرات المنزلية الضيقة.",
+          "image": "https://images.unsplash.com/photo-1544025162-d76694265947?w=150&auto=format&fit=crop&q=60",
+          "link": "https://at.mada.org.qa/technology-category/activities-and-participation/mobility-and-transportation/"
+        }
+      ],
+      "standards": [
+        "معايير التصادم ISO 7176-19",
+        "تصنيف ISO 9999 للكراسي المتحركة",
+        "معايير النقل البري الفيدرالية FMVSS"
+      ]
+    },
+    {
+      "category": "mobility-transport",
+      "mode": "user",
+      "lang": "fr",
+      "question": "Je vis dans un petit appartement et j'ai besoin d'un fauteuil roulant intelligent compact, d'un déambulateur ou d'une canne.",
+      "answer": "Pour les appartements restreints, nous suggérons des fauteuils roulants électriques compacts avec un très faible rayon de braquage.",
+      "confidence": 96,
+      "devices": [
+        {
+          "name": "Fauteuil tout-terrain Scewo Bro",
+          "description": "Fauteuil auto-équilibré compact permettant de monter les marches et de tourner sur place à 360° en intérieur.",
+          "image": "https://images.unsplash.com/photo-1544025162-d76694265947?w=150&auto=format&fit=crop&q=60",
+          "link": "https://at.mada.org.qa/technology-category/activities-and-participation/mobility-and-transportation/"
+        }
+      ],
+      "standards": [
+        "Crash-test ISO 7176-19",
+        "Classification ISO 9999 (12.22)",
+        "Normes d'encombrement intérieur ADA"
+      ]
+    },
+    {
+      "category": "mobility-transport",
+      "mode": "expert",
+      "lang": "fr",
+      "question": "Quelles normes de transport et dimensions intérieures pour espaces restreints s'appliquent aux fauteuils intelligents ?",
+      "answer": "Les fauteuils motorisés recommandés pour l'intérieur doivent être conformes à la norme de crash-test ISO 7176-19 et aux normes d'accessibilité universelle.",
+      "confidence": 95,
+      "devices": [
+        {
+          "name": "Châssis Scewo Bro",
+          "description": "Châssis roulant compact certifié ISO 7176-19, large de seulement 65cm pour passer aisément toutes les portes.",
+          "image": "https://images.unsplash.com/photo-1544025162-d76694265947?w=150&auto=format&fit=crop&q=60",
+          "link": "https://at.mada.org.qa/technology-category/activities-and-participation/mobility-and-transportation/"
+        }
+      ],
+      "standards": [
+        "Crash-test ISO 7176-19",
+        "Classification ISO 9999 (12.22)",
+        "Normes d'encombrement intérieur ADA"
+      ]
+    },
+    {
+      "category": "regulatory-standards",
+      "mode": "user",
+      "lang": "en",
+      "question": "How can I verify if an assistive technology device is safe, certified, and fully compliant with international safety regulations?",
+      "answer": "To verify safety and compliance, users can access the official <b>MADA Assistive Technology Portal</b>. Every device cataloged here has undergone strict independent testing for electrical insulation, ergonomic safety, and linguistic accessibility, guaranteeing peace of mind.",
+      "confidence": 99,
+      "devices": [
+        {
+          "name": "MADA Assistive Technology Portal Gateway",
+          "description": "The primary audited national hub containing hundreds of verified and accredited assistive technologies under Qatar National standards.",
+          "image": "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=150&auto=format&fit=crop&q=60",
+          "link": "https://at.mada.org.qa/assistive-technology-portal/"
+        }
+      ],
+      "standards": [
+        "ISO 9999:2022 Taxonomy",
+        "WHO GATE Initiative Alignment",
+        "Qatar National Vision Accessibility Standards",
+        "W3C Web WCAG Accessibility Compliance"
+      ]
+    },
+    {
+      "category": "regulatory-standards",
+      "mode": "expert",
+      "lang": "en",
+      "question": "Where can an AT specialist quickly lookup Qatar accessibility regulations, WHO GATE alignments, and ISO 9999 standards?",
+      "answer": "AT specialists and accessibility technical officers can quickly query national standards and the Unified AT taxonomy on the <b>MADA Assistive Technology Portal</b>. The taxonomy aligns with the WHO Global Cooperation on Assistive Technology (GATE) guidelines and classifies devices strictly according to <b>ISO 9999:2022</b> codes.",
+      "confidence": 99,
+      "devices": [
+        {
+          "name": "MADA Assistive Technology Portal Gateway",
+          "description": "Strategic portal for accessibility officers and hardware providers to match technical tenders with ISO 9999 codes and WHO GATE schemas.",
+          "image": "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=150&auto=format&fit=crop&q=60",
+          "link": "https://at.mada.org.qa/assistive-technology-portal/"
+        }
+      ],
+      "standards": [
+        "ISO 9999:2022 Taxonomy",
+        "WHO GATE Initiative Alignment",
+        "Qatar National Vision Accessibility Standards",
+        "W3C Web WCAG Accessibility Compliance"
+      ]
+    },
+    {
+      "category": "regulatory-standards",
+      "mode": "user",
+      "lang": "vi",
+      "question": "Làm thế nào để tra cứu nhanh xem một thiết bị trợ giúp có an toàn và đạt quy chuẩn kỹ thuật không?",
+      "answer": "Người dùng có thể dễ dàng kiểm tra độ tin cậy và chứng chỉ an toàn bằng cách truy cập <b>MADA Assistive Technology Portal</b>. Tất cả thiết bị tại cổng thông tin quốc gia này đều đã được kiểm tra độc lập nghiêm ngặt về độ bền vật lý, an toàn pin điện và sự thân thiện với người sử dụng.",
+      "confidence": 99,
+      "devices": [
+        {
+          "name": "Cổng thông tin Công nghệ Hỗ trợ Quốc gia MADA",
+          "description": "Cơ sở dữ liệu tập trung lưu giữ thông tin kiểm định kỹ thuật, tính năng và nhà cung cấp chính thức của hơn 1000 dòng công nghệ hỗ trợ.",
+          "image": "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=150&auto=format&fit=crop&q=60",
+          "link": "https://at.mada.org.qa/assistive-technology-portal/"
+        }
+      ],
+      "standards": [
+        "Danh mục phân loại ISO 9999:2022",
+        "Sáng kiến toàn cầu WHO GATE",
+        "Khung tiếp cận Qatar National Vision",
+        "Quy chuẩn tương thích WCAG 2.1"
+      ]
+    },
+    {
+      "category": "regulatory-standards",
+      "mode": "expert",
+      "lang": "vi",
+      "question": "Chuyên gia CNHT cần tra cứu nhanh các quy định, tiêu chuẩn phân loại ISO 9999 và quy chuẩn tiếp cận MADA.",
+      "answer": "Chuyên gia công nghệ hỗ trợ và cán bộ quản lý kỹ thuật có thể tra cứu toàn diện hệ thống mã hóa thiết bị theo tiêu chuẩn quốc tế <b>ISO 9999:2022</b> và định hướng <b>WHO GATE</b> thông qua <b>MADA Assistive Technology Portal</b>. Cổng thông tin cho phép lọc phân loại nhu cầu tiếp cận và đối chiếu mã tiêu chuẩn chuẩn xác và nhanh chóng.",
+      "confidence": 99,
+      "devices": [
+        {
+          "name": "Cổng thông tin Công nghệ Hỗ trợ Quốc gia MADA",
+          "description": "Trang tra cứu nghiệp vụ kỹ thuật tích hợp bảng đối chiếu mã phân loại ISO 9999 giúp chuẩn hóa danh mục đề xuất CNHT.",
+          "image": "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=150&auto=format&fit=crop&q=60",
+          "link": "https://at.mada.org.qa/assistive-technology-portal/"
+        }
+      ],
+      "standards": [
+        "Danh mục phân loại ISO 9999:2022",
+        "Sáng kiến toàn cầu WHO GATE",
+        "Khung tiếp cận Qatar National Vision",
+        "Quy chuẩn tương thích WCAG 2.1"
+      ]
+    },
+    {
+      "category": "regulatory-standards",
+      "mode": "user",
+      "lang": "ar",
+      "question": "How can I verify if an assistive technology device is safe, certified, and fully compliant with international safety regulations?",
+      "answer": "للتحقق من سلامة الأجهزة، يمكن للمستخدمين الدخول لبوابة مدى للتكنولوجيا المساعدة لمعرفة تقارير الاعتماد والأمان الفنية.",
+      "confidence": 99,
+      "devices": [
+        {
+          "name": "بوابة مدى للتكنولوجيا المساعدة",
+          "description": "المنصة الوطنية الموحدة في قطر التي تضم مئات الأجهزة المعتمدة والمطابقة للمواصفات القياسية الدولية.",
+          "image": "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=150&auto=format&fit=crop&q=60",
+          "link": "https://at.mada.org.qa/assistive-technology-portal/"
+        }
+      ],
+      "standards": [
+        "تصنيفات الأجهزة ISO 9999:2022",
+        "مبادرات منظمة الصحة العالمية WHO GATE",
+        "معايير الوصول الرقمي WCAG 2.1"
+      ]
+    },
+    {
+      "category": "regulatory-standards",
+      "mode": "expert",
+      "lang": "ar",
+      "question": "أين يمكن لأخصائي التكنولوجيا المساعدة البحث السريع عن لوائح الوصول في قطر، توافق WHO GATE، ومعايير ISO 9999؟",
+      "answer": "يمكن للأخصائيين ومسؤولي التكنولوجيا المساعدة الاستعلام المباشر عن التصنيف الدولي المعتمد ISO 9999 ومطابقة مبادرات منظمة الصحة العالمية WHO GATE مباشرة عبر بوابة مدى.",
+      "confidence": 99,
+      "devices": [
+        {
+          "name": "بوابة مدى للتكنولوجيا المساعدة",
+          "description": "المرجع الوطني الأول المعتمد للأخصائيين ومصنعي أجهزة التأهيل للتأكد من مواصفات وتصنيفات الأجهزة.",
+          "image": "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=150&auto=format&fit=crop&q=60",
+          "link": "https://at.mada.org.qa/assistive-technology-portal/"
+        }
+      ],
+      "standards": [
+        "تصنيفات الأجهزة ISO 9999:2022",
+        "مبادرات منظمة الصحة العالمية WHO GATE",
+        "معايير الوصول الرقمي WCAG 2.1"
+      ]
+    },
+    {
+      "category": "regulatory-standards",
+      "mode": "user",
+      "lang": "fr",
+      "question": "How can I verify if an assistive technology device is safe, certified, and fully compliant with international safety regulations?",
+      "answer": "Pour vous assurer de la sécurité de tout appareil d'assistance, vous pouvez consulter le portail officiel de technologie d'assistance de MADA.",
+      "confidence": 99,
+      "devices": [
+        {
+          "name": "Portail d'Assistance MADA",
+          "description": "La plateforme nationale d'accréditation référençant les dispositifs d'assistance homologués.",
+          "image": "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=150&auto=format&fit=crop&q=60",
+          "link": "https://at.mada.org.qa/assistive-technology-portal/"
+        }
+      ],
+      "standards": [
+        "Nomenclature ISO 9999:2022",
+        "Recommandations OMS GATE",
+        "Réglementations d'accessibilité du Qatar"
+      ]
+    },
+    {
+      "category": "regulatory-standards",
+      "mode": "expert",
+      "lang": "fr",
+      "question": "Où un spécialiste AT peut-il consulter rapidement les réglementations d'accessibilité du Qatar, l'OMS GATE et l'ISO 9999 ?",
+      "answer": "Les spécialistes peuvent rapidement consulter l'alignement avec les codes ISO 9999 et les directives de l'OMS GATE directement sur le portail MADA.",
+      "confidence": 99,
+      "devices": [
+        {
+          "name": "Portail d'Assistance MADA",
+          "description": "Portail stratégique pour les spécialistes permettant de vérifier l'alignement avec les codes ISO 9999.",
+          "image": "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=150&auto=format&fit=crop&q=60",
+          "link": "https://at.mada.org.qa/assistive-technology-portal/"
+        }
+      ],
+      "standards": [
+        "Nomenclature ISO 9999:2022",
+        "Recommandations OMS GATE",
+        "Réglementations d'accessibilité du Qatar"
+      ]
+    }
+  ],
+  "metadata": {
+    "source": "https://madaaiagents.ai.studio",
+    "extractedAt": "2026-10-14",
+    "totalQaEntries": 56,
+    "categoriesCount": {
+      "sensory-hearing": 8,
+      "sensory-vision": 8,
+      "voice-speech": 8,
+      "mental-cognitive": 8,
+      "movement": 8,
+      "mobility-transport": 8,
+      "regulatory-standards": 8
+    }
+  }
+}

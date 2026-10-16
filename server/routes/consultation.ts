@@ -308,22 +308,22 @@ router.post('/', consultationUpload.array('attachments', 5), async (req: any, re
 </head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f4f7fe;">
   <div style="background: linear-gradient(135deg, #0047ff 0%, #0052cc 100%); padding: 28px 24px; border-radius: 12px 12px 0 0; text-align: center;">
-    <h1 style="color: white; margin: 0; font-size: 22px; font-weight: 700;">🆕 Yêu Cầu Tư Vấn Mới</h1>
-    <p style="color: rgba(255,255,255,0.88); margin: 8px 0 0; font-size: 14px;">MADA AI - Công nghệ hỗ trợ người khuyết tật</p>
+    <h1 style="color: white; margin: 0; font-size: 22px; font-weight: 700;">🆕 New Consultation Request</h1>
+    <p style="color: rgba(255,255,255,0.88); margin: 8px 0 0; font-size: 14px;">MADA AI - Technology for Disability Support</p>
   </div>
   <div style="background: white; padding: 24px 28px; border-radius: 0 0 12px 12px; box-shadow: 0 4px 16px rgba(0,71,255,0.10);">
     <div style="background: linear-gradient(135deg, #f0f4ff 0%, #e8edff 100%); padding: 16px 20px; border-radius: 10px; margin-bottom: 24px; border-left: 4px solid #0047ff;">
-      <p style="margin: 0; font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">Mã tham chiếu</p>
+      <p style="margin: 0; font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">Reference Code</p>
       <p style="margin: 6px 0 0; font-size: 26px; color: #0047ff; font-weight: 800; letter-spacing: 2px;">${refCode}</p>
     </div>
     <p style="margin: 0 0 20px; font-size: 15px; color: #444; line-height: 1.6;">
       Dear MADA AI Support Team,<br>
-      Một <strong>yêu cầu tư vấn mới</strong> đã được gửi${attachments.length > 0 ? ` kèm theo <strong>${attachments.length} tệp đính kèm</strong>` : ''}. Vui lòng xem chi tiết bên dưới và phản hồi kịp thời.
+      A <strong>new consultation request</strong> has been submitted${attachments.length > 0 ? ` with <strong>${attachments.length} attachment${attachments.length > 1 ? 's' : ''}</strong>` : ''}. Please review the details below and respond promptly.
     </p>
-    <h2 style="font-size: 15px; color: #333; margin: 0 0 14px; padding-bottom: 10px; border-bottom: 2px solid #0047ff; font-weight: 700;">📋 Thông Tin Liên Hệ</h2>
+    <h2 style="font-size: 15px; color: #333; margin: 0 0 14px; padding-bottom: 10px; border-bottom: 2px solid #0047ff; font-weight: 700;">📋 Contact Information</h2>
     <table style="width: 100%; border-collapse: collapse; margin-bottom: 24px;">
       <tr>
-        <td style="padding: 10px 0; color: #888; width: 110px; font-size: 14px;">Họ tên:</td>
+        <td style="padding: 10px 0; color: #888; width: 110px; font-size: 14px;">Name:</td>
         <td style="padding: 10px 0; font-weight: 600; color: #222; font-size: 15px;">${safeName}</td>
       </tr>
       <tr style="border-bottom: 1px solid #f0f0f0;">
@@ -333,63 +333,63 @@ router.post('/', consultationUpload.array('attachments', 5), async (req: any, re
         </td>
       </tr>
       <tr style="border-bottom: 1px solid #f0f0f0;">
-        <td style="padding: 10px 0; color: #888; font-size: 14px;">Điện thoại:</td>
-        <td style="padding: 10px 0; color: #333; font-size: 14px; ${!phone ? 'font-style: italic; color: #bbb;' : ''}">${safePhone || 'Không cung cấp'}</td>
+        <td style="padding: 10px 0; color: #888; font-size: 14px;">Phone:</td>
+        <td style="padding: 10px 0; color: #333; font-size: 14px; ${!phone ? 'font-style: italic; color: #bbb;' : ''}">${safePhone || 'Not provided'}</td>
       </tr>
       <tr>
-        <td style="padding: 10px 0; color: #888; font-size: 14px;">Thời gian:</td>
+        <td style="padding: 10px 0; color: #888; font-size: 14px;">Time:</td>
         <td style="padding: 10px 0; color: #555; font-size: 14px;">${formattedDate}</td>
       </tr>
       <tr>
-        <td style="padding: 10px 0; color: #888; font-size: 14px;">Mã yêu cầu:</td>
+        <td style="padding: 10px 0; color: #888; font-size: 14px;">Request ID:</td>
         <td style="padding: 10px 0; color: #555; font-size: 14px; font-family: monospace;">${id}</td>
       </tr>
     </table>
     ${attachmentsListHtml}
-    <h2 style="font-size: 15px; color: #333; margin: 0 0 14px; padding-bottom: 10px; border-bottom: 2px solid #0047ff; font-weight: 700;">💬 Nội Dung Yêu Cầu</h2>
+    <h2 style="font-size: 15px; color: #333; margin: 0 0 14px; padding-bottom: 10px; border-bottom: 2px solid #0047ff; font-weight: 700;">💬 Request Content</h2>
     <div style="background: #f8f9ff; padding: 16px 20px; border-radius: 10px; margin-bottom: 24px; border: 1px solid #e8edff;">
       <p style="margin: 0; color: #333; line-height: 1.7; font-size: 14px; white-space: pre-wrap; word-break: break-word;">${safeMessage}</p>
     </div>
     <div style="background: #f8f9ff; padding: 16px 20px; border-radius: 10px; margin-bottom: 24px; border: 1px solid #e8edff;">
-      <p style="margin: 0 0 8px; color: #333; font-size: 14px; font-weight: 600;">🔗 Lịch sử trò chuyện</p>
-      <p style="margin: 0; color: #555; font-size: 13px;">Nhấn nút bên dưới để xem lịch sử trò chuyện và nhật ký hội thoại của người dùng.</p>
+      <p style="margin: 0 0 8px; color: #333; font-size: 14px; font-weight: 600;">🔗 Chat History</p>
+      <p style="margin: 0; color: #555; font-size: 13px;">Click the button below to view the chat history and conversation logs.</p>
       <div style="text-align: center; margin-top: 12px;">
-        <a href="${adminBaseUrl}/admin/consultations" style="display: inline-block; background: #0047ff; color: white; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 13px;">Xem lịch sử trò chuyện</a>
+        <a href="${adminBaseUrl}/admin/consultations" style="display: inline-block; background: #0047ff; color: white; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 13px;">View Chat History</a>
       </div>
     </div>
     <div style="text-align: center; margin-top: 28px;">
-      <a href="${adminBaseUrl}/admin/consultations" style="display: inline-block; background: linear-gradient(135deg, #0047ff, #0032cc); color: white; padding: 14px 32px; border-radius: 10px; text-decoration: none; font-weight: 700; font-size: 15px; box-shadow: 0 4px 12px rgba(0,71,255,0.3);">⚡ Xem &amp; Phản Hồi Ngay</a>
+      <a href="${adminBaseUrl}/admin/consultations" style="display: inline-block; background: linear-gradient(135deg, #0047ff, #0032cc); color: white; padding: 14px 32px; border-radius: 10px; text-decoration: none; font-weight: 700; font-size: 15px; box-shadow: 0 4px 12px rgba(0,71,255,0.3);">⚡ View & Respond Now</a>
     </div>
-    <p style="margin: 20px 0 0; font-size: 12px; color: #f39c12; text-align: center; font-weight: 600;">⏰ Vui lòng phản hồi trong vòng 24 giờ để đảm bảo trải nghiệm tốt nhất cho người dùng.</p>
+    <p style="margin: 20px 0 0; font-size: 12px; color: #f39c12; text-align: center; font-weight: 600;">⏰ Please respond within 24 hours to ensure the best user experience.</p>
   </div>
   <div style="text-align: center; padding: 20px; color: #aaa; font-size: 12px;">
-    <p style="margin: 0 0 4px;">Email này được gửi tự động từ hệ thống MADA AI. Vui lòng không trả lời trực tiếp email này.</p>
-    <p style="margin: 0; color: #ccc; font-size: 11px;">© ${new Date().getFullYear()} MADA AI - Công nghệ hỗ trợ người khuyết tật</p>
+    <p style="margin: 0 0 4px;">This email is automatically sent from MADA AI system. Please do not reply directly to this email.</p>
+    <p style="margin: 0; color: #ccc; font-size: 11px;">© ${new Date().getFullYear()} MADA AI - Technology for Disability Support</p>
   </div>
 </body>
 </html>`;
 
     const adminEmailText = `
-YÊU CẦU TƯ VẤN MỚI
-==================
+NEW CONSULTATION REQUEST
+=======================
 
-Mã tham chiếu: ${refCode}
+Reference Code: ${refCode}
 ID: ${id}
 
-📋 Thông tin liên hệ:
-  Họ tên:    ${name}
+📋 Contact Information:
+  Name:      ${name}
   Email:     ${email}
-  Điện thoại: ${phone || 'Không cung cấp'}
-  Thời gian:  ${formattedDate}
+  Phone:     ${phone || 'Not provided'}
+  Time:      ${formattedDate}
 ${attachmentsListText}
 
-💬 Nội dung yêu cầu:
+💬 Request Content:
 ${message}
 
-🔗 Xem chi tiết: ${adminBaseUrl}/admin/consultations
-⚡ Phản hồi ngay: ${adminBaseUrl}/admin/consultations/${id}
+🔗 View Details: ${adminBaseUrl}/admin/consultations
+⚡ Respond Now: ${adminBaseUrl}/admin/consultations/${id}
 
-⏰ Vui lòng phản hồi trong vòng 24 giờ.
+⏰ Please respond within 24 hours.
 `;
 
 // User auto-reply email HTML template
@@ -402,60 +402,60 @@ ${message}
 </head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f4f7fe;">
   <div style="background: linear-gradient(135deg, #0047ff 0%, #0052cc 100%); padding: 28px 24px; border-radius: 12px 12px 0 0; text-align: center;">
-    <h1 style="color: white; margin: 0; font-size: 22px; font-weight: 700;">✅ Chúng Tôi Đã Nhận Được Yêu Cầu</h1>
-    <p style="color: rgba(255,255,255,0.88); margin: 8px 0 0; font-size: 14px;">MADA AI - Công nghệ hỗ trợ người khuyết tật</p>
+    <h1 style="color: white; margin: 0; font-size: 22px; font-weight: 700;">✅ We Have Received Your Request</h1>
+    <p style="color: rgba(255,255,255,0.88); margin: 8px 0 0; font-size: 14px;">MADA AI - Technology for Disability Support</p>
   </div>
   <div style="background: white; padding: 24px 28px; border-radius: 0 0 12px 12px; box-shadow: 0 4px 16px rgba(0,71,255,0.10);">
-    <p style="margin: 0 0 20px; font-size: 15px; color: #444; line-height: 1.6;">Xin chào <strong>${safeName}</strong>,</p>
-    <p style="margin: 0 0 20px; font-size: 15px; color: #444; line-height: 1.6;">Cảm ơn bạn đã liên hệ với MADA AI. Chúng tôi đã nhận được yêu cầu tư vấn của bạn và sẽ phản hồi trong vòng <strong>24 giờ</strong>.</p>
+    <p style="margin: 0 0 20px; font-size: 15px; color: #444; line-height: 1.6;">Hello <strong>${safeName}</strong>,</p>
+    <p style="margin: 0 0 20px; font-size: 15px; color: #444; line-height: 1.6;">Thank you for contacting MADA AI. We have received your consultation request and will respond within <strong>24 hours</strong>.</p>
     <div style="background: linear-gradient(135deg, #f0f4ff 0%, #e8edff 100%); padding: 16px 20px; border-radius: 10px; margin-bottom: 24px; border-left: 4px solid #0047ff;">
-      <p style="margin: 0; font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">Mã tham chiếu của bạn</p>
+      <p style="margin: 0; font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">Your Reference Code</p>
       <p style="margin: 6px 0 0; font-size: 26px; color: #0047ff; font-weight: 800; letter-spacing: 2px;">${refCode}</p>
     </div>
-    <p style="margin: 0 0 12px; font-size: 14px; color: #555; font-weight: 600;">📋 Tóm tắt yêu cầu:</p>
+    <p style="margin: 0 0 12px; font-size: 14px; color: #555; font-weight: 600;">📋 Request Summary:</p>
     <table style="width: 100%; border-collapse: collapse; margin-bottom: 24px;">
       <tr style="border-bottom: 1px solid #f0f0f0;">
-        <td style="padding: 10px 0; color: #888; font-size: 14px;">Thời gian gửi:</td>
+        <td style="padding: 10px 0; color: #888; font-size: 14px;">Submitted at:</td>
         <td style="padding: 10px 0; color: #333; font-size: 14px;">${formattedDateShort}</td>
       </tr>
       <tr>
-        <td style="padding: 10px 0; color: #888; font-size: 14px;">Trạng thái:</td>
-        <td style="padding: 10px 0;"><span style="display: inline-block; background: #fff3cd; color: #856404; padding: 4px 12px; border-radius: 20px; font-size: 13px; font-weight: 600;">⏳ Đang chờ xử lý</span></td>
+        <td style="padding: 10px 0; color: #888; font-size: 14px;">Status:</td>
+        <td style="padding: 10px 0;"><span style="display: inline-block; background: #fff3cd; color: #856404; padding: 4px 12px; border-radius: 20px; font-size: 13px; font-weight: 600;">⏳ Pending</span></td>
       </tr>
     </table>
-    <p style="margin: 0 0 20px; font-size: 15px; color: #444; line-height: 1.6;">Trong lúc chờ đợi, bạn có thể:</p>
+    <p style="margin: 0 0 20px; font-size: 15px; color: #444; line-height: 1.6;">While waiting, you can:</p>
     <ul style="margin: 0 0 24px; padding-left: 20px; color: #444; font-size: 14px; line-height: 2;">
-      <li>Truy cập <a href="${siteUrl}" style="color: #0047ff; text-decoration: none; font-weight: 600;">trang chủ MADA AI</a> để tìm hiểu thêm về sản phẩm</li>
-      <li>Xem <a href="${siteUrl}/faq" style="color: #0047ff; text-decoration: none; font-weight: 600;">câu hỏi thường gặp (FAQ)</a></li>
-      <li>Liên hệ trực tiếp qua hotline nếu cần hỗ trợ khẩn cấp</li>
+      <li>Visit <a href="${siteUrl}" style="color: #0047ff; text-decoration: none; font-weight: 600;">MADA AI homepage</a> to learn more about the product</li>
+      <li>View <a href="${siteUrl}/faq" style="color: #0047ff; text-decoration: none; font-weight: 600;">Frequently Asked Questions (FAQ)</a></li>
+      <li>Contact us directly via hotline for urgent assistance</li>
     </ul>
     <div style="text-align: center; margin-top: 28px;">
-      <a href="${siteUrl}" style="display: inline-block; background: linear-gradient(135deg, #0047ff, #0032cc); color: white; padding: 14px 32px; border-radius: 10px; text-decoration: none; font-weight: 700; font-size: 15px; box-shadow: 0 4px 12px rgba(0,71,255,0.3);">Khám Phá MADA AI</a>
+      <a href="${siteUrl}" style="display: inline-block; background: linear-gradient(135deg, #0047ff, #0032cc); color: white; padding: 14px 32px; border-radius: 10px; text-decoration: none; font-weight: 700; font-size: 15px; box-shadow: 0 4px 12px rgba(0,71,255,0.3);">Explore MADA AI</a>
     </div>
   </div>
   <div style="text-align: center; padding: 20px; color: #aaa; font-size: 12px;">
-    <p style="margin: 0 0 4px;">Nếu bạn có bất kỳ câu hỏi nào, vui lòng reply email này hoặc liên hệ hotline hỗ trợ.</p>
-    <p style="margin: 0; color: #ccc; font-size: 11px;">© ${new Date().getFullYear()} MADA AI - Công nghệ hỗ trợ người khuyết tật</p>
+    <p style="margin: 0 0 4px;">If you have any questions, please reply to this email or contact our support hotline.</p>
+    <p style="margin: 0; color: #ccc; font-size: 11px;">© ${new Date().getFullYear()} MADA AI - Technology for Disability Support</p>
   </div>
 </body>
 </html>`;
 
     const userAutoReplyText = `
-CHUNG TOI DA NHAN DUOC YEU CAU CUA BAN
-=====================================
+WE HAVE RECEIVED YOUR REQUEST
+===========================
 
-Xin chao ${name},
+Hello ${name},
 
-Cam on ban da lien he voi MADA AI. Chung toi da nhan duoc yeu cau tu van cua ban va se phan hoi trong vong 24 gio.
+Thank you for contacting MADA AI. We have received your consultation request and will respond within 24 hours.
 
-Ma tham chieu: ${refCode}
-Thoi gian gui: ${formattedDateShort}
-Trang thai: Dang cho xu ly
+Reference Code: ${refCode}
+Submitted at: ${formattedDateShort}
+Status: Pending
 
-Trong luc cho doi, ban co the:
-  - Truy cap trang chu MADA AI de tim hieu them ve san pham
-  - Xem cau hoi thuong gap (FAQ)
-  - Lien he truc tiep qua hotline neu can ho tro khan cap
+While waiting, you can:
+  - Visit MADA AI homepage to learn more about the product
+  - View Frequently Asked Questions (FAQ)
+  - Contact us directly via hotline for urgent assistance
 
 ${siteUrl}
 `;
@@ -510,7 +510,7 @@ ${siteUrl}
         const adminMailOptions = {
           from: mailFrom,
           to: adminEmail,
-          subject: `[MADA] Yêu cầu tư vấn mới từ ${name}${attachments.length > 0 ? ` [${attachments.length} đính kèm]` : ''}`,
+          subject: `[MADA] New consultation request from ${name}${attachments.length > 0 ? ` [${attachments.length} attachment${attachments.length > 1 ? 's' : ''}]` : ''}`,
           html: adminEmailHtml,
           text: adminEmailText,
           attachments: emailAttachments,
@@ -558,7 +558,7 @@ ${siteUrl}
             const userMailOptions = {
               from: mailFrom,
               to: email,
-              subject: `✅ MADA AI đã nhận được yêu cầu của bạn - Mã: ${refCode}`,
+              subject: `✅ MADA AI - We have received your request - Ref: ${refCode}`,
               html: userAutoReplyHtml,
               text: userAutoReplyText,
               headers: {

@@ -263,7 +263,10 @@ router.post('/items', async (req, res) => {
         console.log(`✅ Translated product "${title}" to EN/AR/FR`);
       } catch (transErr) {
         console.warn('⚠️ Translation failed, continuing without translations:', transErr);
+        // ⭐ Don't crash the request — just skip translation
       }
+    } else if (!process.env.GEMINI_API_KEY) {
+      console.warn('⚠️ GEMINI_API_KEY not set — skipping translation for product:', title);
     }
 
     // Use provided translations if available, otherwise use auto-generated

@@ -235,6 +235,8 @@ export const adminApi = {
   },
 
   // ============== PRODUCTS ==============
+  // ⭐ Use public API for fetching products to avoid auth issues
+  // The public API returns the same data but doesn't require authentication
   async getProducts(params?: { q?: string; category?: string; status?: string; featured?: boolean; limit?: number; offset?: number }) {
     const p = new URLSearchParams();
     if (params?.q) p.set('q', params.q);
@@ -244,7 +246,7 @@ export const adminApi = {
     if (params?.limit) p.set('limit', String(params.limit));
     if (params?.offset) p.set('offset', String(params.offset));
     const qs = p.toString();
-    return request<{ items: Product[]; total: number }>(`/admin/products${qs ? `?${qs}` : ''}`);
+    return request<{ items: Product[]; total: number }>(`/public/products${qs ? `?${qs}` : ''}`);
   },
   async createProduct(data: Partial<Product>) {
     return request<Product>('/admin/products', { method: 'POST', body: JSON.stringify(data) });

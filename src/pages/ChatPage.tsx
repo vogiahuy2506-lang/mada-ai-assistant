@@ -2083,8 +2083,42 @@ Hãy trở thành người bạn đồng hành đáng tin cậy nhất của ng�
     setUserHasScrolled(false); // Reset scroll state when new message is sent
 
     // ⭐ Tăng số lượt hỏi đáp và cập nhật user context
-    setConversationTurns(prev => prev + 1);
-    updateUserContext(userMessage);
+    // ⚠️ Lưu ý: setState trong React là async batched, nên cần tính toán context ngay
+    // để truyền vào request body (ko chờ re-render)
+    const newContextCollected = {
+      hasSymptom: userContextCollected.hasSymptom ||
+        /(bị|mắc|có|vấn đề|triệu chứng|khó khăn|gặp| không thể|audi|hearing|mobility|deaf|disabled|khuyết tật|đau|mỏi|điếc|khiếm thị|khiếm thính)/i.test(userMessage),
+      hasBudget: userContextCollected.hasBudget ||
+        /(giá|tiền|budget|chi phí|đắt|rẻ|triệu|mua|thanh toán|trả góp|insurance|bảo hiểm)/i.test(userMessage),
+      hasConstraint: userContextCollected.hasConstraint ||
+        /(tuổi|trẻ|em bé|người già|senior|child|elderly|nhà|office|văn phòng|school|trường|học|outdoor|indoor|môi trường)/i.test(userMessage),
+      hasGoal: userContextCollected.hasGoal ||
+        /(muốn|cần|học|làm việc|đọc|viết|giao tiếp|đi lại|tự chủ|independent|learn|work|read|communicate|move)/i.test(userMessage),
+      hasDeviceType: userContextCollected.hasDeviceType ||
+        /(xe lăn|máy|thiết bị|device|wheelchair|hearing aid|screen reader|aac|prosthetic|orthotic|cane|crutch|nạng|kính|loa)/i.test(userMessage),
+      hasDuration: userContextCollected.hasDuration ||
+        /(lâu|rồi|tháng|năm|từ|khi|bắt đầu|day|mount|year|week|ago|since|how long)/i.test(userMessage),
+      hasSeverity: userContextCollected.hasSeverity ||
+        /(nặng|vừa|nhẹ|severe|moderate|mild|khó|nghiêm trọng|ảnh hưởng|rất|đỡ|hơn)/i.test(userMessage),
+      hasPreviousTry: userContextCollected.hasPreviousTry ||
+        /(thử|đã|dùng|use|tried|sử dụng|medicine|thuốc|vitamin|sản phẩm)/i.test(userMessage),
+    };
+    const newTurns = conversationTurns + 1;
+    const isReadyForProducts = (
+      (newContextCollected.hasSymptom && newContextCollected.hasSeverity && newContextCollected.hasDuration) ||
+      newTurns >= 5
+    );
+    const newMissingContext: string[] = [];
+    if (!newContextCollected.hasSymptom) newMissingContext.push('symptom');
+    if (!newContextCollected.hasSeverity) newMissingContext.push('severity');
+    if (!newContextCollected.hasDuration) newMissingContext.push('duration');
+    if (!newContextCollected.hasBudget) newMissingContext.push('budget');
+    if (!newContextCollected.hasConstraint) newMissingContext.push('constraint');
+    if (!newContextCollected.hasGoal) newMissingContext.push('goal');
+    if (!newContextCollected.hasPreviousTry) newMissingContext.push('previousTry');
+
+    setConversationTurns(newTurns);
+    setUserContextCollected(newContextCollected);
 
     // ⭐ Check AT keyword after user sends message
     if (!isEndUser && checkATKeyword(userMessage)) {
@@ -2249,6 +2283,11 @@ Hãy trở thành người bạn đồng hành đáng tin cậy nhất của ng�
         agentId: isOmniChat ? null : selectedAgentId,
         agentPrompt: isOmniChat ? getOmniSystemPrompt() : selectedAgent?.systemPrompt,
         userMode,
+        // ⭐ Smart context: gửi lên server để server biết có nên gửi products ngay không
+        // Nếu chưa đủ context → server sẽ hỏi thêm trước khi gợi ý sản phẩm
+        missingContext: newMissingContext,
+        isReadyForProductSuggestion: isReadyForProducts,
+        conversationTurns: newTurns,
       };
       
       // Thêm attachments nếu có
@@ -2318,6 +2357,9 @@ Hãy trở thành người bạn đồng hành đáng tin cậy nhất của ng�
         let confidence = 0.5;
         let suggestedProducts: any[] = [];
         let responseLanguage = language; // Default to UI language, will be updated from server
+        // ⭐ Use FRESH computed values (not stale closure state)
+        const freshIsReady = isReadyForProducts;
+        const freshMissingCtx = newMissingContext;
 
         while (true) {
           const { done, value } = await reader.read();
@@ -2364,8 +2406,9 @@ Hãy trở thành người bạn đồng hành đáng tin cậy nhất của ng�
           // ⭐ THÊM CÂU HỎI FOLLOW-UP KHI CHƯA ĐỦ CONTEXT
           // Bot sẽ hỏi thêm thông tin trước khi đề xuất sản phẩm
           // ⭐ Use responseLanguage (detected from user message) instead of UI language
+          // ⭐ Dùng freshIsReady/freshMissingCtx (computed ngay khi gửi message, không stale)
           let finalContent = fullContent;
-          if (!isReadyForProductSuggestion && getMissingContext.length > 0) {
+          if (!freshIsReady && freshMissingCtx.length > 0) {
             const followUpQuestion = getNextFollowUpQuestion(responseLanguage);
             // Thêm câu hỏi follow-up vào cuối message
             finalContent = `${fullContent}\n\n*${followUpQuestion}*`;
@@ -2506,6 +2549,9 @@ Hãy trở thành người bạn đồng hành đáng tin cậy nhất của ng�
         const fullContent = data.data.answer || data.data.message || '';
         // ⭐ Use response language for follow-up (match bot's language)
         const responseLanguage = data.data.detectedLanguage || language;
+        // ⭐ Dùng fresh values cho non-streaming mode (tránh stale closure state)
+        const nonStreamIsReady = isReadyForProducts;
+        const nonStreamMissingCtx = newMissingContext;
         
         if (!fullContent) {
           throw new Error('Empty response from AI');
@@ -2529,7 +2575,8 @@ Hãy trở thành người bạn đồng hành đáng tin cậy nhất của ng�
         });
 
         // ⭐ THÊM CÂU HỎI FOLLOW-UP KHI CHƯA ĐỦ CONTEXT (non-streaming mode)
-        if (!isReadyForProductSuggestion && getMissingContext.length > 0) {
+        // ⭐ Dùng nonStreamIsReady/nonStreamMissingCtx (computed ngay khi gửi message)
+        if (!nonStreamIsReady && nonStreamMissingCtx.length > 0) {
           const followUpQuestion = getNextFollowUpQuestion(responseLanguage);
           // Cập nhật message cuối cùng với follow-up question
           const updatedMessages = useChatStore.getState().messages;

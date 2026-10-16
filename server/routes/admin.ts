@@ -969,26 +969,32 @@ router.post('/agents/:id/crawl-sources', requireAdmin, async (req: Request, res:
 
     for (const src of sources) {
       try {
-        const result = await dataIngestion.ingestData({
-          type: 'web',
-          content: src.url, // ingestData tự scrape nếu content < 100 chars
-          source: src.url,
-          title: `${agent.name} - ${src.kind === 'product' ? 'Sản phẩm' : 'Kiến thức'}`,
-          language: 'vi',
-          metadata: {
-            agentId: agent.id,
-            agentName: agent.name,
-            sourceKind: src.kind,
-            crawledAt: new Date().toISOString(),
-            botId,
-            madaCategory,
-          },
-          scrapeOptions: {
-            followLinks: !!crawl_follow_links,
-            maxDepth: Number(crawl_max_depth) || 1,
-            maxPages: Number(crawl_max_pages) || 5,
-          },
-        });
+        // ⭐ Wrap each source crawl with 60s timeout to prevent 504
+        const result = await Promise.race([
+          dataIngestion.ingestData({
+            type: 'web',
+            content: src.url, // ingestData tự scrape nếu content < 100 chars
+            source: src.url,
+            title: `${agent.name} - ${src.kind === 'product' ? 'Sản phẩm' : 'Kiến thức'}`,
+            language: 'vi',
+            metadata: {
+              agentId: agent.id,
+              agentName: agent.name,
+              sourceKind: src.kind,
+              crawledAt: new Date().toISOString(),
+              botId,
+              madaCategory,
+            },
+            scrapeOptions: {
+              followLinks: !!crawl_follow_links,
+              maxDepth: Number(crawl_max_depth) || 1,
+              maxPages: Number(crawl_max_pages) || 5,
+            },
+          }),
+          new Promise<any>((_, reject) =>
+            setTimeout(() => reject(new Error('Crawl timeout (60s) — website có thể chậm hoặc không phản hồi')), 60000)
+          ),
+        ]);
         if (result.success) {
           totalDocs += result.documentsAdded || 0;
           results.push({ url: src.url, kind: src.kind, ok: true, docs: result.documentsAdded || 0 });

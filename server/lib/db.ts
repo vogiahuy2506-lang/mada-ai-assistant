@@ -2259,3 +2259,26 @@ export function updateSystemSettings(settings: Partial<SystemSettings>): SystemS
   if (settings.websiteUrl !== undefined) systemSettings.websiteUrl = settings.websiteUrl;
   return systemSettings;
 }
+
+// ============== SCRAPE JOBS SCHEMA ==============
+// Job queue for async URL scraping (AIImportCard preview + save)
+db.exec(`
+  CREATE TABLE IF NOT EXISTS scrape_jobs (
+    id TEXT PRIMARY KEY,
+    url TEXT NOT NULL,
+    mode TEXT NOT NULL CHECK (mode IN ('preview', 'save')),
+    default_category TEXT DEFAULT 'general',
+    mada_language TEXT DEFAULT 'en',
+    status TEXT NOT NULL DEFAULT 'pending'
+      CHECK (status IN ('pending', 'running', 'completed', 'failed')),
+    result TEXT,
+    error TEXT,
+    progress INTEGER NOT NULL DEFAULT 0,
+    progress_message TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_scrape_jobs_status ON scrape_jobs(status);
+  CREATE INDEX IF NOT EXISTS idx_scrape_jobs_created ON scrape_jobs(created_at);
+`);

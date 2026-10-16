@@ -414,12 +414,15 @@ app.get('/api/mada-image', async (req, res) => {
   const { url } = req.query;
 
   if (!url || typeof url !== 'string') {
+    console.warn(`[mada-image] Missing URL parameter`);
     // Return fallback image (1x1 transparent PNG)
     return res.status(200)
       .setHeader('Content-Type', 'image/png')
       .setHeader('Cache-Control', 'no-store')
       .send(Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64'));
   }
+
+  console.log(`[mada-image] Proxying: ${url}`);
 
   // Validate URL is allowed
   // Chấp nhận: mada.org.qa (MADA gốc), cdn.at.mada.org.qa, cdn.mada.org.qa, plus các shop VN hợp lệ
@@ -442,70 +445,11 @@ app.get('/api/mada-image', async (req, res) => {
     'tikicdn.com',
     'salt.tikicdn.com',
     'cdn.shopify.com',
-    'cdn3.mywot.com',
-    'cdn4.mywot.com',
-    'woocommerce.com',
-    'wp.com',
-    'upload.wikimedia.org',
-    'raw.githubusercontent.com',
-    'user-images.githubusercontent.com',
-    'i.imgur.com',
-    'i.pravatar.cc',
-    'picsum.photos',
-    'googleusercontent.com',
-    'ggpht.com',
-    'fbcdn.net',
-    'akamai.net',
-    'akamaized.net',
-    'cloudfront.net',
-    'stackpathdns.com',
-    'cdn.jsdelivr.net',
     'images.unsplash.com',
-    'unsplash.com',
-    'plus.unsplash.com',
-    'res.cloudinary.com',
-    'cloudinary.com',
-    'imgix.net',
-    'ablenet.com',
-    'able-net.com',
-    'able2shop.com',
-    'apple.com',
-    'store.apple.com',
-    'microsoft.com',
-    'microsoftstore.com',
-    'tobii.com',
-    'tobiidynavox.com',
-    'liberator.net.au',
-    'permobil.com',
-    'sunrisemedical.com',
-    'quickie-wheelchairs.com',
-    'invacare.com',
-    'ottobock.com',
-    'ossur.com',
-    'bebionic.com',
-    'phonak.com',
-    'resound.com',
-    'widex.com',
-    'signia.net',
-    'starkey.com',
-    'orcam.com',
-    'enhancedvision.com',
-    'freedomScientific.com',
-    'optelec.com',
-    'prentrom.com',
-    'saltillo.com',
-    'texthelp.com',
-    'donjohnston.com',
-    'cricksoft.com',
-    'AssistiveWare.com',
-    'amazon.com',
-    'amazon.co.uk',
-    'amazonaws.com',
-    'cdn.loom.com',
-    'media.giphy.com',
   ];
   const isAllowed = allowedHosts.some((host) => url.includes(host));
   if (!isAllowed) {
+    console.warn(`[mada-image] Rejected host: ${url}`);
     // Return fallback image instead of JSON error
     return res.status(200)
       .setHeader('Content-Type', 'image/png')
@@ -541,6 +485,7 @@ app.get('/api/mada-image', async (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('X-MADA-Proxy', 'true');
     res.setHeader('X-Cache-Buster', Date.now().toString());
+    console.log(`[mada-image] Success: ${url} (${buffer.byteLength} bytes)`);
     res.send(Buffer.from(buffer));
   } catch (err: any) {
     console.error(`[mada-image] proxy error: ${url}`, err.message);

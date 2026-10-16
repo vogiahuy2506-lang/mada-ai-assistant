@@ -78,6 +78,17 @@ const AAC_PRODUCTS: AACProduct[] = [
     productUrl: 'https://www.thinksmartbox.com/products/grid-pad',
     imageUrl: 'https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?w=400&h=400&fit=crop',
   },
+  {
+    id: 'vision-ruby-xl-hd',
+    title: 'Kính lúp điện tử cầm tay Ruby XL HD',
+    titleEn: 'Ruby XL HD Handheld Electronic Magnifier',
+    description: 'Kính lúp điện tử cầm tay Ruby XL HD là thiết bị hỗ trợ người có thị lực kém đọc sách, tài liệu, nhãn mác. Màn hình 5 inch HD, zoom 2x-14x, đèn LED chiếu sáng, chế độ màu tự nhiên và tương phản cao.',
+    descriptionEn: 'Ruby XL HD is a handheld electronic magnifier that helps people with low vision read books, documents, and labels. 5-inch HD screen, 2x-14x zoom, LED lighting, natural color and high contrast modes.',
+    category: 'sensory-vision',
+    brand: 'Freedom Scientific',
+    productUrl: 'https://www.enhancedvision.com/ruby-xl-hd.html',
+    imageUrl: 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=400&h=400&fit=crop',
+  },
 ];
 
 async function main() {

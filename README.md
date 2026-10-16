@@ -34,9 +34,8 @@ MADA AI Assistant là một ứng dụng web AI-powered được phát triển �
 - Quản lý quota và usage
 - Checkout và Portal integration
 
-### 5. Multi-Vector Database
-- **Mock** - Development (không cần setup, fallback tự động khi Pinecone chưa cấu hình)
-- **Pinecone** - Cloud vector database (mặc định production)
+### 5. In-Memory Vector Search
+- **In-memory** - Development (không cần setup, data persist vào JSON file)
 
 ---
 
@@ -62,9 +61,6 @@ Chỉnh sửa file `.env`:
 ```env
 # Gemini API Key (bắt buộc)
 GEMINI_API_KEY=your_gemini_api_key_here
-
-# Vector Database (mặc định: pinecone; fallback in-memory nếu thiếu key)
-VECTOR_DB_PROVIDER=pinecone
 ```
 
 ### 3. Chạy ứng dụng
@@ -177,7 +173,7 @@ Sau khi script chạy xong, edit `/app/mada-assistant/.env` và điền API keys
 
 ```bash
 nano /app/mada-assistant/.env
-# Sửa MADA_IMAGE, GEMINI_API_KEY, PINECONE_API_KEY, JWT_SECRET...
+# Sửa MADA_IMAGE, GEMINI_API_KEY, JWT_SECRET...
 ```
 
 ### Bước 2 — Copy config files lên VPS
@@ -204,7 +200,6 @@ Vào **GitHub Repo → Settings → Secrets and variables → Actions → New re
 | `VPS_USER` | User SSH (vd: `vohuy`) | Local: `whoami` |
 | `VPS_SSH_KEY` | Private SSH key | `cat ~/.ssh/id_rsa` |
 | `GEMINI_API_KEY` | API key Gemini | https://aistudio.google.com/apikey |
-| `PINECONE_API_KEY` | API key Pinecone | https://pinecone.io |
 
 **Public key** thì copy lên VPS:
 
@@ -306,19 +301,10 @@ Nếu cần chuyển sang PostgreSQL/MySQL, cần sửa code backend (`server/li
 
 ---
 
-## 🗄️ Vector Database Options
+## 🗄️ Vector Database
 
-### Option 1: In-Memory (Mặc định fallback)
-Không cần setup. Tự động kích hoạt khi PINECONE_API_KEY không hợp lệ hoặc unset. Phù hợp dev/test.
-
-### Option 2: Pinecone (Cloud - Khuyến nghị production)
-Cần tài khoản Pinecone.
-
-```env
-VECTOR_DB_PROVIDER=pinecone
-PINECONE_API_KEY=your_key_here
-PINECONE_INDEX_NAME=mada-knowledge-base
-```
+### In-Memory (Mặc định)
+Không cần setup. Data được persist vào file `data/chroma/documents.json`. Phù hợp dev/test và production với dataset nhỏ.
 
 ---
 
@@ -439,9 +425,6 @@ npm run dev:all      # Cả hai
 npm run build         # Production build
 npm run lint         # Check linting
 
-# Pinecone migration
-npm run pinecone:migrate  # Sync data lên Pinecone
-
 # Data
 curl -X POST http://localhost:3001/api/data/sample    # Load sample data
 curl -X POST http://localhost:3001/api/data/seed      # Load seed data
@@ -467,9 +450,6 @@ curl -X POST http://localhost:3001/api/data/comprehensive  # Load full KB
 # Build và chạy app
 docker-compose up -d
 
-# Migration dữ liệu
-npm run pinecone:migrate
-
 # Khởi động server
 npm run server
 ```
@@ -483,10 +463,6 @@ NODE_ENV=production
 
 # Gemini
 GEMINI_API_KEY=xxx
-
-# Vector DB
-VECTOR_DB_PROVIDER=pinecone
-PINECONE_API_KEY=xxx
 
 # Stripe
 STRIPE_SECRET_KEY=xxx
@@ -551,7 +527,6 @@ Thêm trong GitHub Settings → Secrets:
 
 ```
 GEMINI_API_KEY
-PINECONE_API_KEY
 DOCKER_USERNAME
 DOCKER_PASSWORD
 STAGING_HOST
@@ -597,10 +572,6 @@ NODE_ENV=production
 
 # Gemini
 GEMINI_API_KEY=xxx
-
-# Vector DB
-VECTOR_DB_PROVIDER=pinecone
-PINECONE_API_KEY=xxx
 
 # Stripe
 STRIPE_SECRET_KEY=xxx

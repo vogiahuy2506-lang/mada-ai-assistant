@@ -117,15 +117,12 @@ User Query
 Response
 ```
 
-### Vector DB Options
+### Vector Database
 
-1. **Pinecone** (Recommended for production — cloud)
-   - Requires `PINECONE_API_KEY` và `PINECONE_INDEX_NAME`
-
-2. **In-Memory Fallback** (Default khi Pinecone chưa cấu hình)
-   - Cosine similarity search trong RAM
-   - Persist metadata xuống `data/chroma/documents.json`
-   - Phù hợp dev/test
+**In-Memory** (Default)
+- Cosine similarity search trong RAM
+- Persist metadata xuống `data/chroma/documents.json`
+- Phù hợp dev/test và production với dataset nhỏ
 
 ## Data Flow
 
@@ -222,9 +219,6 @@ docker-compose --profile with-proxy up -d
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `GEMINI_API_KEY` | Google Gemini API key | Required |
-| `VECTOR_DB_PROVIDER` | Vector DB: pinecone | pinecone |
-| `PINECONE_API_KEY` | Pinecone API key | - |
-| `PINECONE_INDEX_NAME` | Pinecone index name | mada-knowledge-base |
 | `NODE_ENV` | Environment | production |
 
 ## Monitoring

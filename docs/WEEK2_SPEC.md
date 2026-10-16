@@ -845,11 +845,7 @@ backend/
     // AI & GenAI
     "@google/generative-ai": "^0.21.0",
 
-    // Vector DB
-    "@pinecone-database/pinecone": "^3.0.0",
-    // HOẶC
-    "chromadb": "^1.8.0",
-    // HOẶC Supabase (pgvector)
+    // Vector DB - Sử dụng in-memory (không cần package bổ sung)
 
     // Embedding
     "@google/generative-ai": "^0.21.0", // Dùng Gemini embedding

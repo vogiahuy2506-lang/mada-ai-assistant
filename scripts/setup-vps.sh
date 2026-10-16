@@ -87,10 +87,6 @@ MADA_IMAGE=ghcr.io/<github-user>/mada-ai-assistant:latest
 
 # API Keys
 GEMINI_API_KEY=your_gemini_api_key_here
-PINECONE_API_KEY=your_pinecone_api_key_here
-PINECONE_ENVIRONMENT=us-east-1
-PINECONE_INDEX_NAME=mada-knowledge-base
-VECTOR_DB_PROVIDER=pinecone
 
 # Auth
 JWT_SECRET=change-me-with-openssl-rand-hex-32

@@ -5,8 +5,7 @@
 # Chạy khi container khởi động:
 #   1. Tạo thư mục data + uploads
 #   2. Set ownership cho user nodejs
-#   3. (Tuỳ chọn) Migrate dữ liệu vào Pinecone
-#   4. Khởi động server
+#   3. Khởi động server
 # =====================================================
 set -e
 
@@ -24,10 +23,6 @@ mkdir -p /app/data /app/uploads 2>/dev/null || {
 # ---- Step 2: Validate env quan trọng ----
 if [ -z "$GEMINI_API_KEY" ] || [ "$GEMINI_API_KEY" = "test" ]; then
   echo "⚠️  GEMINI_API_KEY is empty/test - AI features will not work"
-fi
-
-if [ -z "$PINECONE_API_KEY" ] || [ "$PINECONE_API_KEY" = "test" ]; then
-  echo "ℹ️  PINECONE_API_KEY is empty/test - using fallback vector store"
 fi
 
 if [ -z "$JWT_SECRET" ] || [ "$JWT_SECRET" = "change-me-in-production" ] || [ "$JWT_SECRET" = "test-secret" ]; then
@@ -88,12 +83,6 @@ for DB_PATH in /app/data/mada.db /app/mada-ai-assistant/data/mada.db; do
     break
   fi
 done
-
-# ---- Step 5: Optional - Migrate to Pinecone nếu flag được bật ----
-if [ "${RUN_PINEONE_MIGRATE:-false}" = "true" ]; then
-  echo "🔄 Running Pinecone migration..."
-  npm run pinecone:migrate || echo "⚠️  Migration failed - continuing"
-fi
 
 # ---- Step 5: Khởi động server ----
 echo "✅ Starting server..."

@@ -155,7 +155,7 @@ server/
 │   ├── scraper.ts          # Scraper API
 │   └── payments.ts         # Payment API
 └── scripts/
-    └── migrate-to-pinecone.ts # Pinecone migration
+    └── (no scripts needed)
 ```
 
 ---
@@ -172,13 +172,8 @@ server/
 ### Configuration
 
 ```bash
-# Choose provider
-VECTOR_DB_PROVIDER=pinecone   # Cloud, needs API key
-# Empty/invalid PINECONE_API_KEY → auto fallback sang in-memory cosine search
-
-# For Pinecone
-PINECONE_API_KEY=your_key_here
-PINECONE_INDEX_NAME=mada-knowledge-base
+# Gemini API Key (bắt buộc)
+GEMINI_API_KEY=your_key_here
 ```
 
 ### Architecture
@@ -475,8 +470,6 @@ GET /api/payments/usage/:userId
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `GEMINI_API_KEY` | Yes | Google Gemini API key |
-| `VECTOR_DB_PROVIDER` | No | pinecone |
-| `PINECONE_API_KEY` | For Pinecone | Pinecone API key |
 | `STRIPE_SECRET_KEY` | For payments | Stripe API key |
 | `PORT` | No | Server port (default: 3001) |
 
@@ -514,9 +507,6 @@ docker run -d \
 
 ```bash
 # Migrate to Pinecone
-npm run pinecone:migrate
-```
-
 ---
 
 ## Scripts

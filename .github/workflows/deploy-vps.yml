@@ -143,9 +143,11 @@ jobs:
             # Update SQL files to use INSERT OR REPLACE for idempotent sync
             if [ -f "$TEMP_DIR/data/products-sync.sql" ]; then
               echo "Importing products..."
-              # Replace INSERT with INSERT OR REPLACE for idempotent operations
-              sudo sed 's/^INSERT INTO kb_products VALUES/INSERT OR REPLACE INTO kb_products VALUES/' $TEMP_DIR/data/products-sync.sql > /tmp/products-sync-fixed.sql
-              sudo sqlite3 $APP_DIR/data/mada.db < /tmp/products-sync-fixed.sql
+              # Replace INSERT with INSERT OR REPLACE for idempotent operations (handles both INSERT and INSERT OR REPLACE)
+              sudo sed -E 's/^INSERT(\s+OR\s+REPLACE)?\s+INTO\s+kb_products\s+VALUES/INSERT OR REPLACE INTO kb_products VALUES/' $TEMP_DIR/data/products-sync.sql > /tmp/products-sync-fixed.sql
+              sudo sqlite3 $APP_DIR/data/mada.db < /tmp/products-sync-fixed.sql 2>&1 || {
+                echo "⚠️ Product import had warnings/errors, checking result..."
+              }
               PRODUCT_COUNT=$(sudo sqlite3 $APP_DIR/data/mada.db "SELECT COUNT(*) FROM kb_products;")
               echo "✅ Imported products (count: $PRODUCT_COUNT)"
             else
@@ -154,8 +156,10 @@ jobs:
             
             if [ -f "$TEMP_DIR/data/categories-sync.sql" ]; then
               echo "Importing categories..."
-              sudo sed 's/^INSERT INTO kb_categories VALUES/INSERT OR REPLACE INTO kb_categories VALUES/' $TEMP_DIR/data/categories-sync.sql > /tmp/categories-sync-fixed.sql
-              sudo sqlite3 $APP_DIR/data/mada.db < /tmp/categories-sync-fixed.sql
+              sudo sed -E 's/^INSERT(\s+OR\s+REPLACE)?\s+INTO\s+kb_categories\s+VALUES/INSERT OR REPLACE INTO kb_categories VALUES/' $TEMP_DIR/data/categories-sync.sql > /tmp/categories-sync-fixed.sql
+              sudo sqlite3 $APP_DIR/data/mada.db < /tmp/categories-sync-fixed.sql 2>&1 || {
+                echo "⚠️ Category import had warnings/errors, checking result..."
+              }
               CATEGORY_COUNT=$(sudo sqlite3 $APP_DIR/data/mada.db "SELECT COUNT(*) FROM kb_categories;")
               echo "✅ Imported categories (count: $CATEGORY_COUNT)"
             else

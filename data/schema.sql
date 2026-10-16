@@ -60,3 +60,45 @@ CREATE INDEX IF NOT EXISTS idx_products_category ON kb_products(category);
 CREATE INDEX IF NOT EXISTS idx_products_status ON kb_products(status);
 CREATE INDEX IF NOT EXISTS idx_products_featured ON kb_products(featured);
 CREATE INDEX IF NOT EXISTS idx_products_created ON kb_products(created_at);
+
+-- Knowledge items table (for RAG)
+CREATE TABLE IF NOT EXISTS knowledge_items (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL DEFAULT '',
+  title_en TEXT NOT NULL DEFAULT '',
+  title_ar TEXT NOT NULL DEFAULT '',
+  title_fr TEXT NOT NULL DEFAULT '',
+  description TEXT NOT NULL DEFAULT '',
+  description_en TEXT NOT NULL DEFAULT '',
+  description_ar TEXT NOT NULL DEFAULT '',
+  description_fr TEXT NOT NULL DEFAULT '',
+  content TEXT NOT NULL DEFAULT '',
+  content_en TEXT NOT NULL DEFAULT '',
+  content_ar TEXT NOT NULL DEFAULT '',
+  content_fr TEXT NOT NULL DEFAULT '',
+  source TEXT NOT NULL DEFAULT '',
+  source_type TEXT NOT NULL DEFAULT '',
+  url TEXT NOT NULL DEFAULT '',
+  file_path TEXT NOT NULL DEFAULT '',
+  category TEXT NOT NULL DEFAULT 'general',
+  iso_codes TEXT NOT NULL DEFAULT '[]',
+  wcag_level TEXT NOT NULL DEFAULT '',
+  who_gate_area TEXT NOT NULL DEFAULT '',
+  auto_classified INTEGER NOT NULL DEFAULT 0,
+  confidence REAL NOT NULL DEFAULT 0,
+  status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','published','archived')),
+  chunk_count INTEGER NOT NULL DEFAULT 0,
+  language TEXT NOT NULL DEFAULT 'vi',
+  metadata TEXT NOT NULL DEFAULT '{}',
+  indexed INTEGER NOT NULL DEFAULT 0,
+  indexed_at TEXT,
+  created_by TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  translated INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_knowledge_category ON knowledge_items(category);
+CREATE INDEX IF NOT EXISTS idx_knowledge_status ON knowledge_items(status);
+CREATE INDEX IF NOT EXISTS idx_knowledge_source ON knowledge_items(source);
+CREATE INDEX IF NOT EXISTS idx_knowledge_indexed ON knowledge_items(indexed);

@@ -601,22 +601,124 @@ class RAGEngine {
     let relevantDocs: any[] = rawDocs;
     let usedRerank = false;
 
-    // ⭐ Custom agent KHÔNG có dữ liệu → trả lời rằng không tìm thấy thông tin
+    // ⭐ Custom agent KHÔNG có dữ liệu → tìm sản phẩm trong DB theo category làm context
+    // Thay vì trả lời "không tìm thấy" → cho AI giới thiệu sản phẩm có sẵn
     if (agentId && relevantDocs.length === 0) {
-      console.log(`⚠️ [RAG Stream] Agent "${agentId}" - no relevant docs found`);
+      console.log(`⚠️ [RAG Stream] Agent "${agentId}" - no relevant docs found, fetching products as fallback`);
+
+      const lang = config.language || 'vi';
+      const labelHeader = lang === 'en' ? 'Available products in our database' : 'Các sản phẩm hiện có trong cơ sở dữ liệu';
+
+      // Fetch top products từ kb_products theo botId / madaCategory
+      let productContext = '';
+      try {
+        // Map madaCategory (e.g. "mental-cognitive") → DB category enum (e.g. "cognition")
+        const MADA_CATEGORY_TO_DB: Record<string, string> = {
+          'mobility': 'mobility',
+          'vision': 'vision',
+          'hearing': 'hearing',
+          'cognition': 'cognition',
+          'mental-cognitive': 'cognition',
+          'communication': 'communication',
+          'daily-living': 'daily_living',
+          'education': 'education',
+        };
+        const dbCategory = (madaCategory && MADA_CATEGORY_TO_DB[madaCategory]) || null;
+
+        let products: any[] = [];
+        if (dbCategory) {
+          products = db.prepare(
+            `SELECT title, title_en, description, category, brand, price_range, product_url
+             FROM kb_products
+             WHERE (category = ? OR category LIKE ?) AND status = 'published'
+             ORDER BY featured DESC, sort_order DESC, created_at DESC
+             LIMIT 5`
+          ).all(dbCategory, `%${dbCategory}%`) as any[];
+        }
+        if (products.length === 0) {
+          // Fallback: lấy tất cả sản phẩm nếu không match category
+          products = db.prepare(
+            `SELECT title, title_en, description, category, brand, price_range, product_url
+             FROM kb_products
+             WHERE status = 'published'
+             ORDER BY featured DESC, sort_order DESC, created_at DESC
+             LIMIT 5`
+          ).all() as any[];
+        }
+
+        if (products.length > 0) {
+          const isEn = lang === 'en';
+          productContext = products.map((p, i) => {
+            const name = isEn ? (p.title_en || p.title) : p.title;
+            return `${i + 1}. ${name}${p.brand ? ` (${p.brand})` : ''}${p.price_range ? ` — ${p.price_range}` : ''}${p.description ? `\n   ${p.description}` : ''}`;
+          }).join('\n');
+          console.log(`📦 [RAG Stream] Built product context from ${products.length} DB products`);
+        }
+      } catch (err) {
+        console.warn('⚠️ [RAG Stream] Product fallback fetch failed:', (err as Error).message);
+      }
+
+      // Nếu có product context → cho AI giới thiệu sản phẩm
+      if (productContext) {
+        const intro = lang === 'en'
+          ? `I don't have detailed information about this topic in my knowledge base yet, but here are some products from our database that may be relevant:`
+          : `Tôi chưa có thông tin chi tiết về chủ đề này trong cơ sở kiến thức, nhưng dưới đây là một số sản phẩm từ cơ sở dữ liệu có thể phù hợp:`;
+
+        const aiContext = `[${labelHeader}]\n${productContext}`;
+        const prompt = this.buildPrompt(userQuery, aiContext, conversationHistory, true, config.systemInstruction, config.language);
+        const model = this.genAI.getGenerativeModel({
+          model: 'gemini-2.5-flash',
+          generationConfig: { temperature: 0.3, maxOutputTokens: config.maxOutputTokens || 8192, topP: 0.8, topK: 20 },
+        });
+
+        let fullAnswer = '';
+        const productStream = (async function* () {
+          // Stream intro trước
+          yield { text: () => `${intro}\n\n` };
+          fullAnswer += intro + '\n\n';
+
+          // Stream AI response
+          try {
+            const result = await model.generateContentStream({
+              contents: [{ role: 'user', parts: [{ text: prompt }] }],
+            });
+            for await (const chunk of result.stream) {
+              const text = chunk.text();
+              if (text) {
+                fullAnswer += text;
+                yield { text: () => text };
+              }
+            }
+          } catch (e) {
+            console.error('❌ [RAG Stream] product-fallback stream error:', e);
+            // Fallback: stream raw product list
+            const raw = `\n\n${productContext}`;
+            fullAnswer += raw;
+            yield { text: () => raw };
+          }
+        })();
+
+        return {
+          stream: productStream,
+          sources: [],
+          confidence: 50,
+          answer: fullAnswer || intro,
+        };
+      }
+
+      // Không có sản phẩm nào → trả lời "không tìm thấy" như cũ
       const noDataMsgs: Record<string, string> = {
         vi: `Xin lỗi, tôi không tìm thấy thông tin liên quan đến câu hỏi của bạn trong cơ sở dữ liệu của bot này.`,
         en: `Sorry, I couldn't find information related to your question in this bot's knowledge base.`,
         ar: `عذراً، لم أتمكن من العثور على معلومات متعلقة بسؤالك.`,
         fr: `Désolé, je n'ai pas trouvé d'informations concernant votre question.`,
       };
-      const lang = config.language || 'vi';
       const noDataAnswer = noDataMsgs[lang] || noDataMsgs.vi;
-      
+
       const noDataStream = (async function* () {
         yield { text: () => noDataAnswer };
       })();
-      
+
       return {
         stream: noDataStream,
         sources: [],

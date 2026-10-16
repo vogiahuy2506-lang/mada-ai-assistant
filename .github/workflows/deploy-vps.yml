@@ -121,22 +121,43 @@ jobs:
 
             echo "=== Step 8b: Sync mada.db from repo (force overwrite) ==="
             if [ -f "$TEMP_DIR/data/mada.db" ]; then
-              sudo cp -f $TEMP_DIR/data/mada.db $APP_DIR/data/mada.db
-              echo "✅ Synced mada.db ($(sudo ls -lh $APP_DIR/data/mada.db | awk '{print $5}'))"
-              sudo chmod 644 $APP_DIR/data/mada.db
+              # Verify database integrity before copying
+              DB_CHECK=$(sudo sqlite3 $TEMP_DIR/data/mada.db "PRAGMA integrity_check;" 2>&1 || echo "CORRUPT")
+              if [ "$DB_CHECK" = "ok" ]; then
+                sudo cp -f $TEMP_DIR/data/mada.db $APP_DIR/data/mada.db
+                echo "✅ Synced mada.db ($(sudo ls -lh $APP_DIR/data/mada.db | awk '{print $5}'))"
+                sudo chmod 644 $APP_DIR/data/mada.db
+              else
+                echo "⚠️ Repo database is corrupt, creating fresh database..."
+                sudo rm -f $APP_DIR/data/mada.db
+              fi
             else
               echo "⚠️ mada.db not found in repo, keeping existing VPS database"
             fi
 
+            # Create fresh database if needed
+            if [ ! -f "$APP_DIR/data/mada.db" ]; then
+              echo "Creating fresh database..."
+              sudo sqlite3 $APP_DIR/data/mada.db "SELECT 1;" 2>/dev/null || {
+                sudo mkdir -p $APP_DIR/data
+                sudo touch $APP_DIR/data/mada.db
+                sudo chmod 644 $APP_DIR/data/mada.db
+              }
+            fi
+
             echo "=== Step 8c: Sync products and categories SQL ==="
+            # Update SQL files to use INSERT OR REPLACE for idempotent sync
             if [ -f "$TEMP_DIR/data/products-sync.sql" ]; then
               echo "Syncing products from SQL file..."
-              sudo sqlite3 $APP_DIR/data/mada.db < $TEMP_DIR/data/products-sync.sql
+              # Replace INSERT with INSERT OR REPLACE for idempotent operations
+              sudo sed 's/^INSERT INTO kb_products VALUES/INSERT OR REPLACE INTO kb_products VALUES/' $TEMP_DIR/data/products-sync.sql > /tmp/products-sync-fixed.sql
+              sudo sqlite3 $APP_DIR/data/mada.db < /tmp/products-sync-fixed.sql
               echo "✅ Synced products ($(wc -l < $TEMP_DIR/data/products-sync.sql | tr -d ' ') rows)"
             fi
             if [ -f "$TEMP_DIR/data/categories-sync.sql" ]; then
               echo "Syncing categories from SQL file..."
-              sudo sqlite3 $APP_DIR/data/mada.db < $TEMP_DIR/data/categories-sync.sql
+              sudo sed 's/^INSERT INTO kb_categories VALUES/INSERT OR REPLACE INTO kb_categories VALUES/' $TEMP_DIR/data/categories-sync.sql > /tmp/categories-sync-fixed.sql
+              sudo sqlite3 $APP_DIR/data/mada.db < /tmp/categories-sync-fixed.sql
               echo "✅ Synced categories ($(wc -l < $TEMP_DIR/data/categories-sync.sql | tr -d ' ') rows)"
             fi
 

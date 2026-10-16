@@ -390,6 +390,7 @@ app.use(cors({
       'http://34.143.248.174',
       'https://34.143.248.174:3000',
       'http://34.143.248.174:3000',
+      'https://34.143.248.174:443',
     ];
 
     // Production origins (set via env)

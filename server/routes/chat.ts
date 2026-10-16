@@ -1127,8 +1127,22 @@ async function getSuggestedProducts(ragSources: any[], message: string, effectiv
 
 router.post('/', async (req, res) => {
   try {
-    const { message, conversationId, language: uiLanguage = 'vi', agentId, agentPrompt, userMode } = req.body;
-    
+    const {
+      message,
+      conversationId,
+      language: uiLanguage = 'vi',
+      agentId,
+      agentPrompt,
+      userMode,
+      missingContext = [],
+      isReadyForProductSuggestion = false,
+      conversationTurns = 0,
+    } = req.body;
+
+    // ⭐ Smart product suggestion: chỉ gợi ý sản phẩm khi đã đủ context
+    const shouldSuggestProducts = isReadyForProductSuggestion || conversationTurns >= 5;
+    console.log(`[CHAT] Context: missing=${missingContext.join(',')}, isReady=${isReadyForProductSuggestion}, turns=${conversationTurns} → suggest=${shouldSuggestProducts}`);
+
     // Skip RAG ready check for faster testing (products can work without RAG)
     // const ready = await waitForRagReady(2000);
     // if (!ready) { ... }
@@ -1313,8 +1327,9 @@ router.post('/', async (req, res) => {
     }
     
     // ⭐ Tự động gợi ý sản phẩm khi user hỏi về thiết bị/sản phẩm
+    // ⭐ CHỈ gợi ý khi đã đủ context hoặc turns >= 5
     const suggestedProducts: any[] = [];
-    if (shouldShowProducts(message)) {
+    if (shouldShowProducts(message) && shouldSuggestProducts) {
       try {
         const products = await getSuggestedProducts(ragResponse.sources || [], message, effectiveLanguage, agentId);
         suggestedProducts.push(...products);
@@ -1361,7 +1376,15 @@ router.post('/', async (req, res) => {
 // POST /api/chat-with-file — Chat with file attachments
 router.post('/with-file', async (req, res) => {
   try {
-    const { message, conversationId, language: uiLanguage = 'vi', agentPrompt, attachments } = req.body;
+    const {
+      message,
+      conversationId,
+      language: uiLanguage = 'vi',
+      agentPrompt,
+      attachments,
+      isReadyForProductSuggestion = false,
+      conversationTurns = 0,
+    } = req.body;
     
     const ready = await waitForRagReady(15000);
     if (!ready) {
@@ -1561,7 +1584,22 @@ router.post('/with-file', async (req, res) => {
 // POST /api/chat/stream — SSE streaming chat
 router.post('/stream', async (req: any, res: any) => {
   try {
-    const { message, conversationId, language: uiLanguage = 'vi', agentId, agentPrompt, userMode } = req.body;
+    const {
+      message,
+      conversationId,
+      language: uiLanguage = 'vi',
+      agentId,
+      agentPrompt,
+      userMode,
+      missingContext = [],
+      isReadyForProductSuggestion = false,
+      conversationTurns = 0,
+    } = req.body;
+
+    // ⭐ Smart product suggestion: chỉ gợi ý sản phẩm khi đã đủ context
+    // Hoặc khi conversationTurns >= 5 (backup)
+    const shouldSuggestProducts = isReadyForProductSuggestion || conversationTurns >= 5;
+    console.log(`[STREAM] Context: missing=${missingContext.join(',')}, isReady=${isReadyForProductSuggestion}, turns=${conversationTurns} → suggest=${shouldSuggestProducts}`);
     
     // Set SSE headers
     res.setHeader('Content-Type', 'text/event-stream');
@@ -1769,7 +1807,9 @@ router.post('/stream', async (req: any, res: any) => {
       // ⭐ Tự động gửi suggestedProducts khi user hỏi về thiết bị/sản phẩm
       const shouldShow = shouldShowProducts(message);
       console.log(`🔍 [STREAM] shouldShowProducts check: ${shouldShow} for message: "${message.substring(0, 80)}..."`);
-      if (shouldShow) {
+      if (shouldShow && shouldSuggestProducts) {
+        // ⭐ Chỉ gợi ý sản phẩm KHI đã đủ context (isReadyForProductSuggestion=true hoặc turns>=5)
+        // Nếu chưa đủ context → skip gửi products, để AI tự hỏi thêm thông tin
         try {
           let allProducts = [...scrapedProducts]; // Start with scraped products
           const suggestedProducts = await getSuggestedProducts(streamResult.sources || [], message, effectiveLanguage, agentId);
@@ -1790,8 +1830,11 @@ router.post('/stream', async (req: any, res: any) => {
           console.log('⚠️ suggestedProducts error:', suggErr);
         }
       } else if (scrapedProducts.length > 0) {
-        // Still send scraped products even if shouldShow is false (URLs in message)
+        // Still send scraped products from URLs in message even if context not ready
         sendEvent({ type: 'suggestedProducts', suggestedProducts: scrapedProducts, autoScraped: true });
+      } else if (!shouldSuggestProducts && missingContext.length > 0) {
+        // ⭐ Chưa đủ context: gửi event để frontend biết cần hỏi thêm
+        sendEvent({ type: 'contextNeeded', missingContext, message: 'Cần hỏi thêm thông tin trước khi gợi ý sản phẩm' });
       }
       // Stream response
       if (streamResult.stream) {
@@ -1911,8 +1954,8 @@ router.post('/stream', async (req: any, res: any) => {
         const fallbackAnswer = fallbackResponses[effectiveLanguage] || fallbackResponses.vi;
         
         // Stream the fallback response
-        // ⭐ FALLBACK: Vẫn gửi suggestedProducts nếu user hỏi về thiết bị/sản phẩm
-        if (shouldShowProducts(message)) {
+        // ⭐ FALLBACK: Chỉ gửi suggestedProducts khi đã đủ context
+        if (shouldShowProducts(message) && shouldSuggestProducts) {
           try {
             const suggestedProducts = await getSuggestedProducts([], message, effectiveLanguage, agentId);
             if (suggestedProducts.length > 0) {

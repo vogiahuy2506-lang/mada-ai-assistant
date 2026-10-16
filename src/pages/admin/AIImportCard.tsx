@@ -135,6 +135,69 @@ interface AIImportCardProps {
   onImportSuccess?: () => void;
 }
 
+interface SaveJobResult {
+  status: 'completed' | 'failed';
+  progress: number;
+  progressMessage: string | null;
+  error?: string;
+  saved?: number;
+  skipped?: number;
+  syncedToRAG?: number;
+  totalFound?: number;
+  message?: string;
+  url?: string;
+  method?: string;
+  fetchMethod?: string;
+  durationMs?: number;
+}
+
+// ============== JOB POLLING HELPER ==============
+
+async function pollJob<T>(
+  path: string,
+  options: {
+    pollingIntervalMs?: number;
+    maxPolls?: number;
+    onProgress?: (progress: number, message: string | null) => void;
+  } = {}
+): Promise<T & { status: string; progress: number; progressMessage: string | null; error?: string }> {
+  const { pollingIntervalMs = 1500, maxPolls = 80, onProgress } = options;
+
+  for (let i = 0; i < maxPolls; i++) {
+    await new Promise((resolve) => setTimeout(resolve, pollingIntervalMs));
+
+    try {
+      const res = await fetch(`/api/scraper/${path}`, {
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const json = await res.json();
+
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || 'Poll failed');
+      }
+
+      const data = json.data;
+      onProgress?.(data.progress || 0, data.progressMessage || null);
+
+      if (data.status === 'completed') {
+        return data as T & { status: string; progress: number; progressMessage: string | null; error?: string };
+      }
+
+      if (data.status === 'failed') {
+        return data as T & { status: string; progress: number; progressMessage: string | null; error?: string };
+      }
+      // status === 'pending' | 'running' → continue polling
+    } catch (err: any) {
+      // Nếu fetch lỗi, vẫn tiếp tục poll (server có thể đang khởi động lại)
+      console.warn(`[pollJob] poll ${i + 1} failed:`, err.message);
+    }
+  }
+
+  // Timeout
+  const result: any = { status: 'failed', progress: 100, progressMessage: 'Hết thời gian chờ', error: 'maxPolls exceeded' };
+  return result;
+}
+
 export function AIImportCard({ categories, onImportSuccess }: AIImportCardProps) {
   const { user } = useAuthStore();
   const language = useLanguageStore((state) => state.language ?? 'vi') as Language;
@@ -175,6 +238,8 @@ export function AIImportCard({ categories, onImportSuccess }: AIImportCardProps)
     setPreview(null);
   };
 
+  // ============== PREVIEW SCRAPE (JOB-BASED) ==============
+
   const handlePreview = async () => {
     if (!url.trim()) {
       setError(t('aiImport.enterUrl'));
@@ -194,47 +259,53 @@ export function AIImportCard({ categories, onImportSuccess }: AIImportCardProps)
     try {
       const token = getAccessToken() || '';
 
-      // Update progress sau 2s để user biết đang chờ
-      const progressTimer1 = setTimeout(() => {
-        setProgressMessage(t('aiImport.findingProducts'));
-      }, 2000);
-      const progressTimer2 = setTimeout(() => {
-        setProgressMessage(t('aiImport.aiAnalyzing'));
-      }, 6000);
-
-      const res = await fetch('/api/scraper/import-url', {
+      // Bước 1: Tạo preview job → nhận jobId ngay
+      const createRes = await fetch('/api/scraper/import-url', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ url: url.trim(), defaultCategory: category || 'general' }),
+        body: JSON.stringify({ url: url.trim(), defaultCategory: category || 'general', madaLanguage: 'en' }),
       });
-      const json = await res.json();
-      clearTimeout(progressTimer1);
-      clearTimeout(progressTimer2);
-      if (!res.ok || !json.success) {
-        throw new Error(json.error || t('aiImport.scrapeFailed'));
-      }
-      setPreview(json.data);
+      const createJson = await createRes.json();
 
-      // Gợi ý nếu 0 sản phẩm
-      if (json.data?.totalFound === 0) {
+      if (!createRes.ok || !createJson.success) {
+        throw new Error(createJson.error || t('aiImport.scrapeFailed'));
+      }
+
+      const { jobId } = createJson.data;
+
+      // Bước 2: Poll job status cho đến khi completed/failed
+      const pollResult = await pollJob<ImportPreviewResponse>(jobId, {
+        pollingIntervalMs: 1500,
+        maxPolls: 80, // ~2 phút max
+        onProgress: (progress, message) => {
+          setProgressMessage(message || t('aiImport.loadingPage'));
+        },
+      });
+
+      if (pollResult.status === 'failed') {
+        throw new Error(pollResult.error || t('aiImport.scrapeFailed'));
+      }
+
+      const jobData = pollResult as any;
+      setPreview(jobData);
+
+      if (jobData.totalFound === 0) {
         setError(t('aiImport.noProductsFound'));
       }
     } catch (err: any) {
-      // Distinguish network errors from server errors
       const msg = err?.message || t('aiImport.unknownError');
       let displayMsg = msg;
       if (
         msg.includes('Failed to fetch') ||
         msg.includes('Network request failed') ||
         msg.includes('NetworkError') ||
-        msg.includes('fetch') ||
         !navigator.onLine
       ) {
         displayMsg = t('aiImport.networkError');
-      } else if (msg.includes('timeout') || msg.includes('Timeout')) {
+      } else if (msg.includes('timeout') || msg.includes('Timeout') || msg.includes('maxPolls')) {
         displayMsg = t('aiImport.timeout');
       }
       setError(displayMsg);
@@ -244,15 +315,20 @@ export function AIImportCard({ categories, onImportSuccess }: AIImportCardProps)
     }
   };
 
+  // ============== SAVE SCRAPE (JOB-BASED) ==============
+
   const handleSave = async () => {
     if (!preview) return;
     if (!confirm(t('aiImport.saveConfirm', { count: preview.totalFound }))) return;
 
     setSaving(true);
     setError(null);
+    setProgressMessage('Đang tạo job lưu...');
     try {
       const token = getAccessToken() || '';
-      const res = await fetch('/api/scraper/import-url/save', {
+
+      // Bước 1: Tạo save job → nhận jobId ngay
+      const createRes = await fetch('/api/scraper/import-url/save', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -262,18 +338,37 @@ export function AIImportCard({ categories, onImportSuccess }: AIImportCardProps)
           url: preview.url,
           defaultCategory: category || 'general',
           onlyValid,
+          forceReimport: false,
+          madaLanguage: 'en',
         }),
       });
-      const json = await res.json();
-      if (!res.ok || !json.success) {
-        throw new Error(json.error || t('aiImport.saveFailed'));
+      const createJson = await createRes.json();
+
+      if (!createRes.ok || !createJson.success) {
+        throw new Error(createJson.error || t('aiImport.saveFailed'));
       }
-      const { saved, skipped } = json.data || {};
-      let savedMsg = t('aiImport.saved', { saved: saved || 0 });
-      if (skipped) {
-        savedMsg += '\n' + t('aiImport.skipped', { skipped });
+
+      const { jobId } = createJson.data;
+
+      // Bước 2: Poll save job status
+      const pollResult = await pollJob<SaveJobResult>(jobId + '/save', {
+        pollingIntervalMs: 2000,
+        maxPolls: 60, // ~2 phút max cho save
+        onProgress: (progress, message) => {
+          setProgressMessage(message || 'Đang xử lý...');
+        },
+      });
+
+      if (pollResult.status === 'failed') {
+        throw new Error(pollResult.error || t('aiImport.saveFailed'));
       }
-      alert(`✅ ${json.message}\n\n${savedMsg}`);
+
+      const saveData = pollResult as any;
+      let savedMsg = t('aiImport.saved', { saved: saveData.saved || 0 });
+      if (saveData.skipped) {
+        savedMsg += '\n' + t('aiImport.skipped', { skipped: saveData.skipped });
+      }
+      alert(`✅ ${saveData.message || savedMsg}`);
       reset();
       setOpen(false);
       onImportSuccess?.();
@@ -282,10 +377,13 @@ export function AIImportCard({ categories, onImportSuccess }: AIImportCardProps)
       let displayMsg = msg;
       if (msg.includes('Failed to fetch') || msg.includes('Network request failed') || msg.includes('NetworkError') || !navigator.onLine) {
         displayMsg = t('aiImport.networkError');
+      } else if (msg.includes('timeout') || msg.includes('Timeout') || msg.includes('maxPolls')) {
+        displayMsg = t('aiImport.timeout');
       }
       setError(displayMsg);
     } finally {
       setSaving(false);
+      setProgressMessage(null);
     }
   };
 

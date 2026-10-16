@@ -1,12 +1,15 @@
 /**
- * Smart URL Import Routes
+ * Smart URL Import Routes — Async Job Queue
  *
- * Admin paste URL sản phẩm → server scrape → AI extract products
- * với tên/giá/ảnh/brand → lưu vào kb_products (status=draft).
+ * Admin paste URL sản phẩm → scrape chạy NỀN (không block request)
+ * Frontend poll job status → hiển thị kết quả
  *
  * Endpoints:
- *   POST /api/scraper/import-url          — scrape + preview (không lưu)
- *   POST /api/scraper/import-url/save     — scrape + lưu vào DB
+ *   POST /api/scraper/import-url          — Tạo preview job → trả jobId ngay
+ *   GET  /api/scraper/import-url/:jobId   — Poll job status + results
+ *   POST /api/scraper/import-url/save     — Tạo save job → trả jobId ngay
+ *   GET  /api/scraper/import-url/:jobId/save — Poll save job status
+ *   GET  /api/scraper/import-url/metadata — Scrape meta tags (sync, nhanh)
  */
 
 import express from 'express';
@@ -41,8 +44,6 @@ function mapProductToRow(p: ExtractedProduct, defaultCategory: string) {
     ? `${p.price.toLocaleString('en-US')} ${p.currency}`
     : '';
 
-  // ===== MADA branch =====
-  // MADA SP không có brand/giá, dùng category từ botId + giữ ISO codes + attachments metadata
   if (p.extractionMethod === 'mada-scraper' && p.madaMetadata) {
     const meta = p.madaMetadata;
     const detectedBrand = meta.botId || '';
@@ -86,7 +87,6 @@ function mapProductToRow(p: ExtractedProduct, defaultCategory: string) {
     };
   }
 
-  // ===== E-commerce branch (generic) =====
   const detectedBrand = detectBrand(p.name, p.brand);
   const detectedCategory = autoClassifyMadaCategory(
     p.name,
@@ -117,7 +117,7 @@ function mapProductToRow(p: ExtractedProduct, defaultCategory: string) {
     description_en: descriptionEn,
     content,
     category: detectedCategory || 'general',
-    madaCategory: detectedCategory, // để UI hiển thị badge
+    madaCategory: detectedCategory,
     brand: detectedBrand,
     model: '',
     price_range: priceRange,
@@ -134,18 +134,12 @@ function mapProductToRow(p: ExtractedProduct, defaultCategory: string) {
   };
 }
 
-/**
- * Detect brand từ tên SP (fallback khi scraper không trả về brand field)
- */
 function detectBrand(name: string, fallback?: string): string {
-  // Nếu brand đã có và là string ngắn (< 30 chars), dùng luôn
   if (fallback && typeof fallback === 'string' && fallback.length > 0 && fallback.length < 30) {
     return fallback;
   }
 
-  // Danh sách brands phổ biến cần detect
   const brands = [
-    // Laptops / PCs
     'Apple', 'MacBook', 'iPhone', 'iPad',
     'HP', 'Hewlett-Packard',
     'Dell', 'Alienware',
@@ -158,7 +152,6 @@ function detectBrand(name: string, fallback?: string): string {
     'Razer', 'Blade',
     'LG', 'Gram',
     'Samsung', 'Galaxy',
-    // Mobiles
     'Xiaomi', 'Redmi', 'POCO', 'Mi',
     'Oppo', 'OPPO', 'Reno', 'Find',
     'Vivo', 'iQOO',
@@ -173,18 +166,12 @@ function detectBrand(name: string, fallback?: string): string {
     'Tecno',
     'Infinix',
     'Itel',
-    // Audio
-    'Sony', 'Bose', 'JBL', 'Beats', 'Sennheiser', 'Marshall', 'Anker', 'Soundcore',
+    'Bose', 'JBL', 'Beats', 'Sennheiser', 'Marshall', 'Anker', 'Soundcore',
     'AirPods', 'Galaxy Buds',
-    // Cameras
     'Canon', 'Nikon', 'Fujifilm', 'Olympus', 'Panasonic', 'GoPro',
-    // Wearables
     'Apple Watch', 'Garmin', 'Fitbit', 'Amazfit',
-    // Printers
-    'Epson', 'Brother', 'HP',
-    // Smart home
+    'Epson', 'Brother',
     'Google Home', 'Amazon', 'Echo',
-    // Assistive tech brands (MADA domain)
     'OrCam', 'JAWS', 'NVDA', 'ZoomText', 'Dragon',
   ];
 
@@ -192,7 +179,6 @@ function detectBrand(name: string, fallback?: string): string {
   for (const brand of brands) {
     const regex = new RegExp(`\\b${brand.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
     if (regex.test(lower) || regex.test(name)) {
-      // Chuẩn hóa brand name
       if (/^macbook$|^imac$/i.test(brand)) return 'Apple';
       if (/^iphone$|^ipad$|^apple watch$|^airpods$/i.test(brand)) return 'Apple';
       if (/^galaxy$/.test(brand)) return 'Samsung';
@@ -219,45 +205,28 @@ function detectBrand(name: string, fallback?: string): string {
   return (typeof fallback === 'string' && fallback.length < 30) ? fallback : '';
 }
 
-/**
- * Map brand → category MADA (fallback khi không có brand)
- * Fallback: dùng keyword matching trên tên + mô tả sản phẩm
- */
 function detectCategoryFromBrand(brand: string): string {
   if (!brand) return '';
   const b = brand.toLowerCase();
 
-  // Smartphones/Tablets → communication (mobile a11y)
   if (/apple|samsung|xiaomi|oppo|vivo|realme|oneplus|nokia|motorola|sony|google|honor|huawei|tecno|infinix|itel/.test(b)) {
     return 'communication';
   }
-
-  // Laptops/PCs → web_accessibility (web a11y)
   if (/dell|hp|hewlett|lenovo|thinkpad|ideapad|asus|zenbook vivobook|acer|predator|msi|gigabyte|microsoft|surface|razer|lg|alienware|apple/.test(b)) {
     return 'web_accessibility';
   }
-
-  // Audio/headphones/speakers → hearing
   if (/bose|jbl|beats|sennheiser|marshall|anker|soundcore|airpods|galaxy buds|sony audio|jabra|plantronics|audio technica/.test(b)) {
     return 'hearing';
   }
-
-  // Cameras → vision
   if (/canon|nikon|fujifilm|olympus|panasonic|gopro|dji|logitech webcam/.test(b)) {
     return 'vision';
   }
-
-  // Wearables/tablets → daily_living
   if (/garmin|fitbit|amazfit|apple watch|samsung watch|wearable/.test(b)) {
     return 'daily_living';
   }
-
-  // Printers → general
   if (/epson|brother|canon printer|laserjet/.test(b)) {
     return 'general';
   }
-
-  // Assistive tech → vision/hearing
   if (/orcam|jaws|nvda|zoomtext|dragon|屏幕阅读器|读屏软件/.test(b)) {
     return 'vision';
   }
@@ -265,12 +234,6 @@ function detectCategoryFromBrand(brand: string): string {
   return '';
 }
 
-/**
- * Auto-classify product vào category MADA dựa trên:
- * 1. Brand (đã có ở trên)
- * 2. Tên sản phẩm + mô tả (keyword matching)
- * 3. Fallback: dùng AI/Gemini để phân loại
- */
 function autoClassifyMadaCategory(
   name: string,
   description: string,
@@ -279,15 +242,11 @@ function autoClassifyMadaCategory(
 ): string {
   const text = `${name} ${description} ${brand}`.toLowerCase();
 
-  // Nếu có brand → dùng brand mapping trước
   if (brand) {
     const fromBrand = detectCategoryFromBrand(brand);
     if (fromBrand) return fromBrand;
   }
 
-  // === KEYWORD MATCHING trên nội dung ===
-
-  // 🔤 HEARING - Thính giác
   const hearingKeywords = [
     'hearing aid', 'hearing amplifier', ' hearing', 'tai nghe', 'loa', 'loa khuếch đại',
     'amplifier', 'headphone', 'earphone', 'earpiece', 'cochlear', 'hearing loop',
@@ -301,7 +260,6 @@ function autoClassifyMadaCategory(
     return 'hearing';
   }
 
-  // 👁️ VISION - Thị giác
   const visionKeywords = [
     'screen reader', 'NVDA', 'JAWS', 'VoiceOver', 'ZoomText', 'magnifier', 'magnification',
     'Braille', 'braille', 'OrCam', 'eye', 'thị giác', 'khiếm thị', 'mù', 'blind',
@@ -317,7 +275,6 @@ function autoClassifyMadaCategory(
     return 'vision';
   }
 
-  // 🗣️ COMMUNICATION - Giao tiếp
   const communicationKeywords = [
     'AAC', 'communication', 'giao tiếp', 'speech', 'nói', 'tiếng nói',
     'talker', 'communicator', 'ngôn ngữ', 'language', 'symbol', 'biểu tượng',
@@ -333,7 +290,6 @@ function autoClassifyMadaCategory(
     return 'communication';
   }
 
-  // 🦽 MOBILITY - Vận động
   const mobilityKeywords = [
     'wheelchair', 'xe lăn', 'xe đẩy', 'wheel chair', 'wheelchair',
     'prosthetic', 'prosthesis', 'chân giả', 'tay giả', '假肢', '義肢',
@@ -352,7 +308,6 @@ function autoClassifyMadaCategory(
     return 'mobility';
   }
 
-  // 🧠 COGNITION - Nhận thức
   const cognitionKeywords = [
     'cognitive', 'nhận thức', 'cognition', 'memory', 'trí nhớ', 'ghi nhớ',
     'dementia', 'sa sút trí tuệ', ' Alzheimer', 'parkinson', ' Huntington',
@@ -372,7 +327,6 @@ function autoClassifyMadaCategory(
     return 'cognition';
   }
 
-  // 🏠 DAILY LIVING - Sinh hoạt
   const dailyLivingKeywords = [
     'daily living', 'sinh hoạt', 'self-care', 'chăm sóc', 'eating', 'ăn uống',
     'utensil', 'dụng cụ', 'knife', 'dao', 'fork', 'nĩa', 'spoon', 'thìa',
@@ -393,7 +347,6 @@ function autoClassifyMadaCategory(
     return 'daily_living';
   }
 
-  // 🌐 WEB ACCESSIBILITY
   const webA11yKeywords = [
     'website', 'web', 'WCAG', 'accessibility', 'a11y', 'ADA compliance',
     'screen reader', 'browser', 'trình duyệt', 'chrome', 'firefox', 'edge',
@@ -404,7 +357,6 @@ function autoClassifyMadaCategory(
     return 'web_accessibility';
   }
 
-  // Nếu có category từ URL/existing → giữ nguyên
   if (existingCategory && existingCategory !== 'general') {
     return existingCategory;
   }
@@ -412,143 +364,133 @@ function autoClassifyMadaCategory(
   return 'general';
 }
 
-// ============== POST /import-url (PREVIEW ONLY) ==============
+// ============== JOB HELPERS ==============
 
-router.post('/import-url', async (req, res) => {
+interface ScrapeJob {
+  id: string;
+  url: string;
+  mode: 'preview' | 'save';
+  default_category: string;
+  mada_language: string;
+  status: 'pending' | 'running' | 'completed' | 'failed';
+  result: string | null;
+  error: string | null;
+  progress: number;
+  progress_message: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+function createScrapeJob(url: string, mode: 'preview' | 'save', defaultCategory: string, madaLanguage: string): ScrapeJob {
+  const id = `sj_${uuidv4().slice(0, 12)}`;
+  const now = new Date().toISOString();
+  db.prepare(`
+    INSERT INTO scrape_jobs (id, url, mode, default_category, mada_language, status, progress, progress_message, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, 'pending', 0, NULL, ?, ?)
+  `).run(id, url, mode, defaultCategory, madaLanguage, now, now);
+
+  return db.prepare('SELECT * FROM scrape_jobs WHERE id = ?').get(id) as ScrapeJob;
+}
+
+function updateScrapeJob(jobId: string, updates: Partial<Pick<ScrapeJob, 'status' | 'result' | 'error' | 'progress' | 'progress_message'>>) {
+  const sets: string[] = ['updated_at = ?'];
+  const params: any[] = [new Date().toISOString()];
+
+  if (updates.status !== undefined) { sets.push('status = ?'); params.push(updates.status); }
+  if (updates.result !== undefined) { sets.push('result = ?'); params.push(updates.result); }
+  if (updates.error !== undefined) { sets.push('error = ?'); params.push(updates.error); }
+  if (updates.progress !== undefined) { sets.push('progress = ?'); params.push(updates.progress); }
+  if (updates.progress_message !== undefined) { sets.push('progress_message = ?'); params.push(updates.progress_message); }
+
+  params.push(jobId);
+  db.prepare(`UPDATE scrape_jobs SET ${sets.join(', ')} WHERE id = ?`).run(...params);
+}
+
+// ============== BACKGROUND WORKER: PREVIEW SCRAPE ==============
+
+async function runPreviewJob(job: ScrapeJob) {
+  updateScrapeJob(job.id, { status: 'running', progress: 10, progress_message: 'Đang kết nối website...' });
+
   try {
-    const { url, defaultCategory = 'general', madaLanguage = 'en' } = req.body;
-
-    if (!url) {
-      return res
-        .status(400)
-        .json({ success: false, error: 'URL là bắt buộc' });
-    }
-
-    let parsedUrl: URL;
-    try {
-      parsedUrl = new URL(url);
-    } catch {
-      return res
-        .status(400)
-        .json({ success: false, error: 'URL không hợp lệ' });
-    }
-    if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
-      return res
-        .status(400)
-        .json({ success: false, error: 'Chỉ hỗ trợ http/https' });
-    }
-
-    console.log(`\n🕷️ [import-url] Scraping: ${url}`);
-
-    // MADA → preview mode (1 page, 20 SP) cho admin xem nhanh
-    const result: ExtractionResult = await productExtractor.extractFromUrl(url, undefined, {
+    const result: ExtractionResult = await productExtractor.extractFromUrl(job.url, undefined, {
       mode: 'preview',
-      language: madaLanguage === 'ar' ? 'ar' : 'en',
+      language: job.mada_language === 'ar' ? 'ar' : 'en',
     });
 
-    if (!result.success) {
-      return res.status(500).json({
-        success: false,
-        error: result.error || 'Không thể scrape URL này',
-        durationMs: result.durationMs,
-        fetchMethod: result.fetchMethod,
-      });
-    }
+    updateScrapeJob(job.id, { progress: 80, progress_message: 'Đang xử lý kết quả...' });
 
-    console.log(
-      `✅ [import-url] Found ${result.totalFound} products via ${result.method} (fetch=${result.fetchMethod}, ${result.durationMs}ms${result.proxy ? `, proxy=${result.proxy}` : ''})`
-    );
+    const preview = result.products.slice(0, 20).map((p) => mapProductToRow(p, job.default_category));
 
-    // Preview rows (chưa lưu DB)
-    const preview = result.products.slice(0, 20).map((p) =>
-      mapProductToRow(p, defaultCategory)
-    );
-
-    // Get proxy stats (chỉ cần cho e-commerce path)
-    const proxyStats = result.method === 'mada-scraper'
-      ? null
-      : (await import('../lib/scraping/proxyService')).proxyService.getStats();
-
-    res.json({
-      success: true,
-      data: {
-        url,
-        totalFound: result.totalFound,
-        method: result.method,
-        fetchMethod: result.fetchMethod,
-        durationMs: result.durationMs,
-        proxyUsed: result.proxy || null,
-        userAgent: result.userAgent || null,
-        products: result.products.slice(0, 100), // full data cho client
-        previewRows: preview,
-        stats: {
-          withPrice: result.products.filter((p) => p.price > 0).length,
-          withImage: result.products.filter((p) => !!p.imageUrl).length,
-          inStock: result.products.filter((p) => p.inStock).length,
-          withBrand: result.products.filter((p) => !!p.brand).length,
-        },
-        proxyStats,
+    const output = {
+      url: job.url,
+      totalFound: result.totalFound,
+      method: result.method,
+      fetchMethod: result.fetchMethod,
+      durationMs: result.durationMs,
+      proxyUsed: result.proxy || null,
+      userAgent: result.userAgent || null,
+      products: result.products.slice(0, 100),
+      previewRows: preview,
+      stats: {
+        withPrice: result.products.filter((p) => p.price > 0).length,
+        withImage: result.products.filter((p) => !!p.imageUrl).length,
+        inStock: result.products.filter((p) => p.inStock).length,
+        withBrand: result.products.filter((p) => !!p.brand).length,
       },
+      success: result.success,
+      error: result.error || null,
+    };
+
+    updateScrapeJob(job.id, {
+      status: 'completed',
+      progress: 100,
+      progress_message: 'Hoàn tất',
+      result: JSON.stringify(output),
     });
+
+    console.log(`✅ [preview job ${job.id}] Found ${result.totalFound} products in ${result.durationMs}ms`);
   } catch (err: any) {
-    console.error('[import-url] error:', err);
-    res.status(500).json({ success: false, error: err.message });
+    console.error(`❌ [preview job ${job.id}] Failed:`, err.message);
+    updateScrapeJob(job.id, {
+      status: 'failed',
+      progress: 100,
+      error: err.message,
+    });
   }
-});
+}
 
-// ============== POST /import-url/save (PERSIST TO DB) ==============
+// ============== BACKGROUND WORKER: SAVE SCRAPE + PERSIST ==============
 
-router.post('/import-url/save', async (req, res) => {
+async function runSaveJob(job: ScrapeJob) {
+  updateScrapeJob(job.id, { status: 'running', progress: 5, progress_message: 'Đang kết nối website MADA...' });
+
   try {
-    const {
-      url,
-      defaultCategory = 'general',
-      onlyValid = true,
-      forceReimport = false,
-      madaLanguage = 'en',
-    } = req.body;
-
-    if (!url) {
-      return res
-        .status(400)
-        .json({ success: false, error: 'URL là bắt buộc' });
-    }
-
-    // MADA → save mode (3 page, 100 SP) để lưu nhiều SP
-    const result = await productExtractor.extractFromUrl(url, undefined, {
+    // Scrape
+    const result = await productExtractor.extractFromUrl(job.url, undefined, {
       mode: 'save',
-      language: madaLanguage === 'ar' ? 'ar' : 'en',
+      language: job.mada_language === 'ar' ? 'ar' : 'en',
     });
 
-    if (!result.success) {
-      return res
-        .status(500)
-        .json({ success: false, error: result.error || 'Scrape thất bại' });
-    }
+    updateScrapeJob(job.id, { progress: 40, progress_message: `Đã scrape xong, xử lý ${result.products.length} sản phẩm...` });
 
     const isMada = result.method === 'mada-scraper';
-
-    // MADA SP không có giá → bỏ filter "onlyValid" khi user chọn lưu từ MADA
-    // (admin paste URL MADA thường muốn lưu tất cả assistive tech SP)
-    const productsToSave = onlyValid && !isMada
-      ? result.products.filter((p) => p.name && p.price > 0)
-      : result.products.filter((p) => p.name);
+    const productsToSave = result.products.filter((p) => p.name);
 
     if (productsToSave.length === 0) {
-      return res.status(400).json({
-        success: false,
+      updateScrapeJob(job.id, {
+        status: 'failed',
+        progress: 100,
         error: isMada
           ? 'MADA URL không trả về sản phẩm nào. Kiểm tra URL hoặc category.'
-          : 'Không có sản phẩm hợp lệ để lưu. Hãy thử bỏ tick "Chỉ lưu SP có giá" hoặc dùng URL khác.',
+          : 'Không có sản phẩm hợp lệ để lưu.',
       });
+      return;
     }
 
-    // Check duplicates (trừ khi forceReimport=true)
-    const existingUrls = new Set<string>();
-    if (!forceReimport) {
-      const existing = db.prepare('SELECT product_url FROM kb_products').all() as { product_url: string }[];
-      for (const e of existing) existingUrls.add(e.product_url);
-    }
+    updateScrapeJob(job.id, { progress: 50, progress_message: `Đang dịch ${productsToSave.length} sản phẩm...` });
+
+    const existing = db.prepare('SELECT product_url FROM kb_products').all() as { product_url: string }[];
+    const existingUrls = new Set(existing.map(e => e.product_url));
 
     const insert = db.prepare(`
       INSERT INTO kb_products (
@@ -564,16 +506,14 @@ router.post('/import-url/save', async (req, res) => {
     const now = new Date().toISOString();
     let inserted = 0;
     let skipped = 0;
-
-    // ⭐ Pre-process: translate all products BEFORE inserting (translation is async)
-    console.log(`🌐 Translating ${productsToSave.length} products to all languages...`);
     const translatedRows: Array<{ row: any; translations: any }> = [];
+
     for (const p of productsToSave) {
-      if (!forceReimport && existingUrls.has(p.url)) {
+      if (existingUrls.has(p.url)) {
         skipped++;
         continue;
       }
-      const row = mapProductToRow(p, defaultCategory);
+      const row = mapProductToRow(p, job.default_category);
       const detectedLang = detectTextLang(row.title + ' ' + (row.description || ''));
       const translations = await translateProduct({
         title: row.title,
@@ -584,7 +524,8 @@ router.post('/import-url/save', async (req, res) => {
       translatedRows.push({ row, translations });
     }
 
-    // Then insert in a synchronous transaction
+    updateScrapeJob(job.id, { progress: 75, progress_message: `Đang lưu ${translatedRows.length} sản phẩm vào DB...` });
+
     const syncedIds: string[] = [];
     const txn = db.transaction(() => {
       for (const { row, translations } of translatedRows) {
@@ -595,55 +536,260 @@ router.post('/import-url/save', async (req, res) => {
           row.image_url, JSON.stringify(row.iso_codes), row.wcag_level, row.who_gate_area,
           row.status, row.featured, row.sort_order, row.language, now, now
         );
-
-        // ⭐ Auto-sync to knowledge_items
         try {
           const syncRes = syncProductToKnowledge(row);
           if (syncRes.knowledge_item_id) syncedIds.push(syncRes.knowledge_item_id);
         } catch (e) {
-          console.warn(`[import-url/save] sync fail for ${row.id}:`, e);
+          console.warn(`[save job ${job.id}] sync fail:`, e);
         }
         inserted++;
       }
     });
     txn();
 
-    console.log(
-      `💾 [import-url/save] Saved ${inserted} (skipped ${skipped}) from ${url} (method=${result.method}, fetch=${result.fetchMethod}, ${result.durationMs}ms, synced=${syncedIds.length})`
-    );
+    const output = {
+      url: job.url,
+      totalFound: result.totalFound,
+      saved: inserted,
+      skipped,
+      syncedToRAG: syncedIds.length,
+      method: result.method,
+      fetchMethod: result.fetchMethod,
+      durationMs: result.durationMs,
+      message: skipped > 0
+        ? `Đã lưu ${inserted} sản phẩm mới (bỏ qua ${skipped} SP trùng lặp). ${syncedIds.length} SP đã sync sang AI/RAG.`
+        : `Đã lưu ${inserted} sản phẩm từ ${job.url}. ${syncedIds.length} SP đã sync sang AI/RAG.`,
+    };
+
+    updateScrapeJob(job.id, {
+      status: 'completed',
+      progress: 100,
+      progress_message: 'Hoàn tất',
+      result: JSON.stringify(output),
+    });
+
+    console.log(`✅ [save job ${job.id}] Saved ${inserted} products, synced ${syncedIds.length}`);
+  } catch (err: any) {
+    console.error(`❌ [save job ${job.id}] Failed:`, err.message);
+    updateScrapeJob(job.id, {
+      status: 'failed',
+      progress: 100,
+      error: err.message,
+    });
+  }
+}
+
+// ============== POST /import-url — TẠO PREVIEW JOB ==============
+
+router.post('/import-url', (req, res) => {
+  const { url, defaultCategory = 'general', madaLanguage = 'en' } = req.body;
+
+  if (!url) {
+    return res.status(400).json({ success: false, error: 'URL là bắt buộc' });
+  }
+
+  try {
+    new URL(url);
+  } catch {
+    return res.status(400).json({ success: false, error: 'URL không hợp lệ' });
+  }
+
+  // Tạo job → trả jobId ngay (không chờ scrape)
+  const job = createScrapeJob(url, 'preview', defaultCategory, madaLanguage);
+  console.log(`🕷️ [import-url] Created preview job ${job.id} for: ${url}`);
+
+  res.json({
+    success: true,
+    data: { jobId: job.id, status: 'pending', message: 'Đang bắt đầu scrape...' },
+  });
+
+  // Chạy scrape ở NỀN (setImmediate để không block response)
+  setImmediate(() => {
+    runPreviewJob(job);
+  });
+});
+
+// ============== GET /import-url/:jobId — POLL PREVIEW JOB STATUS ==============
+
+router.get('/import-url/:jobId', (req, res) => {
+  const { jobId } = req.params;
+  const job = db.prepare('SELECT * FROM scrape_jobs WHERE id = ? AND mode = ?').get(jobId, 'preview') as ScrapeJob | undefined;
+
+  if (!job) {
+    return res.status(404).json({ success: false, error: 'Job không tồn tại' });
+  }
+
+  if (job.status === 'completed') {
+    const result = JSON.parse(job.result || '{}');
+    return res.json({
+      success: true,
+      data: {
+        status: job.status,
+        progress: job.progress,
+        progressMessage: job.progress_message,
+        ...result,
+      },
+    });
+  }
+
+  if (job.status === 'failed') {
+    return res.json({
+      success: true,
+      data: {
+        status: job.status,
+        progress: job.progress,
+        progressMessage: job.progress_message,
+        error: job.error,
+        success: false,
+        error2: job.error,
+      },
+    });
+  }
+
+  // pending / running
+  res.json({
+    success: true,
+    data: {
+      status: job.status,
+      progress: job.progress,
+      progressMessage: job.progress_message || 'Đang xử lý...',
+    },
+  });
+});
+
+// ============== POST /import-url/save — TẠO SAVE JOB ==============
+
+router.post('/import-url/save', (req, res) => {
+  const {
+    url,
+    defaultCategory = 'general',
+    onlyValid = true,
+    forceReimport = false,
+    madaLanguage = 'en',
+  } = req.body;
+
+  if (!url) {
+    return res.status(400).json({ success: false, error: 'URL là bắt buộc' });
+  }
+
+  // Tạo job → trả jobId ngay
+  const job = createScrapeJob(url, 'save', defaultCategory, madaLanguage);
+  console.log(`💾 [import-url/save] Created save job ${job.id} for: ${url}`);
+
+  res.json({
+    success: true,
+    data: { jobId: job.id, status: 'pending', message: 'Đang bắt đầu scrape và lưu...' },
+  });
+
+  // Chạy ở NỀN
+  setImmediate(() => {
+    runSaveJob(job);
+  });
+});
+
+// ============== GET /import-url/:jobId/save — POLL SAVE JOB STATUS ==============
+
+router.get('/import-url/:jobId/save', (req, res) => {
+  const { jobId } = req.params;
+  const job = db.prepare('SELECT * FROM scrape_jobs WHERE id = ? AND mode = ?').get(jobId, 'save') as ScrapeJob | undefined;
+
+  if (!job) {
+    return res.status(404).json({ success: false, error: 'Job không tồn tại' });
+  }
+
+  if (job.status === 'completed') {
+    const result = JSON.parse(job.result || '{}');
+    return res.json({
+      success: true,
+      data: {
+        status: job.status,
+        progress: job.progress,
+        progressMessage: job.progress_message,
+        ...result,
+      },
+    });
+  }
+
+  if (job.status === 'failed') {
+    return res.json({
+      success: true,
+      data: {
+        status: job.status,
+        progress: job.progress,
+        progressMessage: job.progress_message,
+        error: job.error,
+      },
+    });
+  }
+
+  res.json({
+    success: true,
+    data: {
+      status: job.status,
+      progress: job.progress,
+      progressMessage: job.progress_message || 'Đang xử lý...',
+    },
+  });
+});
+
+// ============== LEGACY: backward compat sync endpoints ==============
+
+// POST /import-url (sync — legacy, vẫn giữ cho backward compat)
+// Nếu client gọi sync version, redirect sang job-based
+router.post('/import-url/sync', async (req, res) => {
+  const { url, defaultCategory = 'general', madaLanguage = 'en' } = req.body;
+
+  if (!url) {
+    return res.status(400).json({ success: false, error: 'URL là bắt buộc' });
+  }
+
+  try {
+    new URL(url);
+  } catch {
+    return res.status(400).json({ success: false, error: 'URL không hợp lệ' });
+  }
+
+  try {
+    const result = await productExtractor.extractFromUrl(url, undefined, {
+      mode: 'preview',
+      language: madaLanguage === 'ar' ? 'ar' : 'en',
+    });
+
+    if (!result.success) {
+      return res.status(500).json({
+        success: false,
+        error: result.error || 'Scrape thất bại',
+        durationMs: result.durationMs,
+      });
+    }
+
+    const preview = result.products.slice(0, 20).map((p) => mapProductToRow(p, defaultCategory));
 
     res.json({
       success: true,
       data: {
         url,
         totalFound: result.totalFound,
-        saved: inserted,
-        skipped,
-        syncedToRAG: syncedIds.length,
         method: result.method,
         fetchMethod: result.fetchMethod,
         durationMs: result.durationMs,
+        products: result.products.slice(0, 100),
+        previewRows: preview,
+        stats: {
+          withPrice: result.products.filter((p) => p.price > 0).length,
+          withImage: result.products.filter((p) => !!p.imageUrl).length,
+          inStock: result.products.filter((p) => p.inStock).length,
+          withBrand: result.products.filter((p) => !!p.brand).length,
+        },
       },
-      message: skipped > 0
-        ? `Đã lưu ${inserted} sản phẩm mới (bỏ qua ${skipped} SP trùng lặp). ${syncedIds.length} SP đã sync sang AI/RAG.`
-        : `Đã lưu ${inserted} sản phẩm từ ${url}. ${syncedIds.length} SP đã sync sang AI/RAG.`,
     });
   } catch (err: any) {
-    console.error('[import-url/save] error:', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-export default router;
+// ============== GET /import-url/metadata (SYNC — NHANH) ==============
 
-// ============== GET /import-url/metadata (SCRAPE META TAGS) ==============
-
-/**
- * GET /api/scraper/import-url/metadata?url=<url>
- *
- * Scrape Open Graph / meta tags từ URL để pre-fill form sản phẩm.
- * Trả về nhanh: title, description, image, siteName.
- */
 router.get('/import-url/metadata', async (req, res) => {
   try {
     const { url } = req.query;
@@ -659,7 +805,18 @@ router.get('/import-url/metadata', async (req, res) => {
       data: metadata,
     });
   } catch (err: any) {
-    console.error('[import-url/metadata] error:', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });
+
+// ============== CLEANUP: xóa jobs cũ hơn 24h ==============
+
+try {
+  const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const deleted = db.prepare("DELETE FROM scrape_jobs WHERE created_at < ? AND status IN ('completed', 'failed')").run(cutoff);
+  if (deleted.changes > 0) {
+    console.log(`🧹 [scrape_jobs] Cleaned up ${deleted.changes} old jobs`);
+  }
+} catch { /* ignore cleanup errors */ }
+
+export default router;

@@ -127,8 +127,8 @@ router.post('/crawl-mada', (req, res) => {
   };
   crawlJobs.set(jobId, job);
 
-  // Spawn process crawl-mada.ts (chạy nền)
-  const scriptPath = path.join(process.cwd(), 'server', 'scripts', 'crawl-mada.ts');
+  // Spawn process mada-scraper.ts (chạy nền)
+  const scriptPath = path.join(process.cwd(), 'server', 'scripts', 'mada-scraper.ts');
   const args = ['tsx', scriptPath];
   if (category !== 'all') args.push('--category', category);
 

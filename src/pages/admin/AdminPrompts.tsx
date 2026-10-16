@@ -1249,6 +1249,8 @@ export function AdminPrompts() {
             'Content-Type': 'application/json',
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
+          // ⭐ 5 phút timeout cho crawl (vì website MADA có thể chậm)
+          signal: AbortSignal.timeout(300000),
           body: JSON.stringify({
             knowledge_url: updatedUrls.map(u => u.url).join('\n'),
             product_urls: [urlModalInput.trim()],
@@ -1285,9 +1287,15 @@ export function AdminPrompts() {
         } else {
           setScrapeResult({ success: false, message: `Error ${res.status}` });
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error('Scrape failed:', err);
-        setScrapeResult({ success: false, message: 'Connection error' });
+        const isTimeout = err?.name === 'AbortError' || err?.message?.includes('timeout');
+        setScrapeResult({
+          success: false,
+          message: isTimeout
+            ? '⏱️ Cào bị timeout (5 phút). Website MADA quá chậm — thử lại với ít URL hơn.'
+            : 'Connection error',
+        });
       } finally {
         setScrapeLoading(false);
       }

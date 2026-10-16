@@ -140,18 +140,31 @@ jobs:
             echo "✅ Fresh mada.db created ($(sudo ls -lh $APP_DIR/data/mada.db | awk '{print $5}'))"
 
             echo "=== Step 8c: Import data from SQL files ==="
+            # Verify SQL files exist and have content
+            echo "--- SQL files in repo ---"
+            sudo ls -lh $TEMP_DIR/data/*.sql 2>/dev/null || echo "No SQL files found!"
+            echo "--- products-sync.sql line count ---"
+            sudo wc -l $TEMP_DIR/data/products-sync.sql 2>/dev/null || echo "File missing!"
+            echo "--- products-sync.sql INSERT count ---"
+            sudo grep -c "^INSERT" $TEMP_DIR/data/products-sync.sql 2>/dev/null || echo "No INSERT statements!"
+
             # Update SQL files to use INSERT OR REPLACE for idempotent sync
             if [ -f "$TEMP_DIR/data/products-sync.sql" ]; then
               echo "Importing products..."
               # Replace INSERT with INSERT OR REPLACE for idempotent operations (handles both INSERT and INSERT OR REPLACE)
               sudo sed -E 's/^INSERT(\s+OR\s+REPLACE)?\s+INTO\s+kb_products\s+VALUES/INSERT OR REPLACE INTO kb_products VALUES/' $TEMP_DIR/data/products-sync.sql > /tmp/products-sync-fixed.sql
-              sudo sqlite3 $APP_DIR/data/mada.db < /tmp/products-sync-fixed.sql 2>&1 || {
-                echo "⚠️ Product import had warnings/errors, checking result..."
-              }
+              echo "Fixed SQL lines: $(sudo wc -l < /tmp/products-sync-fixed.sql)"
+              echo "--- Attempting import ---"
+              sudo sqlite3 $APP_DIR/data/mada.db < /tmp/products-sync-fixed.sql 2>&1
               PRODUCT_COUNT=$(sudo sqlite3 $APP_DIR/data/mada.db "SELECT COUNT(*) FROM kb_products;")
               echo "✅ Imported products (count: $PRODUCT_COUNT)"
+              if [ "$PRODUCT_COUNT" = "0" ]; then
+                echo "⚠️ WARNING: 0 products imported! Check schema match."
+                echo "Schema columns: $(sudo sqlite3 $APP_DIR/data/mada.db "PRAGMA table_info(kb_products);" | wc -l)"
+              fi
             else
-              echo "⚠️ products-sync.sql not found"
+              echo "❌ products-sync.sql NOT FOUND in repo!"
+              ls -la $TEMP_DIR/data/ || echo "data dir missing"
             fi
             
             if [ -f "$TEMP_DIR/data/categories-sync.sql" ]; then
@@ -165,7 +178,17 @@ jobs:
             else
               echo "⚠️ categories-sync.sql not found"
             fi
-            
+
+            if [ -f "$TEMP_DIR/data/knowledge-items-sync.sql" ]; then
+              echo "Importing knowledge items (RAG)..."
+              sudo sed -E 's/^INSERT(\s+OR\s+REPLACE)?\s+INTO\s+knowledge_items\s+VALUES/INSERT OR REPLACE INTO knowledge_items VALUES/' $TEMP_DIR/data/knowledge-items-sync.sql > /tmp/knowledge-items-fixed.sql
+              sudo sqlite3 $APP_DIR/data/mada.db < /tmp/knowledge-items-fixed.sql 2>&1 || {
+                echo "⚠️ Knowledge items import had warnings/errors, checking result..."
+              }
+              KI_COUNT=$(sudo sqlite3 $APP_DIR/data/mada.db "SELECT COUNT(*) FROM knowledge_items;")
+              echo "✅ Imported knowledge items (count: $KI_COUNT)"
+            fi
+
             # Verify database integrity
             DB_CHECK=$(sudo sqlite3 $APP_DIR/data/mada.db "PRAGMA integrity_check;")
             if [ "$DB_CHECK" = "ok" ]; then

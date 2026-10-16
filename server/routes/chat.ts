@@ -673,6 +673,14 @@ async function getSuggestedProducts(ragSources: any[], message: string, effectiv
       }
     }
   }
+
+  // ⭐ Map MADA category slug → DB enum (kb_products.category)
+  // e.g. 'mobility-and-transportation' → 'daily_living', 'sensory-hearing' → 'hearing'
+  if (agentCategory && MADA_CATEGORY_TO_DB[agentCategory]) {
+    const mapped = MADA_CATEGORY_TO_DB[agentCategory];
+    console.log(`📦 [getSuggestedProducts] Mapping MADA category "${agentCategory}" → DB enum "${mapped}"`);
+    agentCategory = mapped;
+  }
   
   // ⭐ Bot Thông tin bổ trợ được xem TẤT CẢ sản phẩm, các bot khác bị giới hạn theo category
   const shouldFilterByCategory = !isRegulatoryBot && agentCategory !== null;

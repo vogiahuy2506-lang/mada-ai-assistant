@@ -467,11 +467,13 @@ ${siteUrl}
 
         // Build transporter with connection settings
         const mailPort = parseInt(process.env.MAIL_PORT || '465', 10);
+        const isSSLMail = mailPort === 465;
+        
         const transporter = nodemailer.createTransport({
           host: process.env.MAIL_HOST,
           port: mailPort,
-          secure: mailPort === 465, // auto-detect based on port
-          requireTLS: process.env.MAIL_TLS === 'true',
+          secure: isSSLMail, // true for port 465 (implicit SSL)
+          requireTLS: !isSSLMail && process.env.MAIL_TLS === 'true', // STARTTLS for other ports
           tls: {
             rejectUnauthorized: process.env.MAIL_TLS_REJECT_UNAUTHORIZED !== 'false',
           },
@@ -483,7 +485,7 @@ ${siteUrl}
           maxConnections: 5,
           maxMessages: 100,
           rateLimit: 10, // max 10 emails per second
-        } as any);
+        });
 
         // Verify connection first (only in debug mode to avoid slowing down)
         if (process.env.MAIL_DEBUG === 'true') {

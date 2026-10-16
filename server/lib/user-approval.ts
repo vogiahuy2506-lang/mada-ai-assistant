@@ -26,15 +26,28 @@ async function sendApprovalEmail(user: UserRow, approved: boolean): Promise<void
     return;
   }
 
+  // mail.digiso.vn uses SSL on port 465
+  // - Port 465: implicit SSL, use secure: true
+  // - Port 587: STARTTLS, use requireTLS: true
+  const mailPort = parseInt(process.env.MAIL_PORT || '465', 10);
+  const isSSLMail = mailPort === 465;
+  
   const transporter = nodemailer.createTransport({
     host: process.env.MAIL_HOST,
-    port: parseInt(process.env.MAIL_PORT || '465'),
-    secure: process.env.MAIL_SECURE === 'true',
-    requireTLS: process.env.MAIL_TLS === 'true',
+    port: mailPort,
+    secure: isSSLMail, // true for port 465 (implicit SSL)
+    requireTLS: !isSSLMail && process.env.MAIL_TLS === 'true', // STARTTLS for other ports
+    tls: {
+      // For SSL connections, allow self-signed certs if needed
+      rejectUnauthorized: process.env.MAIL_TLS_REJECT_UNAUTHORIZED !== 'false',
+    },
     auth: {
       user: process.env.MAIL_USERNAME,
       pass: process.env.MAIL_PASSWORD,
     },
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 30000,
   });
 
   const statusText = approved ? 'has been approved' : 'has been rejected';

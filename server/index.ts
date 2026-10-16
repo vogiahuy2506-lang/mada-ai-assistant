@@ -2293,15 +2293,25 @@ app.post('/api/test-email', async (req, res) => {
     }
 
     const nodemailer = await import('nodemailer');
+    // mail.digiso.vn uses SSL on port 465
+    const mailPort = parseInt(process.env.MAIL_PORT || '465', 10);
+    const isSSLMail = mailPort === 465;
+    
     const transporter = nodemailer.createTransport({
       host: process.env.MAIL_HOST,
-      port: parseInt(process.env.MAIL_PORT || '465'),
-      secure: process.env.MAIL_SECURE === 'true',
-      requireTLS: process.env.MAIL_TLS === 'true',
+      port: mailPort,
+      secure: isSSLMail, // true for port 465 (implicit SSL)
+      requireTLS: !isSSLMail && process.env.MAIL_TLS === 'true', // STARTTLS for other ports
+      tls: {
+        rejectUnauthorized: process.env.MAIL_TLS_REJECT_UNAUTHORIZED !== 'false',
+      },
       auth: {
         user: process.env.MAIL_USERNAME,
         pass: process.env.MAIL_PASSWORD,
       },
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 30000,
     });
 
     await transporter.sendMail({
@@ -4461,15 +4471,25 @@ app.post('/api/consultation', async (req, res) => {
     if (process.env.MAIL_HOST && process.env.MAIL_USERNAME) {
       try {
         const nodemailer = await import('nodemailer');
+        // mail.digiso.vn uses SSL on port 465
+        const mailPort = parseInt(process.env.MAIL_PORT || '465', 10);
+        const isSSLMail = mailPort === 465;
+        
         const transporter = nodemailer.createTransport({
           host: process.env.MAIL_HOST,
-          port: parseInt(process.env.MAIL_PORT || '465'),
-          secure: process.env.MAIL_SECURE === 'true',
-          requireTLS: process.env.MAIL_TLS === 'true',
+          port: mailPort,
+          secure: isSSLMail, // true for port 465 (implicit SSL)
+          requireTLS: !isSSLMail && process.env.MAIL_TLS === 'true', // STARTTLS for other ports
+          tls: {
+            rejectUnauthorized: process.env.MAIL_TLS_REJECT_UNAUTHORIZED !== 'false',
+          },
           auth: {
             user: process.env.MAIL_USERNAME,
             pass: process.env.MAIL_PASSWORD,
           },
+          connectionTimeout: 10000,
+          greetingTimeout: 10000,
+          socketTimeout: 30000,
         });
 
         // Build admin link to view consultation

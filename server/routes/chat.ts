@@ -169,15 +169,16 @@ const AGENT_TO_MADA: Record<string, { botId: string; madaCategory: string }> = {
   'bot-regulatory': { botId: 'bot-regulatory', madaCategory: 'regulatory-standards' },
 };
 
-// ⭐ Product Request Category Mapping
+// ⭐ Product Request Category Mapping (MADA bot category → DB kb_products.category enum)
+// DB CHECK constraint: ('vision', 'hearing', 'mobility', 'cognition', 'communication', 'daily_living', 'education', 'general')
 const MADA_CATEGORY_TO_DB: Record<string, string> = {
-  'sensory-hearing': 'sensory-hearing',
-  'sensory-vision': 'sensory-vision',
-  'voice-and-speech': 'voice-and-speech',
-  'mental-cognitive': 'mental-cognitive',
-  'neuromusculoskeletal-movement': 'neuromusculoskeletal-movement',
-  'mobility-and-transportation': 'mobility-and-transportation',
-  'regulatory-standards': 'regulatory-standards',
+  'sensory-hearing': 'hearing',
+  'sensory-vision': 'vision',
+  'voice-and-speech': 'communication',
+  'mental-cognitive': 'cognition',
+  'neuromusculoskeletal-movement': 'mobility',
+  'mobility-and-transportation': 'daily_living',
+  'regulatory-standards': 'general',
 };
 
 // ⭐ Product request response templates

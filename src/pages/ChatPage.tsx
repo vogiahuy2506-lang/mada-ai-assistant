@@ -918,30 +918,24 @@ export function ChatPage() {
   
   // Helper: Fetch agents directly from API and update store
   const fetchAgentsDirectly = useCallback(() => {
-    // Xóa cache trước khi fetch
+    // ⭐ XÓA HOÀN TOÀN cache localStorage trước khi fetch
+    // Điều này buộc app phải fetch từ backend mỗi lần
     try {
       const storageKey = 'mada-agents';
-      const raw = localStorage.getItem(storageKey);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if ((parsed.state?.agents && parsed.state.agents.length > 0) || parsed.state?.lastSynced) {
-          console.log('[ChatPage] 🔄 Clearing cache before direct fetch...');
-          const newState = { ...parsed, state: { ...parsed.state, agents: [], lastSynced: null } };
-          localStorage.setItem(storageKey, JSON.stringify(newState));
-        }
-      }
+      console.log('[ChatPage] 🔄 Clearing ALL localStorage cache for agents...');
+      localStorage.removeItem(storageKey);
     } catch (_) {}
     
     // Xóa store state TRƯỚC KHI gọi API để tránh persist rehydrate ghi đè
-    useAgentStore.setState({ agents: [], lastSynced: null });
+    useAgentStore.setState({ agents: [], lastSynced: null, isLoading: true });
     
     return fetch('/api/public/agents')
       .then(res => res.json())
       .then((data: { success: boolean; data: unknown[] }) => {
         if (data.success && Array.isArray(data.data)) {
           const freshAgents = data.data.map((item: unknown) => mapBackendAgent(item));
-          console.log('[ChatPage] ✅ Agents fetched directly:', freshAgents.length, 'active:', freshAgents.filter(a => a.isActive).length);
-          freshAgents.forEach((a, i) => console.log(`  [${i}] "${a.name}" isActive=${a.isActive}`));
+          console.log('[ChatPage] ✅ Agents fetched directly from backend:', freshAgents.length, 'active:', freshAgents.filter(a => a.isActive).length);
+          freshAgents.forEach((a, i) => console.log(`  [${i}] "${a.name}" systemPrompt=${a.systemPrompt ? 'HAS' : 'MISSING'}`));
           useAgentStore.setState({
             agents: freshAgents,
             lastSynced: Date.now(),
@@ -1487,75 +1481,35 @@ export function ChatPage() {
     ? activeAgents.find(a => a.id === selectedAgentId) || defaultAgent
     : defaultAgent;
 
-  // ⭐ Tạo system prompt tổng hợp từ TẤT CẢ các bot active - dùng cho "Trò chuyện mới"
-  const getOmniSystemPrompt = () => {
-    if (activeAgents.length === 0) return '';
-    if (activeAgents.length === 1) return activeAgents[0].systemPrompt || '';
-
-    const agentContexts = activeAgents.map((agent, idx) => {
-      const caps = agent.capabilities?.length
-        ? `[Chuyên môn: ${agent.capabilities.join(', ')}]`
-        : '';
-      return `[BOT ${idx + 1}: ${getAgentDisplayName(agent.id, agent.name, language)}]${caps ? ' ' + caps : ''}
-Mô tả: ${agent.description || 'Chuyên gia hỗ trợ'}
-System Prompt: ${agent.systemPrompt || 'Bạn là một trợ lý hữu ích.'}`;
-    });
-
-    return `Bạn là TRỢ LÝ TỔNG HỢP CỦA MADA AI - thư viện tri thức và ngân hàng kiến thức khổng lồ về công nghệ hỗ trợ người khuyết tật.
-
-Bạn có quyền truy cập kiến thức từ ${activeAgents.length} chuyên gia sau:
-${agentContexts.join('\n\n')}
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🎯 VAI TRÒ & KHẢ NĂNG CỦA BẠN
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Bạn là một "THƯ VIỆN TRI THỨC SỐNG" - tương tự như một thủ thư uyên bác nhất thế giới, kết hợp với ngân hàng kiến thức khổng lồ. Bạn có thể:
-
-✅ HIỂU và TRẢ LỜI bất kỳ câu hỏi nào về công nghệ hỗ trợ người khuyết tật
-✅ ĐI SÂU vào chi tiết kỹ thuật, giá cả, đánh giá, so sánh sản phẩm
-✅ ĐỀ XUẤT giải pháp phù hợp dựa trên mô tả triệu chứng/tình trạng của người dùng
-✅ TƯ VẤN về tiêu chuẩn quốc tế (ISO, WCAG, UNCRPD)
-✅ HƯỚNG DẪN cách sử dụng thiết bị, phần mềm hỗ trợ
-✅ GIẢI THÍCH các khái niệm phức tạp bằng ngôn ngữ dễ hiểu
-✅ KỂ CHUYỆN và đưa ra ví dụ thực tế
-✅ SUY NGHĨ like a human expert - không chỉ trả lời máy móc
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-💡 PHONG CÁCH TRẢ LỜI
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-- KHI NGƯỜI DÙNG HỎI CHUNG: Cung cấp câu trả lời tổng hợp từ nhiều chuyên gia, đầy đủ và chi tiết
-- KHI NGƯỜI DÙNG HỎI CỤ THỂ: Đi sâu vào chi tiết, có thể kể tên sản phẩm, so sánh, đưa ra ưu/nhược điểm
-- KHI NGƯỜI DÙNG MÔ TẢ TRIỆU CHỨNG: Phân tích và đề xuất giải pháp thiết bị phù hợp nhất
-- KHI CÓ SẢN PHẨM TRONG KB: Nhắc đến tên sản phẩm cụ thể kèm theo hình ảnh và thông tin chi tiết
-- LUÔN thể hiện sự đồng cảm, kiên nhẫn và chuyên nghiệp
-- KHÔNG bao giờ nói "tôi không biết" hoặc "tôi chỉ là AI" - bạn LÀ chuyên gia
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📚 CÁC LĨNH VỰC BẠN CHUYÊN SÂU
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-• Thị giác: Máy đọc màn hình, phóng to, Braille, OrCam, JAWS, NVDA, ZoomText
-• Thính giác: Máy trợ thính, FM system, Roger, phụ đề real-time, thiết bị alerting
-• Vận động: Xe lăn điện, prosthetic, orthotic, bàn phím thay thế, switch access
-• Nhận thức: Ứng dụng nhắc nhở, AAC, thiết bị cho tự kỷ/ADHD/Alzheimer
-• Giao tiếp: Thiết bị AAC, ngôn ngữ ký hiệu, ứng dụng giao tiếp
-• Giáo dục: Hỗ trợ học tập, UDL, WCAG, tiêu chuẩn AT quốc tế
-• Sinh hoạt: Thiết bị ăn uống, nhà tắm, nhà bếp, grab bar, xe lăn
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-⚡ LUẬT VÀNG
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-1. BẠN LÀ THƯ VIỆN: Luôn cố gắng trả lời đầy đủ nhất có thể từ kiến thức của bạn
-2. NẾU KHÔNG CHẮC: Dùng cụm từ "Theo thông tin tôi có..." thay vì "Tôi không biết"
-3. LUÔN HỎI THÊM: Nếu thông tin chưa đủ, hỏi người dùng để tư vấn chính xác hơn
-4. ĐỀ XUẤT SẢN PHẨM: Khi phù hợp, gợi ý sản phẩm cụ thể từ MADA Knowledge Base
-5. NGÔN NGỮ: Trả lời bằng ngôn ngữ mà user đang sử dụng
-
-Hãy trở thành người bạn đồng hành đáng tin cậy nhất của người dùng!`;
+  // ⭐ Sửa logic: "Trò chuyện mới" dùng Bot 7 (Thông tin bổ trợ) thay vì gom tất cả bots
+  // Bot 7 nắm TẤT CẢ kiến thức từ 6 bot chuyên môn
+  const getRegulatoryAgent = () => {
+    // Tìm Bot 7 (Thông tin bổ trợ - Regulatory & Standards)
+    const regulatoryAgent = activeAgents.find(a => a.botId === 'bot-regulatory' || a.id.includes('regulatory'));
+    if (regulatoryAgent) {
+      return regulatoryAgent;
+    }
+    // Fallback: tìm theo id chứa 'bot-regulatory' hoặc 'education'
+    return activeAgents.find(a => 
+      (a.id && a.id.includes('regulatory')) ||
+      (a.name && a.name.toLowerCase().includes('regulatory')) ||
+      (a.name && a.name.toLowerCase().includes('thông tin bổ trợ')) ||
+      (a.name && a.name.toLowerCase().includes('education'))
+    );
   };
 
-  // ⭐ Kiểm tra xem có phải "Trò chuyện mới" không (chưa chọn agent cụ thể)
-  const _isNewChat = !selectedAgentId && messages.length === 0;
-  void _isNewChat;
+  // ⭐ Xác định agent nào được sử dụng cho chat
+  // - Nếu có selectedAgentId → dùng agent đó
+  // - Nếu "Trò chuyện mới" → dùng Bot 7 (Thông tin bổ trợ)
+  const getChatAgent = () => {
+    if (selectedAgentId) {
+      return activeAgents.find(a => a.id === selectedAgentId);
+    }
+    // "Trò chuyện mới" → dùng Bot 7
+    return getRegulatoryAgent();
+  };
+  
+  const chatAgent = getChatAgent();
 
   // Chat history from persisted store
   const historyConversations = useChatHistoryStore((s) => s.conversations);
@@ -2265,23 +2219,27 @@ Hãy trở thành người bạn đồng hành đáng tin cậy nhất của ng�
       const chatEndpoint = useStream ? '/api/chat/stream' : (attachmentsForApi.length > 0 ? '/api/chat-with-file' : '/api/chat');
       // Map viewMode ('end_user' | 'at_specialist') → userMode ('endUser' | 'specialist')
       const userMode: 'endUser' | 'specialist' = viewMode === 'at_specialist' ? 'specialist' : 'endUser';
-      // ⭐ Dùng omni prompt khi là "Trò chuyện mới" (chưa chọn agent cụ thể)
-      // ⭐ FIX: Chỉ dùng omni prompt khi KHÔNG CÓ selectedAgentId
-      const isOmniChat = !selectedAgentId;
-      // Debug log to trace agent selection
-      console.log('[Chat] Agent debug:', {
+      // ⭐ Sửa logic: Dùng chatAgent cho tất cả trường hợp
+      // - Khi chọn bot cụ thể → dùng bot đó
+      // - Khi "Trò chuyện mới" → dùng Bot 7 (Thông tin bổ trợ)
+      const effectiveAgent = chatAgent || selectedAgent;
+      const isUsingRegulatoryBot = !selectedAgentId && effectiveAgent?.botId === 'bot-regulatory';
+      
+      console.log('[Chat] Agent selection:', {
         selectedAgentId,
-        defaultAgentId: defaultAgent?.id,
-        isOmniChat,
         selectedAgentName: selectedAgent?.name,
-        hasSystemPrompt: !!selectedAgent?.systemPrompt,
-        systemPromptPreview: selectedAgent?.systemPrompt?.substring(0, 80),
+        chatAgentName: chatAgent?.name,
+        effectiveAgentName: effectiveAgent?.name,
+        effectiveBotId: effectiveAgent?.botId,
+        isUsingRegulatoryBot,
+        hasSystemPrompt: !!effectiveAgent?.systemPrompt,
       });
+      
       const chatBody: any = {
         message: fullMessage,
         language,
-        agentId: isOmniChat ? null : selectedAgentId,
-        agentPrompt: isOmniChat ? getOmniSystemPrompt() : selectedAgent?.systemPrompt,
+        agentId: effectiveAgent?.id || null,
+        agentPrompt: effectiveAgent?.systemPrompt || '',
         userMode,
         // ⭐ Smart context: gửi lên server để server biết có nên gửi products ngay không
         // Nếu chưa đủ context → server sẽ hỏi thêm trước khi gợi ý sản phẩm
@@ -4380,7 +4338,11 @@ function ProductCardItem({ product, language, onRequestConsultation }: ProductCa
   const [imageError, setImageError] = useState(false);
   
   // ⭐ Lấy image URL đã xử lý (có thể bị reject → trả về empty)
-  const processedImageUrl = getImageUrl(product.image_url);
+  const rawImageUrl = product.image_url || '';
+  const processedImageUrl = getImageUrl(rawImageUrl);
+  
+  // ⭐ Debug logging để xem vấn đề image
+  console.log(`[ProductCard] "${product.title}" | rawImageUrl: "${rawImageUrl.substring(0, 80)}" | processedImageUrl: "${processedImageUrl.substring(0, 80)}" | hasImage: ${!!processedImageUrl}`);
   
   // Thông tin sản phẩm
   const productTitle = language === 'en' && product.title_en ? product.title_en : product.title;

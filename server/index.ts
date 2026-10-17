@@ -2621,27 +2621,26 @@ app.post('/api/chat', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Message is required' });
     }
 
-    // Check with Guardrails first
-    const guardrailsResult = guardrails.analyzeQuery(message, effectiveLanguage);
-    const safetyScore = guardrails.calculateSafetyScore(message);
+    // Check with Guardrails first - DISABLED
+    // const guardrailsResult = guardrails.analyzeQuery(message, effectiveLanguage);
+    // const safetyScore = guardrails.calculateSafetyScore(message);
+    const safetyScore = 100;
 
-    console.log('🛡️ Guardrails result:', { shouldRedirect: guardrailsResult.shouldRedirect, pattern: guardrailsResult.detectedPattern });
-
-    // If query should be redirected
-    if (guardrailsResult.shouldRedirect) {
-      return res.json({
-        success: true,
-        data: {
-          answer: guardrailsResult.redirectResponse,
-          confidence: safetyScore,
-          sources: [],
-          contextUsed: false,
-          redirected: true,
-          redirectReason: guardrailsResult.detectedPattern,
-          conversationId: conversationId || uuidv4(),
-        },
-      });
-    }
+    // Guardrails DISABLED - all queries allowed
+    // if (guardrailsResult.shouldRedirect) {
+    //   return res.json({
+    //     success: true,
+    //     data: {
+    //       answer: guardrailsResult.redirectResponse,
+    //       confidence: safetyScore,
+    //       sources: [],
+    //       contextUsed: false,
+    //       redirected: true,
+    //       redirectReason: guardrailsResult.detectedPattern,
+    //       conversationId: conversationId || uuidv4(),
+    //     },
+    //   });
+    // }
 
     // Store in history
     const convId = conversationId || uuidv4();
@@ -2725,10 +2724,7 @@ app.post('/api/chat', async (req, res) => {
 
     ragResponse.answer = finalAnswer;
 
-    // Validate response with guardrails
-    if (!guardrails.validateResponse(ragResponse.answer)) {
-      ragResponse.answer = guardrailsResult.redirectResponse || 'Response filtered by safety guardrails.';
-    }
+    // Guardrails DISABLED - validateResponse removed
 
     // ========== AUTO-RECOMMEND PRODUCTS (always, based on RAG sources or MADA KB) ==========
     let suggestedProducts: any[] = [];
@@ -3053,14 +3049,7 @@ app.post('/api/chat-with-file', async (req, res) => {
     }
     
     console.log('📎 Final fileContext:', fileContext.slice(0, 200));
-    // Guardrails check
-    const guardrailsResult = guardrails.analyzeQuery(message, effectiveLanguage);
-    if (guardrailsResult.shouldRedirect) {
-      return res.json({
-        success: true,
-        data: { answer: guardrailsResult.redirectResponse, sources: [], contextUsed: false },
-      });
-    }
+    // Guardrails DISABLED - allow all queries
 
     // Store history
     const convId = conversationId || uuidv4();
@@ -3333,12 +3322,7 @@ app.post('/api/chat/stream', async (req: any, res: any) => {
       ? uiLanguage
       : detectedLanguage;
 
-    // Guardrails check (non-streaming)
-    const guardrailsResult = guardrails.analyzeQuery(message, effectiveLanguage);
-    if (guardrailsResult.shouldRedirect) {
-      sendEvent({ type: 'done', answer: guardrailsResult.redirectResponse, sources: [] });
-      return res.end();
-    }
+    // Guardrails DISABLED - allow all queries
 
     // Store conversation
     const convId = conversationId || uuidv4();
@@ -4009,23 +3993,21 @@ app.post('/api/recommend', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Query is required' });
     }
 
-    // Check with Guardrails first
-    const guardrailsResult = guardrails.analyzeQuery(query, language);
-
-    // If query should be redirected
-    if (guardrailsResult.shouldRedirect) {
-      return res.json({
-        success: true,
-        data: {
-          answer: guardrailsResult.redirectResponse,
-          confidence: 0,
-          sources: [],
-          contextUsed: false,
-          redirected: true,
-          redirectReason: guardrailsResult.detectedPattern,
-        },
-      });
-    }
+    // Check with Guardrails first - DISABLED
+    // const guardrailsResult = guardrails.analyzeQuery(query, language);
+    // if (guardrailsResult.shouldRedirect) {
+    //   return res.json({
+    //     success: true,
+    //     data: {
+    //       answer: guardrailsResult.redirectResponse,
+    //       confidence: 0,
+    //       sources: [],
+    //       contextUsed: false,
+    //       redirected: true,
+    //       redirectReason: guardrailsResult.detectedPattern,
+    //     },
+    //   });
+    // }
 
     const ragResponse = await ragEngine.query(query, [], { topK: maxResults });
 

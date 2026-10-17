@@ -332,6 +332,82 @@ router.get('/featured', (req, res) => {
   }
 });
 
+// ⭐ NEW: Get products by agent ID (for ChatPage to know which products belong to which bot)
+// ⭐ CRITICAL: Products have madaCategory as category (e.g., 'sensory-vision', 'mental-cognitive')
+const AGENT_TO_MADA_PUBLIC: Record<string, { madaCategory: string; productCategory: string }> = {
+  'bot-hearing':    { madaCategory: 'sensory-hearing',          productCategory: 'sensory-hearing' },
+  'bot-vision':     { madaCategory: 'sensory-vision',           productCategory: 'sensory-vision' },
+  'bot-speech':     { madaCategory: 'voice-and-speech',         productCategory: 'voice-and-speech' },
+  'bot-cognitive':  { madaCategory: 'mental-cognitive',         productCategory: 'mental-cognitive' },
+  'bot-neuro':      { madaCategory: 'neuromusculoskeletal-movement', productCategory: 'neuromusculoskeletal-movement' },
+  'bot-mobility':   { madaCategory: 'mobility-and-transportation',    productCategory: 'mobility-and-transportation' },
+  'bot-regulatory': { madaCategory: 'regulatory-standards',     productCategory: 'regulatory-standards' },
+};
+
+router.get('/products/by-agent/:agentId', (req, res) => {
+  try {
+    const { agentId } = req.params;
+    const lang: SupportedLang = ['vi', 'en', 'ar', 'fr'].includes(String(req.query.lang))
+      ? String(req.query.lang) as SupportedLang
+      : 'vi';
+    const limit = Math.min(parseInt(String(req.query.limit)) || 12, 50);
+    
+    let productCategory: string | null = null;
+    
+    // Bước 1: Thử lookup từ database (agentId là UUID của agent trong admin_agents)
+    try {
+      const agentRow = db.prepare('SELECT mada_category FROM admin_agents WHERE id = ?').get(agentId) as any;
+      if (agentRow?.mada_category) {
+        // Products lưu category = mada_category (e.g., 'sensory-vision', 'mental-cognitive')
+        productCategory = agentRow.mada_category;
+        console.log(`📦 [by-agent] DB lookup for ${agentId}: mada_category=${agentRow.mada_category} → productCategory=${productCategory}`);
+      }
+    } catch (e) {
+      console.warn(`[by-agent] DB lookup failed for ${agentId}:`, e);
+    }
+    
+    // Bước 2: Fallback sang hardcoded mapping nếu agentId là bot ID (e.g., 'bot-vision')
+    if (!productCategory && AGENT_TO_MADA_PUBLIC[agentId]) {
+      productCategory = AGENT_TO_MADA_PUBLIC[agentId].productCategory;
+      console.log(`📦 [by-agent] Hardcoded mapping for ${agentId}: productCategory=${productCategory}`);
+    }
+    
+    let rows: ProductRow[];
+    if (productCategory) {
+      // bot-regulatory → xem tất cả categories (không filter)
+      if (agentId === 'bot-regulatory') {
+        rows = db.prepare(
+          "SELECT * FROM kb_products WHERE status = 'published' ORDER BY category ASC, featured DESC, created_at DESC LIMIT ?"
+        ).all(limit) as ProductRow[];
+        console.log(`📦 [by-agent] Regulatory bot - returning all ${rows.length} products`);
+      } else {
+        rows = db.prepare(
+          "SELECT * FROM kb_products WHERE category = ? AND status = 'published' ORDER BY featured DESC, created_at DESC LIMIT ?"
+        ).all(productCategory, limit) as ProductRow[];
+        console.log(`📦 [by-agent] Category filter: ${productCategory} → ${rows.length} products`);
+      }
+    } else {
+      // Không xác định được category → trả về featured products
+      rows = db.prepare(
+        "SELECT * FROM kb_products WHERE status = 'published' AND featured = 1 ORDER BY created_at DESC LIMIT ?"
+      ).all(limit) as ProductRow[];
+      console.log(`📦 [by-agent] No category found - returning ${rows.length} featured products`);
+    }
+
+    res.json({
+      success: true,
+      data: {
+        agentId,
+        madaCategory: productCategory,
+        products: rows.map(r => publishRow(r, lang)),
+        total: rows.length,
+      },
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // GET /api/public/stats - public stats for homepage
 router.get('/stats', (_req, res) => {
   try {

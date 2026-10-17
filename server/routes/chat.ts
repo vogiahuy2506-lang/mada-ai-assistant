@@ -169,16 +169,17 @@ const AGENT_TO_MADA: Record<string, { botId: string; madaCategory: string }> = {
   'bot-regulatory': { botId: 'bot-regulatory', madaCategory: 'regulatory-standards' },
 };
 
-// ⭐ Product Request Category Mapping (MADA bot category → DB kb_products.category enum)
-// DB CHECK constraint: ('vision', 'hearing', 'mobility', 'cognition', 'communication', 'daily_living', 'education', 'general')
+// ⭐ Product Request Category Mapping (MADA bot category → kb_products.category)
+// ⭐ CRITICAL: Products have MADA category slugs as category values (e.g., 'sensory-vision', 'mental-cognitive')
+// This mapping is now 1:1 (no transformation needed) for querying products directly
 const MADA_CATEGORY_TO_DB: Record<string, string> = {
-  'sensory-hearing': 'hearing',
-  'sensory-vision': 'vision',
-  'voice-and-speech': 'communication',
-  'mental-cognitive': 'cognition',
-  'neuromusculoskeletal-movement': 'mobility',
-  'mobility-and-transportation': 'daily_living',
-  'regulatory-standards': 'general',
+  'sensory-hearing': 'sensory-hearing',
+  'sensory-vision': 'sensory-vision',
+  'voice-and-speech': 'voice-and-speech',
+  'mental-cognitive': 'mental-cognitive',
+  'neuromusculoskeletal-movement': 'neuromusculoskeletal-movement',
+  'mobility-and-transportation': 'mobility-and-transportation',
+  'regulatory-standards': 'regulatory-standards',
 };
 
 // ⭐ Product request response templates
@@ -674,11 +675,11 @@ async function getSuggestedProducts(ragSources: any[], message: string, effectiv
     }
   }
 
-  // ⭐ Map MADA category slug → DB enum (kb_products.category)
-  // e.g. 'mobility-and-transportation' → 'daily_living', 'sensory-hearing' → 'hearing'
+  // ⭐ Map MADA category slug → kb_products.category (products store MADA slugs directly)
+  // e.g. 'mobility-and-transportation' → 'mobility-and-transportation'
   if (agentCategory && MADA_CATEGORY_TO_DB[agentCategory]) {
     const mapped = MADA_CATEGORY_TO_DB[agentCategory];
-    console.log(`📦 [getSuggestedProducts] Mapping MADA category "${agentCategory}" → DB enum "${mapped}"`);
+    console.log(`📦 [getSuggestedProducts] Using MADA category "${agentCategory}" → product category "${mapped}"`);
     agentCategory = mapped;
   }
   
@@ -1052,8 +1053,8 @@ async function getSuggestedProducts(ragSources: any[], message: string, effectiv
       
       // Filter mapped products
       const filteredDbProducts = mappedDbProducts.filter((p: any) => {
-        // Phải có image_url hợp lệ
-        const hasImage = !!(p.image_url && p.image_url.startsWith('http'));
+        // Phải có image_url hợp lệ (http OR proxy URL /api/mada-image)
+        const hasImage = !!(p.image_url && (p.image_url.startsWith('http') || p.image_url.startsWith('/api/mada-image')));
         // URL phải là http(s)
         const url = p.product_url || '';
         const isValidUrl = url.startsWith('http://') || url.startsWith('https://');
@@ -1157,24 +1158,10 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Message is required' });
     }
     
-    // Guardrails check
-    const guardrailsResult = guardrails.analyzeQuery(message, effectiveLanguage);
-    const safetyScore = guardrails.calculateSafetyScore(message);
-    
-    if (guardrailsResult.shouldRedirect) {
-      return res.json({
-        success: true,
-        data: {
-          answer: guardrailsResult.redirectResponse,
-          confidence: safetyScore,
-          sources: [],
-          contextUsed: false,
-          redirected: true,
-          redirectReason: guardrailsResult.detectedPattern,
-          conversationId: conversationId || uuidv4(),
-        },
-      });
-    }
+    // Guardrails DISABLED - allow all queries
+    // const guardrailsResult = guardrails.analyzeQuery(message, effectiveLanguage);
+    // const safetyScore = guardrails.calculateSafetyScore(message);
+    const safetyScore = 100;
     
     // ⭐ AUTO-SCRAPE URLS: Nếu message chứa URL, tự động scrape và trả về product cards
     const { scrapedProducts, cleanedMessage } = await autoScrapeUrlsFromMessage(message, effectiveLanguage);
@@ -1321,15 +1308,13 @@ router.post('/', async (req, res) => {
     
     ragResponse.answer = finalAnswer;
     
-    // Validate response
-    if (!guardrails.validateResponse(ragResponse.answer)) {
-      ragResponse.answer = guardrailsResult.redirectResponse || 'Response filtered by safety guardrails.';
-    }
+    // Guardrails DISABLED - validateResponse removed
     
     // ⭐ Tự động gợi ý sản phẩm khi user hỏi về thiết bị/sản phẩm
-    // ⭐ CHỈ gợi ý khi đã đủ context hoặc turns >= 5
+    // ⭐ LUÔN gửi products nếu shouldShowProducts=true (không cần chờ context đủ)
     const suggestedProducts: any[] = [];
-    if (shouldShowProducts(message) && shouldSuggestProducts) {
+    if (shouldShowProducts(message)) {
+      // ⭐ FIX: Gửi products NGAY LẬP TỨC khi user hỏi về sản phẩm - không cần chờ context
       try {
         const products = await getSuggestedProducts(ragResponse.sources || [], message, effectiveLanguage, agentId);
         suggestedProducts.push(...products);
@@ -1551,9 +1536,7 @@ router.post('/with-file', async (req, res) => {
     }
     ragResponse.answer = finalAnswer;
     
-    if (!guardrails.validateResponse(ragResponse.answer)) {
-      ragResponse.answer = 'Response filtered by safety guardrails.';
-    }
+    // Guardrails DISABLED - validateResponse removed
     
     // ⭐ KHÔNG tự động gửi suggestedProducts - chỉ khi user yêu cầu qua /api/chat/products
     const suggestedProducts: any[] = [];
@@ -1638,12 +1621,7 @@ router.post('/stream', async (req: any, res: any) => {
     const detectedLanguage = detectMessageLanguage(message);
     const effectiveLanguage = uiLanguage && ['vi', 'en', 'ar', 'fr'].includes(uiLanguage) ? uiLanguage : detectedLanguage;
     
-    // Guardrails check
-    const guardrailsResult = guardrails.analyzeQuery(message, effectiveLanguage);
-    if (guardrailsResult.shouldRedirect) {
-      sendEvent({ type: 'done', answer: guardrailsResult.redirectResponse, sources: [], detectedLanguage: effectiveLanguage });
-      return res.end();
-    }
+    // Guardrails DISABLED - allow all queries
     
     // ⭐ AUTO-SCRAPE URLS: Nếu message chứa URL, tự động scrape và trả về product cards
     const { scrapedProducts, cleanedMessage } = await autoScrapeUrlsFromMessage(message, effectiveLanguage);
@@ -1805,9 +1783,12 @@ router.post('/stream', async (req: any, res: any) => {
       }
       
       // ⭐ Tự động gửi suggestedProducts khi user hỏi về thiết bị/sản phẩm
+      // ⭐ LUÔN gửi products nếu shouldShowProducts=true (không cần chờ context đủ)
       const shouldShow = shouldShowProducts(message);
       console.log(`🔍 [STREAM] shouldShowProducts check: ${shouldShow} for message: "${message.substring(0, 80)}..."`);
-      if (shouldShow && shouldSuggestProducts) {
+      // ⭐ FIX: Gửi products NGAY LẬP TỨC khi user hỏi về sản phẩm - không cần chờ context
+      // Context sẽ được thu thập dần qua các câu hỏi follow-up
+      if (shouldShow) {
         // ⭐ Chỉ gợi ý sản phẩm KHI đã đủ context (isReadyForProductSuggestion=true hoặc turns>=5)
         // Nếu chưa đủ context → skip gửi products, để AI tự hỏi thêm thông tin
         try {
@@ -1954,8 +1935,8 @@ router.post('/stream', async (req: any, res: any) => {
         const fallbackAnswer = fallbackResponses[effectiveLanguage] || fallbackResponses.vi;
         
         // Stream the fallback response
-        // ⭐ FALLBACK: Chỉ gửi suggestedProducts khi đã đủ context
-        if (shouldShowProducts(message) && shouldSuggestProducts) {
+        // ⭐ FALLBACK: Gửi products NGAY khi user hỏi về sản phẩm
+        if (shouldShowProducts(message)) {
           try {
             const suggestedProducts = await getSuggestedProducts([], message, effectiveLanguage, agentId);
             if (suggestedProducts.length > 0) {

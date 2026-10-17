@@ -1,7 +1,6 @@
--- Knowledge items exported from local DB
--- Generated: 2026-10-16T11:59:53.291Z
+-- knowledge_items exported from local DB
+-- Generated: 2026-10-16T12:03:35.290Z
 
--- Clear existing data
 DELETE FROM knowledge_items;
 
 INSERT OR REPLACE INTO knowledge_items (id,title,description,content,source,source_type,url,file_path,category,iso_codes,wcag_level,who_gate_area,auto_classified,confidence,status,chunk_count,language,metadata,indexed,indexed_at,created_by,created_at,updated_at,title_en,title_ar,title_fr,description_en,description_ar,description_fr,content_en,content_ar,content_fr,translated) VALUES ("69145454-3e76-454f-8e63-3bbc42aeeb2c","TẤT CẢ THÔNG TIN  - Kiến thức","# MADA Center AI-Powered Assistive Technology System","# MADA Center AI-Powered Assistive Technology System","https://madaaiagents.ai.studio/","web",NULL,NULL,"general","[{\"code\":\"22.99.99\",\"description\":\"Khác\"}]","AA","General",1,0.3,"draft",1,"vi","{\"agentId\":\"agent-3200e8c6-2f9b-467d-abe1-074fac3ae03f\",\"agentName\":\"TẤT CẢ THÔNG TIN \",\"sourceKind\":\"knowledge\",\"crawledAt\":\"2026-10-16T11:24:01.132Z\",\"botId\":null,\"madaCategory\":null,\"scrapeMetadata\":{\"viewport\":\"width=device-width, initial-scale=1.0\",\"link:stylesheet\":\"/assets/index-ChBstuBG.css\",\"pageUrl\":\"https://madaaiagents.ai.studio/\",\"pageDomain\":\"madaaiagents.ai.studio\",\"crawledAt\":\"2026-10-16T11:24:03.694Z\"},\"jsonLd\":[],\"tables\":[],\"images\":[],\"faqs\":[],\"structuredData\":{},\"thumbnailUrl\":\"\",\"galleryImages\":[],\"matchedKeywords\":[],\"allScores\":{\"vision\":0,\"hearing\":0,\"mobility\":0,\"cognition\":0,\"communication\":0,\"daily_living\":0,\"education\":0,\"web_accessibility\":0,\"general\":0}}",1,"2026-10-16T11:24:04.701Z",NULL,"2026-10-16T11:24:04.701Z","2026-10-16T11:24:04.701Z","","","",NULL,NULL,NULL,"","","",0);

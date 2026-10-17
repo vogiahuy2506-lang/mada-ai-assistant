@@ -13,6 +13,7 @@
 // ============================================================================
 
 // Pattern cho câu hỏi về triệu chứng/bệnh (Dạng: "tôi có bị X không?" - hỏi về bệnh)
+// ⚠️ KHÔNG chặn: "biểu hiện của X là gì", "triệu chứng X bao gồm những gì"
 const MEDICAL_SYMPTOM_QUESTION_PATTERNS = [
   // Tiếng Việt: hỏi về việc "có bị" một bệnh/triệu chứng không
   /\b(tôi|mình)\s+(?:có\s+)?(?:bị\s+)?(?:phải\s+)?(?:cận|loạn thị|viễn thị|lác|mù|điếc|khiếm thị|khiếm thính)\s+(?:không|kô|hem|hok)\b/iu,
@@ -20,13 +21,15 @@ const MEDICAL_SYMPTOM_QUESTION_PATTERNS = [
   /\b(?:có\s+)?(?:phải\s+)?(?:bị\s+)?(?:cận|loạn|viễn|lác)\s+(?:không|kô|hem|hok|bệnh\s+gì)\b/iu,
   /\b(?:có\s+)?(?:phải\s+)?(?:bị\s+)?(?:tự\s+kỷ|autism|down\s+syndrome|adhd)\s+(?:không|kô|hem|hok)\b/iu,
   /\b(?:có\s+)?(?:phải\s+)?(?:bị\s+)?(?:chóng mặt|hoa mắt|ù tai|đau đầu|mất ngủ)\s+(?:không|kô|hem|hok)\b/iu,
-  /\b(?:tôi|mình)\s+(?:có\s+)?(?:phải\s+)?(?:bị\s+)?(?:bệnh\s+)?(?:gì|paralysis|stroke|stroke)\b/iu,
+  /\b(?:tôi|mình)\s+(?:có\s+)?(?:phải\s+)?(?:bị\s+)?(?:bệnh\s+)?(?:gì|paralysis|stroke)\b/iu,
   // Tiếng Anh: hỏi "do I have X"
   /\bdo\s+i\s+have\s+(?:nearsightedness|myopia|farsightedness|hyperopia|astigmatism|blindness|deafness|glaucoma|cataract|alzheimer|dementia|autism|adhd|paralysis)\b/iu,
   /\bam\s+i\s+(?:blind|deaf|disabled|paralyzed)\b/iu,
   /\bcan\s+you\s+tell\s+me\s+if\s+i\s+(?:have|am|suffer)\b/iu,
   // Tiếng Anh: hỏi "what's wrong with me"
   /\bwhat(?:'s| is)\s+wrong\s+with\s+(?:me|my\s+(?:eyes|ears|body|legs|arms))\b/iu,
+  // Tiếng Việt: hỏi "xác định tôi bị gì" hoặc "chẩn đoán giúp tôi"
+  /\b(?:bạn|xin|hay|làm ơn)\s+(?:xác định|cho biết|tell me|determine)\s+(?:tôi|mình|me)\s+(?:bị|bệnh)\s+(?:gì|what)\b/iu,
 ];
 
 // Pattern cho yêu cầu tư vấn AT (Dạng: "tôi bị X, có thiết bị nào?" - đã biết bệnh, hỏi về giải pháp)

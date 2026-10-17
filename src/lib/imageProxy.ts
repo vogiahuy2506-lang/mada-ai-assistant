@@ -168,13 +168,17 @@ const GARBAGE_URL_PATTERNS = [
  */
 export function getImageUrl(originalUrl: string | null | undefined | unknown): string {
   // Defensive: reject non-string input
-  if (!originalUrl || typeof originalUrl !== 'string') return '';
+  if (!originalUrl || typeof originalUrl !== 'string') {
+    console.log(`[getImageUrl] REJECTED: empty or non-string: ${typeof originalUrl}, value: "${originalUrl}"`);
+    return '';
+  }
 
   // Nếu đã qua proxy rồi thì giữ nguyên (tránh double-proxy)
   if (originalUrl.startsWith('/api/mada-image')) return originalUrl;
 
   // Reject nếu match pattern rác
   if (GARBAGE_URL_PATTERNS.some((pattern) => pattern.test(originalUrl))) {
+    console.log(`[getImageUrl] REJECTED: matches garbage pattern: "${originalUrl}"`);
     return '';
   }
 
@@ -182,6 +186,7 @@ export function getImageUrl(originalUrl: string | null | undefined | unknown): s
   try {
     new URL(originalUrl);
   } catch {
+    console.log(`[getImageUrl] REJECTED: invalid URL: "${originalUrl}"`);
     return '';
   }
 
@@ -196,6 +201,7 @@ export function getImageUrl(originalUrl: string | null | undefined | unknown): s
   }
 
   // Unknown host - vẫn load trực tiếp (browser sẽ fail nếu có hotlink protection)
+  console.log(`[getImageUrl] UNKNOWN host, returning as-is: "${originalUrl}"`);
   return originalUrl;
 }
 

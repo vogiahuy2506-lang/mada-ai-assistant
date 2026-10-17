@@ -490,6 +490,32 @@ export const userHistoryApi = {
   },
 };
 
+// ============== PRODUCTS BY AGENT (for ChatPage) ==============
+export interface AgentProduct {
+  id: string;
+  title: string;
+  title_en: string;
+  description: string;
+  description_en: string;
+  category: string; // MADA category slug (e.g., 'sensory-vision', 'mental-cognitive')
+  brand: string;
+  price_range: string;
+  product_url: string;
+  image_url: string;
+}
+
+export interface AgentProductsResponse {
+  agentId: string;
+  madaCategory: string | null; // e.g., 'sensory-vision' or null if regulatory bot (all categories)
+  products: AgentProduct[];
+  total: number;
+}
+
+export async function fetchProductsByAgent(agentId: string, limit: number = 12, lang: string = 'vi'): Promise<AgentProductsResponse> {
+  const params = new URLSearchParams({ limit: String(limit), lang });
+  return request<AgentProductsResponse>(`/public/products/by-agent/${encodeURIComponent(agentId)}?${params}`);
+}
+
 // ============== USER FAVORITES ==============
 export interface UserFavorite {
   id: string;

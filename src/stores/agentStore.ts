@@ -121,6 +121,7 @@ interface AgentState {
   syncError: string | null;
   backendConnected: boolean;
   loadAgents: () => Promise<void>;
+  forceReloadAgents: () => Promise<void>; // ⭐ Force reload từ backend, clear cache
   refreshAgent: (id: string) => Promise<void>;
   getActiveAgents: () => Agent[];
   getAgentsByCreator: (creator: 'admin' | 'user') => Agent[];
@@ -163,6 +164,8 @@ const agentStore = create<AgentState>()(
       backendConnected: false,
 
       loadAgents: async () => {
+        // luôn fetch từ backend, KHÔNG sử dụng cache cũ
+        // Cache chỉ dùng khi backend không accessible
         const isFirstLoad = get().lastSynced === null;
         set({ isLoading: isFirstLoad, isSyncing: !isFirstLoad, syncError: null });
 
@@ -180,35 +183,26 @@ const agentStore = create<AgentState>()(
               try {
                 res = await apiRequest<{ success: boolean; data: any[] }>('/admin/agents');
               } catch (adminErr) {
-                // If admin endpoint also fails, use cached agents instead of throwing
-                const existingAgents = get().agents;
-                const hasRealAgents = existingAgents.length > 0 && existingAgents[0]?.id !== '__loading__';
-                if (hasRealAgents) {
-                  console.warn('[agentStore] /admin/agents also failed, keeping cached agents');
-                  set({
-                    isLoading: false,
-                    isSyncing: false,
-                    backendConnected: false,
-                    syncError: 'Using cached agents',
-                  });
-                  return;
-                }
-                throw adminErr;
-              }
-            } else {
-              console.warn('[agentStore] Token invalid, skipping /admin/agents fallback:', tokenCheck.reason);
-              // Use cached agents instead of making a request that will fail with 401
-              const existingAgents = get().agents;
-              const hasRealAgents = existingAgents.length > 0 && existingAgents[0]?.id !== '__loading__';
-              if (hasRealAgents) {
+                // ⭐ NẾU FETCH THẤT BẠI: KHÔNG sử dụng cache cũ nữa
+                // Buộc phải báo lỗi để user biết backend không hoạt động
+                console.error('[agentStore] All endpoints failed:', pubErr, adminErr);
                 set({
                   isLoading: false,
                   isSyncing: false,
                   backendConnected: false,
-                  syncError: 'Using cached agents (token expired)',
+                  syncError: 'Backend không phản hồi. Vui lòng kiểm tra server.',
                 });
-                return;
+                throw pubErr; // Re-throw để báo lỗi
               }
+            } else {
+              console.warn('[agentStore] Token invalid, skipping /admin/agents fallback:', tokenCheck.reason);
+              // ⭐ KHÔNG sử dụng cache cũ - báo lỗi
+              set({
+                isLoading: false,
+                isSyncing: false,
+                backendConnected: false,
+                syncError: 'Token hết hạn. Vui lòng đăng nhập lại.',
+              });
               throw pubErr;
             }
           }
@@ -244,6 +238,14 @@ const agentStore = create<AgentState>()(
 
           clearSyncInterval();
         }
+      },
+
+      // ⭐ Force reload agents từ backend, bỏ qua cache
+      forceReloadAgents: async () => {
+        // Clear sync state để buộc fetch mới
+        set({ lastSynced: null, syncError: null });
+        // Gọi loadAgents để fetch từ backend
+        await get().loadAgents();
       },
 
       refreshAgent: async (id: string) => {

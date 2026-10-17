@@ -1,7 +1,6 @@
--- Categories exported from local DB
--- Generated: 2026-10-16T11:59:53.283Z
+-- kb_categories exported from local DB
+-- Generated: 2026-10-16T12:03:35.283Z
 
--- Clear existing data
 DELETE FROM kb_categories;
 
 INSERT OR REPLACE INTO kb_categories (id,name_vi,name_en,name_ar,name_fr,icon,sort_order,description_vi,description_en,description_ar,description_fr,related_url,product_link,created_at,updated_at) VALUES ("vision","Cảm giác – Thị giác","Vision","الحواس - البصر","Sens - Vision","👁️",1,"Bot 2 – Sensory Vision: Phần mềm đọc màn hình, kính lúp điện tử, màn hình Braille, OrCam MyEye. Tiêu chuẩn ISO 22.03.06, 22.06.12, 22.36.12; WCAG 2.2; ISO 9241-171.","Bot 2 – Sensory Vision: screen readers, electronic magnifiers, Braille displays, OrCam MyEye. Standards ISO 22.03.06, 22.06.12, 22.36.12; WCAG 2.2; ISO 9241-171.","بوت 2 - الحواس - البصر: قارئات الشاشة والمكبرات الإلكترونية وشاشات برايل. معايير ISO 22.03.06 و WCAG 2.2.","Bot 2 – Sens – Vision : lecteurs d'écran, loupes électroniques, plages Braille. Normes ISO 22.03.06, WCAG 2.2.","https://at.mada.org.qa/technology-category/body-function/sensory-vision/","","2026-10-16T10:59:56.296Z","2026-10-16T10:59:56.296Z");

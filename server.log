@@ -1,18 +1,20 @@
+node:net:1918
+      const error = new UVExceptionWithHostPort(rval, 'listen', address, port);
+                    ^
 
-> mada-ai-assistant@1.0.0 dev
-> vite
+Error: listen EPERM: operation not permitted /var/folders/xh/kpmx01q91yx21nmxv9hqdl740000gn/T/tsx-501/33563.pipe
+    at Server.setupListenHandle [as _listen2] (node:net:1918:21)
+    at listenInCluster (node:net:1997:12)
+    at Server.listen (node:net:2119:5)
+    at file:///Users/vohuy/Downloads/MADA%20AI%20ASSISTANT/node_modules/tsx/dist/cli.mjs:53:32174
+    at new Promise (<anonymous>)
+    at createIpcServer (file:///Users/vohuy/Downloads/MADA%20AI%20ASSISTANT/node_modules/tsx/dist/cli.mjs:53:32152)
+    at async file:///Users/vohuy/Downloads/MADA%20AI%20ASSISTANT/node_modules/tsx/dist/cli.mjs:55:542 {
+  code: 'EPERM',
+  errno: -1,
+  syscall: 'listen',
+  address: '/var/folders/xh/kpmx01q91yx21nmxv9hqdl740000gn/T/tsx-501/33563.pipe',
+  port: -1
+}
 
-Port 5181 is in use, trying another one...
-Port 5182 is in use, trying another one...
-Port 5183 is in use, trying another one...
-Port 5184 is in use, trying another one...
-Port 5185 is in use, trying another one...
-Port 5186 is in use, trying another one...
-Port 5187 is in use, trying another one...
-error when starting dev server:
-SystemError [ERR_SYSTEM_ERROR]: A system error occurred: uv_interface_addresses returned Unknown system error 1 (Unknown system error 1)
-    at Object.networkInterfaces (node:os:218:16)
-    at resolveServerUrls (file:///Users/vohuy/Downloads/MADA%20AI%20ASSISTANT/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:17354:24)
-    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
-    at async Object.listen (file:///Users/vohuy/Downloads/MADA%20AI%20ASSISTANT/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:63136:31)
-    at async CAC.<anonymous> (file:///Users/vohuy/Downloads/MADA%20AI%20ASSISTANT/node_modules/vite/dist/node/cli.js:749:5)
+Node.js v25.4.0

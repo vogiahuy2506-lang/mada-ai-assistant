@@ -861,12 +861,16 @@ export let ragInitialized = false;
  * toàn 'draft' → vector store rỗng.
  */
 async function syncKnowledgeBaseToVectorStore(): Promise<void> {
-  // Skip sync if RAG is disabled or no network
+  // Skip sync only if explicitly disabled or Gemini not configured
   const skipSync = process.env.SKIP_RAG_SYNC === 'true' || 
-                   process.env.RAG_ENABLED !== 'true';
+                   !process.env.GEMINI_API_KEY || 
+                   process.env.GEMINI_API_KEY === 'your_gemini_api_key_here';
   
   if (skipSync) {
-    console.log('📚 [Sync KB] Skipped (RAG disabled or SKIP_RAG_SYNC=true)');
+    const reason = !process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY === 'your_gemini_api_key_here'
+      ? 'GEMINI_API_KEY not set'
+      : 'SKIP_RAG_SYNC=true';
+    console.log(`📚 [Sync KB] Skipped (${reason})`);
     return;
   }
 

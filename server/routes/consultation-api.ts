@@ -79,8 +79,8 @@ router.post('/start', async (req, res) => {
     // Detect category - prefer explicit botCategory from frontend, otherwise auto-detect
     const category = botCategory || detectCategory(message);
     
-    // Create consultation session
-    const { sessionId } = createConsultationSession(message, effectiveLanguage);
+    // ⭐ Pass botCategory to session so recommendations are filtered correctly
+    const { sessionId } = createConsultationSession(message, effectiveLanguage, botCategory);
     
     // Get initial follow-up questions
     const { questions } = await getConsultationQuestions(sessionId);
@@ -320,11 +320,23 @@ router.post('/quick-recommend', async (req, res) => {
     // Detect category - prefer explicit botCategory from frontend, otherwise auto-detect
     const category = botCategory || detectCategory(message);
     
-    // Query RAG for recommendations
+    // ⭐ Map category to MADA slug and pass as filter
+    const CATEGORY_TO_MADA_SLUG: Record<string, string> = {
+      vision: 'sensory-vision',
+      hearing: 'sensory-hearing',
+      mobility: 'mobility-and-transportation',
+      communication: 'voice-and-speech',
+      cognition: 'mental-cognitive',
+      daily_living: 'daily-living-aids',
+    };
+    const madaCategorySlug = category ? CATEGORY_TO_MADA_SLUG[category] || category : undefined;
+    
+    // Query RAG for recommendations - ⭐ FILTER by category
     const ragResponse = await ragEngine.query(message, [], {
-      systemInstruction: `You are an AT (Assistive Technology) specialist. Provide concise, helpful recommendations based on the user's needs.`,
+      systemInstruction: `You are an AT (Assistive Technology) specialist. Provide concise, helpful recommendations based on the user's needs. ONLY recommend devices from the ${madaCategorySlug || category || 'general'} category.`,
       language: effectiveLanguage,
       topK: 5,
+      madaCategory: madaCategorySlug,
     });
     
     // Get detailed metadata from sources

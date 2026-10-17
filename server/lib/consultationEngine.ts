@@ -650,6 +650,17 @@ Répondez UNIQUEMENT en JSON:
 /**
  * Generate product recommendations based on consultation context
  */
+
+// Map internal category names to MADA category slugs used in the database
+const CATEGORY_TO_MADA_SLUG: Record<string, string> = {
+  vision: 'sensory-vision',
+  hearing: 'sensory-hearing',
+  mobility: 'mobility-and-transportation',
+  communication: 'voice-and-speech',
+  cognition: 'mental-cognitive',
+  daily_living: 'daily-living-aids',
+};
+
 async function generateRecommendations(
   sessionId: string,
   language: string
@@ -668,6 +679,9 @@ async function generateRecommendations(
   // Build context from all answers
   const contextText = session.answers.map(a => `Q: ${a.question}\nA: ${a.answer}`).join('\n\n');
   
+  // ⭐ Get the MADA category slug for filtering
+  const madaCategorySlug = session.category ? CATEGORY_TO_MADA_SLUG[session.category] || session.category : undefined;
+  
   // Create a comprehensive query for RAG
   const ragQuery = `Tìm thiết bị công nghệ hỗ trợ phù hợp.
 Yêu cầu: ${session.userMessage}
@@ -675,13 +689,15 @@ Yêu cầu: ${session.userMessage}
 Thông tin bổ sung:
 ${contextText}
 
-Danh mục: ${session.category || 'general'}`;
+Danh mục: ${madaCategorySlug || session.category || 'general'}`;
   
   try {
+    // ⭐ Pass madaCategory filter to RAG so it only returns products from that category
     const ragResponse = await ragEngine.query(ragQuery, [], {
-      systemInstruction: `Bạn là chuyên gia tư vấn thiết bị AT. Dựa trên thông tin thu thập được, hãy đề xuất 2-3 thiết bị phù hợp nhất.`,
+      systemInstruction: `Bạn là chuyên gia tư vấn thiết bị AT. Dựa trên thông tin thu thập được, hãy đề xuất 2-3 thiết bị phù hợp nhất. CHỈ đề xuất thiết bị thuộc danh mục ${madaCategorySlug || session.category || 'general'}.`,
       language: lang,
       topK: 5,
+      madaCategory: madaCategorySlug,
     });
     
     // Get products from RAG sources
@@ -743,16 +759,20 @@ Danh mục: ${session.category || 'general'}`;
 
 /**
  * Create a new consultation session
+ * @param botCategory - explicit category from the bot the user is consulting (vision, hearing, etc.)
  */
 export function createConsultationSession(
   userMessage: string,
-  language: string
+  language: string,
+  botCategory?: string
 ): {
   sessionId: string;
   session: ConsultationSession;
 } {
   const sessionId = `consult-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  const category = detectCategory(userMessage);
+  // ⭐ PRIORITY: botCategory (explicit from bot) > auto-detect from message
+  const autoDetectedCategory = detectCategory(userMessage);
+  const category = botCategory || autoDetectedCategory;
   
   const session: ConsultationSession = {
     id: sessionId,

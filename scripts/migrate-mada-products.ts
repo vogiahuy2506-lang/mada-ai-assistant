@@ -126,9 +126,9 @@ async function main() {
       db.prepare(`
         INSERT INTO knowledge_items 
         (id, title, title_en, description, description_en, content, content_en, 
-         source, source_type, url, source_url, category, language, status, 
+         source, source_type, url, category, language, status, 
          confidence, metadata, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         kiId,
         title,
@@ -139,7 +139,6 @@ async function main() {
         content.slice(0, 2000),
         product.sourceUrl,
         'web',
-        product.sourceUrl,
         product.sourceUrl,
         product.category,
         'en',
@@ -166,7 +165,7 @@ async function main() {
   const count = db.prepare('SELECT COUNT(*) as count FROM kb_products').get() as { count: number };
   console.log(`\n📦 kb_products now has ${count.count} products`);
 
-  const kiCount = db.prepare('SELECT COUNT(*) as count FROM knowledge_items WHERE category LIKE "sensory-%" OR category LIKE "%hearing" OR category LIKE "%vision" OR category LIKE "%speech" OR category LIKE "%cognitive" OR category LIKE "%movement" OR category LIKE "%mobility"').get() as { count: number };
+  const kiCount = db.prepare(`SELECT COUNT(*) as count FROM knowledge_items WHERE category LIKE 'sensory-%' OR category LIKE '%hearing' OR category LIKE '%vision' OR category LIKE '%speech' OR category LIKE '%cognitive' OR category LIKE '%movement' OR category LIKE '%mobility'`).get() as { count: number };
   console.log(`📦 knowledge_items has ${kiCount.count} MADA items`);
 
   // Show products by category

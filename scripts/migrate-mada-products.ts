@@ -82,9 +82,9 @@ async function main() {
       const content = product.content || product.description || '';
       const description = (product.description || product.content || '').slice(0, 500);
 
-      // Insert into kb_products
+      // Insert into kb_products (use INSERT OR REPLACE to handle duplicates)
       db.prepare(`
-        INSERT INTO kb_products 
+        INSERT OR REPLACE INTO kb_products 
         (id, title, title_en, description, description_en, content, content_en, 
          category, brand, model, price_range, source_url, product_url, image_url, 
          iso_codes, status, featured, language, created_at, updated_at)
@@ -112,7 +112,7 @@ async function main() {
         now
       );
 
-      // Insert into knowledge_items for RAG search
+      // Insert into knowledge_items for RAG search (use INSERT OR REPLACE to handle duplicates)
       const metadata = JSON.stringify({
         thumbnailUrl: imageUrl,
         galleryImages: product.galleryImages,
@@ -124,7 +124,7 @@ async function main() {
       });
 
       db.prepare(`
-        INSERT INTO knowledge_items 
+        INSERT OR REPLACE INTO knowledge_items 
         (id, title, title_en, description, description_en, content, content_en, 
          source, source_type, url, category, language, status, 
          confidence, metadata, created_at, updated_at)

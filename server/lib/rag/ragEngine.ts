@@ -635,16 +635,9 @@ class RAGEngine {
              LIMIT 5`
           ).all(dbCategory, `%${dbCategory}%`) as any[];
         }
-        if (products.length === 0) {
-          // Fallback: lấy tất cả sản phẩm nếu không match category
-          products = db.prepare(
-            `SELECT title, title_en, description, category, brand, price_range, product_url
-             FROM kb_products
-             WHERE status = 'published'
-             ORDER BY featured DESC, sort_order DESC, created_at DESC
-             LIMIT 5`
-          ).all() as any[];
-        }
+        // ⭐ FIX: KHÔNG fallback sang tất cả sản phẩm nếu category không match
+        // Nếu không có sản phẩm đúng category → bỏ qua product fallback, trả lời "không tìm thấy"
+        // Việc hiện sản phẩm không liên quan (vd: thính giác cho câu hỏi về thị giác) gây confusion
 
         if (products.length > 0) {
           const isEn = lang === 'en';

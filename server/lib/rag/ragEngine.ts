@@ -1193,10 +1193,28 @@ ${tail.answerPrompt}`;
   /** Map filter category sang nhiều alias có thể có trong DB */
   private expandCategoryAliases(cat: string): string[] {
     const map: Record<string, string[]> = {
+      // Hearing
+      'sensory-hearing': ['sensory-hearing', 'hearing', 'sensory-hearing'],
       'hearing': ['hearing', 'sensory-hearing'],
-      'mobility': ['mobility', 'mobility-transportation', 'neuromusculoskeletal-movement'],
+      // Vision
+      'sensory-vision': ['sensory-vision', 'vision', 'sensory-vision'],
+      'vision': ['vision', 'sensory-vision'],
+      // Speech/Communication
+      'voice-and-speech': ['voice-and-speech', 'voice', 'speech', 'communication', 'aac'],
+      'voice-speech': ['voice-and-speech', 'voice', 'speech', 'communication', 'aac'],
       'communication': ['communication', 'voice-and-speech'],
-      'cognition': ['cognition', 'mental-cognitive'],
+      // Cognitive
+      'mental-cognitive': ['mental-cognitive', 'cognition', 'cognitive', 'mental'],
+      'cognitive': ['cognitive', 'mental-cognitive'],
+      // Neuro/Movement
+      'neuromusculoskeletal-movement': ['neuromusculoskeletal-movement', 'neuro', 'movement', 'musculoskeletal'],
+      'movement': ['movement', 'neuromusculoskeletal-movement'],
+      // Mobility/Transport
+      'mobility-and-transportation': ['mobility-and-transportation', 'mobility', 'transport', 'physical'],
+      'mobility': ['mobility', 'mobility-and-transportation'],
+      // Regulatory
+      'regulatory-standards': ['regulatory-standards', 'regulatory', 'standards'],
+      // Fallback
       'daily_living': ['general', 'daily_living'],
       'education': ['education', 'general'],
       'general': ['general'],

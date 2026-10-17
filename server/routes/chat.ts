@@ -158,6 +158,48 @@ function toProxyImageUrl(madaUrl: string): string {
   return madaUrl;
 }
 
+// ⭐ Helper: Map knowledge_items row to product card format
+function knowledgeItemToProduct(row: any, effectiveLanguage: string = 'vi'): any {
+  const meta = row.metadata ? (typeof row.metadata === 'string' ? JSON.parse(row.metadata) : row.metadata) : {};
+  const categoryLower = (row.category || '').toLowerCase();
+  
+  let categoryColor = 'from-blue-500 to-cyan-500';
+  if (categoryLower.includes('hearing') || categoryLower.includes('thính')) {
+    categoryColor = 'from-cyan-500 to-blue-600';
+  } else if (categoryLower.includes('vision') || categoryLower.includes('thị')) {
+    categoryColor = 'from-purple-500 to-pink-500';
+  } else if (categoryLower.includes('mobility') || categoryLower.includes('vận')) {
+    categoryColor = 'from-emerald-500 to-teal-500';
+  } else if (categoryLower.includes('cognitive') || categoryLower.includes('nhận')) {
+    categoryColor = 'from-amber-500 to-orange-500';
+  }
+  
+  const title = row.title_en && effectiveLanguage === 'en' ? row.title_en : row.title;
+  const description = row.description_en && effectiveLanguage === 'en' ? row.description_en : (row.description || '');
+  
+  return {
+    id: row.id,
+    title: title || '',
+    title_en: row.title_en || row.title || '',
+    description: description.substring(0, 300) + (description.length > 300 ? '...' : ''),
+    category: row.category || 'general',
+    brand: meta.brand || 'MADA Qatar AT Portal',
+    price_range: meta.priceRange || 'Liên hệ MADA Center',
+    product_url: row.url || meta.productUrl || meta.sourceUrl || '',
+    source_url: row.url || '',
+    image_url: toProxyImageUrl(meta.imageUrl || meta.thumbnailUrl || ''),
+    confidence: 0.85,
+    match_reason: `Phù hợp với danh mục ${row.category}`,
+    mada_advice: '',
+    warranty: '',
+    features: meta.features || [],
+    specifications: {},
+    in_stock: true,
+    galleryImages: [],
+    categoryColor,
+  };
+}
+
 // MADA Agent to Category mapping
 const AGENT_TO_MADA: Record<string, { botId: string; madaCategory: string }> = {
   'bot-hearing':    { botId: 'bot-hearing',    madaCategory: 'sensory-hearing' },
@@ -190,8 +232,8 @@ const PRODUCT_REQUEST_RESPONSES: Record<string, string> = {
   fr: "Basé sur vos besoins, voici les produits de technologie d'assistance que je recommande:",
 };
 
-// ⭐ Get products by category (for product request)
-async function getProductsByCategory(madaCategory: string | null, _language: string, limit: number = 6): Promise<any[]> {
+// ⭐ Get products by category (for product request) - Query from knowledge_items
+async function getProductsByCategory(madaCategory: string | null, language: string, limit: number = 6): Promise<any[]> {
   let products: any[] = [];
   
   try {
@@ -199,80 +241,40 @@ async function getProductsByCategory(madaCategory: string | null, _language: str
     let params: any[];
     
     if (madaCategory && MADA_CATEGORY_TO_DB[madaCategory]) {
-      // Lấy products theo category cụ thể từ kb_products
+      // Lấy products theo category cụ thể từ knowledge_items
       const dbCategory = MADA_CATEGORY_TO_DB[madaCategory];
       query = `
-        SELECT p.*
-        FROM kb_products p
-        WHERE p.category = ? AND p.status IN ('draft', 'published', 'archived')
-        ORDER BY p.featured DESC, p.created_at DESC
+        SELECT * FROM knowledge_items
+        WHERE category = ? AND status = 'published' AND source_type = 'web'
+        ORDER BY created_at DESC
         LIMIT ?
       `;
       params = [dbCategory, limit];
-      console.log(`📦 [ProductRequest] Fetching products for category: ${dbCategory}`);
+      console.log(`📦 [ProductRequest] Fetching products for category: ${dbCategory} from knowledge_items`);
     } else {
       // Lấy tất cả products (bot tổng)
       query = `
-        SELECT p.*
-        FROM kb_products p
-        WHERE p.status IN ('draft', 'published', 'archived')
-        ORDER BY p.featured DESC, p.created_at DESC
+        SELECT * FROM knowledge_items
+        WHERE status = 'published' AND source_type = 'web'
+        ORDER BY created_at DESC
         LIMIT ?
       `;
       params = [limit];
-      console.log(`📦 [ProductRequest] Fetching all products (no category filter)`);
+      console.log(`📦 [ProductRequest] Fetching all products from knowledge_items (no category filter)`);
     }
     
     const rows = db.prepare(query).all(...params) as any[];
     console.log(`📦 [ProductRequest] Found ${rows.length} products`);
     
-    // Map to suggestedProducts format
-    products = rows.map((row: any) => {
-      // Determine category color for gradient
-      const categoryLower = (row.category || '').toLowerCase();
-      let categoryColor = 'from-blue-500 to-cyan-500';
-      if (categoryLower.includes('hearing') || categoryLower.includes('thính')) {
-        categoryColor = 'from-cyan-500 to-blue-600';
-      } else if (categoryLower.includes('vision') || categoryLower.includes('thị')) {
-        categoryColor = 'from-purple-500 to-pink-500';
-      } else if (categoryLower.includes('mobility') || categoryLower.includes('vận')) {
-        categoryColor = 'from-emerald-500 to-teal-500';
-      } else if (categoryLower.includes('cognitive') || categoryLower.includes('nhận')) {
-        categoryColor = 'from-amber-500 to-orange-500';
-      }
-      
-      return {
-        id: row.id || row.product_id,
-        title: row.title,
-        title_en: row.title_en || row.title,
-        description: row.description || '',
-        category: row.category || 'general',
-        brand: row.brand || 'MADA Qatar AT Portal',
-        price_range: row.price_range || 'Liên hệ MADA Center',
-        product_url: row.product_url || row.source_url || '',
-        source_url: row.source_url || '',
-        image_url: toProxyImageUrl(row.image_url || ''),
-        confidence: 0.9,
-        mada_advice: row.mada_advice || '',
-        warranty: row.warranty || '',
-        features: (() => {
-          try {
-            if (Array.isArray(row.features)) return row.features;
-            if (typeof row.features === 'string') return JSON.parse(row.features);
-            return [];
-          } catch {
-            return [];
-          }
-        })(),
-        categoryColor,
-      };
-    });
+    // Map to product format using helper
+    products = rows.map((row: any) => knowledgeItemToProduct(row, language));
+    console.log(`📦 [ProductRequest] Mapped ${products.length} products`);
     
     // Filter out invalid products
     products = products.filter((p: any) => {
       const hasTitle = p.title && p.title.length > 2;
-      const hasUrl = p.product_url && p.product_url.startsWith('http');
-      return hasTitle && hasUrl;
+      const hasUrl = p.product_url && (p.product_url.startsWith('http') || p.product_url.length > 0);
+      return hasTitle;
     });
     
     console.log(`📦 [ProductRequest] Returning ${products.length} valid products`);
@@ -335,7 +337,7 @@ function findProductByMessage(message: string, _effectiveLanguage: string): any 
 
     console.log(`🔍 [findProductByMessage] Searching for phrases:`, phrases.slice(0, 5));
 
-    // Search kb_products for matching titles
+    // Search knowledge_items for matching titles (products scraped from MADA portal)
     for (const phrase of phrases) {
       if (phrase.length < 3) continue;
 
@@ -349,54 +351,29 @@ function findProductByMessage(message: string, _effectiveLanguage: string): any 
         if (term.length < 3) continue;
 
         // Exact match first
-        let product = db.prepare(`
-          SELECT * FROM kb_products
-          WHERE (title = ? COLLATE NOCASE OR title_en = ? COLLATE NOCASE
+        let item = db.prepare(`
+          SELECT * FROM knowledge_items
+          WHERE status = 'published' AND source_type = 'web'
+            AND (title = ? COLLATE NOCASE OR title_en = ? COLLATE NOCASE
               OR REPLACE(title, '®', '') = ? COLLATE NOCASE
               OR REPLACE(title_en, '®', '') = ? COLLATE NOCASE)
-            AND image_url IS NOT NULL AND image_url != ''
           LIMIT 1
         `).get(term, term, term, term) as any;
 
         // Partial match
-        if (!product) {
-          product = db.prepare(`
-            SELECT * FROM kb_products
-            WHERE (title LIKE ? COLLATE NOCASE ESCAPE '/' OR title_en LIKE ? COLLATE NOCASE ESCAPE '/')
-              AND image_url IS NOT NULL AND image_url != ''
-            ORDER BY featured DESC, created_at DESC
+        if (!item) {
+          item = db.prepare(`
+            SELECT * FROM knowledge_items
+            WHERE status = 'published' AND source_type = 'web'
+              AND (title LIKE ? COLLATE NOCASE ESCAPE '/' OR title_en LIKE ? COLLATE NOCASE ESCAPE '/')
+            ORDER BY created_at DESC
             LIMIT 1
           `).get(`%${term}%`, `%${term}%`) as any;
         }
 
-        if (product) {
-          console.log(`✅ [findProductByMessage] MATCHED: "${term}" → "${product.title}"`);
-
-          const categoryLower = (product.category || '').toLowerCase();
-          let categoryColor = 'from-blue-500 to-cyan-500';
-          if (categoryLower.includes('hearing')) categoryColor = 'from-cyan-500 to-blue-600';
-          else if (categoryLower.includes('vision')) categoryColor = 'from-purple-500 to-pink-500';
-          else if (categoryLower.includes('mobility')) categoryColor = 'from-emerald-500 to-teal-500';
-          else if (categoryLower.includes('cognitive') || categoryLower.includes('mental')) categoryColor = 'from-amber-500 to-orange-500';
-
-          return {
-            id: product.id,
-            title: product.title,
-            title_en: product.title_en || product.title,
-            description: product.description || '',
-            category: product.category || 'general',
-            brand: product.brand || 'MADA Qatar AT Portal',
-            price_range: product.price_range || 'Liên hệ MADA Center',
-            product_url: product.product_url || product.source_url || '',
-            source_url: product.source_url || product.product_url || '',
-            image_url: toProxyImageUrl(product.image_url || ''),
-            confidence: 1.0, // High confidence - exact match
-            match_reason: getMatchReason(_effectiveLanguage, 'found'),
-            mada_advice: product.mada_advice || '',
-            warranty: product.warranty || '',
-            features: [],
-            categoryColor,
-          };
+        if (item) {
+          console.log(`✅ [findProductByMessage] MATCHED: "${term}" → "${item.title}"`);
+          return knowledgeItemToProduct(item, _effectiveLanguage);
         }
       }
     }
@@ -719,67 +696,69 @@ async function getSuggestedProducts(ragSources: any[], message: string, effectiv
     return atKeywords.some(kw => lower.includes(kw));
   };
   
-  // Helper: Get full product data from kb_products table
+  // Helper: Get full product data from knowledge_items table
   const getProductFromDb = (productUrl: string): any => {
     if (!productUrl) return null;
     try {
       // Normalize URL (remove trailing slash)
       const normalizedUrl = productUrl.replace(/\/$/, '');
       
-      // Try to find by source_url OR product_url (both exact and normalized)
-      // NOTE: Only remove trailing slash to normalize, NOT all slashes
-      const product = db.prepare(`
-        SELECT * FROM kb_products 
-        WHERE source_url = ? OR product_url = ?
-           OR source_url = ? OR product_url = ?
+      // Try to find in knowledge_items by url (exact and normalized)
+      const item = db.prepare(`
+        SELECT * FROM knowledge_items 
+        WHERE status = 'published' AND source_type = 'web'
+          AND (url = ? OR url = ? OR source = ? OR source = ?)
         LIMIT 1
-      `).get(normalizedUrl, normalizedUrl, productUrl, productUrl) as any;
-      if (product) {
-        console.log(`📷 [DB Lookup] FOUND: ${product.title} | image: ${product.image_url ? 'YES' : 'NO'}`);
-        return product;
+      `).get(normalizedUrl, productUrl, normalizedUrl, productUrl) as any;
+      if (item) {
+        console.log(`📷 [DB Lookup] FOUND in knowledge_items: ${item.title}`);
+        return knowledgeItemToProduct(item, effectiveLanguage);
       }
-      console.log(`📷 [DB Lookup] NOT FOUND for: ${productUrl}`);
+      console.log(`📷 [DB Lookup] NOT FOUND in knowledge_items for: ${productUrl}`);
     } catch (e) { 
       console.warn('[getProductFromDb] DB error:', (e as Error).message);
     }
     return null;
   };
   
-  // Helper: Directly get product by title from kb_products
+  // Helper: Directly get product by title from knowledge_items
   const getProductByTitle = (title: string): any => {
     if (!title) return null;
     try {
       // Try exact match first
-      let product = db.prepare(`
-        SELECT * FROM kb_products 
-        WHERE title = ? OR title_en = ?
+      let item = db.prepare(`
+        SELECT * FROM knowledge_items 
+        WHERE status = 'published' AND source_type = 'web'
+          AND (title = ? OR title_en = ?)
         LIMIT 1
       `).get(title, title) as any;
       
       // Try partial match
-      if (!product) {
-        product = db.prepare(`
-          SELECT * FROM kb_products 
-          WHERE title LIKE ? OR title_en LIKE ?
+      if (!item) {
+        item = db.prepare(`
+          SELECT * FROM knowledge_items 
+          WHERE status = 'published' AND source_type = 'web'
+            AND (title LIKE ? OR title_en LIKE ?)
           LIMIT 1
         `).get(`%${title}%`, `%${title}%`) as any;
       }
       
       // Try matching with special chars removed
-      if (!product) {
+      if (!item) {
         const cleanTitle = title.replace(/[®™©°]/g, '').trim();
-        product = db.prepare(`
-          SELECT * FROM kb_products 
-          WHERE REPLACE(title, '®', '') LIKE ? OR REPLACE(title, '™', '') LIKE ?
+        item = db.prepare(`
+          SELECT * FROM knowledge_items 
+          WHERE status = 'published' AND source_type = 'web'
+            AND (title LIKE ? OR title_en LIKE ?)
           LIMIT 1
         `).get(`%${cleanTitle}%`, `%${cleanTitle}%`) as any;
       }
       
-      if (product) {
-        console.log(`📷 [Title Lookup] FOUND by title "${title}": ${product.title} | image: ${product.image_url ? 'YES' : 'NO'}`);
-        return product;
+      if (item) {
+        console.log(`📷 [Title Lookup] FOUND in knowledge_items by title "${title}": ${item.title}`);
+        return knowledgeItemToProduct(item, effectiveLanguage);
       }
-      console.log(`📷 [Title Lookup] NOT FOUND for title: ${title}`);
+      console.log(`📷 [Title Lookup] NOT FOUND in knowledge_items for title: ${title}`);
     } catch (e) { 
       console.warn('[getProductByTitle] DB error:', (e as Error).message);
     }
@@ -987,69 +966,34 @@ async function getSuggestedProducts(ragSources: any[], message: string, effectiv
           LIMIT 24
         `;
         dbParams = [];
-        console.log(`📦 [getSuggestedProducts] Regulatory bot - fetching ALL products (up to 24)`);
+        console.log(`📦 [getSuggestedProducts] Regulatory bot - fetching ALL products from knowledge_items (up to 24)`);
       } else if (shouldFilterByCategory && agentCategory) {
         // Các bot THƯỜNG: Chỉ lấy sản phẩm thuộc category của mình
         dbQuery = `
-          SELECT * FROM kb_products 
-          WHERE category = ? AND status IN ('draft', 'published', 'archived')
-          AND image_url IS NOT NULL AND image_url != ''
-          ORDER BY featured DESC, created_at DESC
+          SELECT * FROM knowledge_items 
+          WHERE category = ? AND status = 'published' AND source_type = 'web'
+          ORDER BY created_at DESC
           LIMIT 12
         `;
         dbParams = [agentCategory];
+        console.log(`📦 [getSuggestedProducts] Fetching products for category: ${agentCategory} from knowledge_items`);
       } else {
         // Không có category → lấy tất cả
         dbQuery = `
-          SELECT * FROM kb_products 
-          WHERE status IN ('draft', 'published', 'archived')
-          AND image_url IS NOT NULL AND image_url != ''
-          ORDER BY featured DESC, created_at DESC
+          SELECT * FROM knowledge_items 
+          WHERE status = 'published' AND source_type = 'web'
+          ORDER BY created_at DESC
           LIMIT 12
         `;
         dbParams = [];
+        console.log(`📦 [getSuggestedProducts] Fetching all products from knowledge_items`);
       }
       
       const dbProducts = db.prepare(dbQuery).all(...dbParams) as any[];
+      console.log(`📦 [getSuggestedProducts] DB fetched ${dbProducts.length} products from knowledge_items`);
       
-      // Map dbProducts to product format
-      const mappedDbProducts: any[] = dbProducts.map((row: any) => {
-        const categoryLower = (row.category || '').toLowerCase();
-        let categoryColor = 'from-blue-500 to-cyan-500';
-        if (categoryLower.includes('hearing') || categoryLower.includes('thính')) {
-          categoryColor = 'from-cyan-500 to-blue-600';
-        } else if (categoryLower.includes('vision') || categoryLower.includes('thị')) {
-          categoryColor = 'from-purple-500 to-pink-500';
-        } else if (categoryLower.includes('mobility') || categoryLower.includes('vận')) {
-          categoryColor = 'from-emerald-500 to-teal-500';
-        } else if (categoryLower.includes('cognitive') || categoryLower.includes('nhận')) {
-          categoryColor = 'from-amber-500 to-orange-500';
-        }
-        return {
-          id: row.id || row.product_id,
-          title: row.title,
-          title_en: row.title_en || row.title,
-          description: row.description || '',
-          category: row.category || 'general',
-          brand: row.brand || 'MADA Qatar AT Portal',
-          price_range: row.price_range || 'Liên hệ MADA Center',
-          product_url: row.product_url || row.source_url || '',
-          source_url: row.source_url || '',
-          image_url: toProxyImageUrl(row.image_url || ''),
-          confidence: 0.85,
-          match_reason: getMatchReason(effectiveLanguage, 'category', row.category || ''),
-          mada_advice: row.mada_advice || '',
-          warranty: row.warranty || '',
-          features: (() => {
-            try {
-              if (Array.isArray(row.features)) return row.features;
-              if (typeof row.features === 'string') return JSON.parse(row.features);
-              return [];
-            } catch { return []; }
-          })(),
-          categoryColor,
-        };
-      });
+      // Map dbProducts to product format using helper
+      const mappedDbProducts: any[] = dbProducts.map((row: any) => knowledgeItemToProduct(row, effectiveLanguage));
       
       // Filter mapped products
       const filteredDbProducts = mappedDbProducts.filter((p: any) => {

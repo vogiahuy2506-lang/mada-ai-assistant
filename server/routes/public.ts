@@ -320,13 +320,14 @@ router.get('/featured', (req, res) => {
     const lang: SupportedLang = ['vi', 'en', 'ar', 'fr'].includes(String(req.query.lang))
       ? String(req.query.lang) as SupportedLang
       : 'vi';
-    const rows = db
+    // Query from knowledge_items (products scraped from MADA portal)
+    const items = db
       .prepare(
-        "SELECT * FROM kb_products WHERE status = 'published' AND featured = 1 ORDER BY sort_order ASC, created_at DESC LIMIT 12"
+        "SELECT * FROM knowledge_items WHERE status = 'published' AND source_type = 'web' ORDER BY created_at DESC LIMIT 12"
       )
-      .all() as ProductRow[];
+      .all() as KnowledgeItemRow[];
 
-    res.json({ success: true, data: rows.map(r => publishRow(r, lang)) });
+    res.json({ success: true, data: items.map(r => publishRow(knowledgeItemToProductRow(r), lang)) });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -344,6 +345,72 @@ const AGENT_TO_MADA_PUBLIC: Record<string, { madaCategory: string; productCatego
   'bot-regulatory': { madaCategory: 'regulatory-standards',     productCategory: 'regulatory-standards' },
 };
 
+// Transform knowledge_items row to ProductRow format for compatibility
+interface KnowledgeItemRow {
+  id: string;
+  title: string;
+  title_en: string | null;
+  title_ar: string | null;
+  title_fr: string | null;
+  description: string | null;
+  description_en: string | null;
+  description_ar: string | null;
+  description_fr: string | null;
+  content: string | null;
+  content_en: string | null;
+  content_ar: string | null;
+  content_fr: string | null;
+  category: string;
+  iso_codes: string | null;
+  wcag_level: string | null;
+  who_gate_area: string | null;
+  status: string;
+  language: string;
+  url: string | null;
+  metadata: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+function knowledgeItemToProductRow(item: KnowledgeItemRow): ProductRow {
+  let metadata: any = {};
+  try {
+    metadata = item.metadata ? JSON.parse(item.metadata) : {};
+  } catch { /* ignore */ }
+  
+  return {
+    id: item.id,
+    title: item.title || '',
+    title_en: item.title_en || '',
+    title_ar: item.title_ar || '',
+    title_fr: item.title_fr || '',
+    description: item.description || '',
+    description_en: item.description_en || '',
+    description_ar: item.description_ar || '',
+    description_fr: item.description_fr || '',
+    content: item.content || '',
+    content_en: item.content_en || '',
+    content_ar: item.content_ar || '',
+    content_fr: item.content_fr || '',
+    category: item.category || '',
+    brand: metadata.brand || '',
+    model: metadata.model || '',
+    price_range: metadata.priceRange || '',
+    source_url: item.url || '',
+    product_url: item.url || '',
+    image_url: metadata.imageUrl || metadata.thumbnailUrl || '',
+    iso_codes: item.iso_codes || '[]',
+    wcag_level: item.wcag_level || '',
+    who_gate_area: item.who_gate_area || '',
+    status: item.status || 'draft',
+    featured: metadata.featured || 0,
+    sort_order: metadata.sortOrder || 0,
+    language: item.language || 'vi',
+    created_at: item.created_at || '',
+    updated_at: item.updated_at || '',
+  };
+}
+
 router.get('/products/by-agent/:agentId', (req, res) => {
   try {
     const { agentId } = req.params;
@@ -358,7 +425,6 @@ router.get('/products/by-agent/:agentId', (req, res) => {
     try {
       const agentRow = db.prepare('SELECT mada_category FROM admin_agents WHERE id = ?').get(agentId) as any;
       if (agentRow?.mada_category) {
-        // Products lưu category = mada_category (e.g., 'sensory-vision', 'mental-cognitive')
         productCategory = agentRow.mada_category;
         console.log(`📦 [by-agent] DB lookup for ${agentId}: mada_category=${agentRow.mada_category} → productCategory=${productCategory}`);
       }
@@ -372,27 +438,30 @@ router.get('/products/by-agent/:agentId', (req, res) => {
       console.log(`📦 [by-agent] Hardcoded mapping for ${agentId}: productCategory=${productCategory}`);
     }
     
-    let rows: ProductRow[];
+    // Query from knowledge_items (source_type='web' from MADA portal scrape)
+    let items: KnowledgeItemRow[];
     if (productCategory) {
-      // bot-regulatory → xem tất cả categories (không filter)
+      // bot-regulatory → xem tất cả categories
       if (agentId === 'bot-regulatory') {
-        rows = db.prepare(
-          "SELECT * FROM kb_products WHERE status = 'published' ORDER BY category ASC, featured DESC, created_at DESC LIMIT ?"
-        ).all(limit) as ProductRow[];
-        console.log(`📦 [by-agent] Regulatory bot - returning all ${rows.length} products`);
+        items = db.prepare(
+          "SELECT * FROM knowledge_items WHERE status = 'published' AND source_type = 'web' ORDER BY category ASC, created_at DESC LIMIT ?"
+        ).all(limit) as KnowledgeItemRow[];
+        console.log(`📦 [by-agent] Regulatory bot - returning all ${items.length} products`);
       } else {
-        rows = db.prepare(
-          "SELECT * FROM kb_products WHERE category = ? AND status = 'published' ORDER BY featured DESC, created_at DESC LIMIT ?"
-        ).all(productCategory, limit) as ProductRow[];
-        console.log(`📦 [by-agent] Category filter: ${productCategory} → ${rows.length} products`);
+        items = db.prepare(
+          "SELECT * FROM knowledge_items WHERE category = ? AND status = 'published' AND source_type = 'web' ORDER BY created_at DESC LIMIT ?"
+        ).all(productCategory, limit) as KnowledgeItemRow[];
+        console.log(`📦 [by-agent] Category filter: ${productCategory} → ${items.length} products`);
       }
     } else {
       // Không xác định được category → trả về featured products
-      rows = db.prepare(
-        "SELECT * FROM kb_products WHERE status = 'published' AND featured = 1 ORDER BY created_at DESC LIMIT ?"
-      ).all(limit) as ProductRow[];
-      console.log(`📦 [by-agent] No category found - returning ${rows.length} featured products`);
+      items = db.prepare(
+        "SELECT * FROM knowledge_items WHERE status = 'published' AND source_type = 'web' ORDER BY created_at DESC LIMIT ?"
+      ).all(limit) as KnowledgeItemRow[];
+      console.log(`📦 [by-agent] No category found - returning ${items.length} products`);
     }
+    
+    const rows = items.map(knowledgeItemToProductRow);
 
     res.json({
       success: true,
@@ -411,9 +480,14 @@ router.get('/products/by-agent/:agentId', (req, res) => {
 // GET /api/public/stats - public stats for homepage
 router.get('/stats', (_req, res) => {
   try {
-    const total = (db.prepare("SELECT COUNT(*) as c FROM kb_products WHERE status = 'published'").get() as any)?.c || 0;
-    const categories = (db.prepare('SELECT COUNT(*) as c FROM kb_categories').get() as any)?.c || 0;
-    const brands = (db.prepare("SELECT COUNT(DISTINCT brand) as c FROM kb_products WHERE status = 'published' AND brand != ''").get() as any)?.c || 0;
+    // Query from knowledge_items (products scraped from MADA portal)
+    const total = (db.prepare("SELECT COUNT(*) as c FROM knowledge_items WHERE status = 'published' AND source_type = 'web'").get() as any)?.c || 0;
+    // Distinct categories from knowledge_items
+    const catResult = db.prepare("SELECT COUNT(DISTINCT category) as c FROM knowledge_items WHERE status = 'published' AND source_type = 'web' AND category != ''").get() as any;
+    const categories = catResult?.c || 0;
+    // Distinct sources (brands/manufacturers from metadata)
+    const brandResult = db.prepare("SELECT COUNT(DISTINCT json_extract(metadata, '$.brand')) as c FROM knowledge_items WHERE status = 'published' AND source_type = 'web' AND metadata LIKE '%brand%'").get() as any;
+    const brands = brandResult?.c || 0;
 
     res.json({
       success: true,

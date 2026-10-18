@@ -140,6 +140,19 @@ const CATEGORY_ICONS: Record<ATCategory, string> = {
   education: 'school',
 };
 
+// Mapping from UI ATCategory to database mada_category
+// This is used to find the corresponding agent when a category is selected
+const CATEGORY_TO_MADA_CATEGORY: Record<ATCategory, string> = {
+  vision: 'sensory-vision',
+  hearing: 'sensory-hearing',
+  communication: 'voice-and-speech',
+  cognition: 'mental-cognitive',
+  // mobility in UI maps to neuromusculoskeletal-movement (Bot 5)
+  mobility: 'neuromusculoskeletal-movement',
+  daily_living: 'mobility-and-transportation', // Daily living uses mobility category
+  education: 'regulatory-standards', // Education uses regulatory bot
+};
+
 const CATEGORY_LABELS: Record<ATCategory, { title: string; titleEn: string; titleAr: string; titleFr: string; desc: string; descEn: string; descAr: string; descFr: string }> = {
   vision: {
     title: 'CẢM GIÁC - THỊ GIÁC',
@@ -2222,8 +2235,12 @@ export function ChatPage() {
       // ⭐ Sửa logic: Dùng chatAgent cho tất cả trường hợp
       // - Khi chọn bot cụ thể → dùng bot đó
       // - Khi "Trò chuyện mới" → dùng Bot 7 (Thông tin bổ trợ)
-      const effectiveAgent = chatAgent || selectedAgent;
-      const isUsingRegulatoryBot = !selectedAgentId && effectiveAgent?.botId === 'bot-regulatory';
+      // ⭐ FIX: Khi agents chưa load xong nhưng là new chat, vẫn dùng Bot 7
+      const isNewChat = !selectedAgentId && messages.length === 0;
+      const effectiveAgent = isNewChat
+        ? (chatAgent || MADA_BOTS.find(b => b.id === 'bot-regulatory')) // Ưu tiên chatAgent, fallback Bot 7
+        : (chatAgent || selectedAgent);
+      const isUsingRegulatoryBot = isNewChat || (!selectedAgentId && effectiveAgent?.botId === 'bot-regulatory');
       
       console.log('[Chat] Agent selection:', {
         selectedAgentId,
@@ -2680,6 +2697,9 @@ export function ChatPage() {
     setInputValue('');
     setStreamingContent('');
     setActiveCategory(null);
+
+    // ⭐ Reset selectedAgentId để hiển thị Bot 7 (Thông tin bổ trợ)
+    useSelectedAgentStore.getState().setSelectedAgentId(null);
 
     // ⭐ Reset conversation tracking khi bắt đầu cuộc trò chuyện mới
     resetContextTracking();
@@ -3298,6 +3318,17 @@ export function ChatPage() {
                       setInputValue('');
                       setStreamingContent('');
                       setActiveCategory(category);
+                      
+                      // ⭐ FIX: Khi chọn category, cũng chọn bot tương ứng
+                      // Tìm agent có madaCategory khớp với category đã chọn (dùng mapping)
+                      const mappedMadaCategory = CATEGORY_TO_MADA_CATEGORY[category];
+                      const correspondingAgent = activeAgents.find(a => a.madaCategory === mappedMadaCategory);
+                      if (correspondingAgent) {
+                        console.log('[ChatPage] Selected category:', category, '→ selecting agent:', correspondingAgent.name, 'with madaCategory:', correspondingAgent.madaCategory);
+                        useSelectedAgentStore.getState().setSelectedAgentId(correspondingAgent.id);
+                      } else {
+                        console.log('[ChatPage] No agent found for category:', category, 'mapped to:', mappedMadaCategory, 'available madaCategories:', activeAgents.map(a => a.madaCategory));
+                      }
                     }
 
                     if (window.innerWidth < 768) {
@@ -3765,12 +3796,52 @@ export function ChatPage() {
                 
                 {/* Welcome Section */}
                 <div className="text-center mb-10 max-w-2xl mx-auto">
-                  {/* Welcome Typography */}
+                  {/* Welcome Typography - Khi "Trò chuyện mới" (không có selectedAgentId), luôn hiển thị Bot 7 (Thông tin bổ trợ) */}
                   <h2 className="text-2xl font-bold text-on-background mb-2">
-                    {greeting[language] || greeting.vi}
+                    {(() => {
+                      // ⭐ Khi "Trò chuyện mới" (messages rỗng và không có selectedAgentId): hiển thị Bot 7
+                      if (!selectedAgentId && messages.length === 0) {
+                        const bot7 = MADA_BOTS.find(b => b.id === 'bot-regulatory');
+                        if (bot7) {
+                          if (language === 'vi') return bot7.nameVi;
+                          if (language === 'en') return bot7.name;
+                          if (language === 'ar') return bot7.nameAr;
+                          if (language === 'fr') return bot7.nameFr;
+                        }
+                      }
+                      // Nếu có bot được chọn cụ thể, dùng greeting của bot đó
+                      const botInfo = chatAgent ? MADA_BOTS.find(b => b.id === chatAgent.botId) : null;
+                      if (botInfo) {
+                        if (language === 'vi') return botInfo.nameVi;
+                        if (language === 'en') return botInfo.name;
+                        if (language === 'ar') return botInfo.nameAr;
+                        if (language === 'fr') return botInfo.nameFr;
+                      }
+                      return greeting[language] || greeting.vi;
+                    })()}
                   </h2>
                   <p className="text-sm text-on-surface-variant">
-                    {description[language] || description.vi}
+                    {(() => {
+                      // ⭐ Khi "Trò chuyện mới" (messages rỗng và không có selectedAgentId): hiển thị Bot 7
+                      if (!selectedAgentId && messages.length === 0) {
+                        const bot7 = MADA_BOTS.find(b => b.id === 'bot-regulatory');
+                        if (bot7) {
+                          if (language === 'vi') return bot7.descriptionVi;
+                          if (language === 'en') return bot7.description;
+                          if (language === 'ar') return bot7.descriptionAr;
+                          if (language === 'fr') return bot7.descriptionFr;
+                        }
+                      }
+                      // Nếu có bot được chọn cụ thể, dùng description của bot đó
+                      const botInfo = chatAgent ? MADA_BOTS.find(b => b.id === chatAgent.botId) : null;
+                      if (botInfo) {
+                        if (language === 'vi') return botInfo.descriptionVi;
+                        if (language === 'en') return botInfo.description;
+                        if (language === 'ar') return botInfo.descriptionAr;
+                        if (language === 'fr') return botInfo.descriptionFr;
+                      }
+                      return description[language] || description.vi;
+                    })()}
                   </p>
 
                   {/* Language Selector đã được chuyển lên Header Bar - chỉ giữ 1 chỗ duy nhất */}

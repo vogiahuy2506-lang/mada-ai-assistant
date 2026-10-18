@@ -1,20 +1,24 @@
-node:net:1918
-      const error = new UVExceptionWithHostPort(rval, 'listen', address, port);
-                    ^
-
-Error: listen EPERM: operation not permitted /var/folders/xh/kpmx01q91yx21nmxv9hqdl740000gn/T/tsx-501/33563.pipe
-    at Server.setupListenHandle [as _listen2] (node:net:1918:21)
-    at listenInCluster (node:net:1997:12)
-    at Server.listen (node:net:2119:5)
-    at file:///Users/vohuy/Downloads/MADA%20AI%20ASSISTANT/node_modules/tsx/dist/cli.mjs:53:32174
-    at new Promise (<anonymous>)
-    at createIpcServer (file:///Users/vohuy/Downloads/MADA%20AI%20ASSISTANT/node_modules/tsx/dist/cli.mjs:53:32152)
-    at async file:///Users/vohuy/Downloads/MADA%20AI%20ASSISTANT/node_modules/tsx/dist/cli.mjs:55:542 {
-  code: 'EPERM',
-  errno: -1,
-  syscall: 'listen',
-  address: '/var/folders/xh/kpmx01q91yx21nmxv9hqdl740000gn/T/tsx-501/33563.pipe',
-  port: -1
-}
-
-Node.js v25.4.0
+📦 SQLite database initialized at /Users/vohuy/Downloads/MADA AI ASSISTANT/data/mada.db
+✅ Knowledge items translation columns added
+✅ KB Products translation columns added
+🌱 Seeded 9 KB categories (4 languages: VI/EN/AR/FR)
+🤖 admin_agents already has 8 rows — skipping seed
+📋 admin_prompts already has 10 rows — skipping seed
+📋 prompt_templates already has 10 rows — skipping seed
+✅ Migrated suggested_prompts to correct values
+✅ Schema created
+✅ Users table schema is up-to-date
+👤 Admin already exists: admin@mada.vn
+🔑 SuperAdmin password verified: superadmin@mada.vn
+ℹ️ [System] MADA AI Server started on port 3001
+ℹ️ [RAG Engine] Vector store initialized with 65 documents
+✅ [Auth Service] Auth service configured (SQLite + JWT + bcrypt)
+ℹ️ [Security] CORS policy: any localhost port allowed (dev)
+🔧 Initializing services...
+✅ Using Gemini embeddings: AQ.Ab8RN6I...
+📁 Static files root: /Users/vohuy/Downloads/MADA AI ASSISTANT/dist/client
+📁 Assets path: /Users/vohuy/Downloads/MADA AI ASSISTANT/dist/client/assets
+📁 Assets exist: true
+📦 Serving frontend from /Users/vohuy/Downloads/MADA AI ASSISTANT/dist/client
+✅ Permissions schema initialized
+📋 Permissions already seeded (48 rows) — skipping

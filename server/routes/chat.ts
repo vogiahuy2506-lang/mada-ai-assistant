@@ -200,6 +200,47 @@ function knowledgeItemToProduct(row: any, effectiveLanguage: string = 'vi'): any
   };
 }
 
+// ⭐ Helper: Map kb_products row to product card format
+function kbProductToProduct(row: any, effectiveLanguage: string = 'vi'): any {
+  const categoryLower = (row.category || '').toLowerCase();
+  
+  let categoryColor = 'from-blue-500 to-cyan-500';
+  if (categoryLower.includes('hearing') || categoryLower.includes('thính')) {
+    categoryColor = 'from-cyan-500 to-blue-600';
+  } else if (categoryLower.includes('vision') || categoryLower.includes('thị')) {
+    categoryColor = 'from-purple-500 to-pink-500';
+  } else if (categoryLower.includes('mobility') || categoryLower.includes('vận')) {
+    categoryColor = 'from-emerald-500 to-teal-500';
+  } else if (categoryLower.includes('cognitive') || categoryLower.includes('nhận')) {
+    categoryColor = 'from-amber-500 to-orange-500';
+  }
+  
+  const title = row.title_en && effectiveLanguage === 'en' ? row.title_en : row.title;
+  const description = row.description_en && effectiveLanguage === 'en' ? row.description_en : (row.description || '');
+  
+  return {
+    id: row.id,
+    title: title || '',
+    title_en: row.title_en || row.title || '',
+    description: description.substring(0, 300) + (description.length > 300 ? '...' : ''),
+    category: row.category || 'general',
+    brand: row.brand || 'MADA Qatar AT Portal',
+    price_range: row.price_range || 'Liên hệ MADA Center',
+    product_url: row.source_url || row.product_url || row.url || '',
+    source_url: row.source_url || row.url || '',
+    image_url: toProxyImageUrl(row.image_url || ''),
+    confidence: 0.85,
+    match_reason: `Phù hợp với danh mục ${row.category}`,
+    mada_advice: row.mada_advice || '',
+    warranty: row.warranty || '',
+    features: row.features ? JSON.parse(row.features) : [],
+    specifications: {},
+    in_stock: true,
+    galleryImages: [],
+    categoryColor,
+  };
+}
+
 // MADA Agent to Category mapping
 const AGENT_TO_MADA: Record<string, { botId: string; madaCategory: string }> = {
   'bot-hearing':    { botId: 'bot-hearing',    madaCategory: 'sensory-hearing' },
@@ -212,16 +253,27 @@ const AGENT_TO_MADA: Record<string, { botId: string; madaCategory: string }> = {
 };
 
 // ⭐ Product Request Category Mapping (MADA bot category → kb_products.category)
-// ⭐ CRITICAL: Products have MADA category slugs as category values (e.g., 'sensory-vision', 'mental-cognitive')
-// This mapping is now 1:1 (no transformation needed) for querying products directly
+// ⭐ CRITICAL: Maps old MADA category names to NEW category IDs used in kb_products
+// This is a 1:1 mapping but with name transformation
 const MADA_CATEGORY_TO_DB: Record<string, string> = {
-  'sensory-hearing': 'sensory-hearing',
-  'sensory-vision': 'sensory-vision',
+  // Old MADA category → New kb_products category
+  'sensory-hearing': 'hearing',
+  'sensory-vision': 'vision',
   'voice-and-speech': 'voice-and-speech',
-  'mental-cognitive': 'mental-cognitive',
-  'neuromusculoskeletal-movement': 'neuromusculoskeletal-movement',
-  'mobility-and-transportation': 'mobility-and-transportation',
-  'regulatory-standards': 'regulatory-standards',
+  'mental-cognitive': 'cognition',
+  'neuromusculoskeletal-movement': 'mobility',
+  'mobility-and-transportation': 'daily_living',
+  'regulatory-standards': 'education',
+  // Also support new category names directly
+  'hearing': 'hearing',
+  'vision': 'vision',
+  'cognition': 'cognition',
+  'mobility': 'mobility',
+  'daily_living': 'daily_living',
+  'communication': 'communication',
+  'web_accessibility': 'web_accessibility',
+  'general': 'general',
+  'education': 'education',
 };
 
 // ⭐ Product request response templates
@@ -654,6 +706,8 @@ async function getSuggestedProducts(ragSources: any[], message: string, effectiv
 
   // ⭐ Map MADA category slug → kb_products.category (products store MADA slugs directly)
   // e.g. 'mobility-and-transportation' → 'mobility-and-transportation'
+  // ⭐ IMPORTANT: Lưu original MADA category TRƯỚC KHI mapping để dùng trong specific checks
+  const originalMadaCategory = agentCategory;
   if (agentCategory && MADA_CATEGORY_TO_DB[agentCategory]) {
     const mapped = MADA_CATEGORY_TO_DB[agentCategory];
     console.log(`📦 [getSuggestedProducts] Using MADA category "${agentCategory}" → product category "${mapped}"`);
@@ -933,6 +987,41 @@ async function getSuggestedProducts(ragSources: any[], message: string, effectiv
       if (isNonATCategory && !hasValidATKeywords(titleLower)) return false;
       if (isFromNonATSite) return false;
       if (isGenericTitle) return false;
+      
+      // ⭐ STRATEGY 1 CATEGORY FILTER: Mỗi bot chỉ hiển thị sản phẩm thuộc category của mình
+      // bot-regulatory (Thông tin bổ trợ) KHÔNG bị filter - được xem TẤT CẢ sản phẩm
+      // ⭐ CRITICAL FIX: Dùng originalMadaCategory (chưa map) cho specific checks vì agentCategory đã bị remap rồi!
+      if (shouldFilterByCategory && agentCategory) {
+        const productCategory = (p.category || '').toLowerCase();
+        const catLower = agentCategory.toLowerCase();
+        let categoryMatch = 
+          productCategory.includes(catLower) ||
+          (originalMadaCategory === 'sensory-hearing' && productCategory.includes('hearing')) ||
+          (originalMadaCategory === 'sensory-vision' && productCategory.includes('vision')) ||
+          (originalMadaCategory === 'voice-and-speech' && (
+            productCategory.includes('voice') ||
+            productCategory.includes('speech') ||
+            productCategory.includes('communication') ||
+            productCategory.includes('aac')
+          )) ||
+          (originalMadaCategory === 'mobility-and-transportation' && (
+            productCategory.includes('mobility') ||
+            productCategory.includes('physical')
+          )) ||
+          (originalMadaCategory === 'mental-cognitive' && (
+            productCategory.includes('cognitive') ||
+            productCategory.includes('mental')
+          )) ||
+          (originalMadaCategory === 'neuromusculoskeletal-movement' && (
+            productCategory.includes('neuro') ||
+            productCategory.includes('musculoskeletal')
+          ));
+        if (!categoryMatch) {
+          console.log(`📦 [Filter STRATEGY1 CATEGORY MISMATCH] "${p.title}" - product category "${productCategory}" vs agent category "${agentCategory}" (original: "${originalMadaCategory}")`);
+          return false;
+        }
+      }
+      
       return true;
     });
     
@@ -968,32 +1057,34 @@ async function getSuggestedProducts(ragSources: any[], message: string, effectiv
         dbParams = [];
         console.log(`📦 [getSuggestedProducts] Regulatory bot - fetching ALL products from knowledge_items (up to 24)`);
       } else if (shouldFilterByCategory && agentCategory) {
-        // Các bot THƯỜNG: Chỉ lấy sản phẩm thuộc category của mình
+        // Các bot THƯỜNG: Chỉ lấy sản phẩm thuộc category của mình từ kb_products
         dbQuery = `
-          SELECT * FROM knowledge_items 
-          WHERE category = ? AND status = 'published' AND source_type = 'web'
-          ORDER BY created_at DESC
+          SELECT * FROM kb_products 
+          WHERE category = ? AND status IN ('draft', 'published', 'archived')
+          AND image_url IS NOT NULL AND image_url != ''
+          ORDER BY featured DESC, created_at DESC
           LIMIT 12
         `;
         dbParams = [agentCategory];
-        console.log(`📦 [getSuggestedProducts] Fetching products for category: ${agentCategory} from knowledge_items`);
+        console.log(`📦 [getSuggestedProducts] Fetching products for category: ${agentCategory} from kb_products`);
       } else {
-        // Không có category → lấy tất cả
+        // Không có category → lấy tất cả từ kb_products
         dbQuery = `
-          SELECT * FROM knowledge_items 
-          WHERE status = 'published' AND source_type = 'web'
-          ORDER BY created_at DESC
+          SELECT * FROM kb_products 
+          WHERE status IN ('draft', 'published', 'archived')
+          AND image_url IS NOT NULL AND image_url != ''
+          ORDER BY featured DESC, created_at DESC
           LIMIT 12
         `;
         dbParams = [];
-        console.log(`📦 [getSuggestedProducts] Fetching all products from knowledge_items`);
+        console.log(`📦 [getSuggestedProducts] Fetching all products from kb_products`);
       }
       
       const dbProducts = db.prepare(dbQuery).all(...dbParams) as any[];
-      console.log(`📦 [getSuggestedProducts] DB fetched ${dbProducts.length} products from knowledge_items`);
+      console.log(`📦 [getSuggestedProducts] DB fetched ${dbProducts.length} products from kb_products`);
       
-      // Map dbProducts to product format using helper
-      const mappedDbProducts: any[] = dbProducts.map((row: any) => knowledgeItemToProduct(row, effectiveLanguage));
+      // Map kb_products rows to product format using helper
+      const mappedDbProducts: any[] = dbProducts.map((row: any) => kbProductToProduct(row, effectiveLanguage));
       
       // Filter mapped products
       const filteredDbProducts = mappedDbProducts.filter((p: any) => {
@@ -1010,33 +1101,34 @@ async function getSuggestedProducts(ragSources: any[], message: string, effectiv
         
         // ⭐ Category matching - MỖI BOT chỉ thấy sản phẩm thuộc category của mình
         // bot-regulatory (Thông tin bổ trợ) KHÔNG bị filter - được xem TẤT CẢ sản phẩm
+        // ⭐ CRITICAL FIX: Dùng originalMadaCategory (chưa map) cho specific checks
         let categoryMatch = true;
         if (shouldFilterByCategory && agentCategory) {
           const productCategory = (p.category || '').toLowerCase();
           const catLower = agentCategory.toLowerCase();
           categoryMatch =
             productCategory.includes(catLower) ||
-            (agentCategory === 'sensory-hearing' && productCategory.includes('hearing')) ||
-            (agentCategory === 'sensory-vision' && productCategory.includes('vision')) ||
-            (agentCategory === 'voice-and-speech' && (
+            (originalMadaCategory === 'sensory-hearing' && productCategory.includes('hearing')) ||
+            (originalMadaCategory === 'sensory-vision' && productCategory.includes('vision')) ||
+            (originalMadaCategory === 'voice-and-speech' && (
               productCategory.includes('voice') ||
               productCategory.includes('speech') ||
               productCategory.includes('communication') ||
               productCategory.includes('aac')
             )) ||
-            (agentCategory === 'mobility-and-transportation' && (
+            (originalMadaCategory === 'mobility-and-transportation' && (
               productCategory.includes('mobility') ||
               productCategory.includes('physical')
             )) ||
-            (agentCategory === 'mental-cognitive' && (
+            (originalMadaCategory === 'mental-cognitive' && (
               productCategory.includes('cognitive') ||
               productCategory.includes('mental')
             )) ||
-            (agentCategory === 'neuromusculoskeletal-movement' && (
+            (originalMadaCategory === 'neuromusculoskeletal-movement' && (
               productCategory.includes('neuro') ||
               productCategory.includes('musculoskeletal')
             ));
-          if (!categoryMatch) console.log(`📦 [Filter OUT DB] "${p.title}" - category mismatch: ${productCategory} vs ${agentCategory}`);
+          if (!categoryMatch) console.log(`📦 [Filter OUT DB] "${p.title}" - category mismatch: ${productCategory} vs ${agentCategory} (original: "${originalMadaCategory}")`);
         }
         
         if (!hasImage) console.log(`📦 [Filter OUT DB] "${p.title}" - no valid image`);

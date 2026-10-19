@@ -228,7 +228,9 @@ class VectorStore {
     if (!this.dataDir) return;
 
     const docsPath = path.join(this.dataDir, 'documents.json');
-    const docs = Array.from(this.inMemoryStore.values()).map(({ embedding, ...doc }) => doc);
+    // ⭐ FIX: Giữ lại embedding khi save → tránh phải tính lại mỗi lần restart
+    // File sẽ lớn hơn (768 dims × N docs) nhưng RAG sẽ hoạt động ngay sau restart
+    const docs = Array.from(this.inMemoryStore.values());
     fs.writeFileSync(docsPath, JSON.stringify(docs, null, 2));
   }
 

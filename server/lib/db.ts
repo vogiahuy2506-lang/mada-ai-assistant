@@ -216,6 +216,20 @@ db.exec(`
 `);
 
 
+// ============== CHAT CONTEXT SCHEMA ==============
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS conversation_recommended_products (
+    conversation_id TEXT NOT NULL,
+    product_title TEXT NOT NULL,
+    product_title_en TEXT,
+    recommended_at TEXT NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY (conversation_id, product_title)
+  );
+  CREATE INDEX IF NOT EXISTS idx_conv_products ON conversation_recommended_products(conversation_id);
+`);
+
+
 try {
   const cols = db.prepare("PRAGMA table_info(kb_categories)").all() as any[];
   const colNames = cols.map((c: any) => c.name);

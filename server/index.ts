@@ -58,6 +58,11 @@ function toProxyImageUrl(madaUrl: string): string {
 }
 
 // RAG imports
+// Auth imports - DB must be initialized FIRST
+import './lib/db'; // Initialize DB
+import db, { getFileUploadQuota, trackFileUpload } from './lib/db';
+
+// RAG imports (depend on db being initialized)
 import { vectorStore } from './lib/rag/vectorStore';
 import { ragEngine } from './lib/rag/ragEngine';
 import { ragService } from './lib/rag/rag.service'; // ⭐ Seed data service
@@ -67,10 +72,6 @@ import { guardrails } from './lib/guardrails';
 
 // Scheduler imports
 import { startScheduler } from './lib/scraping-scheduler';
-
-// Auth imports
-import './lib/db'; // Initialize DB
-import db, { getFileUploadQuota, trackFileUpload } from './lib/db';
 import { authenticate, requireRole } from './lib/auth';
 import authRoutes from './routes/auth';
 import userRoutes from './routes/users';
@@ -2762,7 +2763,7 @@ app.post('/api/chat', async (req, res) => {
         
         suggestedProducts = ragSources.slice(0, 4).map((src: any, idx: number) => {
           const meta = src.metadata || {};
-          const sourceUrl = meta.source || meta.url || src.source || '';
+          const sourceUrl = meta.productUrl || meta.source || meta.url || src.source || '';
           // Ưu tiên thumbnailUrl trong metadata (vector store copy từ DB)
           // Sau đó mới đến DB lookup theo sourceUrl
           let thumbnail = meta.thumbnailUrl || thumbnailMap[sourceUrl] || '';
@@ -3178,7 +3179,7 @@ SELECT url, source, json_extract(metadata, '$.thumbnailUrl') as thumbnail
         
         suggestedProducts = ragSources.slice(0, 4).map((src: any, idx: number) => {
           const meta = src.metadata || {};
-          const sourceUrl = meta.source || meta.url || src.source || '';
+          const sourceUrl = meta.productUrl || meta.source || meta.url || src.source || '';
           const category = meta.category || 'general';
           const thumbnail = meta.thumbnailUrl || thumbnailMap[sourceUrl] || '';
           return {
@@ -3442,7 +3443,7 @@ app.post('/api/chat/stream', async (req: any, res: any) => {
           
 suggestedProducts = ragSources.slice(0, 4).map((src: any, idx: number) => {
             const meta = src.metadata || {};
-            const sourceUrl = meta.source || meta.url || src.source || '';
+            const sourceUrl = meta.productUrl || meta.source || meta.url || src.source || '';
             const category = meta.category || 'general';
             const thumbnail = meta.thumbnailUrl || thumbnailMap[sourceUrl] || '';
             return {

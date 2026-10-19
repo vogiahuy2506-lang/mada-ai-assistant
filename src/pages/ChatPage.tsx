@@ -397,6 +397,103 @@ function detectCategoryFromQuery(query: string): string {
   return 'general';
 }
 
+/**
+ * ⭐ HELPER: Convert product names in markdown text to clickable links
+ * Finds product names in the content and replaces them with markdown links using product_url
+ */
+function convertProductNamesToLinks(
+  content: string,
+  products: SuggestedProduct[] | undefined
+): string {
+  if (!content || !products || products.length === 0) {
+    return content;
+  }
+
+  let result = content;
+
+  // Track which positions have already been linked to avoid double-linking
+  const linkedRanges: { start: number; end: number }[] = [];
+
+  for (const product of products) {
+    // Get the best URL for this product
+    const url = product.product_url || product.source_url;
+    if (!url || !url.startsWith('http')) continue;
+
+    // Create a regex-friendly version of the product name
+    const productName = product.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    if (productName.length < 2) continue; // Skip very short names
+
+    // Helper to check if a position is already linked
+    const isPositionLinked = (pos: number): boolean => {
+      return linkedRanges.some(range => pos >= range.start && pos <= range.end);
+    };
+
+    // Helper to mark a range as linked
+    const markAsLinked = (start: number, end: number) => {
+      linkedRanges.push({ start, end });
+    };
+
+    // Pattern 1: Bold markdown **ProductName**
+    const boldPattern = new RegExp(`\\*\\*(${productName})\\*\\*`, 'gi');
+    
+    result = result.replace(boldPattern, (match, name) => {
+      // Don't link if already linked
+      const matchIndex = result.indexOf(match);
+      if (isPositionLinked(matchIndex)) return match;
+      
+      markAsLinked(matchIndex, matchIndex + match.length);
+      return `[${name}](${url})`;
+    });
+
+    // Pattern 2: Plain product name (not already linked)
+    // Use word boundary for better matching
+    const plainPattern = new RegExp(`\\b(${productName})\\b`, 'gi');
+    
+    result = result.replace(plainPattern, (match) => {
+      // Don't link if it's inside a markdown link [text](url)
+      const matchIndex = result.indexOf(match);
+      if (isPositionLinked(matchIndex)) return match;
+      
+      // Check context: don't link if preceded by []( or similar
+      const beforeStart = Math.max(0, matchIndex - 5);
+      const beforeContext = result.substring(beforeStart, matchIndex);
+      if (beforeContext.endsWith('](') || beforeContext.endsWith('[')) return match;
+      
+      markAsLinked(matchIndex, matchIndex + match.length);
+      return `[${match}](${url})`;
+    });
+
+    // Pattern 3: Also try with title_en if different from title
+    if (product.title_en && product.title_en !== product.title) {
+      const productNameEn = product.title_en.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      if (productNameEn.length >= 2) {
+        // Bold pattern for English name
+        const boldPatternEn = new RegExp(`\\*\\*(${productNameEn})\\*\\*`, 'gi');
+        result = result.replace(boldPatternEn, (match, name) => {
+          const matchIndex = result.indexOf(match);
+          if (isPositionLinked(matchIndex)) return match;
+          markAsLinked(matchIndex, matchIndex + match.length);
+          return `[${name}](${url})`;
+        });
+
+        // Plain pattern for English name
+        const plainPatternEn = new RegExp(`\\b(${productNameEn})\\b`, 'gi');
+        result = result.replace(plainPatternEn, (match) => {
+          const matchIndex = result.indexOf(match);
+          if (isPositionLinked(matchIndex)) return match;
+          const beforeStart = Math.max(0, matchIndex - 5);
+          const beforeContext = result.substring(beforeStart, matchIndex);
+          if (beforeContext.endsWith('](') || beforeContext.endsWith('[')) return match;
+          markAsLinked(matchIndex, matchIndex + match.length);
+          return `[${match}](${url})`;
+        });
+      }
+    }
+  }
+
+  return result;
+}
+
 interface Message {
   id: string;
   role: string;
@@ -935,7 +1032,7 @@ export function ChatPage() {
     // Điều này buộc app phải fetch từ backend mỗi lần
     try {
       const storageKey = 'mada-agents';
-      console.log('[ChatPage] 🔄 Clearing ALL localStorage cache for agents...');
+
       localStorage.removeItem(storageKey);
     } catch (_) {}
     
@@ -947,8 +1044,7 @@ export function ChatPage() {
       .then((data: { success: boolean; data: unknown[] }) => {
         if (data.success && Array.isArray(data.data)) {
           const freshAgents = data.data.map((item: unknown) => mapBackendAgent(item));
-          console.log('[ChatPage] ✅ Agents fetched directly from backend:', freshAgents.length, 'active:', freshAgents.filter(a => a.isActive).length);
-          freshAgents.forEach((a, i) => console.log(`  [${i}] "${a.name}" systemPrompt=${a.systemPrompt ? 'HAS' : 'MISSING'}`));
+
           useAgentStore.setState({
             agents: freshAgents,
             lastSynced: Date.now(),
@@ -968,12 +1064,12 @@ export function ChatPage() {
   useEffect(() => {
     // ⭐ Stagger delay to avoid 429 rate limiting on initial load
     const timer = setTimeout(() => {
-      console.log('[ChatPage] Loading agents from backend (direct)...');
+
       fetchAgentsDirectly();
     }, 200); // 200ms delay to avoid initial burst
     
     const onFocus = () => {
-      console.log('[ChatPage] Window focus - reloading agents...');
+
       fetchAgentsDirectly();
     };
     window.addEventListener('focus', onFocus);
@@ -988,15 +1084,15 @@ export function ChatPage() {
   useEffect(() => {
     // ⭐ Stagger delay to avoid 429
     const timer = setTimeout(() => {
-      console.log('[ChatPage] Loading system settings from backend...');
+
       loadSystemSettings().then(() => {
-        console.log('[ChatPage] System settings loaded, categoryOrder:', useSystemSettingsStore.getState().categoryOrder);
+
       }).catch((err) => {
         console.error('[ChatPage] Failed to load system settings:', err);
       });
     }, 100); // 100ms delay
     const onFocus = () => {
-      console.log('[ChatPage] Window focus - reloading system settings...');
+
       loadSystemSettings();
     };
     window.addEventListener('focus', onFocus);
@@ -1053,7 +1149,7 @@ export function ChatPage() {
   useEffect(() => {
     const sessionId = searchParams.get('session');
     if (sessionId) {
-      console.log('[ChatPage] Loading session from URL:', sessionId);
+
       // Set the active conversation ID to load from URL
       setActiveConversationId(sessionId);
       // Load messages for this session (synchronous)
@@ -1068,11 +1164,11 @@ export function ChatPage() {
   useEffect(() => {
     const cleanup = onAgentChange((event) => {
       const agentId = 'agentId' in event ? event.agentId : ('agentIds' in event ? event.agentIds?.join(',') : '');
-      console.log('[ChatPage] 📡 Received agent change broadcast:', event.type, agentId || '');
+
 
       // ⭐ Xử lý thay đổi category order (từ AdminSettings)
       if (event.type === 'category-order-changed') {
-        console.log('[ChatPage] 🔄 Category order changed, reloading system settings...');
+
         useSystemSettingsStore.getState().loadFromBackend();
         return;
       }
@@ -1137,7 +1233,7 @@ export function ChatPage() {
             // Xóa agents cũ trong persist storage để force fetch từ API
             // Luôn xóa nếu có data (kể cả agents rỗng) để đảm bảo fresh fetch
             if (parsed.state?.agents !== undefined || parsed.state?.lastSynced) {
-              console.log('[ChatPage] 🔄 Clearing localStorage cache before broadcast reload...');
+
               const newState = { ...parsed, state: { ...parsed.state, agents: [], lastSynced: null } };
               localStorage.setItem(storageKey, JSON.stringify(newState));
             }
@@ -1149,13 +1245,13 @@ export function ChatPage() {
       clearCache();
 
       // Gọi API trực tiếp thay vì qua loadAgents() để tránh race condition với persist
-      console.log('[ChatPage] 🔄 Fetching agents directly from /public/agents...');
+
       fetch('/api/public/agents')
         .then(res => res.json())
         .then((fetchData: { success: boolean; data: unknown[] }) => {
           if (fetchData.success && Array.isArray(fetchData.data)) {
             const freshAgents = fetchData.data.map((item: unknown) => mapBackendAgent(item));
-            console.log('[ChatPage] ✅ Fresh agents fetched:', freshAgents.length, 'active:', freshAgents.filter(a => a.isActive).length);
+
             // Cập nhật store trực tiếp với dữ liệu mới
             useAgentStore.setState({
               agents: freshAgents,
@@ -1186,7 +1282,7 @@ export function ChatPage() {
   // ⭐ Lắng nghe broadcast từ Admin - cập nhật settings ngay khi admin thay đổi
   useEffect(() => {
     const cleanup = onSettingsChange((event) => {
-      console.log('[ChatPage] 📡 Received settings change broadcast:', event.type, event);
+
       // Reload settings ngay lập tức khi có thay đổi từ Admin
       loadChatSettings();
     });
@@ -1226,6 +1322,13 @@ export function ChatPage() {
   // ⭐ Lưu message gốc của user để trả lời sau khi hỏi đủ 4 câu
   const [pendingUserMessage, setPendingUserMessage] = useState<string | null>(null);
   const [pendingMessageTimestamp, setPendingMessageTimestamp] = useState<number>(0);
+  
+  // ⭐ TRACKING: Câu hỏi cuối cùng đã hỏi để KHÔNG LẶP LẠI
+  // Lưu cả question type và question text để so sánh
+  const [lastAskedQuestion, setLastAskedQuestion] = useState<{
+    type: string | null;
+    text: string;
+  }>({ type: null, text: '' });
   
   // ⭐ Tính Maturity Score (0-100) - được giữ lại cho tương lai nếu cần
   const _getMaturityScore = useCallback(() => {
@@ -1296,26 +1399,152 @@ export function ChatPage() {
   }, [userContextCollected, conversationTurns]);
   
   // ⭐ Lấy danh sách context còn thiếu (để bot hỏi thêm)
-  const getMissingContext = useMemo(() => {
-    const missing: string[] = [];
-    
-    // Ưu tiên theo thứ tự: triệu chứng → mức độ → thời gian → bổ sung
-    if (!userContextCollected.hasSymptom) missing.push('symptom');
-    if (!userContextCollected.hasSeverity) missing.push('severity');
-    if (!userContextCollected.hasDuration) missing.push('duration');
-    if (!userContextCollected.hasBudget) missing.push('budget');
-    if (!userContextCollected.hasConstraint) missing.push('constraint');
-    if (!userContextCollected.hasGoal) missing.push('goal');
-    if (!userContextCollected.hasPreviousTry) missing.push('previousTry');
-    
-    return missing;
-  }, [userContextCollected]);
+  /**
+   * ⭐ SMART CONTEXT EXTRACTOR: Phân tích toàn bộ lịch sử hội thoại để trích xuất context
+   * Thay vì chỉ kiểm tra tin nhắn hiện tại, giờ sẽ phân tích TẤT CẢ tin nhắn trước đó
+   * ⭐ ĐÂY LÀ HÀM THƯỜNG (không useCallback) để có thể dùng trong getNextFollowUpQuestion
+   */
+  const analyzeConversationHistory = (messages: { role: string; content: string }[]): {
+    hasSymptom: boolean;
+    hasBudget: boolean;
+    hasConstraint: boolean;
+    hasGoal: boolean;
+    hasDeviceType: boolean;
+    hasDuration: boolean;
+    hasSeverity: boolean;
+    hasPreviousTry: boolean;
+  } => {
+    // Tổng hợp tất cả nội dung từ USER MESSAGES ONLY
+    // KHÔNG phân tích assistant messages vì sẽ bị ảnh hưởng bởi câu hỏi của bot
+    const allContent = messages
+      .filter(m => m.role === 'user')
+      .map(m => m.content.toLowerCase())
+      .join(' ');
+
+    // Các patterns để detect context
+    const patterns = {
+      // SYMPTOM: Mô tả triệu chứng/bệnh tình - MỞ RỘNG để bắt nhiều trường hợp hơn
+      hasSymptom: [
+        /(bị|mắc|có|vấn đề|triệu chứng|khó khăn|gặp| không thể)/i,
+        /(audi|hearing|mobility|deaf|disabled|khuyết tật)/i,
+        /(đau|mỏi|điếc|khiếm thị|khiếm thính|tai|mắt|mù|điếc)/i,
+        /(bệnh|tình trạng|biểu hiện|symptom|condition|sick|illness)/i,
+        /(khiếm thị|khiếm thính|thị giác|thính giác)/i,
+        // ⭐ MỚI: Các triệu chứng cụ thể hơn
+        /(mất tiếng|khó nghe|khó nhìn|giảm thị lực|ùng tai|chóng mặt)/i,
+        /(tê bì|liệt|yếu|cứng|co cơ|bại)/i,
+        /(mất trí nhớ|lú lẫn|quên|confusion|memory)/i,
+        /(khó nói|ngọng|lisp|stutter|dysarthria)/i,
+        // ⭐ MÔ TẢ DÀI: Khi user viết nhiều hơn 50 ký tự mà không phải là câu hỏi
+        /.{50,}(?:bị|mắc|gặp| có|triệu chứng|biểu hiện|tình trạng)/i,
+      ],
+
+      // BUDGET: Ngân sách/giá cả
+      hasBudget: [
+        /(giá|tiền|budget|chi phí|đắt|rẻ|triệu|mua|thanh toán|trả góp|insurance|bảo hiểm)/i,
+        /(price|cost|money|bought|purchase|vnd|usd|qar)/i,
+        /(bao nhiêu|cần bao|nhiều tiền|ít tiền)/i,
+      ],
+
+      // CONSTRAINT: Ràng buộc (độ tuổi, môi trường)
+      hasConstraint: [
+        /(tuổi|trẻ|em bé|người già|senior|child|elderly|nhà|office|văn phòng|school|trường|học)/i,
+        /(outdoor|indoor|môi trường|độ tuổi|years old|age)/i,
+        /(người lớn|thanh thiếu niên|teenager|baby|toddler)/i,
+        // ⭐ MỚI: Thêm các từ chỉ độ tuổi cụ thể
+        /(tôi \d+|mình \d+|con \d+|năm nay|tuổi)/i,
+      ],
+
+      // GOAL: Mục tiêu sử dụng thiết bị
+      hasGoal: [
+        /(muốn|cần|học|làm việc|đọc|viết|giao tiếp|đi lại|tự chủ|independent)/i,
+        /(learn|work|read|communicate|move|walk|stand)/i,
+        /(để|mục đích|giúp|tôi có thể|tôi muốn)/i,
+        /(tự tin|hòa nhập|tham gia|sinh hoạt)/i,
+      ],
+
+      // DEVICE TYPE: Loại thiết bị quan tâm
+      hasDeviceType: [
+        /(xe lăn|máy|thiết bị|device|wheelchair|hearing aid|screen reader)/i,
+        /(aac|prosthetic|orthotic|cane|crutch|nạng|kính|loa|braille)/i,
+        /(máy trợ|bàn phím|chuột|ghế|giường|nệm)/i,
+        /(thiết bị gì|nên dùng|cái gì|xe gì)/i,
+      ],
+
+      // DURATION: Thời gian xảy ra vấn đề - MỞ RỘNG
+      hasDuration: [
+        /(lâu|rồi|tháng|năm|từ|khi|bắt đầu|day|mount|year|week|ago|since)/i,
+        /(how long|多久|多长时间|depuis)/i,
+        /(từ năm|từ tháng|vài tháng|năm nay|năm ngoái)/i,
+        // ⭐ MỚI: Các biểu thức thời gian cụ thể
+        /(đã \d+|\d+ ngày|\d+ tuần|\d+ tháng|\d+ năm)/i,
+        /(gần đây|mới đây|vừa|mới|recently)/i,
+        /(bẩm sinh|từ nhỏ|từ bé|lúc đầu|ban đầu)/i,
+        /(mãn tính|cấp tính|kinh niên|acute|chronic)/i,
+      ],
+
+      // SEVERITY: Mức độ nghiêm trọng - MỞ RỘNG
+      hasSeverity: [
+        /(nặng|vừa|nhẹ|severe|moderate|mild|khó|nghiêm trọng|ảnh hưởng)/i,
+        /(rất|đỡ|hơn|tốt hơn|xấu hơn|dần|dần dần)/i,
+        /(severe|intense|serious|critical|critical)/i,
+        // ⭐ MỚI: Các cách diễn đạt mức độ nghiêm trọng
+        /(không thể|hoàn toàn|hoàn toàn không|completely unable)/i,
+        /(hạn chế|giới hạn|limited|có thể một phần)/i,
+        /(đáng kể|quan trọng|significant|major|minor)/i,
+        /(gần như|almost|near|nearly|bien|tam)/i,
+      ],
+
+      // PREVIOUS TRY: Đã thử sản phẩm/gì đó trước đó
+      hasPreviousTry: [
+        /(thử|đã|dùng|use|tried|sử dụng|medicine|thuốc|vitamin)/i,
+        /(trước đây|trước kia|trước mặt|hồi|ngày xưa)/i,
+        /(đã từng|có kinh nghiệm|used before|before this)/i,
+        /(không hiệu quả|không tốt|không phù hợp|failed|ineffective)/i,
+        /(có hiệu quả|có tác dụng|tốt|effective|helped)/i,
+      ],
+    };
+
+    // Check each pattern against all content
+    return {
+      hasSymptom: patterns.hasSymptom.some(p => p.test(allContent)),
+      hasBudget: patterns.hasBudget.some(p => p.test(allContent)),
+      hasConstraint: patterns.hasConstraint.some(p => p.test(allContent)),
+      hasGoal: patterns.hasGoal.some(p => p.test(allContent)),
+      hasDeviceType: patterns.hasDeviceType.some(p => p.test(allContent)),
+      hasDuration: patterns.hasDuration.some(p => p.test(allContent)),
+      hasSeverity: patterns.hasSeverity.some(p => p.test(allContent)),
+      hasPreviousTry: patterns.hasPreviousTry.some(p => p.test(allContent)),
+    };
+  };
   
   // ⭐ Tạo câu hỏi follow-up dựa trên context còn thiếu
   // Bot sẽ hỏi TỪNG câu một, không hỏi tất cả cùng lúc
-  const getNextFollowUpQuestion = useCallback((lang: Language): string => {
-    const missing = getMissingContext;
-    if (missing.length === 0) return '';
+  // ⭐ FIX: Tính toán lại context TRỰC TIẾP từ messages và KHÔNG lặp lại câu hỏi cuối
+  // Trả về cả câu hỏi và loại để tracking
+  const getNextFollowUpQuestionWithType = useCallback((
+    lang: Language, 
+    conversationMessages: { role: string; content: string }[] = [],
+    lastAskedQuestionType: string | null = null
+  ): { question: string; type: string | null } => {
+    // ⭐ QUAN TRỌNG: Tính toán context TRỰC TIẾP từ messages hiện tại
+    // KHÔNG dùng userContextCollected state vì nó có thể stale
+    const currentContext = analyzeConversationHistory(conversationMessages);
+    
+    // Xác định những context còn thiếu dựa trên phân tích hiện tại
+    const missing: string[] = [];
+    if (!currentContext.hasSymptom) missing.push('symptom');
+    if (!currentContext.hasSeverity) missing.push('severity');
+    if (!currentContext.hasDuration) missing.push('duration');
+    if (!currentContext.hasBudget) missing.push('budget');
+    if (!currentContext.hasConstraint) missing.push('constraint');
+    if (!currentContext.hasGoal) missing.push('goal');
+    if (!currentContext.hasPreviousTry) missing.push('previousTry');
+    
+    // ⭐ BỎ QUA câu hỏi cuối cùng đã hỏi để tránh lặp lại
+    const filteredMissing = missing.filter(type => type !== lastAskedQuestionType);
+    
+    if (filteredMissing.length === 0) return { question: '', type: null }; // Đã có đủ context hoặc tất cả đều đã hỏi rồi
     
     const questionsByLang: Record<Language, Record<string, string[]>> = {
       vi: {
@@ -1357,36 +1586,32 @@ export function ChatPage() {
     };
     
     const langQuestions = questionsByLang[lang] || questionsByLang.vi;
-    const nextMissing = missing[0]; // Lấy cái đầu tiên trong danh sách thiếu
-    const questions = langQuestions[nextMissing] || langQuestions.symptom;
     
-    // Random 1 câu hỏi
-    return questions[Math.floor(Math.random() * questions.length)];
-  }, [getMissingContext]);
+    // ⭐ Lấy câu hỏi đầu tiên trong danh sách còn thiếu (đã lọc)
+    const nextMissing = filteredMissing[0];
+    const questions = langQuestions[nextMissing] || langQuestions.symptom;
+    const selectedQuestion = questions[Math.floor(Math.random() * questions.length)];
+    
+    return { question: selectedQuestion, type: nextMissing };
+  }, [analyzeConversationHistory]);
   
-  // ⭐ Cập nhật context khi user nhắn tin
-  const updateUserContext = useCallback((message: string) => {
-    const lowerMsg = message.toLowerCase();
+  // ⭐ Cập nhật context khi user nhắn tin - DÙNG phân tích lịch sử hội thoại
+  const updateUserContext = useCallback((message: string, conversationMessages: { role: string; content: string }[] = []) => {
+    // Phân tích toàn bộ lịch sử hội thoại
+    const historyContext = analyzeConversationHistory(conversationMessages);
     
     setUserContextCollected(prev => ({
-      hasSymptom: prev.hasSymptom || 
-        /(bị|mắc|có|vấn đề|triệu chứng|khó khăn|gặp| không thể|audi|hearing|mobility|deaf|disabled|khuyết tật|đau|mỏi|điếc|khiếm thị|khiếm thính)/i.test(lowerMsg),
-      hasBudget: prev.hasBudget || 
-        /(giá|tiền|budget|chi phí|đắt|rẻ|triệu|mua|thanh toán|trả góp|insurance|bảo hiểm)/i.test(lowerMsg),
-      hasConstraint: prev.hasConstraint || 
-        /(tuổi|trẻ|em bé|người già|senior|child|elderly|nhà|office|văn phòng|school|trường|học|outdoor|indoor|môi trường)/i.test(lowerMsg),
-      hasGoal: prev.hasGoal || 
-        /(muốn|cần|học|làm việc|đọc|viết|giao tiếp|đi lại|tự chủ|independent|learn|work|read|communicate|move)/i.test(lowerMsg),
-      hasDeviceType: prev.hasDeviceType || 
-        /(xe lăn|máy|thiết bị|device|wheelchair|hearing aid|screen reader|aac|prosthetic|orthotic|cane|crutch|nạng|kính|loa)/i.test(lowerMsg),
-      hasDuration: prev.hasDuration || 
-        /(lâu|rồi|tháng|năm|từ|khi|bắt đầu|day|mount|year|week|ago|since|how long)/i.test(lowerMsg),
-      hasSeverity: prev.hasSeverity || 
-        /(nặng|vừa|nhẹ|severe|moderate|mild|khó|nghiêm trọng|ảnh hưởng|rất|đỡ|hơn)/i.test(lowerMsg),
-      hasPreviousTry: prev.hasPreviousTry || 
-        /(thử|đã|dùng|use|tried|sử dụng|medicine|thuốc|vitamin|sản phẩm)/i.test(lowerMsg),
+      // Lấy từ lịch sử HOẶC từ tin nhắn hiện tại
+      hasSymptom: historyContext.hasSymptom || prev.hasSymptom,
+      hasBudget: historyContext.hasBudget || prev.hasBudget,
+      hasConstraint: historyContext.hasConstraint || prev.hasConstraint,
+      hasGoal: historyContext.hasGoal || prev.hasGoal,
+      hasDeviceType: historyContext.hasDeviceType || prev.hasDeviceType,
+      hasDuration: historyContext.hasDuration || prev.hasDuration,
+      hasSeverity: historyContext.hasSeverity || prev.hasSeverity,
+      hasPreviousTry: historyContext.hasPreviousTry || prev.hasPreviousTry,
     }));
-  }, []);
+  }, [analyzeConversationHistory]);
   
   // ⭐ Reset context khi bắt đầu cuộc trò chuyện mới
   const resetContextTracking = useCallback(() => {
@@ -1419,7 +1644,7 @@ export function ChatPage() {
         lowerMessage.includes(keyword.toLowerCase())
       );
       if (simpleMatch) {
-        console.log(`[AT Suggestion] Triggered by category: ${category} (simple keyword)`);
+
         return true;
       }
 
@@ -1428,7 +1653,7 @@ export function ChatPage() {
         lowerMessage.includes(keyword.toLowerCase())
       );
       if (complexMatch) {
-        console.log(`[AT Suggestion] Triggered by category: ${category} (complex keyword)`);
+
         return true;
       }
     }
@@ -1464,7 +1689,7 @@ export function ChatPage() {
       if (res.ok) {
         const data = await res.json();
         if (data.success && data.data?.questions?.length > 0) {
-          console.log('💡 AI follow-up questions:', data.data.questions);
+
           return data.data.questions;
         }
       }
@@ -1726,7 +1951,7 @@ export function ChatPage() {
           if (data.success && data.data?.user) {
             const { login } = useAuthStore.getState();
             login(data.data.user);
-            console.log('✅ Google OAuth login successful:', data.data.user.name);
+
           }
         })
         .catch((err) => console.error('Failed to fetch user after Google login:', err))
@@ -2177,23 +2402,22 @@ export function ChatPage() {
     // ⭐ Tăng số lượt hỏi đáp và cập nhật user context
     // ⚠️ Lưu ý: setState trong React là async batched, nên cần tính toán context ngay
     // để truyền vào request body (ko chờ re-render)
+    
+    // ⭐ MỚI: Lấy toàn bộ lịch sử hội thoại để phân tích context
+    const allMessages = useChatStore.getState().messages;
+    
+    // ⭐ Sử dụng analyzeConversationHistory để phân tích toàn bộ lịch sử
+    const historyContext = analyzeConversationHistory(allMessages);
+    
     const newContextCollected = {
-      hasSymptom: userContextCollected.hasSymptom ||
-        /(bị|mắc|có|vấn đề|triệu chứng|khó khăn|gặp| không thể|audi|hearing|mobility|deaf|disabled|khuyết tật|đau|mỏi|điếc|khiếm thị|khiếm thính)/i.test(userMessage),
-      hasBudget: userContextCollected.hasBudget ||
-        /(giá|tiền|budget|chi phí|đắt|rẻ|triệu|mua|thanh toán|trả góp|insurance|bảo hiểm)/i.test(userMessage),
-      hasConstraint: userContextCollected.hasConstraint ||
-        /(tuổi|trẻ|em bé|người già|senior|child|elderly|nhà|office|văn phòng|school|trường|học|outdoor|indoor|môi trường)/i.test(userMessage),
-      hasGoal: userContextCollected.hasGoal ||
-        /(muốn|cần|học|làm việc|đọc|viết|giao tiếp|đi lại|tự chủ|independent|learn|work|read|communicate|move)/i.test(userMessage),
-      hasDeviceType: userContextCollected.hasDeviceType ||
-        /(xe lăn|máy|thiết bị|device|wheelchair|hearing aid|screen reader|aac|prosthetic|orthotic|cane|crutch|nạng|kính|loa)/i.test(userMessage),
-      hasDuration: userContextCollected.hasDuration ||
-        /(lâu|rồi|tháng|năm|từ|khi|bắt đầu|day|mount|year|week|ago|since|how long)/i.test(userMessage),
-      hasSeverity: userContextCollected.hasSeverity ||
-        /(nặng|vừa|nhẹ|severe|moderate|mild|khó|nghiêm trọng|ảnh hưởng|rất|đỡ|hơn)/i.test(userMessage),
-      hasPreviousTry: userContextCollected.hasPreviousTry ||
-        /(thử|đã|dùng|use|tried|sử dụng|medicine|thuốc|vitamin|sản phẩm)/i.test(userMessage),
+      hasSymptom: historyContext.hasSymptom || userContextCollected.hasSymptom,
+      hasBudget: historyContext.hasBudget || userContextCollected.hasBudget,
+      hasConstraint: historyContext.hasConstraint || userContextCollected.hasConstraint,
+      hasGoal: historyContext.hasGoal || userContextCollected.hasGoal,
+      hasDeviceType: historyContext.hasDeviceType || userContextCollected.hasDeviceType,
+      hasDuration: historyContext.hasDuration || userContextCollected.hasDuration,
+      hasSeverity: historyContext.hasSeverity || userContextCollected.hasSeverity,
+      hasPreviousTry: historyContext.hasPreviousTry || userContextCollected.hasPreviousTry,
     };
     const newTurns = conversationTurns + 1;
 
@@ -2401,17 +2625,14 @@ export function ChatPage() {
         ? (chatAgent || MADA_BOTS.find(b => b.id === 'bot-regulatory')) // Ưu tiên chatAgent, fallback Bot 7
         : (chatAgent || selectedAgent);
       const isUsingRegulatoryBot = isNewChat || (!selectedAgentId && (effectiveAgent as any)?.botId === 'bot-regulatory');
-      
-      console.log('[Chat] Agent selection:', {
-        selectedAgentId,
-        selectedAgentName: selectedAgent?.name,
-        chatAgentName: chatAgent?.name,
-        effectiveAgentName: effectiveAgent?.name,
-        effectiveBotId: (effectiveAgent as any)?.botId,
-        isUsingRegulatoryBot,
-        hasSystemPrompt: !!effectiveAgent?.systemPrompt,
-      });
-      
+
+      // ⭐ Track sản phẩm đã hiển thị để không lặp lại
+      // Lấy từ messages trước đó
+      const allShownProductIds = messages
+        .flatMap((m: Message) => m.suggestedProducts || [])
+        .map((p: any) => p.id)
+        .filter((id: any) => id);
+
       const chatBody: any = {
         message: fullMessage,
         language,
@@ -2429,11 +2650,13 @@ export function ChatPage() {
         // - shouldShowProductsNow: đã đủ điều kiện show sản phẩm chưa
         // - isInQuestionGatheringMode: có đang trong chế độ hỏi câu hỏi không
         // - userApprovedProducts: user đã đồng ý xem sản phẩm chưa
+        // ⭐ MỚI: shownProductIds - danh sách sản phẩm đã hiển thị để không lặp lại
         triggersProductSuggestion,
         followUpQuestionsAsked,
         shouldShowProductsNow,
         isInQuestionGatheringMode,
         userApprovedProducts: userHasApproved, // Dùng biến local thay vì state
+        shownProductIds: allShownProductIds,
       };
       
       // Thêm attachments nếu có
@@ -2454,7 +2677,7 @@ export function ChatPage() {
         for (let attempt = 0; attempt < 4; attempt++) {
           if (attempt > 0) {
             const delay = Math.min(2000 * Math.pow(2, attempt - 1), 16000);
-            console.log(`[Chat] Retry attempt ${attempt} after ${delay}ms...`);
+
             await new Promise(r => setTimeout(r, delay));
           }
 
@@ -2571,8 +2794,17 @@ export function ChatPage() {
             setFollowUpQuestionsAsked(0);
           } else if (!freshIsReady && freshMissingCtx.length > 0) {
             // Chưa đủ context → hỏi thêm câu hỏi follow-up
-            const followUpQuestion = getNextFollowUpQuestion(responseLanguage);
-            finalContent = `${fullContent}\n\n*${followUpQuestion}*`;
+            // ⭐ FIX: Truyền conversationMessages và lastAskedQuestion.type để tránh lặp lại
+            const { question: followUpQuestion, type: questionType } = getNextFollowUpQuestionWithType(
+              responseLanguage, 
+              messages,
+              lastAskedQuestion.type
+            );
+            if (followUpQuestion) {
+              finalContent = `${fullContent}\n\n*${followUpQuestion}*`;
+              // ⭐ Cập nhật state: lưu câu hỏi vừa hỏi để không hỏi lại
+              setLastAskedQuestion({ type: questionType, text: followUpQuestion });
+            }
           }
 
           addMessage({
@@ -2761,16 +2993,23 @@ export function ChatPage() {
           // Reset follow-up count sau khi hỏi xong
           setFollowUpQuestionsAsked(0);
         } else if (!nonStreamIsReady && nonStreamMissingCtx.length > 0) {
-          const followUpQuestion = getNextFollowUpQuestion(responseLanguage);
-          // Cập nhật message cuối cùng với follow-up question
+          // ⭐ FIX: Truyền messages và lastAskedQuestion.type để tránh lặp lại
+          const { question: followUpQuestion, type: questionType } = getNextFollowUpQuestionWithType(
+            responseLanguage, 
+            messages,
+            lastAskedQuestion.type
+          );
+          // Cập nhật message cuối cùng với follow-up question (chỉ nếu có câu hỏi)
           const updatedMessages = useChatStore.getState().messages;
-          if (updatedMessages.length > 0) {
+          if (updatedMessages.length > 0 && followUpQuestion) {
             const lastMsg = updatedMessages[updatedMessages.length - 1];
             if (lastMsg.role === 'assistant') {
               const updatedContent = `${lastMsg.content}\n\n*${followUpQuestion}*`;
               const newMessages = [...updatedMessages];
               newMessages[newMessages.length - 1] = { ...lastMsg, content: updatedContent };
               setMessages(newMessages);
+              // ⭐ Cập nhật state: lưu câu hỏi vừa hỏi để không hỏi lại
+              setLastAskedQuestion({ type: questionType, text: followUpQuestion });
             }
           }
         }
@@ -2836,7 +3075,7 @@ export function ChatPage() {
           content: t('chat.connectionError'),
         });
       } else {
-        console.log('Request was aborted (stopped by user)');
+
         // Don't add error message - handleStopGeneration already handles this with "Phản hồi đã bị dừng"
       }
     } finally {
@@ -3011,7 +3250,7 @@ export function ChatPage() {
       recognition.onerror = (event: any) => {
         // Ignore 'aborted' error - this is normal when user stops recording or timeout
         if (event.error === 'aborted') {
-          console.log('[Voice] Recording aborted by user or timeout');
+
           setIsRecording(false);
           setIsListening(false);
           setInterimTranscript('');
@@ -3265,7 +3504,7 @@ export function ChatPage() {
             }
             
             fileData.isLoading = false;
-            console.log('[MADA] File processed:', fileData);
+
             return fileData;
           })
         );
@@ -3346,7 +3585,7 @@ export function ChatPage() {
   };
 
   const handleConsultationSubmit = (data: { name: string; email: string; phone: string; message: string; attachments?: { name: string; type: string; size: number }[] }) => {
-    console.log('Consultation submitted:', data);
+
     addMessage({
       role: 'user',
       content: t('chat.consultationSent'),
@@ -3533,10 +3772,10 @@ export function ChatPage() {
                       const mappedMadaCategory = CATEGORY_TO_MADA_CATEGORY[category];
                       const correspondingAgent = activeAgents.find(a => a.madaCategory === mappedMadaCategory);
                       if (correspondingAgent) {
-                        console.log('[ChatPage] Selected category:', category, '→ selecting agent:', correspondingAgent.name, 'with madaCategory:', correspondingAgent.madaCategory);
+
                         useSelectedAgentStore.getState().setSelectedAgentId(correspondingAgent.id);
                       } else {
-                        console.log('[ChatPage] No agent found for category:', category, 'mapped to:', mappedMadaCategory, 'available madaCategories:', activeAgents.map(a => a.madaCategory));
+
                       }
                     }
 
@@ -4622,7 +4861,7 @@ function ProductCardItem({ product, language, onRequestConsultation }: ProductCa
   const processedImageUrl = getImageUrl(rawImageUrl);
   
   // ⭐ Debug logging để xem vấn đề image
-  console.log(`[ProductCard] "${product.title}" | rawImageUrl: "${rawImageUrl.substring(0, 80)}" | processedImageUrl: "${processedImageUrl.substring(0, 80)}" | hasImage: ${!!processedImageUrl}`);
+
   
   // Thông tin sản phẩm
   const productTitle = language === 'en' && product.title_en ? product.title_en : product.title;
@@ -4954,7 +5193,7 @@ function MessageBubble({
           <div className="relative bg-white/80 backdrop-blur-sm rounded-2xl rounded-tl-sm border border-slate-200/50 p-4 shadow-sm group-hover:shadow-md group-hover:bg-white/90 transition-all duration-300">
             <div className="text-sm text-slate-700 leading-relaxed [&_p]:mb-3 [&_p]:leading-relaxed [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:my-3 [&_ul]:space-y-1.5 [&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:my-3 [&_ol]:space-y-1.5 [&_li]:leading-relaxed [&_li]:mb-1 [&_h3]:text-base [&_h3]:font-bold [&_h3]:mt-4 [&_h3]:mb-2 [&_h2]:text-lg [&_h2]:font-bold [&_h2]:mt-4 [&_h2]:mb-2 [&_strong]:font-bold [&_code]:bg-slate-100 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-xs [&_pre]:bg-slate-100 [&_pre]:p-3 [&_pre]:rounded-lg [&_pre]:overflow-x-auto [&_pre]:my-3 [&_blockquote]:border-l-4 [&_blockquote]:border-slate-300 [&_blockquote]:pl-3 [&_blockquote]:italic [&_blockquote]:text-slate-600 [&_a]:text-blue-500 [&_a]:underline" dir={language === 'ar' ? 'rtl' : 'ltr'}>
               <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                {message.content}
+                {convertProductNamesToLinks(message.content, message.suggestedProducts)}
               </ReactMarkdown>
             </div>
           </div>

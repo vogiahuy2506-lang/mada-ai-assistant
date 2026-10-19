@@ -21,8 +21,8 @@ async function fetchWithRetry(
   for (let attempt = 0; attempt <= retries; attempt++) {
     const response = await fn();
 
-    // 429 = Too Many Requests — retry with backoff
-    if (response.status === 429) {
+    // 429 (rate limit) và 500/502/503/504 (Gemini quá tải) — retry với backoff
+    if (response.status === 429 || response.status === 500 || response.status === 502 || response.status === 503 || response.status === 504) {
       if (attempt === retries) {
         const body = await response.text().catch(() => '');
         throw new Error(`Gemini API error: 429 Too Many Requests (after ${retries} retries). ${body}`);
@@ -47,11 +47,19 @@ async function fetchWithRetry(
 }
 
 // Direct Gemini API call that bypasses proxy, with automatic 429 retry
-async function callGeminiDirect(apiKey: string, modelName: string, prompt: string, tools?: any): Promise<any> {
+async function callGeminiDirect(
+  apiKey: string,
+  modelName: string,
+  prompt: string,
+  tools?: any,
+  opts?: { systemInstruction?: string; contents?: any[] }
+): Promise<any> {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
 
   const body: any = {
-    contents: [{ parts: [{ text: prompt }] }],
+    contents: opts?.contents && opts.contents.length > 0
+      ? opts.contents
+      : [{ role: 'user', parts: [{ text: prompt }] }],
     generationConfig: {
       temperature: 0.3,
       maxOutputTokens: 2048,
@@ -59,6 +67,10 @@ async function callGeminiDirect(apiKey: string, modelName: string, prompt: strin
       topK: 20,
     },
   };
+
+  if (opts?.systemInstruction) {
+    body.systemInstruction = { parts: [{ text: opts.systemInstruction }] };
+  }
 
   if (tools?.length > 0) {
     body.tools = tools;
@@ -127,8 +139,14 @@ const SYSTEM_PROMPT = `Bạn là MADA AI - trợ lý ảo chuyên về Công ngh
 - KHÔNG lặp lại câu hỏi của người dùng
 - KHÔNG dùng ngôn ngữ máy móc, khô khan
 
+⚠️ QUAN TRỌNG - VỀ LINK/SURL:
+- KHÔNG BAO GIỜ tự tạo URL hay link trong câu trả lời
+- KHÔNG bịa đặt URL như "https://at.mada.org.qa/technology/..." 
+- Nếu cần gợi ý sản phẩm: CHỈ ghi TÊN SẢN PHẨM, KHÔNG ghi URL
+- Link sản phẩm sẽ được hệ thống tự động gắn vào card sản phẩm bên dưới
+
 📋 NỘI DUNG CẦN CÓ:
-- Tên sản phẩm cụ thể (kèm link nguồn MADA nếu có)
+- Tên sản phẩm cụ thể (KHÔNG kèm link trong text)
 - Giá tham khảo (VND/USD) - chỉ khi có trong dữ liệu
 - Đối tượng phù hợp (trẻ em, người lớn, người cao tuổi...)
 - Ưu điểm nổi bật 1-2 dòng
@@ -147,7 +165,7 @@ const SYSTEM_PROMPT = `Bạn là MADA AI - trợ lý ảo chuyên về Công ngh
 - Nếu câu hỏi về y tế: "Xin lỗi, mình chỉ hỗ trợ tư vấn về Công nghệ Hỗ trợ (AT). Về các vấn đề y tế, bạn nên tham khảo ý kiến bác sĩ chuyên khoa nhé."
 
 💡 VỀ DỮ LIỆU:
-- Nếu CÓ thông tin trong [THÔNG TIN TỪ CƠ SỞ TRI THỨC]: dùng thông tin đó, kèm nguồn tham khảo
+- Nếu CÓ thông tin trong [THÔNG TIN TỪ CƠ SỞ TRI THỨC]: dùng thông tin đó
 - Nếu KHÔNG CÓ hoặc THÔNG TIN ÍT: DÙNG KIẾN THỨC CHUNG của bạn về Công nghệ Hỗ trợ để trả lời! Đừng nói "không tìm thấy" - hãy tư vấn dựa trên kiến thức AT của bạn
 - Bạn có kiến thức rộng về: thiết bị hỗ trợ người khiếm thị, người khiếm hearing, xe lăn, thiết bị giao tiếp AAC, công nghệ hỗ trợ nhận thức, vật dụng sinh hoạt hàng ngày, v.v.
 
@@ -155,18 +173,18 @@ const SYSTEM_PROMPT = `Bạn là MADA AI - trợ lý ảo chuyên về Công ngh
 
 Câu hỏi: "Cho tôi xin thiết bị hỗ trợ người khiếm thị đọc sách"
 
-Trả lời mẫu:
+Trả lời mẫu (ĐÚNG - KHÔNG có URL):
 Dưới đây là 3 thiết bị phổ biến cho người khiếm thị đọc sách:
 
 1. **NVDA** (Miễn phí) - Phần mềm đọc màn hình mã nguồn mở, hỗ trợ tiếng Việt
    - Phù hợp: Người khiếm thị dùng máy tính
    - Ưu điểm: Miễn phí 100%, cộng đồng hỗ trợ lớn
 
-2. **Kính lúp điện tử Ruby HD** - Khoảng 8-15 triệu VNĐ
+2. **Ruby HD** - Kính lúp điện tử cầm tay
    - Phù hợp: Người già thị lực kém, học sinh
    - Ưu điểm: Phóng to 2-24x, gọn nhẹ, dễ mang theo
 
-3. **BrailleSense Polaris** - Khoảng 50-80 triệu VNĐ
+3. **BrailleSense Polaris** - Máy đọc chữ nổi
    - Phù hợp: Người khiếm thị thành thạo chữ Braille
    - Ưu điểm: Hiển thị chữ nổi, kết nối WiFi, đọc PDF
 
@@ -193,61 +211,68 @@ const RAG_TAIL_PROMPTS: Record<'vi' | 'en' | 'ar' | 'fr', RagTailPrompt> = {
     aiLabel: 'MADA AI',
     guidanceTitle: 'CHỈ DẪN TRẢ LỜI',
     guidanceRules: [
+      '⚠️ QUAN TRỌNG: KHÔNG BAO GIỜ tự tạo URL hay link trong câu trả lời',
+      '⚠️ KHÔNG bịa đặt URL như "https://at.mada.org.qa/technology/..."',
+      '⚠️ Chỉ ghi TÊN SẢN PHẨM, KHÔNG ghi URL. Link sẽ được hệ thống gắn tự động',
       'Trả lời NGẮN GỌN, ĐÚNG TRỌNG TÂM câu hỏi',
       'Nếu CÓ thông tin trong [THÔNG TIN TỪ CƠ SỞ TRI THỨC]: dùng thông tin đó',
-      'Nếu KHÔNG CÓ hoặc ÍT thông tin: DÙNG KIẾN THỨC CHUNG về Công nghệ Hỗ trợ để trả lời! Đừng nói "không tìm thấy"',
-      'Bạn có kiến thức về: thiết bị khiếm thị, khiếm hearing, xe lăn, AAC, thiết bị nhận thức, vật dụng sinh hoạt...'
+      'Nếu KHÔNG CÓ hoặc ÍT thông tin: DÙNG KIẾN THỨC CHUNG về Công nghệ Hỗ trợ để trả lời!',
     ],
     contextHeader: '📚 THÔNG TIN TỪ CƠ SỞ TRI THỨC',
     historyHeader: '📝 LỊCH SỬ',
     questionHeader: '❓ Câu hỏi',
-    answerPrompt: '🤖 Trả lời ngắn gọn, đúng trọng tâm:'
+    answerPrompt: '🤖 Trả lời ngắn gọn, đúng trọng tâm (KHÔNG ghi URL):'
   },
   en: {
     userLabel: 'User',
     aiLabel: 'MADA AI',
     guidanceTitle: 'ANSWER GUIDELINES',
     guidanceRules: [
+      '⚠️ IMPORTANT: NEVER invent or create URLs/links in your answer',
+      '⚠️ DO NOT make up URLs like "https://at.mada.org.qa/technology/..."',
+      '⚠️ Only write PRODUCT NAMES, NOT URLs. Links will be added automatically by the system',
       'Answer CONCISELY, FOCUSED on the question',
       'If information IS in [KNOWLEDGE BASE CONTEXT]: use that information',
-      'If NO or LIMITED information: Use your GENERAL KNOWLEDGE about Assistive Technology to answer! Do NOT say "not found"',
-      'You know about: vision devices, hearing aids, wheelchairs, AAC, cognitive aids, daily living products...'
+      'If NO or LIMITED information: Use your GENERAL KNOWLEDGE about Assistive Technology to answer!',
     ],
     contextHeader: '📚 KNOWLEDGE BASE CONTEXT',
     historyHeader: '📝 HISTORY',
     questionHeader: '❓ Question',
-    answerPrompt: '🤖 Answer concisely and focused:'
+    answerPrompt: '🤖 Answer concisely and focused (NO URLs):'
   },
   ar: {
     userLabel: 'المستخدم',
     aiLabel: 'MADA AI',
     guidanceTitle: 'إرشادات الإجابة',
     guidanceRules: [
+      '⚠️ مهم: لا تقم بإنشاء عناوين URL أو روابط في إجابتك',
+      '⚠️ لا تخترع عناوين URL مثل "https://at.mada.org.qa/technology/..."',
+      '⚠️ اكتب فقط أسماء المنتجات، وليس عناوين URL. سيتم إضافة الروابط تلقائيًا',
       'أجب بإيجاز، مع التركيز على السؤال',
       'إذا كانت المعلومات موجودة في [سياق قاعدة المعرفة]: استخدم تلك المعلومات',
-      'إذا لم تكن هناك معلومات كافية: استخدم معرفتك العامة حول التكنولوجيا المساعدة! لا تقل "غير موجود"',
-      'أنت تعرف عن: أجهزة البصر، سماعات الأذن، الكراسي المتحركة، AAC، أجهزة الإدراك...'
+      'إذا لم تكن هناك معلومات كافية: استخدم معرفتك العامة حول التكنولوجيا المساعدة!',
     ],
     contextHeader: '📚 سياق قاعدة المعرفة',
     historyHeader: '📝 السجل',
     questionHeader: '❓ سؤال',
-    answerPrompt: '🤖 أجب بإيجاز وبشكل مركّز:'
+    answerPrompt: '🤖 أجب بإيجاز وبشكل مركّز (بدون روابط):'
   },
   fr: {
     userLabel: 'Utilisateur',
     aiLabel: 'MADA AI',
     guidanceTitle: 'CONSIGNES DE RÉPONSE',
     guidanceRules: [
+      '⚠️ IMPORTANT: Ne JAMAIS inventer ou créer des URL/liens dans votre réponse',
+      '⚠️ NE PAS inventer des URLs comme "https://at.mada.org.qa/technology/..."',
+      '⚠️ Écrivez uniquement les NOMS DE PRODUITS, PAS les URLs. Les liens seront ajoutés automatiquement',
       'Répondez CONCISÉMENT, en vous concentrant sur la question',
-      'Utilisez uniquement les informations DE LA SOURCE, sans digression',
-      "Si AUCUNE ou PEU dinformation: Utilisez vos CONNAISSANCES GÉNÉRALES sur la Technologie dAssistance! Ne dites JAMAIS non trouvé",
-      'Si l\'information EST dans [CONTEXTE BASE DE CONNAISSANCES], RÉPONDEZ immédiatement, NE dites JAMAIS "non trouvé"',
-      'Si AUCUNE information : "Je n\'ai pas trouvé d\'information sur [sujet] dans la base de données."'
+      "Si AUCUNE ou PEU dinformation: Utilisez vos CONNAISSANCES GÉNÉRALES sur la Technologie d'Assistance!",
+      "Si l'information EST dans [CONTEXTE BASE DE CONNAISSANCES], RÉPONDEZ immédiatement",
     ],
     contextHeader: '📚 CONTEXTE BASE DE CONNAISSANCES',
     historyHeader: '📝 HISTORIQUE',
     questionHeader: '❓ Question',
-    answerPrompt: '🤖 Réponses concise et ciblée :'
+    answerPrompt: "🤖 Réponses concise et ciblée (PAS d'URLs):"
   }
 };
 
@@ -403,6 +428,7 @@ class RAGEngine {
       // Build prompt
       const hasContext = context.length > 0;
       const prompt = this.buildPrompt(userQuery, context, conversationHistory, hasContext, systemInstruction, config.language);
+      const req = this.buildRequest(userQuery, context, conversationHistory, hasContext, systemInstruction, config.language);
 
       // Generate response
       if (!this._isConfigured || !this.genAI) {
@@ -430,7 +456,11 @@ class RAGEngine {
       try {
         // Call Gemini API directly (no SDK, no proxy)
         const apiKey = process.env.GEMINI_API_KEY!;
-        const geminiResult = await callGeminiDirect(apiKey, 'gemini-2.5-flash', prompt, tools ? [{ functionDeclarations: [RAG_RESPONSE_SCHEMA] }] : undefined);
+        // Trả lời dạng text thuần (không dùng function-calling) để câu trả lời tự nhiên hơn
+        const geminiResult = await callGeminiDirect(apiKey, 'gemini-2.5-flash', prompt, undefined, {
+          systemInstruction: req.systemText,
+          contents: req.contents,
+        });
         
         // Parse the response
         const candidates = geminiResult?.candidates || [];
@@ -462,7 +492,10 @@ class RAGEngine {
         try {
           // Retry without structured output
           const apiKey = process.env.GEMINI_API_KEY!;
-          const geminiResult = await callGeminiDirect(apiKey, 'gemini-2.5-flash', prompt, undefined);
+          const geminiResult = await callGeminiDirect(apiKey, 'gemini-2.5-flash', prompt, undefined, {
+            systemInstruction: req.systemText,
+            contents: req.contents,
+          });
           const parts = geminiResult?.candidates?.[0]?.content?.parts || [];
           const textParts = parts.filter((p: any) => p.text);
           const rawAnswer = textParts.map((p: any) => p.text).join('\n');
@@ -570,8 +603,8 @@ class RAGEngine {
     confidence: number;
     answer: string;
   }> {
-    if (!this.initialized) {
-      await this.initialize();
+    if (!this._isConfigured) {
+      this.initialize();
     }
 
     const topK = config.topK || 10;
@@ -619,6 +652,22 @@ class RAGEngine {
              ORDER BY featured DESC, sort_order DESC, created_at DESC
              LIMIT 5`
           ).all(dbCategory, `%${dbCategory}%`) as any[];
+          
+          // ⭐ ANTI-REPEAT: Filter out already-recommended products
+          const recommendedSet = getRecommendedProducts(conversationId || '');
+          products = products.filter(p => !recommendedSet.has(p.title.toLowerCase()));
+          
+          // If all products were already recommended, fetch more (expand LIMIT and filter again)
+          if (products.length === 0 && recommendedSet.size > 0) {
+            const expandedProducts = db.prepare(
+              `SELECT title, title_en, description, category, brand, price_range, product_url
+               FROM kb_products
+               WHERE (category = ? OR category LIKE ?) AND status = 'published'
+               ORDER BY featured DESC, sort_order DESC, created_at DESC
+               LIMIT 10`
+            ).all(dbCategory, `%${dbCategory}%`) as any[];
+            products = expandedProducts.filter(p => !recommendedSet.has(p.title.toLowerCase()));
+          }
         }
         // ⭐ FIX: KHÔNG fallback sang tất cả sản phẩm nếu category không match
         // Nếu không có sản phẩm đúng category → bỏ qua product fallback, trả lời "không tìm thấy"
@@ -643,9 +692,10 @@ class RAGEngine {
           : `Tôi chưa có thông tin chi tiết về chủ đề này trong cơ sở kiến thức, nhưng dưới đây là một số sản phẩm từ cơ sở dữ liệu có thể phù hợp:`;
 
         const aiContext = `[${labelHeader}]\n${productContext}`;
-        const prompt = this.buildPrompt(userQuery, aiContext, conversationHistory, true, config.systemInstruction, config.language);
+        const fbReq = this.buildRequest(userQuery, aiContext, conversationHistory, true, config.systemInstruction, config.language);
         const model = this.genAI.getGenerativeModel({
           model: 'gemini-2.5-flash',
+          systemInstruction: fbReq.systemText,
           generationConfig: { temperature: 0.3, maxOutputTokens: config.maxOutputTokens || 8192, topP: 0.8, topK: 20 },
         });
 
@@ -657,9 +707,7 @@ class RAGEngine {
 
           // Stream AI response
           try {
-            const result = await model.generateContentStream({
-              contents: [{ role: 'user', parts: [{ text: prompt }] }],
-            });
+            const result = await model.generateContentStream({ contents: fbReq.contents });
             for await (const chunk of result.stream) {
               const text = chunk.text();
               if (text) {
@@ -742,7 +790,7 @@ class RAGEngine {
 
     // Build prompt
     const hasContext = context.length > 0;
-    const prompt = this.buildPrompt(userQuery, context, conversationHistory, hasContext, config.systemInstruction, config.language);
+    const streamReq = this.buildRequest(userQuery, context, conversationHistory, hasContext, config.systemInstruction, config.language);
 
     // Format sources
     const sources = relevantDocs.map((doc) => ({
@@ -762,6 +810,7 @@ class RAGEngine {
 
     const model = this.genAI.getGenerativeModel({
       model: 'gemini-2.5-flash',
+      systemInstruction: streamReq.systemText,
       generationConfig: {
         temperature: 0.3,
         maxOutputTokens: config.maxOutputTokens || 8192,
@@ -770,17 +819,17 @@ class RAGEngine {
       },
     });
 
-    // Retry wrapper for streaming — detects 429 before starting the stream
-    async function streamWithRetry(model: any, prompt: string, retries = 3, baseDelayMs = 2000) {
+    // Retry wrapper for streaming — retry khi gặp 429/5xx trước khi stream bắt đầu
+    async function streamWithRetry(model: any, contents: any[], retries = 3, baseDelayMs = 2000) {
       for (let attempt = 0; attempt <= retries; attempt++) {
         try {
-          const result = await model.generateContentStream({
-            contents: [{ role: 'user', parts: [{ text: prompt }] }],
-          });
+          const result = await model.generateContentStream({ contents });
           return result;
         } catch (error: any) {
           const msg = error?.message || '';
-          const is429 = msg.includes('429') || msg.includes('Too Many Requests') || error?.status === 429;
+          const is429 = msg.includes('429') || msg.includes('Too Many Requests') || error?.status === 429
+            || msg.includes('503') || msg.includes('Service Unavailable') || error?.status === 503
+            || error?.status === 500 || error?.status === 502 || error?.status === 504;
 
           if (is429 && attempt < retries) {
             const delay = Math.min(baseDelayMs * Math.pow(2, attempt), 16000);
@@ -799,7 +848,7 @@ class RAGEngine {
 
     const stream = (async function* () {
       try {
-        const result = await streamWithRetry(model, prompt);
+        const result = await streamWithRetry(model, streamReq.contents);
 
         for await (const chunk of result.stream) {
           const text = chunk.text();
@@ -834,8 +883,16 @@ class RAGEngine {
     const langCode: 'vi' | 'en' | 'ar' | 'fr' = (['vi', 'en', 'ar', 'fr'].includes(language) ? language : 'vi');
     const tail = RAG_TAIL_PROMPTS[langCode];
 
-    const historyStr = conversationHistory.length > 0
-      ? conversationHistory
+    // Chuẩn hóa lịch sử: bỏ tin rỗng, bỏ câu hỏi hiện tại (đã được ghép ở cuối prompt), chỉ giữ 12 tin gần nhất
+    const cleanedHistory = conversationHistory.filter((m) => m && typeof m.content === 'string' && m.content.trim().length > 0);
+    const lastMsg = cleanedHistory[cleanedHistory.length - 1];
+    if (lastMsg && lastMsg.role === 'user' && lastMsg.content.trim() === userQuery.trim()) {
+      cleanedHistory.pop();
+    }
+    const recentHistory = cleanedHistory.slice(-12);
+
+    const historyStr = recentHistory.length > 0
+      ? recentHistory
           .map((msg) => {
             const roleLabel = msg.role === 'user' ? tail.userLabel : tail.aiLabel;
             return `${roleLabel}: ${msg.content}`;
@@ -861,6 +918,56 @@ ${historyStr}
 ${tail.questionHeader}: ${userQuery}
 
 ${tail.answerPrompt}`;
+  }
+
+  /**
+   * Tạo request đúng chuẩn Gemini: systemInstruction tách riêng, lịch sử là các lượt user/model,
+   * lượt cuối là câu hỏi hiện tại kèm tri thức tham chiếu.
+   */
+  private buildRequest(
+    userQuery: string,
+    context: string,
+    conversationHistory: Array<{ role: string; content: string }>,
+    hasContext: boolean,
+    systemInstruction?: string,
+    language: 'vi' | 'en' | 'ar' | 'fr' = 'vi'
+  ): { systemText: string; contents: Array<{ role: 'user' | 'model'; parts: Array<{ text: string }> }> } {
+    const langCode: 'vi' | 'en' | 'ar' | 'fr' = (['vi', 'en', 'ar', 'fr'].includes(language) ? language : 'vi');
+    const tail = RAG_TAIL_PROMPTS[langCode];
+
+    const cleaned = conversationHistory.filter((m) => m && typeof m.content === 'string' && m.content.trim().length > 0);
+    const last = cleaned[cleaned.length - 1];
+    if (last && last.role === 'user' && last.content.trim() === userQuery.trim()) {
+      cleaned.pop();
+    }
+
+    const turns: Array<{ role: 'user' | 'model'; parts: Array<{ text: string }> }> = [];
+    for (const m of cleaned.slice(-12)) {
+      const role: 'user' | 'model' = m.role === 'user' ? 'user' : 'model';
+      const prev = turns[turns.length - 1];
+      if (prev && prev.role === role) {
+        prev.parts[0].text += `\n${m.content}`;
+      } else {
+        turns.push({ role, parts: [{ text: m.content }] });
+      }
+    }
+    // Gemini yêu cầu lượt đầu là user
+    while (turns.length > 0 && turns[0].role !== 'user') turns.shift();
+
+    const currentTurn = [
+      hasContext ? `${tail.contextHeader}:\n${context}\n\n---` : '',
+      `${tail.questionHeader}: ${userQuery}`,
+    ].filter(Boolean).join('\n');
+
+    const lastTurn = turns[turns.length - 1];
+    if (lastTurn && lastTurn.role === 'user') {
+      lastTurn.parts[0].text += `\n\n${currentTurn}`;
+    } else {
+      turns.push({ role: 'user', parts: [{ text: currentTurn }] });
+    }
+
+    const systemText = `${systemInstruction || SYSTEM_PROMPT}\n\n${tail.guidanceTitle}:\n${tail.guidanceRules.map((r) => `- ${r}`).join('\n')}`;
+    return { systemText, contents: turns };
   }
 
   private calculateConfidence(relevantDocs: any[], hasContext: boolean): number {
@@ -957,7 +1064,10 @@ ${tail.answerPrompt}`;
     // Pass 1: search theo filter - Dùng hybrid search để kết hợp vector + keyword
     // ⭐ Ưu tiên agentFilter (custom agents) > filter (MADA bots) > no filter
     let primary: any[] = [];
-    const searchFilter = agentFilter || filter;
+    // Bot dựng sẵn của MADA (id dạng "bot-...") dùng filter botId/category và được fallback sang KB chung;
+    // chỉ agent tùy chỉnh mới bị cô lập dữ liệu.
+    const isBuiltInBot = !!agentId && agentId.startsWith('bot-');
+    const searchFilter = isBuiltInBot ? (filter || agentFilter) : (agentFilter || filter);
     
     if (searchFilter) {
       try {
@@ -976,7 +1086,7 @@ ${tail.answerPrompt}`;
 
     // Nếu có agentId (custom agent) → KHÔNG BAO GIỜ fallback sang MADA KB
     // Custom agent phải dùng DỮ LIỆU RIÊNG, không trộn với MADA
-    const hasAgentId = !!agentId;
+    const hasAgentId = !!agentId && !isBuiltInBot;
     
     // Nếu priority mode VÀ chưa đủ → fallback hybrid search toàn bộ KB
     // NHƯNG: Nếu có agentId (custom agent), KHÔNG fallback - dùng kết quả hiện có
@@ -996,6 +1106,10 @@ ${tail.answerPrompt}`;
           }
           if (merged.length >= topK) break;
         }
+        if (merged.length === 0) {
+          // Vector store rỗng hoặc không khớp → dùng tìm kiếm từ khóa trên SQLite
+          return await this.sqliteFallback(userQuery, topK);
+        }
         return merged;
       } catch (err) {
         console.warn('⚠️ [RAG] Fallback hybrid search failed, trying vector:', err);
@@ -1011,9 +1125,13 @@ ${tail.answerPrompt}`;
             }
             if (merged.length >= topK) break;
           }
+          if (merged.length === 0) {
+            return await this.sqliteFallback(userQuery, topK);
+          }
           return merged;
         } catch (err2) {
           console.warn('⚠️ [RAG] Fallback search also failed:', err2);
+          return await this.sqliteFallback(userQuery, topK);
         }
       }
     } else if (hasAgentId && primary.length === 0) {
@@ -1065,10 +1183,40 @@ ${tail.answerPrompt}`;
 
       // Tách keywords (loại bỏ stop words)
       const stopWords = new Set(['là', 'gì', 'có', 'cho', 'tôi', 'bạn', 'của', 'và', 'thì', 'mà', 'được', 'không', 'này', 'kia', 'với', 'từ', 'trong', 'một', 'những', 'các']);
-      const keywords = query.toLowerCase()
+      const lowerQuery = query.toLowerCase();
+      const baseKeywords = lowerQuery
         .split(/\s+/)
         .filter(w => w.length > 2 && !stopWords.has(w))
         .slice(0, 8);
+
+      // Dữ liệu trong knowledge_items chủ yếu là tiếng Anh (dù nhãn language = 'vi'),
+      // nên mở rộng cụm từ tiếng Việt sang từ khóa tiếng Anh tương ứng để tìm được kết quả.
+      const viToEn: Array<[string, string[]]> = [
+        ['khiếm thị', ['vision', 'blind', 'braille', 'screen reader']],
+        ['mù', ['blind', 'braille']],
+        ['mắt', ['vision', 'eye', 'magnif']],
+        ['nhìn', ['vision', 'magnif']],
+        ['đọc sách', ['reader', 'reading', 'book']],
+        ['sách', ['book', 'reader']],
+        ['phóng to', ['magnif', 'zoom']],
+        ['kính lúp', ['magnif']],
+        ['khiếm thính', ['hearing', 'deaf']],
+        ['nghe', ['hearing', 'amplif']],
+        ['điếc', ['deaf', 'hearing']],
+        ['xe lăn', ['wheelchair']],
+        ['di chuyển', ['mobility', 'wheelchair']],
+        ['giao tiếp', ['communication', 'aac']],
+        ['nói', ['speech', 'voice']],
+        ['nhận thức', ['cognitive', 'memory']],
+        ['trí nhớ', ['memory', 'cognitive']],
+        ['học', ['learning', 'education']],
+        ['tiêu chuẩn', ['standard', 'iso']],
+      ];
+      const expanded = new Set<string>(baseKeywords);
+      for (const [vi, enWords] of viToEn) {
+        if (lowerQuery.includes(vi)) enWords.forEach(w => expanded.add(w));
+      }
+      const keywords = Array.from(expanded).slice(0, 12);
 
       if (keywords.length === 0) return [];
 

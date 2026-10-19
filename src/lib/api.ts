@@ -511,7 +511,7 @@ export interface AgentProductsResponse {
   total: number;
 }
 
-export async function fetchProductsByAgent(agentId: string, limit: number = 12, lang: string = 'vi'): Promise<AgentProductsResponse> {
+export async function fetchProductsByAgent(agentId: string, limit: number = 12, lang: string = 'vi') {
   const params = new URLSearchParams({ limit: String(limit), lang });
   return request<AgentProductsResponse>(`/public/products/by-agent/${encodeURIComponent(agentId)}?${params}`);
 }

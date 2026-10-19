@@ -21,7 +21,6 @@ import { getSystemSettings } from '../lib/db';
 import { verifyAccessToken, requireAdmin } from '../lib/auth';
 import { getFileUploadQuota, trackFileUpload } from '../lib/db';
 import { chatHistory, waitForRagReady } from '../lib/chat-context';
-import { logActivity } from '../index';
 import { parseAttachment } from '../lib/fileProcessor';
 import { translateContent } from '../lib/translationService';
 import { productExtractor, type ExtractedProduct } from '../lib/scraping/productExtractor';
@@ -55,12 +54,12 @@ async function autoScrapeUrlsFromMessage(
     return { scrapedProducts: [], cleanedMessage: message };
   }
   
-  console.log(`🔗 [AutoScrape] Found ${urls.length} URL(s) in message: ${urls.join(', ')}`);
+
   
   // Scrape each URL (limit to first 3 to avoid too many requests)
   for (const url of urls.slice(0, 3)) {
     try {
-      console.log(`🕷️ [AutoScrape] Scraping: ${url}`);
+
       
       const result = await productExtractor.extractFromUrl(url, undefined, {
         mode: 'preview',
@@ -106,9 +105,8 @@ async function autoScrapeUrlsFromMessage(
         };
         
         scrapedProducts.push(productCard);
-        console.log(`✅ [AutoScrape] Scraped: ${product.name} | image: ${productCard.image_url ? 'YES' : 'NO'}`);
-      } else {
-        console.log(`⚠️ [AutoScrape] No products found for: ${url}`);
+
+
       }
     } catch (err) {
       console.error(`❌ [AutoScrape] Error scraping ${url}:`, err);
@@ -294,33 +292,35 @@ async function getProductsByCategory(madaCategory: string | null, language: stri
     
     if (madaCategory && MADA_CATEGORY_TO_DB[madaCategory]) {
       // Lấy products theo category cụ thể từ knowledge_items
+      // ⭐ Include cả 'web' (scraped) và 'manual' (admin imported từ kb_products)
+      // để user thấy được sản phẩm thực tế (manual) lẫn crawled data
       const dbCategory = MADA_CATEGORY_TO_DB[madaCategory];
       query = `
         SELECT * FROM knowledge_items
-        WHERE category = ? AND status = 'published' AND source_type = 'web'
-        ORDER BY created_at DESC
+        WHERE category = ? AND status = 'published' AND source_type IN ('web', 'manual')
+        ORDER BY (source_type = 'manual') DESC, created_at DESC
         LIMIT ?
       `;
       params = [dbCategory, limit];
-      console.log(`📦 [ProductRequest] Fetching products for category: ${dbCategory} from knowledge_items`);
+      // Fetching products for category
     } else {
       // Lấy tất cả products (bot tổng)
       query = `
         SELECT * FROM knowledge_items
-        WHERE status = 'published' AND source_type = 'web'
-        ORDER BY created_at DESC
+        WHERE status = 'published' AND source_type IN ('web', 'manual')
+        ORDER BY (source_type = 'manual') DESC, created_at DESC
         LIMIT ?
       `;
       params = [limit];
-      console.log(`📦 [ProductRequest] Fetching all products from knowledge_items (no category filter)`);
+      // Fetching all products
     }
     
     const rows = db.prepare(query).all(...params) as any[];
-    console.log(`📦 [ProductRequest] Found ${rows.length} products`);
+    // Products found
     
     // Map to product format using helper
     products = rows.map((row: any) => knowledgeItemToProduct(row, language));
-    console.log(`📦 [ProductRequest] Mapped ${products.length} products`);
+    // Products mapped
     
     // Filter out invalid products
     products = products.filter((p: any) => {
@@ -329,7 +329,7 @@ async function getProductsByCategory(madaCategory: string | null, language: stri
       return hasTitle;
     });
     
-    console.log(`📦 [ProductRequest] Returning ${products.length} valid products`);
+    // Returning valid products
   } catch (err) {
     console.error('❌ [ProductRequest] Error:', err);
   }
@@ -387,7 +387,7 @@ function findProductByMessage(message: string, _effectiveLanguage: string): any 
     // Also try full cleaned message as single phrase
     if (cleaned.length >= 4) phrases.unshift(cleaned);
 
-    console.log(`🔍 [findProductByMessage] Searching for phrases:`, phrases.slice(0, 5));
+
 
     // Search knowledge_items for matching titles (products scraped from MADA portal)
     for (const phrase of phrases) {
@@ -424,18 +424,47 @@ function findProductByMessage(message: string, _effectiveLanguage: string): any 
         }
 
         if (item) {
-          console.log(`✅ [findProductByMessage] MATCHED: "${term}" → "${item.title}"`);
+
           return knowledgeItemToProduct(item, _effectiveLanguage);
         }
       }
     }
 
-    console.log(`🔍 [findProductByMessage] No specific product found`);
+
     return null;
   } catch (err) {
     console.warn('[findProductByMessage] Error:', err);
     return null;
   }
+}
+
+/**
+ * Detect if user message is explicitly asking about products/devices (high priority)
+ * Returns true ONLY for explicit requests that should bypass conversation turns requirement
+ */
+function isExplicitProductRequest(message: string): boolean {
+  const contentLower = message.toLowerCase();
+  
+  // EXPLICIT commands to show products - these should show products IMMEDIATELY
+  const explicitCommands = [
+    // Vietnamese
+    'hiển thị sản phẩm', 'xem sản phẩm', 'show products', 'tìm sản phẩm',
+    'gợi ý thiết bị', 'đề xuất sản phẩm', 'suggest devices', 'recommend products',
+    'gợi ý sp', 'đề xuất sp', 'tìm thiết bị', 'tìm sp',
+    'what products', 'what devices', 'which products', 'which devices',
+    'có sản phẩm nào', 'có thiết bị nào', 'có gì', 'available products',
+    'danh sách sản phẩm', 'danh sách thiết bị', 'list of products', 'list of devices',
+    'cho xem', 'hiển thị', 'đưa ra', 'liệt kê', 'giới thiệu',
+    'cho tôi xem', 'cho mình xem', 'show me', 'display', 'list them',
+    // ⭐ CRITICAL: "có sp nào hỗ trợ không" pattern - VERY EXPLICIT
+    'có sản phẩm nào', 'có sp nào', 'sản phẩm nào hỗ trợ', 'sp nào hỗ trợ',
+    'sản phẩm gì', 'thiết bị gì', 'có gì không', 'có cái nào',
+    // English
+    'show me products', 'show me devices', 'list products', 'list devices',
+    'recommend something', 'any products', 'any devices',
+  ];
+  
+  return explicitCommands.some(cmd => contentLower.includes(cmd));
 }
 
 /**
@@ -655,15 +684,19 @@ function extractStructuredDataFromContent(content: string, lang: string): any {
 }
 
 // Get suggested products from RAG sources (and agent category if specified)
-async function getSuggestedProducts(ragSources: any[], message: string, effectiveLanguage: string, agentId?: string): Promise<any[]> {
+async function getSuggestedProducts(ragSources: any[], message: string, effectiveLanguage: string, agentId?: string, shownProductIds: string[] = [], isAskingForOtherProducts: boolean = false): Promise<any[]> {
   let suggestedProducts: any[] = [];
 
   // ⭐ FEATURE 1: Try to detect a SPECIFIC product name from user message FIRST
   // If user mentions "Victor Reader", "OrCam", etc. → return ONLY that product
   const specificProduct = findProductByMessage(message, effectiveLanguage);
   if (specificProduct) {
-    console.log(`🎯 [getSuggestedProducts] Specific product detected: "${specificProduct.title}" - returning only this product`);
-    return [specificProduct];
+    // ⭐ Nếu sản phẩm này đã hiển thị rồi → tìm sản phẩm khác
+    if (shownProductIds.includes(specificProduct.id)) {
+      // Tìm sản phẩm khác cùng loại
+    } else {
+      return [specificProduct];
+    }
   }
 
   // ⭐ CRITICAL: Get agent's MADA category - lookup từ DB TRƯỚC, fallback sang hardcoded mapping
@@ -687,7 +720,7 @@ async function getSuggestedProducts(ragSources: any[], message: string, effectiv
                          agentName.includes('thông tin bổ trợ') ||
                          agentName.includes('education') ||
                          agentName.includes('standard');
-        console.log(`📦 [getSuggestedProducts] DB lookup: botId=${agentBotId}, madaCategory=${agentCategory}, name=${agentRow.name}, isRegulatoryBot=${isRegulatoryBot}`);
+
       }
     } catch (err) {
       console.warn('⚠️ [getSuggestedProducts] DB lookup failed:', err);
@@ -710,14 +743,14 @@ async function getSuggestedProducts(ragSources: any[], message: string, effectiv
   const originalMadaCategory = agentCategory;
   if (agentCategory && MADA_CATEGORY_TO_DB[agentCategory]) {
     const mapped = MADA_CATEGORY_TO_DB[agentCategory];
-    console.log(`📦 [getSuggestedProducts] Using MADA category "${agentCategory}" → product category "${mapped}"`);
+
     agentCategory = mapped;
   }
   
   // ⭐ Bot Thông tin bổ trợ được xem TẤT CẢ sản phẩm, các bot khác bị giới hạn theo category
   const shouldFilterByCategory = !isRegulatoryBot && agentCategory !== null;
   
-  console.log(`📦 [getSuggestedProducts] FINAL: agentId=${agentId}, agentBotId=${agentBotId}, agentCategory=${agentCategory}, isRegulatoryBot=${isRegulatoryBot}, shouldFilterByCategory=${shouldFilterByCategory}`);
+
 
   // Helper: Check if URL is valid for product
   const isValidProductUrl = (url: string): boolean => {
@@ -765,10 +798,10 @@ async function getSuggestedProducts(ragSources: any[], message: string, effectiv
         LIMIT 1
       `).get(normalizedUrl, productUrl, normalizedUrl, productUrl) as any;
       if (item) {
-        console.log(`📷 [DB Lookup] FOUND in knowledge_items: ${item.title}`);
+
         return knowledgeItemToProduct(item, effectiveLanguage);
       }
-      console.log(`📷 [DB Lookup] NOT FOUND in knowledge_items for: ${productUrl}`);
+
     } catch (e) { 
       console.warn('[getProductFromDb] DB error:', (e as Error).message);
     }
@@ -809,10 +842,10 @@ async function getSuggestedProducts(ragSources: any[], message: string, effectiv
       }
       
       if (item) {
-        console.log(`📷 [Title Lookup] FOUND in knowledge_items by title "${title}": ${item.title}`);
+
         return knowledgeItemToProduct(item, effectiveLanguage);
       }
-      console.log(`📷 [Title Lookup] NOT FOUND in knowledge_items for title: ${title}`);
+
     } catch (e) { 
       console.warn('[getProductByTitle] DB error:', (e as Error).message);
     }
@@ -821,9 +854,9 @@ async function getSuggestedProducts(ragSources: any[], message: string, effectiv
   
   // Strategy 1: From RAG sources
   if (ragSources.length > 0) {
-    console.log(`📦 [getSuggestedProducts] Strategy 1: ${ragSources.length} RAG sources`);
+
     const sourceUrls = ragSources.slice(0, 8).map((src: any) => src.source || src.metadata?.source || '').filter(Boolean);
-    console.log(`📦 [getSuggestedProducts] Strategy 1: sourceUrls =`, sourceUrls.slice(0, 5));
+
     let dbDataMap: Record<string, any> = {};
     
     // Helper: normalize URL (remove trailing slash)
@@ -862,7 +895,7 @@ async function getSuggestedProducts(ragSources: any[], message: string, effectiv
           }
         }
         
-        console.log(`📦 [getSuggestedProducts] Found ${dbDataMap.length || Object.keys(dbDataMap).length} knowledge_items for ${sourceUrls.length} sources`);
+
       } catch (e) { 
         console.error('[getSuggestedProducts] knowledge_items lookup error:', (e as Error).message);
       }
@@ -876,42 +909,42 @@ async function getSuggestedProducts(ragSources: any[], message: string, effectiv
       
       // Get thumbnail: try metadata first (thumbnailUrl OR image_url), then kb_products table
       let thumbnail = meta.thumbnailUrl || meta.image_url || '';
-      console.log(`📷 [Product ${idx}] title="${meta.title || 'N/A'}" sourceUrl="${sourceUrl.slice(0,60)}"`);
-      console.log(`📷 [Product ${idx}] dbItem found: ${!!dbItem.id}, dbItem.url="${(dbItem.url || '').slice(0,60)}"`);
-      
+
+
+
       // Also get full product data from kb_products for additional fields
       // ⭐ LUÔN ƯU TIÊN URL từ kb_products nếu có, ngược lại dùng URL từ database hoặc metadata
       let kbProduct = getProductFromDb(dbItem.url || sourceUrl || meta.productUrl || '');
-      console.log(`📷 [Product ${idx}] getProductFromDb(${dbItem.url?.slice(0,40) || sourceUrl?.slice(0,40) || 'N/A'}...) = ${kbProduct ? 'FOUND' : 'NOT FOUND'}`);
-      
+
+
       // Fallback: try to find by title if URL lookup failed
       if (!kbProduct && meta.title) {
-        console.log(`📷 [Product ${idx}] Trying getProductByTitle("${meta.title}")`);
+
         kbProduct = getProductByTitle(meta.title);
       }
-      
+
       // Get the final URL after we know if kbProduct exists
       const finalProductUrl = kbProduct?.source_url || kbProduct?.product_url || dbItem.url || sourceUrl || meta.productUrl || '';
-      
+
       if (kbProduct) {
-        console.log(`📷 [Product ${idx}] ✓ Found: ${kbProduct.title}, image=${kbProduct.image_url ? 'YES' : 'NO'}`);
+
         // ⭐ FIX: Ưu tiên kbProduct.image_url, fallback về metadata thumbnailUrl
         thumbnail = kbProduct.image_url || thumbnail || '';
       } else {
-        console.log(`📷 [Product ${idx}] ✗ NOT found in kb_products, using metadata thumbnail`);
+
         // Nếu không có kbProduct, vẫn giữ thumbnail từ metadata
         thumbnail = thumbnail || '';
       }
-      
-      console.log(`📷 [Product ${idx}] FINAL image=${thumbnail ? 'HAS IMAGE' : 'NO IMAGE'}`);
-      
+
+
+
       // Parse detailed metadata
       const detailedMeta = parseDetailedMetadata(meta);
       const dbDetailedMeta = parseDetailedMetadata(dbItem.metadata);
-      
+
       // Extract structured data from content
       const contentData = extractStructuredDataFromContent(src.content || '', effectiveLanguage);
-      
+
       // Merge all data sources (kbProduct has priority for brand, price, etc.)
       const merged = {
         ...detailedMeta,
@@ -920,14 +953,17 @@ async function getSuggestedProducts(ragSources: any[], message: string, effectiv
         brand: kbProduct?.brand || detailedMeta.brand || dbDetailedMeta.brand || 'MADA Qatar AT Portal',
         price_range: kbProduct?.price_range || detailedMeta.price_range || dbDetailedMeta.price_range || 'Contact MADA Center',
       };
-      
+
       // Build full product object
       // Use actual image from MADA only - NO picsum fallback
       const actualImage = toProxyImageUrl(thumbnail);
       const image_url = actualImage || '';
-      
+
+      // ⭐ FIX: Get product ID - use dbItem.id or kbProduct.id or generate from URL
+      const productId = kbProduct?.id || dbItem.id || `rag-${idx}`;
+
       return {
-        id: kbProduct?.id || src.id || dbItem.id || `src-${idx}`,
+        id: productId,
         title: kbProduct?.title || meta.title || dbItem.title || 'Assistive Technology',
         title_en: kbProduct?.title_en || meta.title_en || meta.title || dbItem.title || 'Assistive Technology',
         description: kbProduct?.description || (src.content || dbItem.content || '').slice(0, 300),
@@ -956,9 +992,12 @@ async function getSuggestedProducts(ragSources: any[], message: string, effectiv
         availability: merged.availability || '',
       };
     });
-    
-    // ⭐ Filter out invalid products (bots, invalid URLs, no images, garbage titles, non-AT products)
+
+    // ⭐ Filter out already-shown products AND invalid products
     suggestedProducts = suggestedProducts.filter((p: any) => {
+      // ⭐ EXCLUDE already-shown products
+      if (shownProductIds.includes(p.id)) return false;
+      
       const botCheck = isBotEntry(p.title);
       const urlCheck = isValidProductUrl(p.product_url);
       // Filter out garbage titles (repeated chars like "kkkk", "aaaa", etc.)
@@ -967,34 +1006,33 @@ async function getSuggestedProducts(ragSources: any[], message: string, effectiv
       // ⭐ Filter out non-AT products (category = 'general' without valid AT-related content)
       const isNonATCategory = (p.category || '').toLowerCase() === 'general';
       // ⭐ Filter out products from non-AT websites (e-commerce, cosmetics, etc.)
-      const nonATDomains = ['hasaki.vn', 'thegioididong.com', 'cellphones.com.vn', 'fptshop.com.vn', 
-                           'dienmayxanh.com', 'tiki.vn', 'lazada.vn', 'shopee.vn', 'youtube.com', 
+      const nonATDomains = ['hasaki.vn', 'thegioididong.com', 'cellphones.com.vn', 'fptshop.com.vn',
+                           'dienmayxanh.com', 'tiki.vn', 'lazada.vn', 'shopee.vn', 'youtube.com',
                            'facebook.com', 'tiktok.com', 'instagram.com'];
       const productUrl = (p.product_url || p.source_url || '').toLowerCase();
       const isFromNonATSite = nonATDomains.some(domain => productUrl.includes(domain));
       // ⭐ Filter out products with generic titles
       const genericTitles = ['sản phẩm về da', 'sản phẩm công nghệ', 'thế giới di động', 'cổng thông tin'];
       const isGenericTitle = genericTitles.some(t => titleLower.includes(t));
-      
-      if (garbageTitle) console.log(`📦 [Filter GARBAGE TITLE] "${p.title}"`);
-      if (isNonATCategory) console.log(`📦 [Filter NON-AT CATEGORY] "${p.title}" - category: ${p.category}`);
-      if (isFromNonATSite) console.log(`📦 [Filter NON-AT SITE] "${p.title}" - url: ${p.product_url}`);
-      if (isGenericTitle) console.log(`📦 [Filter GENERIC TITLE] "${p.title}"`);
-      
+
+
+
+
+
       if (botCheck) return false;
       if (!urlCheck) return false;
       if (garbageTitle) return false;
       if (isNonATCategory && !hasValidATKeywords(titleLower)) return false;
       if (isFromNonATSite) return false;
       if (isGenericTitle) return false;
-      
+
       // ⭐ STRATEGY 1 CATEGORY FILTER: Mỗi bot chỉ hiển thị sản phẩm thuộc category của mình
       // bot-regulatory (Thông tin bổ trợ) KHÔNG bị filter - được xem TẤT CẢ sản phẩm
       // ⭐ CRITICAL FIX: Dùng originalMadaCategory (chưa map) cho specific checks vì agentCategory đã bị remap rồi!
       if (shouldFilterByCategory && agentCategory) {
         const productCategory = (p.category || '').toLowerCase();
         const catLower = agentCategory.toLowerCase();
-        let categoryMatch = 
+        let categoryMatch =
           productCategory.includes(catLower) ||
           (originalMadaCategory === 'sensory-hearing' && productCategory.includes('hearing')) ||
           (originalMadaCategory === 'sensory-vision' && productCategory.includes('vision')) ||
@@ -1017,15 +1055,15 @@ async function getSuggestedProducts(ragSources: any[], message: string, effectiv
             productCategory.includes('musculoskeletal')
           ));
         if (!categoryMatch) {
-          console.log(`📦 [Filter STRATEGY1 CATEGORY MISMATCH] "${p.title}" - product category "${productCategory}" vs agent category "${agentCategory}" (original: "${originalMadaCategory}")`);
+
           return false;
         }
       }
-      
+
       return true;
     });
     
-    console.log(`📦 [getSuggestedProducts] Strategy 1 result: ${suggestedProducts.length} products (after filtering)`);
+
   }
   
   // ⭐ FIX: CHỈ gợi ý sản phẩm từ RAG sources - KHÔNG fallback random
@@ -1036,58 +1074,76 @@ async function getSuggestedProducts(ragSources: any[], message: string, effectiv
   // Đối với các bot thường: fallback như bình thường
   const hasEnoughProducts = suggestedProducts.length >= 3;
   const needsAllProducts = isRegulatoryBot;
-  
+
   if (needsAllProducts || suggestedProducts.length < 3) {
-    console.log(`📦 [getSuggestedProducts] ${isRegulatoryBot ? 'Regulatory bot - fetching ALL products' : 'Not enough products from RAG - fetching from database'}...`);
-    
+
+
     // Fetch directly from kb_products by category (or all if regulatory bot)
     try {
       let dbQuery: string;
-      let dbParams: any[];
-      
+      let dbParams: any[] = [];
+
+      // ⭐ Build exclusion clause for already-shown products
+      // Fix: Exclude by id AND url to catch ALL shown products (kb_products + scraped + knowledge_items)
+      let excludeClause = '';
+      const excludeIds = shownProductIds.filter((id: any) => id);
+      if (excludeIds.length > 0) {
+        const idPlaceholders = excludeIds.map(() => '?').join(',');
+        const urlPlaceholders = excludeIds.map(() => '?').join(',');
+        excludeClause = `AND id NOT IN (${idPlaceholders}) AND product_url NOT IN (SELECT product_url FROM kb_products WHERE id IN (${urlPlaceholders}))`;
+        dbParams = [...excludeIds, ...excludeIds];
+      }
+
+      // ⭐ LIMIT: Always 12, let excludeClause handle deduplication (OFFSET was broken with category filter)
+      const LIMIT = 12;
+
       if (isRegulatoryBot) {
         // ⭐ Regulatory bot: LẤY TẤT CẢ sản phẩm từ TẤT CẢ categories
         dbQuery = `
-          SELECT * FROM kb_products 
+          SELECT * FROM kb_products
           WHERE status IN ('draft', 'published', 'archived')
           AND image_url IS NOT NULL AND image_url != ''
+          ${excludeClause}
           ORDER BY category ASC, featured DESC, created_at DESC
-          LIMIT 24
+          LIMIT ${LIMIT}
         `;
-        dbParams = [];
-        console.log(`📦 [getSuggestedProducts] Regulatory bot - fetching ALL products from knowledge_items (up to 24)`);
+
       } else if (shouldFilterByCategory && agentCategory) {
         // Các bot THƯỜNG: Chỉ lấy sản phẩm thuộc category của mình từ kb_products
         dbQuery = `
-          SELECT * FROM kb_products 
+          SELECT * FROM kb_products
           WHERE category = ? AND status IN ('draft', 'published', 'archived')
           AND image_url IS NOT NULL AND image_url != ''
+          ${excludeClause}
           ORDER BY featured DESC, created_at DESC
-          LIMIT 12
+          LIMIT ${LIMIT}
         `;
-        dbParams = [agentCategory];
-        console.log(`📦 [getSuggestedProducts] Fetching products for category: ${agentCategory} from kb_products`);
+        dbParams = [agentCategory, ...dbParams];
+
       } else {
         // Không có category → lấy tất cả từ kb_products
         dbQuery = `
-          SELECT * FROM kb_products 
+          SELECT * FROM kb_products
           WHERE status IN ('draft', 'published', 'archived')
           AND image_url IS NOT NULL AND image_url != ''
+          ${excludeClause}
           ORDER BY featured DESC, created_at DESC
-          LIMIT 12
+          LIMIT ${LIMIT}
         `;
-        dbParams = [];
-        console.log(`📦 [getSuggestedProducts] Fetching all products from kb_products`);
+
       }
-      
+
       const dbProducts = db.prepare(dbQuery).all(...dbParams) as any[];
-      console.log(`📦 [getSuggestedProducts] DB fetched ${dbProducts.length} products from kb_products`);
-      
+
+
       // Map kb_products rows to product format using helper
       const mappedDbProducts: any[] = dbProducts.map((row: any) => kbProductToProduct(row, effectiveLanguage));
-      
+
       // Filter mapped products
       const filteredDbProducts = mappedDbProducts.filter((p: any) => {
+        // ⭐ EXCLUDE already-shown products
+        if (shownProductIds.includes(p.id)) return false;
+
         // Phải có image_url hợp lệ (http OR proxy URL /api/mada-image)
         const hasImage = !!(p.image_url && (p.image_url.startsWith('http') || p.image_url.startsWith('/api/mada-image')));
         // URL phải là http(s)
@@ -1098,7 +1154,7 @@ async function getSuggestedProducts(ragSources: any[], message: string, effectiv
         // Title không phải garbage
         const titleLower = (p.title || '').toLowerCase();
         const isGarbageTitle = /^(.)\1{3,}$/.test(titleLower) || /^(test|test123|abcd|qwerty)/i.test(titleLower);
-        
+
         // ⭐ Category matching - MỖI BOT chỉ thấy sản phẩm thuộc category của mình
         // bot-regulatory (Thông tin bổ trợ) KHÔNG bị filter - được xem TẤT CẢ sản phẩm
         // ⭐ CRITICAL FIX: Dùng originalMadaCategory (chưa map) cho specific checks
@@ -1128,19 +1184,17 @@ async function getSuggestedProducts(ragSources: any[], message: string, effectiv
               productCategory.includes('neuro') ||
               productCategory.includes('musculoskeletal')
             ));
-          if (!categoryMatch) console.log(`📦 [Filter OUT DB] "${p.title}" - category mismatch: ${productCategory} vs ${agentCategory} (original: "${originalMadaCategory}")`);
+
         }
-        
-        if (!hasImage) console.log(`📦 [Filter OUT DB] "${p.title}" - no valid image`);
-        if (!isValidUrl) console.log(`📦 [Filter OUT DB] "${p.title}" - invalid URL: ${url.slice(0, 50)}`);
-        if (isBot) console.log(`📦 [Filter OUT DB] "${p.title}" - is bot entry`);
-        if (isGarbageTitle) console.log(`📦 [Filter OUT DB] "${p.title}" - garbage title`);
-        
+
+
+
+
         return hasImage && isValidUrl && !isBot && !isGarbageTitle && categoryMatch;
       });
-      
-      console.log(`📦 [getSuggestedProducts] DB fetched: ${dbProducts.length}, after filter: ${filteredDbProducts.length}`);
-      
+
+
+
       // ⭐ THÊM filteredDbProducts vào suggestedProducts (tránh trùng lặp)
       for (const p of filteredDbProducts) {
         const exists = suggestedProducts.some(
@@ -1150,13 +1204,13 @@ async function getSuggestedProducts(ragSources: any[], message: string, effectiv
           suggestedProducts.push(p);
         }
       }
-      
+
     } catch (err) {
       console.warn('⚠️ [getSuggestedProducts] DB fetch error:', err);
     }
   }
   
-  console.log(`📦 [getSuggestedProducts] FINAL: ${suggestedProducts.length} products`);
+
   // ⭐ Regulatory bot: trả về nhiều hơn (12), các bot thường: 6
   const MAX_PRODUCTS = isRegulatoryBot ? 12 : 6;
   return suggestedProducts.slice(0, MAX_PRODUCTS);
@@ -1180,7 +1234,13 @@ router.post('/', async (req, res) => {
       shouldShowProductsNow = false,
       isInQuestionGatheringMode = false,
       userApprovedProducts = false,
+      // ⭐ MỚI: Track sản phẩm đã hiển thị để không lặp lại
+      shownProductIds = [],
     } = req.body;
+
+    // ⭐ Detect nếu user hỏi về "sản phẩm khác" / "other products"
+    const messageLower = (message || '').toLowerCase();
+    const isAskingForOtherProducts = /((còn|co|khác|other|another|more|another)|(sản phẩm|sp|thiết bị|product|device)(khác|else|more|additional)|(có|gì|có gì)(khác|else|nữa|more)|(list|show|hiển thị|gợi ý)(thêm|more|additional)|more products|more devices|more options|additional products)/i.test(messageLower);
 
     // ⭐ Smart product suggestion: chỉ gợi ý sản phẩm khi đã đủ context
     // ⭐ NEW LOGIC: Chỉ suggest products khi:
@@ -1194,25 +1254,18 @@ router.post('/', async (req, res) => {
       isReadyForProductSuggestion ||
       conversationTurns >= 5
     );
-    console.log(`[CHAT] Product Suggestion Logic: triggers=${triggersProductSuggestion}, asked=${followUpQuestionsAsked}/4, approved=${userApprovedProducts}, showNow=${shouldShowProductsNow} → suggest=${shouldSuggestProducts}`);
 
-    // Skip RAG ready check for faster testing (products can work without RAG)
-    // const ready = await waitForRagReady(2000);
-    // if (!ready) { ... }
-    
+
     const detectedLanguage = detectMessageLanguage(message);
     // ⭐ Ưu tiên detect từ message - nếu người dùng hỏi tiếng Anh thì reply tiếng Anh
     const effectiveLanguage = uiLanguage && ['vi', 'en', 'ar', 'fr'].includes(uiLanguage) ? uiLanguage : detectedLanguage;
     
-    console.log('🌍 Language settings:', { uiLanguage, detectedLanguage, effectiveLanguage, messagePreview: message?.slice(0, 30) });
+
     
     if (!message) {
       return res.status(400).json({ success: false, error: 'Message is required' });
     }
     
-    // Guardrails DISABLED - allow all queries
-    // const guardrailsResult = guardrails.analyzeQuery(message, effectiveLanguage);
-    // const safetyScore = guardrails.calculateSafetyScore(message);
     const safetyScore = 100;
     
     // ⭐ AUTO-SCRAPE URLS: Nếu message chứa URL, tự động scrape và trả về product cards
@@ -1221,7 +1274,7 @@ router.post('/', async (req, res) => {
     // Nếu có scraped products và message chủ yếu là URL → trả về ngay không cần RAG
     const isUrlOnly = scrapedProducts.length > 0 && cleanedMessage.length < 10;
     if (isUrlOnly) {
-      console.log(`🔗 [Chat] URL-only message detected, returning scraped products directly`);
+
       
       const responseTexts: Record<string, string> = {
         vi: 'Đây là thông tin sản phẩm tôi trích xuất từ URL bạn cung cấp:',
@@ -1248,7 +1301,7 @@ router.post('/', async (req, res) => {
     // ⭐ Handle MADA_PRODUCT_REQUEST - Trả về sản phẩm theo category của bot
     const isProductRequest = message.includes('[MADA_PRODUCT_REQUEST]');
     if (isProductRequest) {
-      console.log(`📦 [MADA_PRODUCT_REQUEST] Detected in non-stream! agentId: ${agentId}`);
+
       
       // Get category from agent mapping
       const madaMapping = agentId ? AGENT_TO_MADA[agentId] : null;
@@ -1327,17 +1380,7 @@ router.post('/', async (req, res) => {
       ragConfig.priority = true;
     }
     
-    console.log('🤖 Chat RAG config:', { 
-      agentId, 
-      botId,
-      madaCategory,
-      ragConfig: { 
-        hasAgentId: !!ragConfig.agentId, 
-        hasBotId: !!ragConfig.botId,
-        hasMadaCategory: !!ragConfig.madaCategory,
-        priority: ragConfig.priority 
-      }
-    });
+
     
     // Query RAG
     const ragResponse = await ragEngine.query(message, chatHistory.get(convId) || [], ragConfig);
@@ -1363,18 +1406,20 @@ router.post('/', async (req, res) => {
     // Guardrails DISABLED - validateResponse removed
     
     // ⭐ Tự động gợi ý sản phẩm khi user hỏi về thiết bị/sản phẩm
-    // ⭐ CHỈ gửi products khi đã có đủ context (conversationTurns >= 3 hoặc isReadyForProductSuggestion=true)
+    // ⭐ CHỉ gửi products khi đã có đủ context HOẶC user EXPLICITLY yêu cầu
     const suggestedProducts: any[] = [];
-    if (shouldShowProducts(message) && (conversationTurns >= 3 || isReadyForProductSuggestion)) {
+    const isExplicitRequest = isExplicitProductRequest(message); // ⭐ CRITICAL FIX
+    if (shouldShowProducts(message) && (conversationTurns >= 3 || isReadyForProductSuggestion || isExplicitRequest)) {
       // ⭐ Đợi user cung cấp đủ context trước khi gợi ý sản phẩm
       try {
-        const products = await getSuggestedProducts(ragResponse.sources || [], message, effectiveLanguage, agentId);
+        // ⭐ Truyền shownProductIds và isAskingForOtherProducts để không lặp lại sản phẩm
+        const products = await getSuggestedProducts(ragResponse.sources || [], message, effectiveLanguage, agentId, shownProductIds, isAskingForOtherProducts);
         suggestedProducts.push(...products);
       } catch (suggErr) {
-        console.log('⚠️ suggestedProducts error:', suggErr);
+
       }
-    } else if (shouldShowProducts(message) && conversationTurns < 3) {
-      console.log(`⏳ [CHAT] Chưa đủ context (turns=${conversationTurns}/3) - chưa gợi ý sản phẩm, để AI hỏi thêm thông tin`);
+    } else if (shouldShowProducts(message) && conversationTurns < 3 && !isExplicitRequest) {
+
     }
     
     // Store assistant response
@@ -1404,6 +1449,8 @@ router.post('/', async (req, res) => {
         detectedLanguage: effectiveLanguage,
         suggestedProducts: allProducts,
         autoScraped: scrapedProducts.length > 0,
+        // ⭐ Trả về danh sách ID sản phẩm đã hiển thị để frontend track và gửi lại cho lần sau
+        shownProductIds: allProducts.map((p: any) => p.id).filter(Boolean),
       },
     });
   } catch (error) {
@@ -1443,7 +1490,7 @@ router.post('/with-file', async (req, res) => {
       isReadyForProductSuggestion ||
       conversationTurns >= 5
     );
-    console.log(`[WITH-FILE] Product Suggestion Logic: triggers=${triggersProductSuggestion}, asked=${followUpQuestionsAsked}/4, approved=${userApprovedProducts}, showNow=${shouldShowProductsNow} → suggest=${shouldSuggestProducts}`);
+
     
     const ready = await waitForRagReady(15000);
     if (!ready) {
@@ -1460,7 +1507,7 @@ router.post('/with-file', async (req, res) => {
     const detectedLanguage = detectMessageLanguage(message);
     const effectiveLanguage = uiLanguage && ['vi', 'en', 'ar', 'fr'].includes(uiLanguage) ? uiLanguage : detectedLanguage;
 
-    console.log('📎 Chat with files:', { message: message?.slice(0, 50), fileCount: attachments?.length || 0, effectiveLanguage });
+
     
     if (!message) {
       return res.status(400).json({ success: false, error: 'Message is required' });
@@ -1543,16 +1590,16 @@ router.post('/with-file', async (req, res) => {
                 preview: truncatedText.slice(0, 200),
                 fileType: result.type 
               });
-              console.log(`✅ Parsed ${result.type}: ${name} → ${result.text.length} chars`);
+
             } else {
               // Parse failed — include error info
               const displayName = name.length > 40 ? name.slice(0, 37) + '...' : name;
               fileContext += `\n\n⚠️ Không thể đọc file "${displayName}": ${result.error || 'Lỗi không xác định'}`;
               attachmentResults.push({ name, type: mimeType, success: false, error: result.error, fileType: result.type });
-              console.log(`⚠️ Failed to parse ${name}: ${result.error}`);
+
             }
           } catch (attErr) {
-            console.log('⚠️ Attachment processing error:', attErr);
+
             fileContext += `\n\n⚠️ Lỗi xử lý file "${name}": ${attErr instanceof Error ? attErr.message : 'Unknown'}`;
             attachmentResults.push({ name, type: mimeType, success: false, error: String(attErr) });
           }
@@ -1657,7 +1704,13 @@ router.post('/stream', async (req: any, res: any) => {
       shouldShowProductsNow = false,
       isInQuestionGatheringMode = false,
       userApprovedProducts = false,
+      // ⭐ MỚI: Track sản phẩm đã hiển thị để không lặp lại
+      shownProductIds = [],
     } = req.body;
+
+    // ⭐ Detect nếu user hỏi về "sản phẩm khác" / "other products"
+    const messageLower = (message || '').toLowerCase();
+    const isAskingForOtherProducts = /((còn|co|khác|other|another|more|another)|(sản phẩm|sp|thiết bị|product|device)(khác|else|more|additional)|(có|gì|có gì)(khác|else|nữa|more)|(list|show|hiển thị|gợi ý)(thêm|more|additional)|more products|more devices|more options|additional products)/i.test(messageLower);
 
     // ⭐ Smart product suggestion: chỉ gợi ý sản phẩm khi đã đủ context
     // ⭐ NEW LOGIC: Chỉ suggest products khi:
@@ -1671,7 +1724,7 @@ router.post('/stream', async (req: any, res: any) => {
       isReadyForProductSuggestion ||
       conversationTurns >= 5
     );
-    console.log(`[STREAM] Product Suggestion Logic: triggers=${triggersProductSuggestion}, asked=${followUpQuestionsAsked}/4, approved=${userApprovedProducts}, showNow=${shouldShowProductsNow} → suggest=${shouldSuggestProducts}`);
+
     
     // Set SSE headers
     res.setHeader('Content-Type', 'text/event-stream');
@@ -1718,7 +1771,7 @@ router.post('/stream', async (req: any, res: any) => {
     // Nếu có scraped products và message chủ yếu là URL → trả về ngay không cần RAG
     const isUrlOnly = scrapedProducts.length > 0 && cleanedMessage.length < 10;
     if (isUrlOnly) {
-      console.log(`🔗 [Stream] URL-only message detected, returning scraped products directly`);
+
       
       const responseTexts: Record<string, string> = {
         vi: 'Đây là thông tin sản phẩm tôi trích xuất từ URL bạn cung cấp:',
@@ -1754,7 +1807,7 @@ router.post('/stream', async (req: any, res: any) => {
       const madaMapping = agentId ? AGENT_TO_MADA[agentId] : null;
       const madaCategory = madaMapping?.madaCategory || null;
       
-      console.log(`📦 [MADA_PRODUCT_REQUEST] Detected! agentId: ${agentId}, madaCategory: ${madaCategory || 'all'}`);
+
       
       // Fetch products
       const products = await getProductsByCategory(madaCategory, effectiveLanguage, 6);
@@ -1835,18 +1888,10 @@ router.post('/stream', async (req: any, res: any) => {
       ragConfig.priority = true;
     }
     
-    console.log('🤖 Stream Chat RAG config:', { 
-      agentId, 
-      botId,
-      madaCategory,
-      ragConfig: { 
-        hasAgentId: !!ragConfig.agentId, 
-        hasBotId: !!ragConfig.botId,
-        hasMadaCategory: !!ragConfig.madaCategory,
-        priority: ragConfig.priority 
-      }
-    });
-    
+    // ⭐ Track product IDs sent in this response (for done event + dedup on next turn)
+    let sentProductIds: string[] = [];
+
+
     // Check RAG engine
     if (!ragEngine.isConfigured) {
       const ready = await waitForRagReady(15000);
@@ -1872,18 +1917,20 @@ router.post('/stream', async (req: any, res: any) => {
       }
       
       // ⭐ Tự động gửi suggestedProducts khi user hỏi về thiết bị/sản phẩm
-      // ⭐ CHỈ gửi products khi đã có đủ context (conversationTurns >= 3 hoặc isReadyForProductSuggestion=true)
+      // ⭐ CHỈ gửi products khi đã có đủ context HOẶC user EXPLICITLY yêu cầu xem sản phẩm
       const shouldShow = shouldShowProducts(message);
-      console.log(`🔍 [STREAM] shouldShowProducts check: ${shouldShow} for message: "${message.substring(0, 80)}..."`);
+      const isExplicitRequest = isExplicitProductRequest(message); // ⭐ CRITICAL FIX: User hỏi trực tiếp → show ngay!
+
       // ⭐ Đợi user cung cấp đủ context trước khi gợi ý sản phẩm
-      if (shouldShow && (conversationTurns >= 3 || isReadyForProductSuggestion)) {
-        // ⭐ Chỉ gợi ý sản phẩm KHI đã đủ context (isReadyForProductSuggestion=true hoặc turns>=5)
-        // Nếu chưa đủ context → skip gửi products, để AI tự hỏi thêm thông tin
+      // ⭐ NHƯNG: Nếu user EXPLICITLY yêu cầu xem sản phẩm → show NGAY LẬP TỨC
+      if (shouldShow && (conversationTurns >= 3 || isReadyForProductSuggestion || isExplicitRequest)) {
+        // ⭐ Chỉ gợi ý sản phẩm KHI đã đủ context HOẶC user explicit yêu cầu
         try {
           let allProducts = [...scrapedProducts]; // Start with scraped products
-          const suggestedProducts = await getSuggestedProducts(streamResult.sources || [], message, effectiveLanguage, agentId);
-          console.log(`📦 [STREAM] suggestedProducts count: ${suggestedProducts.length}, first title: ${suggestedProducts[0]?.title || 'N/A'}`);
-          
+          // ⭐ Truyền shownProductIds và isAskingForOtherProducts để không lặp lại sản phẩm
+          const suggestedProducts = await getSuggestedProducts(streamResult.sources || [], message, effectiveLanguage, agentId, shownProductIds, isAskingForOtherProducts);
+
+
           // Merge without duplicates
           for (const p of suggestedProducts) {
             const exists = allProducts.some((ap: any) => ap.product_url === p.product_url || ap.source_url === p.source_url);
@@ -1891,29 +1938,35 @@ router.post('/stream', async (req: any, res: any) => {
               allProducts.push(p);
             }
           }
-          
+
           if (allProducts.length > 0) {
+            sentProductIds = allProducts.map((p: any) => p.id).filter(Boolean);
+            // ⭐ ANTI-REPEAT: Track recommended products
             sendEvent({ type: 'suggestedProducts', suggestedProducts: allProducts, autoScraped: scrapedProducts.length > 0 });
           }
         } catch (suggErr) {
-          console.log('⚠️ suggestedProducts error:', suggErr);
+
         }
       } else if (scrapedProducts.length > 0) {
         // Still send scraped products from URLs in message even if context not ready
+        sentProductIds = scrapedProducts.map((p: any) => p.id).filter(Boolean);
         sendEvent({ type: 'suggestedProducts', suggestedProducts: scrapedProducts, autoScraped: true });
-      } else if (!shouldSuggestProducts && missingContext.length > 0) {
+      } else if (!shouldSuggestProducts && !isExplicitRequest && missingContext.length > 0) {
         // ⭐ Chưa đủ context: gửi event để frontend biết cần hỏi thêm
         sendEvent({ type: 'contextNeeded', missingContext, message: 'Cần hỏi thêm thông tin trước khi gợi ý sản phẩm' });
       }
-      // Stream response
+      // Stream response (gom lại toàn bộ câu trả lời để lưu vào lịch sử hội thoại)
+      let fullStreamedAnswer = '';
       if (streamResult.stream) {
         for await (const chunk of streamResult.stream) {
           const chunkText = chunk.text();
           if (chunkText) {
+            fullStreamedAnswer += chunkText;
             sendEvent({ type: 'chunk', chunk: chunkText });
           }
         }
       } else if (streamResult.answer) {
+        fullStreamedAnswer = streamResult.answer;
         sendEvent({ type: 'chunk', chunk: streamResult.answer });
       }
       
@@ -1922,9 +1975,16 @@ router.post('/stream', async (req: any, res: any) => {
         conversationId: convId,
         confidence: streamResult.confidence || 0.5,
         detectedLanguage: effectiveLanguage,
+        shownProductIds: sentProductIds,
       });
       
-      chatHistory.get(convId)!.push({ role: 'assistant', content: streamResult.answer || '' });
+      chatHistory.get(convId)!.push({ role: 'assistant', content: fullStreamedAnswer || streamResult.answer || '' });
+
+      // Giới hạn lịch sử để không phình bộ nhớ và prompt
+      const convHistory = chatHistory.get(convId)!;
+      if (convHistory.length > 40) {
+        convHistory.splice(0, convHistory.length - 40);
+      }
       
     } catch (streamError) {
       console.error('❌ Stream error:', streamError);
@@ -1937,13 +1997,17 @@ router.post('/stream', async (req: any, res: any) => {
                             errorMsg.includes('ECONNREFUSED');
       
       // ⭐ 429 Too Many Requests — API rate limit
+      // Gồm cả 503/UNAVAILABLE: Gemini quá tải cũng dùng chung câu fallback "hệ thống đang bận"
       const is429Error = errorMsg.includes('429') || 
                          errorMsg.includes('Too Many Requests') ||
-                         errorMsg.includes('RESOURCE_EXHAUSTED');
+                         errorMsg.includes('RESOURCE_EXHAUSTED') ||
+                         errorMsg.includes('503') ||
+                         errorMsg.includes('Service Unavailable') ||
+                         errorMsg.includes('UNAVAILABLE');
       
       if (isNetworkError || is429Error) {
         const errorType = is429Error ? '429_RATE_LIMIT' : 'NETWORK_ERROR';
-        console.log(`🔄 [FALLBACK ${errorType}] ${is429Error ? 'API rate limited, ' : ''}providing basic response`);
+
         
         // Tạo câu trả lời cơ bản dựa trên context của conversation
         const contextMessages = chatHistory.get(convId) || [];
@@ -2023,18 +2087,24 @@ router.post('/stream', async (req: any, res: any) => {
         const fallbackAnswer = fallbackResponses[effectiveLanguage] || fallbackResponses.vi;
         
         // Stream the fallback response
-        // ⭐ FALLBACK: CHỈ gửi products khi đã có đủ context (conversationTurns >= 3)
-        if (shouldShowProducts(message) && (conversationTurns >= 3 || isReadyForProductSuggestion)) {
+        // ⭐ FALLBACK: CHỈ gửi products khi đã có đủ context HOẶC user EXPLICITLY yêu cầu
+        const isExplicitRequest = isExplicitProductRequest(message); // ⭐ CRITICAL FIX
+        // ⭐ Detect nếu user hỏi về "sản phẩm khác"
+        const messageLower = (message || '').toLowerCase();
+        const isAskingForOtherProductsFallback = /((còn|co|khác|other|another|more|another)|(sản phẩm|sp|thiết bị|product|device)(khác|else|more|additional)|(có|gì|có gì)(khác|else|nữa|more)|(list|show|hiển thị|gợi ý)(thêm|more|additional)|more products|more devices|more options|additional products)/i.test(messageLower);
+        if (shouldShowProducts(message) && (conversationTurns >= 3 || isReadyForProductSuggestion || isExplicitRequest)) {
           try {
-            const suggestedProducts = await getSuggestedProducts([], message, effectiveLanguage, agentId);
+            // ⭐ Truyền shownProductIds và isAskingForOtherProducts để không lặp lại sản phẩm
+            const suggestedProducts = await getSuggestedProducts([], message, effectiveLanguage, agentId, shownProductIds, isAskingForOtherProductsFallback);
             if (suggestedProducts.length > 0) {
+              sentProductIds = suggestedProducts.map((p: any) => p.id).filter(Boolean);
               sendEvent({ type: 'suggestedProducts', suggestedProducts });
             }
           } catch (suggErr) {
-            console.log('⚠️ [FALLBACK] suggestedProducts error:', suggErr);
+
           }
-        } else if (shouldShowProducts(message) && conversationTurns < 3) {
-          console.log(`⏳ [FALLBACK] Chưa đủ context (turns=${conversationTurns}/3) - chưa gợi ý sản phẩm`);
+        } else if (shouldShowProducts(message) && conversationTurns < 3 && !isExplicitRequest) {
+
         }
         
         const words = fallbackAnswer.split(' ');
@@ -2049,6 +2119,7 @@ router.post('/stream', async (req: any, res: any) => {
           confidence: 0.3,
           isFallback: true,
           detectedLanguage: effectiveLanguage,
+          shownProductIds: [],
         });
         
         chatHistory.get(convId)!.push({ role: 'assistant', content: fallbackAnswer });
@@ -2093,7 +2164,7 @@ router.post('/follow-up', async (req, res) => {
       return res.status(400).json({ success: false, error: 'userMessage is required' });
     }
 
-    console.log('💡 Generating follow-up questions for:', userMessage.slice(0, 50));
+
 
     // Build context
     const historyContext = conversationHistory
@@ -2167,7 +2238,7 @@ RÈGLES:
 
     // Check Gemini config
     if (!process.env.GEMINI_API_KEY && !process.env.GOOGLE_GEMINI_API_KEY) {
-      console.log('💡 Follow-up: No Gemini API key, returning fallback questions');
+
       return res.json({ success: true, data: { questions: generateFallbackFollowUps(userMessage, language), source: 'no_api_key' } });
     }
 
@@ -2396,7 +2467,7 @@ router.post('/products', async (req, res) => {
     // ⭐ Handle MADA_PRODUCT_REQUEST
     const isProductRequest = message?.includes('[MADA_PRODUCT_REQUEST]');
     if (isProductRequest) {
-      console.log(`📦 [Products API] MADA_PRODUCT_REQUEST detected! agentId: ${agentId}`);
+
       
       // Get category from agent mapping
       const madaMapping = agentId ? AGENT_TO_MADA[agentId] : null;
@@ -2419,7 +2490,8 @@ router.post('/products', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Message is required' });
     }
     
-    // ⭐ CHỈ gửi products khi đã có đủ context (conversationTurns >= 3 hoặc isReadyForProductSuggestion=true)
+    // ⭐ CHỈ gửi products khi đã có đủ context HOẶC user EXPLICITLY yêu cầu
+    const isExplicitRequest = isExplicitProductRequest(message); // ⭐ CRITICAL FIX
     if (!shouldShowProducts(message)) {
       return res.json({
         success: true,
@@ -2433,9 +2505,9 @@ router.post('/products', async (req, res) => {
       });
     }
     
-    // ⭐ Check context - only show products when user has provided enough info
-    if (conversationTurns < 3 && !isReadyForProductSuggestion) {
-      console.log(`⏳ [Products API] Chưa đủ context (turns=${conversationTurns}/3) - yêu cầu cung cấp thêm thông tin trước`);
+    // ⭐ Check context - only show products when user has provided enough info HOẶC explicit request
+    if (conversationTurns < 3 && !isReadyForProductSuggestion && !isExplicitRequest) {
+
       return res.json({
         success: true,
         data: {
@@ -2451,7 +2523,7 @@ router.post('/products', async (req, res) => {
     // Get products
     const products = await getSuggestedProducts([], message, effectiveLanguage, agentId);
     
-    console.log(`📦 [Products API] Found ${products.length} products for: "${message.slice(0, 50)}..."`);
+
     
     res.json({
       success: true,
@@ -2726,7 +2798,7 @@ router.get('/feedback/questions', async (_req, res) => {
       ORDER BY sort_order ASC
     `).all();
     
-    console.log('[DEBUG] Feedback questions from DB:', JSON.stringify(questions, null, 2));
+
     
     res.json({ success: true, data: questions });
   } catch (error) {

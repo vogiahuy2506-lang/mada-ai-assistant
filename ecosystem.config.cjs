@@ -1,8 +1,7 @@
 module.exports = {
   apps: [{
     name: 'mada-ai',
-    script: 'npm',
-    args: 'run server',
+    script: 'dist/server.mjs',
     cwd: '/home/hotro_digibook/mada-ai-assistant',
     instances: 1,
     exec_mode: 'fork',

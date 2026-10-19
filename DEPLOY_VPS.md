@@ -1,36 +1,28 @@
-# ===== VPS DEPLOY - chạy từng lệnh một =====
+# ===== FIX DEPLOY - chạy tuần tự =====
 
-# Bước 1: Vào thư mục project
 cd /home/hotro_digibook/mada-ai-assistant
-pwd   # phải in ra: /home/hotro_digibook/mada-ai-assistant
 
-# Bước 2: Xóa hết PM2 process cũ (đang có 1 fork lỗi + 1 server thật)
-pm2 delete all
-pm2 kill
-sleep 2
+# Bước 1: Reset về origin/main (mất uncommitted changes trên VPS)
+git fetch origin
+git reset --hard origin/main
 
-# Bước 3: Pull code mới
-git pull origin main
+# Verify:
+git log --oneline -3
+ls -la ecosystem.config.cjs   # phải tồn tại
 
-# Bước 4: Cài dependencies
-npm ci --omit=dev
+# Bước 2: Cài dependencies BAO GỒM devDependencies (vì cần esbuild để build)
+npm ci
 
-# Bước 5: Build frontend
+# Bước 3: Build lại
 npm run build
 
-# Bước 6: Khởi động lại với ecosystem file (dùng file có sẵn để tránh lỗi spawn bash)
-# Kiểm tra trước:
-ls ecosystem.config.cjs 2>/dev/null || ls ecosystem.config.js 2>/dev/null || ls ecosystem.config.json 2>/dev/null
-
-# Bước 7: Khởi động app - DÙNG ecosystem file nếu có, không thì dùng lệnh này:
-pm2 start npm --name mada-ai -- run server
+# Bước 4: Restart app
+pm2 delete all
+pm2 start ecosystem.config.cjs
 pm2 save
-pm2 startup   # copy lệnh mà PM2 in ra, chạy nó với sudo
 
-# Bước 8: Verify
-sleep 3
+# Bước 5: Verify
+sleep 5
 pm2 status
 pm2 logs mada-ai --lines 30 --nostream
 curl -s -o /dev/null -w "Health: %{http_code}\n" http://localhost:3001/api/health
-
-# ===== DONE =====

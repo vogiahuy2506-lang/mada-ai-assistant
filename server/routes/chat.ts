@@ -838,7 +838,7 @@ async function getSuggestedProducts(ragSources: any[], message: string, effectiv
           SELECT id, title, content, source, url, category, language, metadata
           FROM knowledge_items
           WHERE url IN (${placeholders}) OR source IN (${placeholders})
-        `).all(...sourceUrls) as any[];
+        `).all(...sourceUrls, ...sourceUrls) as any[];
         
         // Also try with trailing slash removed for both
         const normalizedSourceUrls = sourceUrls.map(url => url.replace(/\/$/, ''));
@@ -847,7 +847,7 @@ async function getSuggestedProducts(ragSources: any[], message: string, effectiv
           SELECT id, title, content, source, url, category, language, metadata
           FROM knowledge_items
           WHERE url IN (${normalizedPlaceholders}) OR source IN (${normalizedPlaceholders})
-        `).all(...normalizedSourceUrls) as any[];
+        `).all(...normalizedSourceUrls, ...normalizedSourceUrls) as any[];
         
         // Merge all rows
         const allRows = [...rows, ...normalizedRows];
@@ -1174,11 +1174,27 @@ router.post('/', async (req, res) => {
       missingContext = [],
       isReadyForProductSuggestion = false,
       conversationTurns = 0,
+      // ⭐ NEW: Các tham số kiểm soát việc hiển thị sản phẩm
+      triggersProductSuggestion = false,
+      followUpQuestionsAsked = 0,
+      shouldShowProductsNow = false,
+      isInQuestionGatheringMode = false,
+      userApprovedProducts = false,
     } = req.body;
 
     // ⭐ Smart product suggestion: chỉ gợi ý sản phẩm khi đã đủ context
-    const shouldSuggestProducts = isReadyForProductSuggestion || conversationTurns >= 5;
-    console.log(`[CHAT] Context: missing=${missingContext.join(',')}, isReady=${isReadyForProductSuggestion}, turns=${conversationTurns} → suggest=${shouldSuggestProducts}`);
+    // ⭐ NEW LOGIC: Chỉ suggest products khi:
+    // 1. user đã approve (userApprovedProducts = true) VÀ
+    // 2. Đã hỏi đủ câu hỏi (followUpQuestionsAsked >= 4) VÀ
+    // 3. Message trigger product suggestion
+    // HOẶC fallback: isReadyForProductSuggestion OR conversationTurns >= 5
+    const shouldSuggestProducts = (
+      (userApprovedProducts && followUpQuestionsAsked >= 4 && triggersProductSuggestion) ||
+      shouldShowProductsNow ||
+      isReadyForProductSuggestion ||
+      conversationTurns >= 5
+    );
+    console.log(`[CHAT] Product Suggestion Logic: triggers=${triggersProductSuggestion}, asked=${followUpQuestionsAsked}/4, approved=${userApprovedProducts}, showNow=${shouldShowProductsNow} → suggest=${shouldSuggestProducts}`);
 
     // Skip RAG ready check for faster testing (products can work without RAG)
     // const ready = await waitForRagReady(2000);
@@ -1347,16 +1363,18 @@ router.post('/', async (req, res) => {
     // Guardrails DISABLED - validateResponse removed
     
     // ⭐ Tự động gợi ý sản phẩm khi user hỏi về thiết bị/sản phẩm
-    // ⭐ LUÔN gửi products nếu shouldShowProducts=true (không cần chờ context đủ)
+    // ⭐ CHỈ gửi products khi đã có đủ context (conversationTurns >= 3 hoặc isReadyForProductSuggestion=true)
     const suggestedProducts: any[] = [];
-    if (shouldShowProducts(message)) {
-      // ⭐ FIX: Gửi products NGAY LẬP TỨC khi user hỏi về sản phẩm - không cần chờ context
+    if (shouldShowProducts(message) && (conversationTurns >= 3 || isReadyForProductSuggestion)) {
+      // ⭐ Đợi user cung cấp đủ context trước khi gợi ý sản phẩm
       try {
         const products = await getSuggestedProducts(ragResponse.sources || [], message, effectiveLanguage, agentId);
         suggestedProducts.push(...products);
       } catch (suggErr) {
         console.log('⚠️ suggestedProducts error:', suggErr);
       }
+    } else if (shouldShowProducts(message) && conversationTurns < 3) {
+      console.log(`⏳ [CHAT] Chưa đủ context (turns=${conversationTurns}/3) - chưa gợi ý sản phẩm, để AI hỏi thêm thông tin`);
     }
     
     // Store assistant response
@@ -1405,7 +1423,27 @@ router.post('/with-file', async (req, res) => {
       attachments,
       isReadyForProductSuggestion = false,
       conversationTurns = 0,
+      // ⭐ NEW: Các tham số kiểm soát việc hiển thị sản phẩm
+      triggersProductSuggestion = false,
+      followUpQuestionsAsked = 0,
+      shouldShowProductsNow = false,
+      isInQuestionGatheringMode = false,
+      userApprovedProducts = false,
     } = req.body;
+
+    // ⭐ Smart product suggestion: chỉ gợi ý sản phẩm khi đã đủ context
+    // ⭐ NEW LOGIC: Chỉ suggest products khi:
+    // 1. user đã approve (userApprovedProducts = true) VÀ
+    // 2. Đã hỏi đủ câu hỏi (followUpQuestionsAsked >= 4) VÀ
+    // 3. Message trigger product suggestion
+    // HOẶC fallback: isReadyForProductSuggestion OR conversationTurns >= 5
+    const shouldSuggestProducts = (
+      (userApprovedProducts && followUpQuestionsAsked >= 4 && triggersProductSuggestion) ||
+      shouldShowProductsNow ||
+      isReadyForProductSuggestion ||
+      conversationTurns >= 5
+    );
+    console.log(`[WITH-FILE] Product Suggestion Logic: triggers=${triggersProductSuggestion}, asked=${followUpQuestionsAsked}/4, approved=${userApprovedProducts}, showNow=${shouldShowProductsNow} → suggest=${shouldSuggestProducts}`);
     
     const ready = await waitForRagReady(15000);
     if (!ready) {
@@ -1418,10 +1456,10 @@ router.post('/with-file', async (req, res) => {
       };
       return res.status(503).json({ success: false, error: errMsgs[lang] || errMsgs.vi, retryable: true });
     }
-    
+
     const detectedLanguage = detectMessageLanguage(message);
     const effectiveLanguage = uiLanguage && ['vi', 'en', 'ar', 'fr'].includes(uiLanguage) ? uiLanguage : detectedLanguage;
-    
+
     console.log('📎 Chat with files:', { message: message?.slice(0, 50), fileCount: attachments?.length || 0, effectiveLanguage });
     
     if (!message) {
@@ -1613,12 +1651,27 @@ router.post('/stream', async (req: any, res: any) => {
       missingContext = [],
       isReadyForProductSuggestion = false,
       conversationTurns = 0,
+      // ⭐ NEW: Các tham số kiểm soát việc hiển thị sản phẩm
+      triggersProductSuggestion = false,
+      followUpQuestionsAsked = 0,
+      shouldShowProductsNow = false,
+      isInQuestionGatheringMode = false,
+      userApprovedProducts = false,
     } = req.body;
 
     // ⭐ Smart product suggestion: chỉ gợi ý sản phẩm khi đã đủ context
-    // Hoặc khi conversationTurns >= 5 (backup)
-    const shouldSuggestProducts = isReadyForProductSuggestion || conversationTurns >= 5;
-    console.log(`[STREAM] Context: missing=${missingContext.join(',')}, isReady=${isReadyForProductSuggestion}, turns=${conversationTurns} → suggest=${shouldSuggestProducts}`);
+    // ⭐ NEW LOGIC: Chỉ suggest products khi:
+    // 1. user đã approve (userApprovedProducts = true) VÀ
+    // 2. Đã hỏi đủ câu hỏi (followUpQuestionsAsked >= 4) VÀ
+    // 3. Message trigger product suggestion
+    // HOẶC fallback: isReadyForProductSuggestion OR conversationTurns >= 5
+    const shouldSuggestProducts = (
+      (userApprovedProducts && followUpQuestionsAsked >= 4 && triggersProductSuggestion) ||
+      shouldShowProductsNow ||
+      isReadyForProductSuggestion ||
+      conversationTurns >= 5
+    );
+    console.log(`[STREAM] Product Suggestion Logic: triggers=${triggersProductSuggestion}, asked=${followUpQuestionsAsked}/4, approved=${userApprovedProducts}, showNow=${shouldShowProductsNow} → suggest=${shouldSuggestProducts}`);
     
     // Set SSE headers
     res.setHeader('Content-Type', 'text/event-stream');
@@ -1819,12 +1872,11 @@ router.post('/stream', async (req: any, res: any) => {
       }
       
       // ⭐ Tự động gửi suggestedProducts khi user hỏi về thiết bị/sản phẩm
-      // ⭐ LUÔN gửi products nếu shouldShowProducts=true (không cần chờ context đủ)
+      // ⭐ CHỈ gửi products khi đã có đủ context (conversationTurns >= 3 hoặc isReadyForProductSuggestion=true)
       const shouldShow = shouldShowProducts(message);
       console.log(`🔍 [STREAM] shouldShowProducts check: ${shouldShow} for message: "${message.substring(0, 80)}..."`);
-      // ⭐ FIX: Gửi products NGAY LẬP TỨC khi user hỏi về sản phẩm - không cần chờ context
-      // Context sẽ được thu thập dần qua các câu hỏi follow-up
-      if (shouldShow) {
+      // ⭐ Đợi user cung cấp đủ context trước khi gợi ý sản phẩm
+      if (shouldShow && (conversationTurns >= 3 || isReadyForProductSuggestion)) {
         // ⭐ Chỉ gợi ý sản phẩm KHI đã đủ context (isReadyForProductSuggestion=true hoặc turns>=5)
         // Nếu chưa đủ context → skip gửi products, để AI tự hỏi thêm thông tin
         try {
@@ -1971,8 +2023,8 @@ router.post('/stream', async (req: any, res: any) => {
         const fallbackAnswer = fallbackResponses[effectiveLanguage] || fallbackResponses.vi;
         
         // Stream the fallback response
-        // ⭐ FALLBACK: Gửi products NGAY khi user hỏi về sản phẩm
-        if (shouldShowProducts(message)) {
+        // ⭐ FALLBACK: CHỈ gửi products khi đã có đủ context (conversationTurns >= 3)
+        if (shouldShowProducts(message) && (conversationTurns >= 3 || isReadyForProductSuggestion)) {
           try {
             const suggestedProducts = await getSuggestedProducts([], message, effectiveLanguage, agentId);
             if (suggestedProducts.length > 0) {
@@ -1981,6 +2033,8 @@ router.post('/stream', async (req: any, res: any) => {
           } catch (suggErr) {
             console.log('⚠️ [FALLBACK] suggestedProducts error:', suggErr);
           }
+        } else if (shouldShowProducts(message) && conversationTurns < 3) {
+          console.log(`⏳ [FALLBACK] Chưa đủ context (turns=${conversationTurns}/3) - chưa gợi ý sản phẩm`);
         }
         
         const words = fallbackAnswer.split(' ');
@@ -2333,7 +2387,7 @@ router.post('/evaluate', async (req, res) => {
 // POST /api/chat/products — Get products on-demand
 router.post('/products', async (req, res) => {
   try {
-    const { message, language = 'vi', agentId } = req.body;
+    const { message, language = 'vi', agentId, conversationTurns = 0, isReadyForProductSuggestion = false } = req.body;
     
     // ⭐ Detect language from message for product recommendations
     const detectedLanguage = detectMessageLanguage(message);
@@ -2365,7 +2419,7 @@ router.post('/products', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Message is required' });
     }
     
-    // Check if message is asking for products
+    // ⭐ CHỈ gửi products khi đã có đủ context (conversationTurns >= 3 hoặc isReadyForProductSuggestion=true)
     if (!shouldShowProducts(message)) {
       return res.json({
         success: true,
@@ -2375,6 +2429,21 @@ router.post('/products', async (req, res) => {
           hint: effectiveLanguage === 'vi' 
             ? 'Hãy hỏi về sản phẩm, thiết bị, giá cả hoặc nơi mua để xem gợi ý.'
             : 'Ask about products, devices, prices or where to buy to see suggestions.',
+        },
+      });
+    }
+    
+    // ⭐ Check context - only show products when user has provided enough info
+    if (conversationTurns < 3 && !isReadyForProductSuggestion) {
+      console.log(`⏳ [Products API] Chưa đủ context (turns=${conversationTurns}/3) - yêu cầu cung cấp thêm thông tin trước`);
+      return res.json({
+        success: true,
+        data: {
+          products: [],
+          reason: 'not_enough_context',
+          hint: effectiveLanguage === 'vi'
+            ? 'Vui lòng cho tôi biết thêm về nhu cầu của bạn (ngân sách, mục đích sử dụng, đối tượng sử dụng...) để tôi có thể gợi ý sản phẩm phù hợp hơn.'
+            : 'Please provide more details about your needs (budget, usage purpose, target user...) so I can suggest suitable products.',
         },
       });
     }

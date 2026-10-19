@@ -351,24 +351,9 @@ class RAGEngine {
       // ⚡ PERFORMANCE OPTIMIZATION: Reduce docs retrieved (was topK * 4, now topK * 2)
       let relevantDocs = await this.retrieveDocuments(userQuery, topK * 2, { botId, madaCategory, agentId, priority });
 
-      // ⭐ Custom agent KHÔNG có dữ liệu → trả lời rằng không tìm thấy thông tin
-      // Không cho AI trả lời sai bằng kiến thức chung
-      if (agentId && relevantDocs.length === 0) {
-        console.log(`⚠️ [RAG] Agent "${agentId}" - no relevant docs found for query: "${userQuery.slice(0, 50)}..."`);
-        const noDataMsgs: Record<string, string> = {
-          vi: `Xin lỗi, tôi không tìm thấy thông tin liên quan đến câu hỏi của bạn trong cơ sở dữ liệu của bot này. Vui lòng thử hỏi về chủ đề khác hoặc liên hệ quản trị viên để thêm dữ liệu.`,
-          en: `Sorry, I couldn't find information related to your question in this bot's knowledge base. Please try asking about a different topic or contact the administrator to add data.`,
-          ar: `عذراً، لم أتمكن من العثور على معلومات متعلقة بسؤالك في قاعدة معرفة هذا البوت. يرجى محاولة السؤال عن موضوع آخر أو الاتصال بالمسؤول لإضافة البيانات.`,
-          fr: `Désolé, je n'ai pas trouvé d'informations concernant votre question dans la base de connaissances de ce bot. Veuillez essayer de poser une question sur un autre sujet ou contacter l'administrateur pour ajouter des données.`,
-        };
-        const lang = config.language || 'vi';
-        return {
-          answer: noDataMsgs[lang] || noDataMsgs.vi,
-          confidence: 0,
-          sources: [],
-          contextUsed: false,
-        };
-      }
+      // ⭐ FIX: Cho phép AI trả lời bằng kiến thức chung khi không có relevantDocs
+      // AI có kiến thức về AT, không nên chặn trả lời
+      // if (agentId && relevantDocs.length === 0) { ... return "không tìm thấy" ... } // DISABLED
 
       // Apply re-ranking only if top score is low (relevance uncertain)
       // Re-ranking costs ~2s extra per query. For seed/migration KB, vector search
@@ -699,25 +684,9 @@ class RAGEngine {
         };
       }
 
-      // Không có sản phẩm nào → trả lời "không tìm thấy" như cũ
-      const noDataMsgs: Record<string, string> = {
-        vi: `Xin lỗi, tôi không tìm thấy thông tin liên quan đến câu hỏi của bạn trong cơ sở dữ liệu của bot này.`,
-        en: `Sorry, I couldn't find information related to your question in this bot's knowledge base.`,
-        ar: `عذراً، لم أتمكن من العثور على معلومات متعلقة بسؤالك.`,
-        fr: `Désolé, je n'ai pas trouvé d'informations concernant votre question.`,
-      };
-      const noDataAnswer = noDataMsgs[lang] || noDataMsgs.vi;
-
-      const noDataStream = (async function* () {
-        yield { text: () => noDataAnswer };
-      })();
-
-      return {
-        stream: noDataStream,
-        sources: [],
-        confidence: 0,
-        answer: noDataAnswer,
-      };
+      // ⭐ FIX: Thay vì return "không tìm thấy" → cho AI trả lời bằng kiến thức chung
+      // Bỏ qua return ở đây để code tiếp tục xuống rerank và AI response
+      // if (!productContext) { return "không tìm thấy" } // DISABLED
     }
 
     // ⭐ FIX: Pinecone trả score=1.0 cho mọi doc (do metric config), không dùng được.

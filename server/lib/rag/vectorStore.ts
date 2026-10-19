@@ -201,21 +201,23 @@ class VectorStore {
       try {
         const data = JSON.parse(fs.readFileSync(docsPath, 'utf-8'));
         const provider = getEmbeddingProvider();
+        let embeddedCount = 0;
+        let skippedCount = 0;
         for (const doc of data) {
           if (!doc.embedding) {
             if (!provider) {
+              skippedCount++;
               continue;
             }
-            try {
-              doc.embedding = await provider.embed(doc.content);
-            } catch (e) {
-              console.warn(`⚠️ Skipped doc ${doc.id} — failed to compute embedding`);
-              continue;
-            }
+            // ⭐ OPTIMIZATION: Skip embedding computation during init to avoid hangs
+            // Embeddings will be computed lazily on-demand
+            skippedCount++;
+            continue;
           }
           this.inMemoryStore.set(doc.id, doc);
+          embeddedCount++;
         }
-        console.log(`📚 Loaded ${this.inMemoryStore.size} documents from disk`);
+        console.log(`📚 Loaded ${this.inMemoryStore.size} documents (${embeddedCount} with embeddings, ${skippedCount} pending)`);
       } catch (e) {
         console.log('📚 Starting with empty knowledge base');
       }

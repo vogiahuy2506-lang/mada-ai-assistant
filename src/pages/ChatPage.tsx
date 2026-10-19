@@ -1217,6 +1217,15 @@ export function ChatPage() {
     hasSeverity: false,    // Mức độ nghiêm trọng
     hasPreviousTry: false, // Đã thử sản phẩm gì chưa
   });
+
+  // ⭐ NEW: Theo dõi số câu hỏi đã hỏi trước khi show sản phẩm
+  // YÊU CẦU: Phải hỏi ít nhất 4 câu hỏi, sau đó mới được show sản phẩm
+  const [followUpQuestionsAsked, setFollowUpQuestionsAsked] = useState(0);
+  const [isInQuestionGatheringMode, setIsInQuestionGatheringMode] = useState(false);
+  const [userApprovedProducts, setUserApprovedProducts] = useState(false);
+  // ⭐ Lưu message gốc của user để trả lời sau khi hỏi đủ 4 câu
+  const [pendingUserMessage, setPendingUserMessage] = useState<string | null>(null);
+  const [pendingMessageTimestamp, setPendingMessageTimestamp] = useState<number>(0);
   
   // ⭐ Tính Maturity Score (0-100) - được giữ lại cho tương lai nếu cần
   const _getMaturityScore = useCallback(() => {
@@ -1278,8 +1287,8 @@ export function ChatPage() {
       return true;
     }
     
-    // Backup: >= 5 lượt hỏi đáp (bot đã hỏi nhiều, giả sử đã khai thác đủ)
-    if (conversationTurns >= 5) {
+    // Backup: >= 3 lượt hỏi đáp (bot đã hỏi nhiều, giả sử đã khai thác đủ context)
+    if (conversationTurns >= 3) {
       return true;
     }
     
@@ -1392,6 +1401,12 @@ export function ChatPage() {
       hasSeverity: false,
       hasPreviousTry: false,
     });
+    // ⭐ Reset product suggestion states
+    setFollowUpQuestionsAsked(0);
+    setIsInQuestionGatheringMode(false);
+    setUserApprovedProducts(false);
+    setPendingUserMessage(null);
+    setPendingMessageTimestamp(0);
   }, []);
 
   // ⭐ Function to check if message contains AT keywords
@@ -2012,16 +2027,127 @@ export function ChatPage() {
     utterance.lang = language === 'vi' ? 'vi-VN' : language === 'en' ? 'en-US' : 'fr-FR';
     utterance.rate = 1;
     utterance.pitch = 1;
-    
+
     utterance.onend = () => setSpeakingId(null);
     utterance.onerror = () => setSpeakingId(null);
-    
+
     window.speechSynthesis.speak(utterance);
     setSpeakingId(id);
   }, [speakingId, language]);
 
+  // ⭐ Helper: Detect if message is asking about products/devices
+  const shouldTriggerProductSuggestion = (message: string): boolean => {
+    const contentLower = message.toLowerCase();
+
+    // Explicit commands to show products (highest priority)
+    const explicitCommands = [
+      'hiển thị sản phẩm', 'xem sản phẩm', 'show products', 'tìm sản phẩm',
+      'gợi ý thiết bị', 'đề xuất sản phẩm', 'suggest devices', 'recommend products',
+      'what products', 'what devices', 'which products', 'which devices',
+      'có sản phẩm nào', 'có thiết bị nào', 'danh sách sản phẩm', 'danh sách thiết bị',
+      'list of products', 'list of devices',
+      // ⭐ THÊM: Khi user đồng ý xem sản phẩm
+      'ok', 'có', 'có', 'được', 'có đi', 'vâng', 'đồng ý', '同意', 'نعم', 'yes', 'si', 'oui',
+      'xem đi', 'xem đi', 'muốn xem', 'cho xem', 'hiển thị', 'đưa ra',
+      'show me', 'display', 'list them', 'xem sản phẩm', 'xem thiết bị',
+      'xem những thiết bị hỗ trợ', 'xem devices', 'ok đi', 'okay', 'sure',
+    ];
+
+    // Product-related keywords
+    const productKeywords = [
+      'sản phẩm', 'thiết bị', 'máy', 'mua', 'bán', 'shop', 'cửa hàng',
+      'ở đâu', 'mua ở đâu', 'nơi bán', 'gợi ý', 'đề xuất', 'recommend', 'suggest',
+      'wheelchair', 'máy trợ', 'xe lăn', 'chân giả', 'tay giả', 'kính', 'nạng',
+      'hình ảnh', 'hình', 'ảnh', 'coi hình', 'xem hình', 'pic', 'image', 'photo',
+      'link', 'url', 'web', 'website', 'tư vấn', 'chi tiết', 'sp', 'mẫu mã',
+      'inspiration', 'victor reader', 'orcam', 'jaws', 'nvda', 'zoomtext',
+      'braille', 'brailler', 'tactile', 'caption', 'fm system', 'roger',
+      'prosthetic', 'orthotic', 'orthopedic', 'crutch', 'cane', 'walker', 'stair',
+      'người mù', 'người điếc', 'người khuyết tật', 'khiếm thị', 'khiếm thính',
+      'device', 'product', 'buy', 'purchase', 'price', 'cost', 'where to buy',
+      'recommend', 'suggest', 'wheelchair', 'hearing aid', 'screen reader',
+      'aac', 'prosthetic', 'orthotic', 'orthopedic', 'crutch', 'cane', 'walker',
+      'braille', 'magnifier', 'amplifier', 'communication device',
+      'assistive', 'assistive technology', 'at device', 'disability equipment',
+    ];
+
+    // Check explicit commands first
+    if (explicitCommands.some(cmd => contentLower.includes(cmd))) {
+      return true;
+    }
+
+    // Then check product keywords
+    return productKeywords.some(kw => contentLower.includes(kw));
+  };
+
+  // ⭐ NEW: Generate the product offer question (ask user if they want to see products)
+  const getProductOfferQuestion = (lang: Language): string => {
+    const questions: Record<Language, string> = {
+      vi: 'Bạn có muốn tôi đưa ra một số sản phẩm công nghệ hỗ trợ liên quan không? (Bạn có thể yêu cầu xem sản phẩm cụ thể hoặc xem những thiết bị hỗ trợ của từng con)',
+      en: 'Would you like me to suggest some related assistive technology products? (You can ask to see specific products or supporting devices)',
+      ar: 'هل تريد مني اقتراح بعض منتجات تقنية المساعدة ذات الصلة؟ (يمكنك طلب رؤية منتجات محددة أو الأجهزة الداعمة)',
+      fr: 'Voulez-vous que je suggère des produits de technologie d\'assistance connexes? (Vous pouvez demander à voir des produits spécifiques ou des appareils de soutien)',
+    };
+    return questions[lang] || questions.vi;
+  };
+
+  // ⭐ NEW: Check if user is EXPLICITLY asking about products/devices
+  // This triggers product cards to show IMMEDIATELY without waiting for 4 questions
+  const isExplicitProductRequest = (message: string): boolean => {
+    const contentLower = message.toLowerCase();
+    
+    // Explicit product requests - user wants to see products NOW
+    const explicitCommands = [
+      // Vietnamese
+      'sản phẩm', 'thiết bị', 'máy', 'có sp nào', 'có thiết bị nào',
+      'xem sản phẩm', 'xem sp', 'xem thiết bị', 'coi sản phẩm',
+      'gợi ý thiết bị', 'đề xuất sản phẩm', 'tìm sản phẩm', 'tìm thiết bị',
+      'mua ở đâu', 'nơi bán', 'giá bao nhiêu', 'giá là bao nhiêu',
+      'cho xem', 'hiển thị', 'liệt kê', 'giới thiệu',
+      'hình ảnh', 'xem hình', 'coi hình', 'pic', 'ảnh sp',
+      // English
+      'what products', 'what devices', 'which products', 'which devices',
+      'show products', 'show me products', 'recommend products', 'suggest devices',
+      'buy', 'purchase', 'price', 'where to buy', 'cost',
+      'wheelchair', 'hearing aid', 'screen reader', 'aac device',
+      'product list', 'device list', 'available products',
+      // Special case: when user asks "what can you help me with" or "do you have..."
+      'bạn có', 'do you have', 'can you show', 'what do you have',
+    ];
+    
+    return explicitCommands.some(cmd => contentLower.includes(cmd));
+  };
+
   const handleSend = async () => {
     if (!inputValue.trim() || isLoading) return;
+
+    // ⭐ NEW: Check if user is approving products in question gathering mode
+    const userMessage = inputValue.trim();
+    const isProductApproval = isInQuestionGatheringMode && (
+      /^(ok|có|được|có đi|vâng|đồng ý|同意|نعم|yes|si|oui|ok đi|okay|sure|xem đi|xem sản phẩm|muốn xem)$/i.test(userMessage.trim())
+    );
+
+    // ⭐ NEW: Check if user is explicitly asking about products (show products immediately)
+    const userExplicitlyRequestsProducts = isExplicitProductRequest(userMessage);
+    
+    // If user explicitly asks about products, set approval to true to show products
+    if (userExplicitlyRequestsProducts) {
+      setUserApprovedProducts(true);
+    }
+
+    // If in question gathering mode and user approves products
+    if (isProductApproval) {
+      setUserApprovedProducts(true);
+      setIsInQuestionGatheringMode(false);
+    }
+
+    // ⭐ NEW: If we're in question gathering mode and user hasn't approved yet,
+    // treat this as a follow-up question response (increment count)
+    const isFollowUpResponse = isInQuestionGatheringMode && !isProductApproval;
+    if (isFollowUpResponse) {
+      // This is a response to a follow-up question - count it
+      setFollowUpQuestionsAsked(prev => prev + 1);
+    }
 
     // Quota gate: anonymous
     const { user: currentUser, incrementQuota: bumpUserQuota } = useAuthStore.getState();
@@ -2042,7 +2168,6 @@ export function ChatPage() {
       bumpUserQuota();
     }
 
-    const userMessage = inputValue.trim();
     setInputValue('');
     setLoading(true);
     setIsGeneratingResponse(true);
@@ -2071,10 +2196,40 @@ export function ChatPage() {
         /(thử|đã|dùng|use|tried|sử dụng|medicine|thuốc|vitamin|sản phẩm)/i.test(userMessage),
     };
     const newTurns = conversationTurns + 1;
+
+    // ⭐ NEW LOGIC: Kiểm soát việc hiển thị sản phẩm
+    // 1. Nếu user message trigger product suggestion VÀ chưa hỏi đủ 4 câu:
+    //    - KHÔNG show sản phẩm, chỉ hỏi follow-up question
+    // 2. Nếu đã hỏi đủ 4 câu:
+    //    - Trả lời câu hỏi user + hỏi có muốn xem sản phẩm không
+    // 3. Nếu user đồng ý (isProductApproval = true):
+    //    - Show sản phẩm
+
+    const triggersProductSuggestion = shouldTriggerProductSuggestion(userMessage);
+    const hasAskedEnoughQuestions = followUpQuestionsAsked >= 4;
+
+    // ⭐ FIX: Dùng isProductApproval (biến local) thay vì userApprovedProducts (state)
+    // vì setState là async nên state chưa được update khi tính toán trong cùng lần render
+    // isProductApproval = true khi user nói "ok", "có", "đồng ý", v.v.
+
+    // Tính shouldShowProductsNow:
+    // - User đã approve (isProductApproval từ message hiện tại HOẶC userApprovedProducts từ state trước đó)
+    // - VÀ đã hỏi đủ 4 câu
+    const userHasApproved = isProductApproval || userApprovedProducts;
+    const shouldShowProductsNow = userHasApproved && hasAskedEnoughQuestions;
+
+    // Nếu trigger product suggestion nhưng chưa đủ 4 câu hỏi → bắt đầu gathering mode
+    if (triggersProductSuggestion && !hasAskedEnoughQuestions && !userHasApproved) {
+      setIsInQuestionGatheringMode(true);
+    }
+
+    // Tính toán isReadyForProducts với logic mới
+    // - Đủ context OR đã hỏi đủ 4 câu AND user đã approve
     const isReadyForProducts = (
       (newContextCollected.hasSymptom && newContextCollected.hasSeverity && newContextCollected.hasDuration) ||
       newTurns >= 5
-    );
+    ) && (hasAskedEnoughQuestions || !triggersProductSuggestion || shouldShowProductsNow);
+
     const newMissingContext: string[] = [];
     if (!newContextCollected.hasSymptom) newMissingContext.push('symptom');
     if (!newContextCollected.hasSeverity) newMissingContext.push('severity');
@@ -2086,6 +2241,11 @@ export function ChatPage() {
 
     setConversationTurns(newTurns);
     setUserContextCollected(newContextCollected);
+
+    // ⭐ NEW: Sau khi user approve products, reset question count
+    if (userApprovedProducts) {
+      setFollowUpQuestionsAsked(0);
+    }
 
     // ⭐ Check AT keyword after user sends message
     if (!isEndUser && checkATKeyword(userMessage)) {
@@ -2240,14 +2400,14 @@ export function ChatPage() {
       const effectiveAgent = isNewChat
         ? (chatAgent || MADA_BOTS.find(b => b.id === 'bot-regulatory')) // Ưu tiên chatAgent, fallback Bot 7
         : (chatAgent || selectedAgent);
-      const isUsingRegulatoryBot = isNewChat || (!selectedAgentId && effectiveAgent?.botId === 'bot-regulatory');
+      const isUsingRegulatoryBot = isNewChat || (!selectedAgentId && (effectiveAgent as any)?.botId === 'bot-regulatory');
       
       console.log('[Chat] Agent selection:', {
         selectedAgentId,
         selectedAgentName: selectedAgent?.name,
         chatAgentName: chatAgent?.name,
         effectiveAgentName: effectiveAgent?.name,
-        effectiveBotId: effectiveAgent?.botId,
+        effectiveBotId: (effectiveAgent as any)?.botId,
         isUsingRegulatoryBot,
         hasSystemPrompt: !!effectiveAgent?.systemPrompt,
       });
@@ -2263,6 +2423,17 @@ export function ChatPage() {
         missingContext: newMissingContext,
         isReadyForProductSuggestion: isReadyForProducts,
         conversationTurns: newTurns,
+        // ⭐ NEW: Các tham số kiểm soát việc hiển thị sản phẩm
+        // - triggersProductSuggestion: user message có trigger product suggestion không
+        // - followUpQuestionsAsked: số câu hỏi đã hỏi
+        // - shouldShowProductsNow: đã đủ điều kiện show sản phẩm chưa
+        // - isInQuestionGatheringMode: có đang trong chế độ hỏi câu hỏi không
+        // - userApprovedProducts: user đã đồng ý xem sản phẩm chưa
+        triggersProductSuggestion,
+        followUpQuestionsAsked,
+        shouldShowProductsNow,
+        isInQuestionGatheringMode,
+        userApprovedProducts: userHasApproved, // Dùng biến local thay vì state
       };
       
       // Thêm attachments nếu có
@@ -2382,20 +2553,36 @@ export function ChatPage() {
           // Bot sẽ hỏi thêm thông tin trước khi đề xuất sản phẩm
           // ⭐ Use responseLanguage (detected from user message) instead of UI language
           // ⭐ Dùng freshIsReady/freshMissingCtx (computed ngay khi gửi message, không stale)
+          // ⭐ NEW LOGIC:
+          // - Nếu đang trong question gathering mode (đã hỏi < 4 câu): hỏi thêm câu hỏi
+          // - Nếu đã hỏi đủ 4 câu VÀ trigger product suggestion: hỏi có muốn xem sản phẩm không
+          // - Nếu user đã approve products: show sản phẩm (không thêm câu hỏi)
           let finalContent = fullContent;
-          if (!freshIsReady && freshMissingCtx.length > 0) {
+          const currentFollowUpCount = followUpQuestionsAsked; // Use the current state value
+
+          if (userHasApproved || userExplicitlyRequestsProducts) {
+            // User đã đồng ý HOẶC hỏi trực tiếp về sản phẩm → không thêm câu hỏi, chỉ show products
+            // Products sẽ được hiển thị từ suggestedProducts
+          } else if (currentFollowUpCount >= 4 && triggersProductSuggestion) {
+            // Đã hỏi đủ 4 câu → hỏi có muốn xem sản phẩm không
+            const productOfferQuestion = getProductOfferQuestion(responseLanguage);
+            finalContent = `${fullContent}\n\n*${productOfferQuestion}*`;
+            // Reset follow-up count sau khi hỏi xong
+            setFollowUpQuestionsAsked(0);
+          } else if (!freshIsReady && freshMissingCtx.length > 0) {
+            // Chưa đủ context → hỏi thêm câu hỏi follow-up
             const followUpQuestion = getNextFollowUpQuestion(responseLanguage);
-            // Thêm câu hỏi follow-up vào cuối message
             finalContent = `${fullContent}\n\n*${followUpQuestion}*`;
           }
-          
+
           addMessage({
             role: 'assistant',
             content: finalContent,
             confidence: confidence,
             sources: sources,
             contextUsed: sources.length > 0,
-            suggestedProducts: suggestedProducts,
+            // ⭐ Show products nếu user đã approve HOẶC user hỏi trực tiếp về sản phẩm
+            suggestedProducts: (userHasApproved || userExplicitlyRequestsProducts) ? suggestedProducts : undefined,
           });
 
           // 💾 Save assistant message vào backend (DB persistence)
@@ -2546,12 +2733,34 @@ export function ChatPage() {
           confidence: data.data.confidence,
           sources: data.data.sources,
           contextUsed: data.data.contextUsed,
-          suggestedProducts: data.data.suggestedProducts,
+          // ⭐ Show products nếu user đã approve HOẶC user hỏi trực tiếp về sản phẩm
+          suggestedProducts: (userHasApproved || userExplicitlyRequestsProducts) ? data.data.suggestedProducts : undefined,
         });
 
         // ⭐ THÊM CÂU HỎI FOLLOW-UP KHI CHƯA ĐỦ CONTEXT (non-streaming mode)
         // ⭐ Dùng nonStreamIsReady/nonStreamMissingCtx (computed ngay khi gửi message)
-        if (!nonStreamIsReady && nonStreamMissingCtx.length > 0) {
+        // ⭐ NEW LOGIC:
+        // - Nếu đang trong question gathering mode (đã hỏi < 4 câu): hỏi thêm câu hỏi
+        // - Nếu đã hỏi đủ 4 câu VÀ trigger product suggestion: hỏi có muốn xem sản phẩm không
+        // ⭐ NEW LOGIC: Nếu user hỏi trực tiếp về sản phẩm thì KHÔNG hỏi thêm
+        if (userHasApproved || userExplicitlyRequestsProducts) {
+          // User đã đồng ý HOẶC hỏi trực tiếp về sản phẩm → không thêm câu hỏi
+        } else if (followUpQuestionsAsked >= 4 && triggersProductSuggestion) {
+          // Đã hỏi đủ 4 câu → hỏi có muốn xem sản phẩm không
+          const productOfferQuestion = getProductOfferQuestion(responseLanguage);
+          const updatedMessages = useChatStore.getState().messages;
+          if (updatedMessages.length > 0) {
+            const lastMsg = updatedMessages[updatedMessages.length - 1];
+            if (lastMsg.role === 'assistant') {
+              const updatedContent = `${lastMsg.content}\n\n*${productOfferQuestion}*`;
+              const newMessages = [...updatedMessages];
+              newMessages[newMessages.length - 1] = { ...lastMsg, content: updatedContent };
+              setMessages(newMessages);
+            }
+          }
+          // Reset follow-up count sau khi hỏi xong
+          setFollowUpQuestionsAsked(0);
+        } else if (!nonStreamIsReady && nonStreamMissingCtx.length > 0) {
           const followUpQuestion = getNextFollowUpQuestion(responseLanguage);
           // Cập nhật message cuối cùng với follow-up question
           const updatedMessages = useChatStore.getState().messages;

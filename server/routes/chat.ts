@@ -24,6 +24,7 @@ import { chatHistory, waitForRagReady } from '../lib/chat-context';
 import { parseAttachment } from '../lib/fileProcessor';
 import { translateContent } from '../lib/translationService';
 import { productExtractor, type ExtractedProduct } from '../lib/scraping/productExtractor';
+import { logActivity } from '../index';
 
 const router = express.Router();
 

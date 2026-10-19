@@ -2294,6 +2294,37 @@ export function ChatPage() {
       'aac', 'prosthetic', 'orthotic', 'orthopedic', 'crutch', 'cane', 'walker',
       'braille', 'magnifier', 'amplifier', 'communication device',
       'assistive', 'assistive technology', 'at device', 'disability equipment',
+      // ⭐ SYMPTOM-BASED KEYWORDS (tiếng Việt) - mô tả vấn đề người dùng gặp phải
+      // THỊ LỰC
+      'nhìn xa', 'nhìn gần', 'nhìn rõ', 'nhìn kém', 'nhìn mờ', 'mắt kém',
+      'mắt mờ', 'lão hóa mắt', 'lão thị', 'viễn thị', 'cận thị', 'loạn thị',
+      'tật khúc xạ', 'đục thủy tinh thể', 'thoái hóa điểm vàng', 'võng mạc',
+      'đọc sách khó', 'đọc chữ khó', 'khó đọc', 'không đọc được', 'chữ nhỏ',
+      'phóng to chữ', 'phóng to', 'zoom', 'tăng độ tương phản', 'tương phản cao',
+      'tật mắt', 'tật thị', 'suy giảm thị lực', 'mất thị lực', 'thị lực kém',
+      'khó khăn khi nhìn', 'khó nhìn',
+      // THÍNH LỰC
+      'nghe kém', 'nghe khó', 'khó nghe', 'không nghe rõ', 'ù tai', 've kêu',
+      'điếc', 'lãng tai', 'suy giảm thính lực', 'mất thính lực', 'thính lực kém',
+      'máy trợ thính', 'tai nghe trợ thính', 'phục hồi thính', 'âm thanh to',
+      // VẬN ĐỘNG
+      'đi lại khó', 'khó đi lại', 'khó vận động', 'tay run', 'tay yếu', 'chân yếu',
+      'chân run', 'liệt', 'bại liệt', 'phục hồi chức năng', 'tập đi', 'tập vận động',
+      'xe lăn điện', 'xe điện', 'khung đi', 'gậy chống', 'gậy dìm',
+      // GIAO TIẾP
+      'nói khó', 'khó nói', 'không nói được', 'âm lượng yếu', 'giọng nói yếu',
+      'mất giọng', 'khàn giọng', 'rối loạn ngôn ngữ', 'aphasia',
+      // NHẬN THỨC
+      'mất trí nhớ', 'hay quên', 'khó tập trung', 'rối loạn tăng động', 'adhd',
+      'tự kỷ', 'autism', 'chậm phát triển', 'rối loạn học tập', 'dyslexia',
+      'khó đọc hiểu', 'khó viết', 'khó tính toán',
+      // TIẾNG ANH tương đương
+      'low vision', 'vision loss', 'visually impaired', 'blind', 'seeing difficulties',
+      'hard of hearing', 'hearing loss', 'deaf', 'tinnitus',
+      'mobility issues', 'walking difficulty', 'paralysis', 'limb weakness',
+      'speech difficulty', 'speech impairment', 'mute', 'voice disorder',
+      'cognitive impairment', 'memory loss', 'dementia', 'alzheimer',
+      'reading difficulty', 'dyslexia', 'adhd', 'autism',
     ];
 
     // Check explicit commands first
@@ -2338,6 +2369,31 @@ export function ChatPage() {
       'product list', 'device list', 'available products',
       // Special case: when user asks "what can you help me with" or "do you have..."
       'bạn có', 'do you have', 'can you show', 'what do you have',
+      // ⭐ SYMPTOM-BASED (tiếng Việt) - mô tả vấn đề AT ngay lập tức
+      // THỊ LỰC
+      'nhìn xa', 'nhìn gần', 'nhìn rõ', 'nhìn kém', 'nhìn mờ', 'mắt kém',
+      'mắt mờ', 'lão hóa mắt', 'lão thị', 'viễn thị', 'cận thị', 'loạn thị',
+      'tật khúc xạ', 'đục thủy tinh thể', 'thoái hóa điểm vàng',
+      'đọc sách khó', 'đọc chữ khó', 'khó đọc', 'không đọc được',
+      'tật mắt', 'tật thị', 'suy giảm thị lực', 'mất thị lực', 'thị lực kém',
+      'khó khăn khi nhìn', 'khó nhìn',
+      // THÍNH LỰC
+      'nghe kém', 'nghe khó', 'khó nghe', 'không nghe rõ', 'ù tai',
+      'điếc', 'lãng tai', 'suy giảm thính lực', 'mất thính lực', 'thính lực kém',
+      // VẬN ĐỘNG
+      'đi lại khó', 'khó đi lại', 'khó vận động', 'tay run', 'tay yếu', 'chân yếu',
+      'chân run', 'liệt', 'bại liệt', 'phục hồi chức năng',
+      // GIAO TIẾP
+      'nói khó', 'khó nói', 'không nói được', 'mất giọng', 'khàn giọng',
+      // NHẬN THỨC
+      'mất trí nhớ', 'hay quên', 'khó tập trung', 'tự kỷ', 'autism',
+      'chậm phát triển', 'rối loạn học tập', 'dyslexia',
+      // ENGLISH symptoms
+      'low vision', 'vision loss', 'visually impaired', 'blind',
+      'hard of hearing', 'hearing loss', 'deaf', 'tinnitus',
+      'mobility issues', 'walking difficulty', 'paralysis',
+      'speech difficulty', 'speech impairment', 'mute',
+      'memory loss', 'dementia', 'alzheimer',
     ];
     
     return explicitCommands.some(cmd => contentLower.includes(cmd));

@@ -1,28 +1,17 @@
-# ===== FIX DEPLOY - chạy tuần tự =====
+# ===== DEBUG - chạy từng lệnh =====
 
 cd /home/hotro_digibook/mada-ai-assistant
 
-# Bước 1: Reset về origin/main (mất uncommitted changes trên VPS)
-git fetch origin
-git reset --hard origin/main
+# 1. Xem logs server
+pm2 logs mada-ai --lines 80 --nostream
 
-# Verify:
-git log --oneline -3
-ls -la ecosystem.config.cjs   # phải tồn tại
-
-# Bước 2: Cài dependencies BAO GỒM devDependencies (vì cần esbuild để build)
-npm ci
-
-# Bước 3: Build lại
-npm run build
-
-# Bước 4: Restart app
+# 2. Kiểm tra port 3001 có listen không
 pm2 delete all
-pm2 start ecosystem.config.cjs
-pm2 save
+sleep 2
+netstat -tlnp 2>/dev/null | grep -E ':3001|:8080|:80' || ss -tlnp 2>/dev/null | grep -E ':3001|:8080|:80'
 
-# Bước 5: Verify
-sleep 5
-pm2 status
-pm2 logs mada-ai --lines 30 --nostream
-curl -s -o /dev/null -w "Health: %{http_code}\n" http://localhost:3001/api/health
+# 3. Xem package.json scripts để biết "npm run server" làm gì
+cat package.json | grep -A 20 '"scripts"'
+
+# 4. Chạy server foreground để xem lỗi trực tiếp (Ctrl+C để thoát)
+NODE_ENV=production PORT=3001 npm run server

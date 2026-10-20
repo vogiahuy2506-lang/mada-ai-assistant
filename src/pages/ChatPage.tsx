@@ -4818,6 +4818,51 @@ export function ChatPage() {
 
                 {/* Right Icons & Send - Material Design 3 Style */}
                 <div className="flex items-center gap-1 pr-1">
+                  {/* Language Switcher - Mobile Only */}
+                  <div className="relative md:hidden" data-language-dropdown>
+                    <button
+                      onClick={() => setShowLanguageMenu(!showLanguageMenu)}
+                      className="flex items-center justify-center w-9 h-9 rounded-full bg-white/60 hover:bg-white/80 transition-colors"
+                      title={LANGUAGES.find(l => l.code === language)?.name || 'Ngôn ngữ'}
+                      aria-label="Đổi ngôn ngữ"
+                    >
+                      <Globe className="w-5 h-5 text-slate-600" />
+                    </button>
+
+                    {showLanguageMenu && (
+                      <div className="absolute right-0 bottom-full mb-2 w-44 bg-white border border-black/10 rounded-2xl shadow-2xl overflow-hidden z-50">
+                        <div className="p-2 space-y-0.5">
+                          {LANGUAGES.map((lang) => (
+                            <button
+                              key={lang.code}
+                              onClick={() => {
+                                setLanguage(lang.code);
+                                setShowLanguageMenu(false);
+                              }}
+                              className={clsx(
+                                'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200',
+                                language === lang.code
+                                  ? 'bg-emerald-500 text-white'
+                                  : 'hover:bg-gray-50 text-gray-700'
+                              )}
+                            >
+                              <span className="text-base flex-shrink-0">{lang.flag}</span>
+                              <span className={clsx(
+                                'flex-1 text-left text-xs font-medium',
+                                language === lang.code ? 'text-white' : ''
+                              )}>
+                                {lang.name}
+                              </span>
+                              {language === lang.code && (
+                                <Check className="w-4 h-4 flex-shrink-0" />
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
                   {/* Voice Button */}
                   <button
                     onClick={handleVoiceRecord}

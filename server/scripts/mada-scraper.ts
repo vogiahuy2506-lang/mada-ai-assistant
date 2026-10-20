@@ -736,8 +736,18 @@ async function main() {
   }
 }
 
-// Run if executed directly (ESM: use import.meta.url)
-const isMainModule = (typeof import.meta !== 'undefined' && (import.meta.url === `file://${process.argv[1]}` || import.meta.url.endsWith(process.argv[1] || '')));
+// Run ONLY when this file is the process entry point (e.g. `npx tsx server/scripts/mada-scraper.ts`).
+// ⚠️ KHÔNG dùng `import.meta.url.endsWith(process.argv[1])` ở đây: khi esbuild bundle
+// server/index.ts vào dist/server.mjs, cả hai đều trỏ tới dist/server.mjs nên điều kiện
+// luôn TRUE → scraper tự chạy lúc khởi động server và block event loop, khiến
+// app.listen() không bao giờ callback (port 3001 không bind).
+const entryScript = process.argv[1] || '';
+const isMainModule =
+  typeof import.meta !== 'undefined' &&
+  (import.meta.url === `file://${entryScript}` ||
+    entryScript.endsWith('mada-scraper.ts') ||
+    entryScript.endsWith('mada-scraper.js') ||
+    entryScript.endsWith('mada-scraper.mjs'));
 
 if (isMainModule) {
   main().catch(err => {

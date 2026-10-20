@@ -1014,24 +1014,24 @@ const chatHistory: Map<string, any[]> = new Map();
 const HOST = '0.0.0.0';
 
 // @ts-ignore - Express listen overload conflict (kept as Server for graceful shutdown)
-// Wait for bootstrap() to complete (initializeServices includes ragEngine.initialize +
-// syncKnowledgeBaseToVectorStore) BEFORE accepting connections. Without this, requests
-// can race ahead of RAG init and hit "Hệ thống đang khởi tạo" even though the engine
-// is healthy seconds later.
-bootstrap().then(() => {
-  const server = app.listen(Number(PORT), HOST, () => {
-    console.log(`🚀 MADA AI Server running on http://${HOST}:${PORT}`);
-    console.log(`📚 API Documentation: http://localhost:${PORT}/api/health`);
-    console.log(`🌐 Frontend: http://localhost:${PORT}/`);
-    console.log(`⚡ RAG Enabled: ${ragInitialized}`);
-    console.log(`🤖 Gemini Configured: ${!!process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'your_gemini_api_key_here'}`);
-    console.log(`🛡️  Guardrails: Active`);
-    console.log(`🔐 Auth: SQLite + bcrypt + JWT (admin: ${process.env.ADMIN_EMAIL || 'admin@mada.vn'})`);
-  });
-  void server; // intentionally kept for graceful shutdown support
-}).catch((err) => {
-  console.error('❌ Bootstrap failed, cannot start server:', err);
-  process.exit(1);
+// Bind the port FIRST so the server is reachable immediately, then initialize services
+// in the background. Previously bootstrap() was awaited before listen(); any long-running
+// init step (KB sync, RAG embeddings, scraper) blocked the port from ever binding,
+// which made curl / nginx fail with "Connection refused".
+// Requests arriving before RAG is ready are handled by waitForRagReady() with a timeout.
+const server = app.listen(Number(PORT), HOST, () => {
+  console.log(`🚀 MADA AI Server running on http://${HOST}:${PORT}`);
+  console.log(`📚 API Documentation: http://localhost:${PORT}/api/health`);
+  console.log(`🌐 Frontend: http://localhost:${PORT}/`);
+  console.log(`⚡ RAG Enabled: ${ragInitialized}`);
+  console.log(`🤖 Gemini Configured: ${!!process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'your_gemini_api_key_here'}`);
+  console.log(`🛡️  Guardrails: Active`);
+  console.log(`🔐 Auth: SQLite + bcrypt + JWT (admin: ${process.env.ADMIN_EMAIL || 'admin@mada.vn'})`);
+});
+void server; // intentionally kept for graceful shutdown support
+
+bootstrap().catch((err) => {
+  console.error('❌ Bootstrap failed (server still listening):', err);
 });
 
 // ============== MAPPING AGENT TO MADA ==============

@@ -261,7 +261,7 @@ const MADA_CATEGORY_TO_DB: Record<string, string> = {
   'voice-and-speech': 'voice-and-speech',
   'mental-cognitive': 'cognition',
   'neuromusculoskeletal-movement': 'mobility',
-  'mobility-and-transportation': 'daily_living',
+  'mobility-and-transportation': 'mobility',
   'regulatory-standards': 'education',
   // Also support new category names directly
   'hearing': 'hearing',
@@ -584,11 +584,32 @@ function shouldShowProducts(message: string): boolean {
     'speech difficulty', 'speech impairment', 'mute', 'voice disorder',
     'cognitive impairment', 'memory loss', 'dementia', 'alzheimer',
     'reading difficulty', 'adhd', 'autism',
-    // Arabic
+    // Arabic - MỞ RỘNG: sản phẩm, triệu chứng, AT, shopping
     'منتج', 'جهاز', 'شراء', 'سعر', 'ينصح', 'يقت', 'كرسي متحرك', 'سماعة',
-    // French
+    'معينات سمعية', 'كرسي متحرك', 'مساعدة', 'إعاقة', 'ذوي الإعاقة', 'أجهزة مساعدة',
+    'ضعف البصر', 'فقدان البصر', 'عمى', 'ضعف السمع', 'الصمم', 'طرفة أذن',
+    'حركة', 'تنقل', 'مشية', 'شلل', 'تلفظ', 'توصيل', 'جهاز تواصل', 'AAC',
+    'ذاكرة', 'خرف', 'زهايمر', 'توحد', 'عجز التعلم', 'عصبي', 'عضلي',
+    'مساعد', 'مقترح', 'توصية', 'فحص', 'اختبار', 'عرض', 'طلب', 'ابحث', 'ابحث عن',
+    'أريد أن أشتري', 'أريد جهاز', 'ما هو الجهاز', 'ما هي المعينات', 'معينات بصرية',
+    'معينات سمعية', 'معينات حركية', 'معينات إدراكية', 'معينات تواصل', 'تقنية مساعدة',
+    'wheeler', 'hearing aid', 'assistive', 'device', 'product', 'recommend',
+    // French - MỞ RỘNG: sản phẩm, triệu chứng, AT, shopping
     'produit', 'appareil', 'dispositif', "siège d'aisance", 'fauteuil roulant',
-    'appareil auditif', 'achat', 'prix', 'recommander',
+    'appareil auditif', 'achat', 'prix', 'recommander', 'prothèse', 'orthèse',
+    'handicap', 'invalidité', 'déficience', 'malvoyant', 'sourd', 'aveugle',
+    'mobilité', 'marche', 'paralysie', 'fauteuil', 'canne', 'béquille', 'déambulateur',
+    'trouble de la parole', 'trouble du langage', 'communication', 'AAC',
+    'mémoire', 'démence', 'alzheimer', 'autisme', 'tdah', 'dyslexie',
+    'aide auditive', 'amplificateur', 'loupe', 'lecteur d\'écran', 'braille',
+    'technologie d\'assistance', 'matériel pédagogique', 'appareillage',
+    'qu\'est-ce que', 'quel appareil', 'recommandez', 'suggérez', 'proposez',
+    'je veux', 'je cherche', 'besoin', 'aide', 'assistance', 'accessibilité',
+    'catalogue', 'liste', 'options', 'choix', 'acheter', 'où acheter', 'prix',
+    'handicap visuel', 'handicap auditif', 'handicap moteur', 'handicap cognitif',
+    'autre produit', 'autre appareil', 'autres options', 'plus d\'options',
+    'fauteuils roulants', 'prothèses', 'orthèses', 'aides à la marche',
+    'low vision', 'vision loss', 'hearing loss', 'assistive technology',
   ];
   
   return productKeywords.some(kw => contentLower.includes(kw));
@@ -599,7 +620,7 @@ function detectMessageLanguage(message: string): 'vi' | 'en' | 'ar' | 'fr' {
   const text = message || '';
   if (/[\u0600-\u06FF]/.test(text)) return 'ar';
   const viDiacritics = /[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/i;
-  if (viDiacritics.test(text) && viDiacritics.test(text)) return 'vi';
+  if (viDiacritics.test(text)) return 'vi';
   const frWords = /\b(je|tu|il|elle|nous|vous|ils|elles|bonjour|merci|oui|non|parce que|s'il vous plaît|désolé|excusez-moi|vous êtes|je suis|estre|être)\b/i;
   if (frWords.test(text)) return 'fr';
   return 'en';
@@ -1302,14 +1323,15 @@ router.post('/', async (req, res) => {
     // ⭐ Smart product suggestion: chỉ gợi ý sản phẩm khi đã đủ context
     // ⭐ NEW LOGIC: Chỉ suggest products khi:
     // 1. user đã approve (userApprovedProducts = true) VÀ
-    // 2. Đã hỏi đủ câu hỏi (followUpQuestionsAsked >= 4) VÀ
+    // 2. Đã hỏi đủ câu hỏi (followUpQuestionsAsked >= 3) VÀ
     // 3. Message trigger product suggestion
-    // HOẶC fallback: isReadyForProductSuggestion OR conversationTurns >= 5
+    // HOẶC fallback: isReadyForProductSuggestion OR conversationTurns >= 3 OR isExplicitProductRequest
     const shouldSuggestProducts = (
-      (userApprovedProducts && followUpQuestionsAsked >= 4 && triggersProductSuggestion) ||
+      (userApprovedProducts && followUpQuestionsAsked >= 3 && triggersProductSuggestion) ||
       shouldShowProductsNow ||
       isReadyForProductSuggestion ||
-      conversationTurns >= 5
+      isExplicitProductRequest(message) ||
+      conversationTurns >= 3
     );
 
 
@@ -1538,14 +1560,15 @@ router.post('/with-file', async (req, res) => {
     // ⭐ Smart product suggestion: chỉ gợi ý sản phẩm khi đã đủ context
     // ⭐ NEW LOGIC: Chỉ suggest products khi:
     // 1. user đã approve (userApprovedProducts = true) VÀ
-    // 2. Đã hỏi đủ câu hỏi (followUpQuestionsAsked >= 4) VÀ
+    // 2. Đã hỏi đủ câu hỏi (followUpQuestionsAsked >= 3) VÀ
     // 3. Message trigger product suggestion
-    // HOẶC fallback: isReadyForProductSuggestion OR conversationTurns >= 5
+    // HOẶC fallback: isReadyForProductSuggestion OR conversationTurns >= 3 OR isExplicitProductRequest
     const shouldSuggestProducts = (
-      (userApprovedProducts && followUpQuestionsAsked >= 4 && triggersProductSuggestion) ||
+      (userApprovedProducts && followUpQuestionsAsked >= 3 && triggersProductSuggestion) ||
       shouldShowProductsNow ||
       isReadyForProductSuggestion ||
-      conversationTurns >= 5
+      isExplicitProductRequest(message) ||
+      conversationTurns >= 3
     );
 
     
@@ -1772,14 +1795,15 @@ router.post('/stream', async (req: any, res: any) => {
     // ⭐ Smart product suggestion: chỉ gợi ý sản phẩm khi đã đủ context
     // ⭐ NEW LOGIC: Chỉ suggest products khi:
     // 1. user đã approve (userApprovedProducts = true) VÀ
-    // 2. Đã hỏi đủ câu hỏi (followUpQuestionsAsked >= 4) VÀ
+    // 2. Đã hỏi đủ câu hỏi (followUpQuestionsAsked >= 3) VÀ
     // 3. Message trigger product suggestion
-    // HOẶC fallback: isReadyForProductSuggestion OR conversationTurns >= 5
+    // HOẶC fallback: isReadyForProductSuggestion OR conversationTurns >= 3 OR isExplicitProductRequest
     const shouldSuggestProducts = (
-      (userApprovedProducts && followUpQuestionsAsked >= 4 && triggersProductSuggestion) ||
+      (userApprovedProducts && followUpQuestionsAsked >= 3 && triggersProductSuggestion) ||
       shouldShowProductsNow ||
       isReadyForProductSuggestion ||
-      conversationTurns >= 5
+      isExplicitProductRequest(message) ||
+      conversationTurns >= 3
     );
 
     

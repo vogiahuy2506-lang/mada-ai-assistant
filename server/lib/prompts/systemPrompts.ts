@@ -818,7 +818,8 @@ export function invalidateSystemPromptCache() {
 export function buildSystemPrompt(
   lang: string,
   userMode: 'endUser' | 'specialist' = 'endUser',
-  agentPrompt?: string
+  agentPrompt?: string,
+  agentId?: string
 ): string {
   const langCode = (['vi', 'en', 'ar', 'fr'].includes(lang) ? lang : 'vi') as 'vi' | 'en' | 'ar' | 'fr';
 
@@ -829,8 +830,12 @@ export function buildSystemPrompt(
   const emotionSettings = loadEmotionSettings();
 
   // ⭐ BOT 7 (Regulatory) — multilingual system prompts (vi/en/ar/fr)
-  // Detect Bot 7 by its unique signature in agentPrompt
-  const isBot7Regulatory = (agentPrompt || '').startsWith('Bạn là TRỢ LÝ TỔNG HỢP CỦA MADA AI') ||
+  // Detect Bot 7 by either agentId OR its unique signature in agentPrompt.
+  // This ensures BOT7_PROMPTS are used even if the caller omits agentPrompt
+  // (e.g. legacy curl/admin paths) but passes agentId='bot-regulatory'.
+  const isBot7Regulatory =
+    agentId === 'bot-regulatory' ||
+    (agentPrompt || '').startsWith('Bạn là TRỢ LÝ TỔNG HỢP CỦA MADA AI') ||
     (typeof agentPrompt === 'string' && agentPrompt.includes('6 CHUYÊN GIA CHUYÊN MÔN'));
 
   const BOT7_PROMPTS: Record<string, string> = {

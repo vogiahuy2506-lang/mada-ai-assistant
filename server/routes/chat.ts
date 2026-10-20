@@ -646,8 +646,13 @@ function isAnswerInExpectedLanguage(answer: string, expectedLang: 'vi' | 'en' | 
 }
 
 // Build system instruction
-function getSystemInstruction(lang: string, agentPrompt?: string, userMode: 'endUser' | 'specialist' = 'endUser'): string {
-  return buildSystemPrompt(lang, userMode, agentPrompt);
+function getSystemInstruction(
+  lang: string,
+  agentPrompt?: string,
+  userMode: 'endUser' | 'specialist' = 'endUser',
+  agentId?: string
+): string {
+  return buildSystemPrompt(lang, userMode, agentPrompt, agentId);
 }
 
 // Parse detailed metadata from knowledge item
@@ -1423,7 +1428,7 @@ router.post('/', async (req, res) => {
     
     // Build RAG config
     const validUserMode: 'endUser' | 'specialist' = userMode === 'specialist' ? 'specialist' : 'endUser';
-    const agentInstruction = getSystemInstruction(effectiveLanguage, agentPrompt, validUserMode);
+    const agentInstruction = getSystemInstruction(effectiveLanguage, agentPrompt, validUserMode, agentId);
     
     // ⭐ FIX: Lấy botId/madaCategory từ DATABASE (không chỉ từ hardcoded mapping)
     let botId: string | null = null;
@@ -1545,6 +1550,7 @@ router.post('/with-file', async (req, res) => {
       message,
       conversationId,
       language: uiLanguage = 'vi',
+      agentId,
       agentPrompt,
       attachments,
       isReadyForProductSuggestion = false,
@@ -1711,7 +1717,7 @@ router.post('/with-file', async (req, res) => {
     chatHistory.get(convId)!.push({ role: 'user', content: message });
     
     // Build RAG config with file context
-    const agentInstruction = getSystemInstruction(effectiveLanguage, agentPrompt, 'endUser');
+    const agentInstruction = getSystemInstruction(effectiveLanguage, agentPrompt, 'endUser', agentId);
     const ragConfig: any = { 
       systemInstruction: agentInstruction, 
       language: effectiveLanguage,
@@ -1933,7 +1939,7 @@ router.post('/stream', async (req: any, res: any) => {
     
     // Build RAG config
     const validUserMode: 'endUser' | 'specialist' = userMode === 'specialist' ? 'specialist' : 'endUser';
-    const agentInstruction = getSystemInstruction(effectiveLanguage, agentPrompt, validUserMode);
+    const agentInstruction = getSystemInstruction(effectiveLanguage, agentPrompt, validUserMode, agentId);
     
     // ⭐ FIX: Lấy botId/madaCategory từ DATABASE (không chỉ từ hardcoded mapping)
     let botId: string | null = null;
@@ -2751,7 +2757,7 @@ router.post('/consultation/direct', async (req, res) => {
     
     // Otherwise, normal chat
     const validUserMode: 'endUser' | 'specialist' = userMode === 'specialist' ? 'specialist' : 'endUser';
-    const agentInstruction = buildSystemPrompt(effectiveLanguage, validUserMode, agentPrompt);
+    const agentInstruction = buildSystemPrompt(effectiveLanguage, validUserMode, agentPrompt, agentId);
     
     const ragConfig: any = { systemInstruction: agentInstruction, language: effectiveLanguage };
     if (agentId) {

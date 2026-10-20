@@ -2543,9 +2543,10 @@ const _MODE_PERSONA_INSTRUCTIONS: Record<string, Record<'endUser' | 'specialist'
 function getSystemInstruction(
   lang: string,
   agentPrompt?: string,
-  userMode: 'endUser' | 'specialist' = 'endUser'
+  userMode: 'endUser' | 'specialist' = 'endUser',
+  agentId?: string
 ): string {
-  return buildSystemPrompt(lang, userMode, agentPrompt);
+  return buildSystemPrompt(lang, userMode, agentPrompt, agentId);
 }
 
 /**
@@ -2656,7 +2657,7 @@ app.post('/api/chat', async (req, res) => {
 
     // ⭐ Dùng full language instruction chung (DRY) + persona theo userMode
     const validUserMode: 'endUser' | 'specialist' = userMode === 'specialist' ? 'specialist' : 'endUser';
-    const agentInstruction = getSystemInstruction(effectiveLanguage, agentPrompt, validUserMode);
+    const agentInstruction = getSystemInstruction(effectiveLanguage, agentPrompt, validUserMode, agentId);
 
     // ⭐ FIX: Lấy botId/madaCategory từ DATABASE (không chỉ từ hardcoded mapping)
     // Ưu tiên: DB của agent → fallback AGENT_TO_MADA mapping
@@ -3340,7 +3341,7 @@ app.post('/api/chat/stream', async (req: any, res: any) => {
     // ⭐ Dùng full language instruction chung (không hard-code riêng) + persona theo userMode
     const validUserMode: 'endUser' | 'specialist' = userMode === 'specialist' ? 'specialist' : 'endUser';
     let ragConfig: any = {
-      systemInstruction: getSystemInstruction(effectiveLanguage, agentPrompt, validUserMode),
+      systemInstruction: getSystemInstruction(effectiveLanguage, agentPrompt, validUserMode, agentId),
       language: effectiveLanguage,
     };
 

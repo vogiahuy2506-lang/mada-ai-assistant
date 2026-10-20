@@ -902,6 +902,15 @@ Bạn nắm giữ TOÀN BỘ kiến thức từ 6 chuyên gia chuyên môn:
 - NGÔN NGỮ: Trả lời bằng ngôn ngữ user đang sử dụng
 - KHÔNG BAO GIỜ nói "tôi không biết" — bạn LÀ thư viện kiến thức
 
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📋 BẮT BUỘC — MỖI CÂU TRẢ LỜI PHẢI BẮT ĐẦU BẰNG HEADER SAU
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Mỗi lượt trả lời, NGAY DÒNG ĐẦU TIÊN, phải có header dạng:
+
+📋 **6 CHUYÊN GIA CHUYÊN MÔN — TỔNG HỢP KIẾN THỨC**
+
+Sau header đó là 1 câu tóm tắt ngắn gọn (1-2 dòng) về chủ đề user hỏi, rồi mới đến nội dung chi tiết. KHÔNG được bỏ header này — đây là định danh của Bot 7. Sau đó mới trình bày các thông tin từ các chuyên gia liên quan.
+
 Hãy là người bạn đồng hành đáng tin cậy nhất của user!`,
 
     en: `You are MADA AI's COMPREHENSIVE ASSISTANT — a massive knowledge library about assistive technology for people with disabilities at Mada Center.
@@ -966,6 +975,15 @@ You hold ALL knowledge from 6 specialized experts:
 - ALWAYS show empathy, patience, and professionalism
 - LANGUAGE: Respond in the language the user is using
 - NEVER say "I don't know" — you ARE the knowledge library
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📋 MANDATORY — EVERY RESPONSE MUST START WITH THE FOLLOWING HEADER
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+On every reply, ON THE VERY FIRST LINE, you MUST include the header:
+
+📋 **6 SPECIALIZED EXPERTS — COMPREHENSIVE KNOWLEDGE BASE**
+
+After the header add a short 1-2 line summary of the user's question, then present the detailed answer with relevant expert knowledge. NEVER omit this header — it identifies Bot 7.
 
 Be the user's most trusted companion!`,
 
@@ -1032,6 +1050,15 @@ Be the user's most trusted companion!`,
 - اللغة: أجب باللغة التي يستخدمها المستخدم
 - لا تقل أبداً "لا أعرف" - أنت مكتبة المعرفة
 
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📋 إلزامي — يجب أن تبدأ كل إجابة بالترويسة التالية
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+في كل رد، في السطر الأول تماماً، يجب عليك تضمين الترويسة:
+
+📋 **6 خبراء متخصصين — قاعدة المعرفة الشاملة**
+
+بعد الترويسة، أضف ملخصاً موجزاً (1-2 سطر) عن موضوع سؤال المستخدم، ثم قدم الإجابة التفصيلية مع المعرفة الخبيرة ذات الصلة. لا تحذف هذه الترويسة أبداً — إنها تحدد هوية البوت 7.
+
 كن رفيقاً موثوقاً للمستخدم!`,
 
     fr: `Vous êtes l'ASSISTANT GLOBAL DE MADA AI — une vaste bibliothèque de connaissances sur les technologies d'assistance pour les personnes handicapées au Centre Mada.
@@ -1096,6 +1123,15 @@ Vous détenez TOUTES les connaissances des 6 experts spécialisés:
 - Montrez TOUJOURS empathie, patience et professionnalisme
 - LANGUE: Répondez dans la langue utilisée par l'utilisateur
 - Ne dites JAMAIS "je ne sais pas" — vous ÊTES la bibliothèque de connaissances
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📋 OBLIGATOIRE — Chaque réponse DOIT commencer par l'en-tête suivante
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Pour chaque réponse, SUR LA TOUTE PREMIÈRE LIGNE, vous DEVEZ inclure l'en-tête:
+
+📋 **6 EXPERTS SPÉCIALISÉS — BASE DE CONNAISSANCES COMPLÈTE**
+
+Après l'en-tête, ajoutez un résumé court (1-2 lignes) de la question de l'utilisateur, puis présentez la réponse détaillée avec les connaissances expertes pertinentes. Ne supprimez JAMAIS cette en-tête — elle identifie le Bot 7.
 
 Soyez le compagnon le plus fiable de l'utilisateur!`
   };
@@ -1251,14 +1287,23 @@ Soyez le compagnon le plus fiable de l'utilisateur!`
   }
   const isAgentChat = !!(resolvedAgentPrompt && typeof resolvedAgentPrompt === 'string' && resolvedAgentPrompt.trim().length > 0);
 
+  // ⭐ Decide which identity to use as the system role.
+  // Order of priority:
+  //   1. Bot 7 (regulatory) — uses its own multilingual BOT7_PROMPTS, NOT the generic
+  //      main_prompt / CORE_IDENTITY. This must NOT be gated by isAgentChat, because
+  //      callers may pass only agentId='bot-regulatory' (no agentPrompt) yet expect
+  //      the BOT7 framing to be applied.
+  //   2. Other agent-specific prompts from madaBots.ts
+  //   3. Generic mainPrompt (admin-curated) or CORE_IDENTITY fallback
+  const identityBlock = isBot7Regulatory
+    ? `🤖 VAI TRÒ CHÍNH:\n${BOT7_PROMPTS[langCode] || BOT7_PROMPTS['vi']}`
+    : isAgentChat
+      ? `🤖 VAI TRÒ CHÍNH:\n${resolvedAgentPrompt}`
+      : (mainPrompt || CORE_IDENTITY[langCode]);
+
   const parts = [
-    // 1. IDENTITY: Agent-specific OR main system prompt (agent takes priority)
-    // ⭐ Bot 7 (Regulatory) uses multilingual prompts — pick by langCode
-    isAgentChat
-      ? (isBot7Regulatory
-          ? `🤖 VAI TRÒ CHÍNH:\n${BOT7_PROMPTS[langCode] || BOT7_PROMPTS['vi']}`
-          : `🤖 VAI TRÒ CHÍNH:\n${resolvedAgentPrompt}`)
-      : (mainPrompt || CORE_IDENTITY[langCode]),
+    // 1. IDENTITY
+    identityBlock,
     // 2. Language Rules (always needed for consistency)
     LANGUAGE_RULES[langCode] || LANGUAGE_RULES.vi,
     // 3. Persona Mode (always applied)
@@ -1271,17 +1316,17 @@ Soyez le compagnon le plus fiable de l'utilisateur!`
     SAFETY_RULES[langCode as keyof typeof SAFETY_RULES] || SAFETY_RULES.en,
     // 7. Product Knowledge (only for non-agent chat, or add on top)
     // ⭐ Bot 7 (Regulatory) already has full AT knowledge embedded → skip duplicate
-    ...(isAgentChat && !isBot7Regulatory
-      ? [
-        // For agent chat: add AT knowledge on TOP of agent's specific expertise
-        `🔧 KIẾN THỨC AT BỔ SUNG:\n${PRODUCT_KNOWLEDGE[langCode as keyof typeof PRODUCT_KNOWLEDGE] || PRODUCT_KNOWLEDGE.en}`,
-      ]
+    ...(isBot7Regulatory
+      ? []
       : isAgentChat
-        ? []
+        ? [
+          // For non-Bot-7 agent chat: add AT knowledge on TOP of agent's specific expertise
+          `🔧 KIẾN THỨC AT BỔ SUNG:\n${PRODUCT_KNOWLEDGE[langCode as keyof typeof PRODUCT_KNOWLEDGE] || PRODUCT_KNOWLEDGE.en}`,
+        ]
         : [
-        // For non-agent chat: use full product knowledge
-        PRODUCT_KNOWLEDGE[langCode as keyof typeof PRODUCT_KNOWLEDGE] || PRODUCT_KNOWLEDGE.en,
-      ]),
+          // For non-agent chat: use full product knowledge
+          PRODUCT_KNOWLEDGE[langCode as keyof typeof PRODUCT_KNOWLEDGE] || PRODUCT_KNOWLEDGE.en,
+        ]),
     // ⭐ 8. Follow-Up Questions Rules
     SMART_CONSULT_RULES[langCode] || SMART_CONSULT_RULES.en,
     // 9. Emotion Settings Instructions

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { AdminLayout } from './AdminLayout';
+import { AdminLayout } from './AdminLayoutLinear';
 import { PromptTemplates } from './PromptTemplates';
 import { adminApi, UserStats, KnowledgeStats } from './adminApi';
 import { useSystemSettingsStore, useAuthStore, useLanguageStore } from '@/stores';

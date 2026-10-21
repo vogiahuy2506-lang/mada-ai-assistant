@@ -315,11 +315,119 @@ export const adminApi = {
   async createAgent(data: any) {
     return request<any>('/admin/agents', { method: 'POST', body: JSON.stringify(data) });
   },
+  /** Load 1 agent theo id (đầy đủ field, khác với public/agents). */
+  async getAgent(id: string) {
+    return request<any>(`/admin/agents/${id}`);
+  },
   async updateAgent(id: string, data: any) {
     return request<any>(`/admin/agents/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
   },
   async deleteAgent(id: string) {
     return request<{ success: boolean }>(`/admin/agents/${id}`, { method: 'DELETE' });
+  },
+
+  // ============ AI ASSISTANTS STUDIO — per-bot deep config ============
+
+  /** Sản phẩm đã gán riêng cho bot. */
+  async getAgentLinkedProducts(agentId: string) {
+    return request<{ agentId: string; items: any[]; total: number }>(
+      `/admin/agents/${agentId}/products`,
+    );
+  },
+  /** Gán 1 sản phẩm vào bot. */
+  async linkAgentProduct(agentId: string, productId: string) {
+    return request<{ agentId: string; productId: string; total: number }>(
+      `/admin/agents/${agentId}/products`,
+      { method: 'POST', body: JSON.stringify({ productId }) },
+    );
+  },
+  /** Bỏ gán sản phẩm khỏi bot. */
+  async unlinkAgentProduct(agentId: string, productId: string) {
+    return request<{ agentId: string; productId: string }>(
+      `/admin/agents/${agentId}/products/${productId}`,
+      { method: 'DELETE' },
+    );
+  },
+  /** Auto-gán sản phẩm theo mada_category của bot. */
+  async syncAgentProducts(agentId: string, category?: string) {
+    return request<{ agentId: string; category: string; linked: number }>(
+      `/admin/agents/${agentId}/products/sync`,
+      { method: 'POST', body: JSON.stringify({ category }) },
+    );
+  },
+
+  /** Tài liệu KB đã ingest cho bot (gom theo nguồn). */
+  async getAgentKnowledge(agentId: string, limit = 50) {
+    return request<{
+      agentId: string;
+      agentName: string;
+      totalChunks: number;
+      sources: Array<{ source: string; title: string; chunks: number; crawledAt?: string }>;
+      documents: Array<{ id: string; title: string; source: string; preview: string; crawledAt: string | null }>;
+    }>(`/admin/agents/${agentId}/knowledge?limit=${limit}`);
+  },
+  /** Thêm KB thủ công cho bot: text hoặc URL. */
+  async addAgentKnowledge(
+    agentId: string,
+    payload: { type: 'text' | 'web'; content: string; title?: string; language?: string },
+  ) {
+    return request<{ success: boolean; documentsAdded?: number; message?: string }>(
+      `/admin/agents/${agentId}/knowledge`,
+      { method: 'POST', body: JSON.stringify(payload) },
+    );
+  },
+
+  /** Câu hỏi gợi ý gán riêng cho bot. */
+  async getAgentQuestions(agentId: string) {
+    return request<any[]>(`/admin/agents/${agentId}/questions`);
+  },
+
+  /** Playground: gửi 1 lượt chat test với cấu hình hiện tại của bot. */
+  async agentPlayground(
+    agentId: string,
+    payload: {
+      message: string;
+      history?: Array<{ role: string; content: string }>;
+      language?: string;
+      userMode?: 'endUser' | 'specialist';
+      /** Prompt chưa lưu — để test thay đổi tức thì. */
+      draftPrompt?: string;
+    },
+  ) {
+    return request<{
+      answer: string;
+      confidence: number;
+      contextUsed: boolean;
+      latencyMs: number;
+      language: string;
+      userMode: string;
+      agentName: string;
+      sources: Array<{ title: string; source: string; score: number | null; preview: string }>;
+      systemInstructionPreview: string;
+    }>(`/admin/agents/${agentId}/playground`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  /** Xem system prompt đầy đủ sẽ gửi cho AI. */
+  async previewAgentPrompt(
+    agentId: string,
+    params: { language?: string; userMode?: string; draftPrompt?: string } = {},
+  ) {
+    const p = new URLSearchParams();
+    if (params.language) p.set('language', params.language);
+    if (params.userMode) p.set('userMode', params.userMode);
+    if (params.draftPrompt) p.set('draftPrompt', params.draftPrompt);
+    const qs = p.toString();
+    return request<{
+      agentId: string;
+      agentName: string;
+      language: string;
+      userMode: string;
+      systemInstruction: string;
+      chars: number;
+    }>(`/admin/agents/${agentId}/preview-prompt${qs ? `?${qs}` : ''}`);
   },
   async uploadAgentAvatar(file: File) {
     const form = new FormData();

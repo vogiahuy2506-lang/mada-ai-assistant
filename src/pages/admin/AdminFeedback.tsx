@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { AdminLayout } from './AdminLayout';
+import { AdminLayout } from './AdminLayoutLinear';
 import { getAccessToken, validateLocalToken, clearTokens } from '@/lib/api';
 import clsx from 'clsx';
 import {

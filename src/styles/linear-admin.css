@@ -1,0 +1,362 @@
+/* ===================================================================
+   Linear-Inspired Design System — Admin
+   Triết lý: tối giản, nhiều khoảng thở, typography rõ ràng,
+   border mảnh, ít màu, tương tác tinh tế.
+   =================================================================== */
+
+:root {
+  /* ── Linear Neutral Scale (cool grays) ── */
+  --lin-0:   #ffffff;
+  --lin-25:  #fcfcfd;
+  --lin-50:  #f7f8f9;
+  --lin-100: #eef0f2;
+  --lin-150: #e4e6ea;
+  --lin-200: #dcdfe4;
+  --lin-300: #c4c8d0;
+  --lin-400: #9da3ae;
+  --lin-500: #7c828f;
+  --lin-600: #626874;
+  --lin-700: #4d525c;
+  --lin-800: #3a3e46;
+  --lin-900: #25282e;
+  --lin-950: #17191d;
+  --lin-1000: #0f1013;
+
+  /* ── Accent: Linear signature indigo/violet ── */
+  --lin-accent:      #5e6ad2;
+  --lin-accent-hover:#4f5bc4;
+  --lin-accent-soft: rgba(94, 106, 210, 0.10);
+  --lin-accent-border:rgba(94, 106, 210, 0.28);
+
+  /* ── Semantic ── */
+  --lin-success: #4cb782;
+  --lin-warning: #f2c94c;
+  --lin-danger:  #eb5757;
+  --lin-info:    #5e6ad2;
+
+  /* ── Semantic Surfaces (light) ── */
+  --lin-bg:            var(--lin-50);
+  --lin-bg-elevated:   var(--lin-0);
+  --lin-bg-sunken:     var(--lin-100);
+  --lin-bg-hover:      rgba(0, 0, 0, 0.037);
+  --lin-bg-active:     rgba(0, 0, 0, 0.055);
+
+  --lin-text-primary:   var(--lin-900);
+  --lin-text-secondary: var(--lin-600);
+  --lin-text-tertiary:  var(--lin-500);
+  --lin-text-quaternary:var(--lin-400);
+  --lin-text-inverted:  var(--lin-0);
+
+  --lin-border:      var(--lin-200);
+  --lin-border-subtle: var(--lin-150);
+  --lin-border-strong:  var(--lin-300);
+
+  /* ── Typography ── */
+  --lin-font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --lin-font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --lin-text-xs:   11px;
+  --lin-text-sm:   12px;
+  --lin-text-base: 13px;
+  --lin-text-md:   14px;
+  --lin-text-lg:   16px;
+  --lin-text-xl:   20px;
+  --lin-text-2xl:  24px;
+  --lin-text-3xl:  30px;
+
+  /* ── Spacing (4px base, tinh tế) ── */
+  --lin-space-1: 4px;
+  --lin-space-2: 6px;
+  --lin-space-3: 8px;
+  --lin-space-4: 12px;
+  --lin-space-5: 16px;
+  --lin-space-6: 20px;
+  --lin-space-7: 24px;
+  --lin-space-8: 32px;
+  --lin-space-9: 40px;
+  --lin-space-10: 48px;
+
+  /* ── Radius ── */
+  --lin-radius-sm: 4px;
+  --lin-radius:    6px;
+  --lin-radius-md: 8px;
+  --lin-radius-lg: 10px;
+  --lin-radius-xl: 14px;
+  --lin-radius-full: 999px;
+
+  /* ── Elevation ── */
+  --lin-shadow-xs: 0 1px 2px rgba(0,0,0,0.04);
+  --lin-shadow-sm: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.03);
+  --lin-shadow-md: 0 4px 12px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.04);
+  --lin-shadow-lg: 0 12px 32px rgba(0,0,0,0.12), 0 4px 8px rgba(0,0,0,0.05);
+  --lin-shadow-focus: 0 0 0 3px var(--lin-accent-soft);
+
+  /* ── Motion ── */
+  --lin-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --lin-duration-fast: 120ms;
+  --lin-duration: 180ms;
+
+  /* ── Layout ── */
+  --lin-sidebar-w: 232px;
+  --lin-sidebar-w-collapsed: 52px;
+  --lin-topbar-h: 48px;
+  --lin-content-max: 1400px;
+}
+
+/* ============== Dark theme ============== */
+.dark {
+  --lin-bg:            #08090a;
+  --lin-bg-elevated:   #0f1013;
+  --lin-bg-sunken:     #0a0b0d;
+  --lin-bg-hover:      rgba(255, 255, 255, 0.037);
+  --lin-bg-active:     rgba(255, 255, 255, 0.06);
+
+  --lin-text-primary:   #f7f8f9;
+  --lin-text-secondary: #a4a9b3;
+  --lin-text-tertiary:  #7c828f;
+  --lin-text-quaternary:#626874;
+  --lin-text-inverted:  var(--lin-900);
+
+  --lin-border:        #23252a;
+  --lin-border-subtle: #1a1c1f;
+  --lin-border-strong:  #2f3238;
+
+  --lin-accent:      #7c85ea;
+  --lin-accent-hover:#8f97f0;
+  --lin-accent-soft: rgba(124, 133, 234, 0.13);
+  --lin-accent-border:rgba(124, 133, 234, 0.32);
+
+  --lin-success: #4cb782;
+  --lin-warning: #e5b74b;
+  --lin-danger:  #f0616f;
+  --lin-info:    #7c85ea;
+
+  --lin-shadow-xs: 0 1px 2px rgba(0,0,0,0.3);
+  --lin-shadow-sm: 0 1px 3px rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.25);
+  --lin-shadow-md: 0 4px 12px rgba(0,0,0,0.5), 0 1px 3px rgba(0,0,0,0.3);
+  --lin-shadow-lg: 0 12px 32px rgba(0,0,0,0.6), 0 4px 8px rgba(0,0,0,0.4);
+}
+
+/* ===================================================================
+   Base utilities — dùng được ngay mọi admin page
+   =================================================================== */
+
+/* Layout shell */
+.lin-shell {
+  background: var(--lin-bg);
+  color: var(--lin-text-primary);
+  font-family: var(--lin-font-sans);
+  font-size: var(--lin-text-base);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Main column offset — trượt theo bề rộng sidebar (mở rộng / thu gọn).
+   Trên mobile sidebar là overlay nên không offset. */
+.lin-main-offset {
+  margin-left: var(--lin-shell-sidebar-w, var(--lin-sidebar-w));
+}
+
+@media (max-width: 767px) {
+  .lin-main-offset {
+    margin-left: 0;
+  }
+}
+
+/* Card */
+.lin-card {
+  background: var(--lin-bg-elevated);
+  border: 1px solid var(--lin-border);
+  border-radius: var(--lin-radius-lg);
+  box-shadow: var(--lin-shadow-xs);
+}
+.lin-card-hover {
+  transition: border-color var(--lin-duration) var(--lin-ease),
+              box-shadow var(--lin-duration) var(--lin-ease),
+              transform var(--lin-duration) var(--lin-ease);
+}
+.lin-card-hover:hover {
+  border-color: var(--lin-border-strong);
+  box-shadow: var(--lin-shadow-sm);
+}
+
+/* Buttons */
+.lin-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--lin-space-2);
+  font-family: var(--lin-font-sans);
+  font-size: var(--lin-text-base);
+  font-weight: 500;
+  line-height: 1;
+  padding: 0 var(--lin-space-4);
+  height: 32px;
+  border-radius: var(--lin-radius);
+  border: 1px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--lin-duration-fast) var(--lin-ease),
+              border-color var(--lin-duration-fast) var(--lin-ease),
+              color var(--lin-duration-fast) var(--lin-ease),
+              opacity var(--lin-duration-fast) var(--lin-ease);
+  user-select: none;
+}
+.lin-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.lin-btn-primary {
+  background: var(--lin-accent);
+  color: #fff;
+}
+.lin-btn-primary:hover:not(:disabled) { background: var(--lin-accent-hover); }
+
+.lin-btn-secondary {
+  background: var(--lin-bg-elevated);
+  color: var(--lin-text-primary);
+  border-color: var(--lin-border);
+  box-shadow: var(--lin-shadow-xs);
+}
+.lin-btn-secondary:hover:not(:disabled) {
+  background: var(--lin-bg-hover);
+  border-color: var(--lin-border-strong);
+}
+
+.lin-btn-ghost {
+  background: transparent;
+  color: var(--lin-text-secondary);
+}
+.lin-btn-ghost:hover:not(:disabled) {
+  background: var(--lin-bg-hover);
+  color: var(--lin-text-primary);
+}
+
+.lin-btn-danger {
+  background: var(--lin-danger);
+  color: #fff;
+}
+.lin-btn-danger:hover:not(:disabled) { opacity: 0.88; }
+
+.lin-btn-sm { height: 26px; font-size: var(--lin-text-sm); padding: 0 var(--lin-space-3); }
+.lin-btn-lg { height: 38px; font-size: var(--lin-text-md); }
+
+/* Inputs */
+.lin-input,
+.lin-select,
+.lin-textarea {
+  width: 100%;
+  font-family: var(--lin-font-sans);
+  font-size: var(--lin-text-base);
+  color: var(--lin-text-primary);
+  background: var(--lin-bg-elevated);
+  border: 1px solid var(--lin-border);
+  border-radius: var(--lin-radius);
+  padding: 0 var(--lin-space-3);
+  height: 32px;
+  transition: border-color var(--lin-duration-fast) var(--lin-ease),
+              box-shadow var(--lin-duration-fast) var(--lin-ease);
+}
+.lin-textarea { height: auto; padding: var(--lin-space-3); resize: vertical; line-height: 1.6; }
+
+.lin-input:focus,
+.lin-select:focus,
+.lin-textarea:focus {
+  outline: none;
+  border-color: var(--lin-accent);
+  box-shadow: var(--lin-shadow-focus);
+}
+.lin-input::placeholder,
+.lin-textarea::placeholder { color: var(--lin-text-quaternary); }
+
+.lin-input:disabled, .lin-select:disabled {
+  background: var(--lin-bg-sunken);
+  color: var(--lin-text-tertiary);
+  cursor: not-allowed;
+}
+
+/* Labels */
+.lin-label {
+  display: block;
+  font-size: var(--lin-text-base);
+  font-weight: 500;
+  color: var(--lin-text-primary);
+  margin-bottom: var(--lin-space-2);
+}
+.lin-hint {
+  font-size: var(--lin-text-sm);
+  color: var(--lin-text-tertiary);
+  margin-top: var(--lin-space-2);
+  margin-bottom: calc(var(--lin-space-2) * -1);
+}
+
+/* Badges */
+.lin-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px var(--lin-space-2);
+  border-radius: var(--lin-radius-sm);
+  font-size: var(--lin-text-xs);
+  font-weight: 500;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+.lin-badge-neutral { background: var(--lin-bg-sunken); color: var(--lin-text-secondary); }
+.lin-badge-accent  { background: var(--lin-accent-soft); color: var(--lin-accent); }
+.lin-badge-success { background: rgba(76,183,130,0.12); color: var(--lin-success); }
+.lin-badge-warning { background: rgba(242,201,76,0.14); color: #b8860b; }
+.lin-badge-danger  { background: rgba(235,87,87,0.12); color: var(--lin-danger); }
+.dark .lin-badge-warning { color: var(--lin-warning); }
+
+/* Text tones */
+.lin-t-primary    { color: var(--lin-text-primary); }
+.lin-t-secondary  { color: var(--lin-text-secondary); }
+.lin-t-tertiary   { color: var(--lin-text-tertiary); }
+.lin-t-quaternary { color: var(--lin-text-quaternary); }
+.lin-t-accent     { color: var(--lin-accent); }
+
+/* Divider */
+.lin-divider { height: 1px; background: var(--lin-border-subtle); }
+
+/* Table */
+.lin-table { width: 100%; border-collapse: collapse; }
+.lin-table th {
+  text-align: left;
+  font-size: var(--lin-text-sm);
+  font-weight: 500;
+  color: var(--lin-text-tertiary);
+  padding: var(--lin-space-2) var(--lin-space-4);
+  border-bottom: 1px solid var(--lin-border);
+  white-space: nowrap;
+}
+.lin-table td {
+  padding: var(--lin-space-3) var(--lin-space-4);
+  border-bottom: 1px solid var(--lin-border-subtle);
+  font-size: var(--lin-text-base);
+  color: var(--lin-text-primary);
+}
+.lin-table tbody tr {
+  transition: background var(--lin-duration-fast) var(--lin-ease);
+}
+.lin-table tbody tr:hover { background: var(--lin-bg-hover); }
+
+/* Scrollbars — tinh tế */
+.lin-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
+.lin-scroll::-webkit-scrollbar-track { background: transparent; }
+.lin-scroll::-webkit-scrollbar-thumb {
+  background: var(--lin-border-strong);
+  border-radius: var(--lin-radius-full);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+.lin-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--lin-text-quaternary);
+  background-clip: padding-box;
+}
+
+/* Focus ring a11y */
+.lin-focus-visible:focus-visible {
+  outline: 2px solid var(--lin-accent);
+  outline-offset: 2px;
+  border-radius: var(--lin-radius-sm);
+}

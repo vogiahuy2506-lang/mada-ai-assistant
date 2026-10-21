@@ -4,7 +4,7 @@ import {
   Save, RefreshCw, CheckCircle, XCircle, Info,
   Loader2, Shield, Zap, Database, Users
 } from 'lucide-react';
-import { AdminLayout } from './AdminLayout';
+import { AdminLayout } from './AdminLayoutLinear';
 import { getAccessToken } from '@/lib/api';
 import { useLanguageStore } from '@/stores';
 import clsx from 'clsx';

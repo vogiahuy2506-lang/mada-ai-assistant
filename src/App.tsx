@@ -8,6 +8,7 @@ import { AuthModal } from '@/components/auth/AuthModal';
 import { PaywallModal } from '@/components/auth/PaywallModal';
 import { translations } from '@/lib/translations';
 import { validateLocalToken, clearTokens } from '@/lib/api';
+import { withAdminShell } from '@/pages/admin/withAdminShell';
 
 // Import ChatPage directly to avoid lazy loading issues
 import { ChatPage } from '@/pages/ChatPage';
@@ -30,7 +31,18 @@ const AdminFeedbackQuestions = lazy(() => import('@/pages/admin/AdminFeedbackQue
 const AdminPermissions = lazy(() => import('@/pages/admin/Permissions'));
 const AdminSupport = lazy(() => import('@/pages/admin/AdminSupport'));
 const FileManagement = lazy(() => import('@/pages/admin/FileManagement'));
-const WidgetCustomization = lazy(() => import('@/pages/admin/WidgetCustomization'));
+const WidgetCustomization = lazy(() =>
+  import('@/pages/admin/WidgetCustomization').then((m) => ({
+    default: withAdminShell(m.WidgetCustomization),
+  })),
+);
+// Layout 3 cột + playground chat: cần shell full-height (bleed) để composer
+// luôn nằm trong viewport thay vì rơi xuống dưới màn hình.
+const AIAssistants = lazy(() =>
+  import('@/pages/admin/AIAssistants').then((m) => ({
+    default: withAdminShell(m.default, { bleed: true }),
+  })),
+);
 const DataManagerPage = lazy(() => import('@/pages/DataManagerPage'));
 const ProfilePage = lazy(() => import('@/pages/ProfilePage'));
 const ProductsPage = lazy(() => import('@/pages/ProductsPage'));
@@ -83,7 +95,8 @@ function PageLoader({ t }: { t: (key: string) => string }) {
 }
 
 function App() {
-  const { isDark } = useThemeStore();
+  // Dùng selector để tránh re-render không cần thiết và có state rõ ràng khi init
+  const isDark = useThemeStore((s) => s.isDark);
   const refreshUser = useAuthStore((s) => s.refreshUser);
   const user = useAuthStore((s) => s.user);
   const { t } = useAppTranslations();
@@ -284,6 +297,14 @@ function App() {
             element={
               <RoleGuard requiredRole="admin">
                 <AdminSupport />
+              </RoleGuard>
+            }
+          />
+          <Route
+            path="/admin/chatbots"
+            element={
+              <RoleGuard requiredRole="admin">
+                <AIAssistants />
               </RoleGuard>
             }
           />

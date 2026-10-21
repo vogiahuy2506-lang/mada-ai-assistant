@@ -2,6 +2,35 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { getAccessToken, validateLocalToken } from '@/lib/api';
 
+// ============== Per-chatbot config ==============
+// Mỗi nhóm là JSON blob lưu trong cột TEXT của bảng `admin_agents`.
+// undefined/null = chưa override → kế thừa config global từ widgetStore
+// (/api/widget/config) hoặc chatSettingsStore (/api/admin/chat-settings).
+export interface AgentWidgetConfig {
+  position?: 'bottom-left' | 'bottom-right' | 'top-left' | 'top-right';
+  theme?: 'mada-blue' | 'soft-green' | 'warm-amber' | 'neutral-gray';
+  borderRadius?: number;
+  showBubbleAvatar?: boolean;
+  defaultLanguage?: string;
+  enabledLanguages?: string[];
+}
+
+export interface AgentBehaviorConfig {
+  fallbackMessage?: string;
+  enableGuardrails?: boolean;
+  refusalMessage?: string;
+  enableAutoSuggest?: boolean;
+  rateLimitPerMinute?: number;
+  adminEscalationThreshold?: number;
+}
+
+export interface AgentPublishConfig {
+  status?: 'draft' | 'published' | 'archived';
+  version?: number;
+  scheduledAt?: string | null;
+  releaseNotes?: string;
+}
+
 export interface Agent {
   id: string;
   name: string;
@@ -20,6 +49,29 @@ export interface Agent {
   knowledgeUrl?: string;
   productUrl?: string;
   sortOrder?: number;
+
+  // ── Per-chatbot config ──
+  //   null   = explicit reset về global (xóa override; server set cột NULL)
+  //   undefined = không truyền key (giữ nguyên DB, dành cho update từng phần)
+  //   object = override riêng (ghi lên DB)
+  widgetConfig?: AgentWidgetConfig | null;
+  behaviorConfig?: AgentBehaviorConfig | null;
+  publishConfig?: AgentPublishConfig | null;
+  greeting?: Record<string, string> | null;
+  aiInstructions?: Record<string, any> | null;
+  emotionSettings?: Record<string, any> | null;
+}
+
+/** Parse JSON blob từ DB, trả undefined nếu rỗng/lỗi — an toàn với dữ liệu cũ. */
+function parseJsonField<T>(raw: unknown): T | undefined {
+  if (raw === null || raw === undefined || raw === '') return undefined;
+  if (typeof raw === 'object') return raw as T;
+  try {
+    const parsed = JSON.parse(String(raw));
+    return parsed && typeof parsed === 'object' ? (parsed as T) : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 const API_BASE = '/api';
@@ -110,6 +162,14 @@ function mapBackendAgent(a: any): Agent {
     knowledgeUrl: a.knowledge_url || a.knowledgeUrl,
     productUrl: a.product_url || a.productUrl,
     sortOrder: a.sort_order ?? a.sortOrder ?? 0,
+
+    // ── Per-chatbot config: JSON blob trong cột TEXT ──
+    widgetConfig: parseJsonField<AgentWidgetConfig>(a.widget_config ?? a.widgetConfig),
+    behaviorConfig: parseJsonField<AgentBehaviorConfig>(a.behavior_config ?? a.behaviorConfig),
+    publishConfig: parseJsonField<AgentPublishConfig>(a.publish_config ?? a.publishConfig),
+    greeting: parseJsonField<Record<string, string>>(a.greeting),
+    aiInstructions: parseJsonField<Record<string, any>>(a.ai_instructions ?? a.aiInstructions),
+    emotionSettings: parseJsonField<Record<string, any>>(a.emotion_settings ?? a.emotionSettings),
   };
 }
 
@@ -123,6 +183,8 @@ interface AgentState {
   loadAgents: () => Promise<void>;
   forceReloadAgents: () => Promise<void>; // ⭐ Force reload từ backend, clear cache
   refreshAgent: (id: string) => Promise<void>;
+  /** ⭐ Ghi agent xuống backend (POST nếu mới, PATCH nếu có) rồi cập nhật state. */
+  saveAgent: (agent: Agent) => Promise<void>;
   getActiveAgents: () => Agent[];
   getAgentsByCreator: (creator: 'admin' | 'user') => Agent[];
   getAgentById: (id: string) => Agent | undefined;
@@ -172,36 +234,42 @@ const agentStore = create<AgentState>()(
         try {
           let res: { success: boolean; data: any[] } | null = null;
 
-          try {
-            res = await apiRequest<{ success: boolean; data: any[] }>('/public/agents');
-          } catch (pubErr) {
-            // ⭐ Fix: Validate token locally before falling back to /admin/agents
-            // This prevents 401 errors when the stored token is expired or invalid
-            const tokenCheck = validateLocalToken();
-            if (tokenCheck.valid) {
-              console.warn('[agentStore] /public/agents failed, falling back to /admin/agents:', pubErr);
+          // ⭐ Ưu tiên /admin/agents vì trả đầy đủ field (widget_config,
+          // behavior_config, publish_config…). Chỉ fall back /public/agents khi
+          // token hết hạn hoặc không có quyền admin.
+          const tokenCheck = validateLocalToken();
+
+          if (tokenCheck.valid) {
+            try {
+              res = await apiRequest<{ success: boolean; data: any[] }>('/admin/agents');
+            } catch (adminErr) {
+              // /admin thất bại → thử public endpoint
+              console.warn('[agentStore] /admin/agents failed, falling back to /public/agents:', adminErr);
               try {
-                res = await apiRequest<{ success: boolean; data: any[] }>('/admin/agents');
-              } catch (adminErr) {
-                // ⭐ NẾU FETCH THẤT BẠI: KHÔNG sử dụng cache cũ nữa
-                // Buộc phải báo lỗi để user biết backend không hoạt động
-                console.error('[agentStore] All endpoints failed:', pubErr, adminErr);
+                res = await apiRequest<{ success: boolean; data: any[] }>('/public/agents');
+              } catch (pubErr) {
+                console.error('[agentStore] All endpoints failed:', adminErr, pubErr);
                 set({
                   isLoading: false,
                   isSyncing: false,
                   backendConnected: false,
                   syncError: 'Backend không phản hồi. Vui lòng kiểm tra server.',
                 });
-                throw pubErr; // Re-throw để báo lỗi
+                throw adminErr;
               }
-            } else {
-              console.warn('[agentStore] Token invalid, skipping /admin/agents fallback:', tokenCheck.reason);
-              // ⭐ KHÔNG sử dụng cache cũ - báo lỗi
+            }
+          } else {
+            // Không có token hợp lệ → dùng public endpoint
+            console.warn('[agentStore] Token không hợp lệ, dùng /public/agents:', tokenCheck.reason);
+            try {
+              res = await apiRequest<{ success: boolean; data: any[] }>('/public/agents');
+            } catch (pubErr) {
+              console.error('[agentStore] /public/agents failed:', pubErr);
               set({
                 isLoading: false,
                 isSyncing: false,
                 backendConnected: false,
-                syncError: 'Token hết hạn. Vui lòng đăng nhập lại.',
+                syncError: 'Không thể kết nối backend.',
               });
               throw pubErr;
             }
@@ -260,6 +328,54 @@ const agentStore = create<AgentState>()(
         } catch (err) {
           console.warn(`[agentStore] refreshAgent(${id}) failed:`, err);
         }
+      },
+
+      // ⭐ Ghi agent xuống backend. Đây là action DUY NHẤT persist được —
+      // upsertAgent/updateAgent chỉ mutate state nên mất khi reload trang.
+      saveAgent: async (agent: Agent) => {
+        const exists = get().agents.some((a) => a.id === agent.id && a.id !== '__loading__');
+
+        // Chỉ gửi những field backend thực sự nhận (khớp whitelist của PATCH).
+        const payload: Record<string, unknown> = {
+          name: agent.name,
+          description: agent.description,
+          avatar: agent.avatar,
+          system_prompt: agent.systemPrompt,
+          capabilities: agent.capabilities,
+          is_active: agent.isActive,
+          mada_category: agent.madaCategory,
+          prompt_id: agent.promptId,
+          avatar_url: agent.avatarUrl,
+          knowledge_url: agent.knowledgeUrl,
+          product_url: agent.productUrl,
+          sort_order: agent.sortOrder ?? 0,
+          bot_id: agent.botId,
+          // Per-chatbot config — null = reset về global (server set cột NULL),
+          // undefined = không truyền key (giữ nguyên DB). Object = ghi override.
+          ...(agent.widgetConfig !== undefined ? { widget_config: agent.widgetConfig } : {}),
+          ...(agent.behaviorConfig !== undefined ? { behavior_config: agent.behaviorConfig } : {}),
+          ...(agent.publishConfig !== undefined ? { publish_config: agent.publishConfig } : {}),
+          ...(agent.greeting !== undefined ? { greeting: agent.greeting } : {}),
+          ...(agent.aiInstructions !== undefined ? { ai_instructions: agent.aiInstructions } : {}),
+          ...(agent.emotionSettings !== undefined ? { emotion_settings: agent.emotionSettings } : {}),
+        };
+
+        if (exists) {
+          await apiRequest(`/admin/agents/${encodeURIComponent(agent.id)}`, {
+            method: 'PATCH',
+            body: JSON.stringify(payload),
+          });
+        } else {
+          // POST yêu cầu system_prompt — đảm bảo có giá trị để không bị 400.
+          payload.system_prompt = agent.systemPrompt || agent.description || agent.name;
+          await apiRequest('/admin/agents', {
+            method: 'POST',
+            body: JSON.stringify({ ...payload, id: agent.id }),
+          });
+        }
+
+        // Đồng bộ lại state từ server để nhận id/timestamp chuẩn hoá.
+        await get().refreshAgent(agent.id);
       },
 
       getActiveAgents: () => {

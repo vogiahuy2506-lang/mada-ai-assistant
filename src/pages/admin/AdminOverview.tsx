@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { AdminLayout } from './AdminLayout';
+import { AdminLayout } from './AdminLayoutLinear';
 import { adminApi, AdminUser, KnowledgeStats, UserStats } from './adminApi';
 import { useLanguageStore } from '@/stores';
 

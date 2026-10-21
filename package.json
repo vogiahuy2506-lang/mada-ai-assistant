@@ -22,6 +22,11 @@
     "test:performance": "npx tsx server/tests/performance-test.ts",
     "test:performance:benchmark": "npx tsx server/tests/performance-test.ts --benchmark 10",
     "test:qa": "npx tsx server/tests/run-tests.ts",
+    "seed": "tsx scripts/seed-local.ts",
+    "seed:docker": "docker compose -f docker-compose.dev.yml exec -T app npx tsx scripts/seed-local.ts",
+    "dev:docker": "docker compose -f docker-compose.dev.yml up -d",
+    "dev:docker:down": "docker compose -f docker-compose.dev.yml down",
+    "dev:docker:logs": "docker compose -f docker-compose.dev.yml logs -f app",
     "sync-data": "node scripts/sync-production.cjs",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 1000",
     "lint:fix": "eslint . --ext ts,tsx --fix"

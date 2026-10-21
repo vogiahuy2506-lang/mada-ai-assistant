@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { AdminLayout } from './AdminLayout';
+import { AdminLayout } from './AdminLayoutLinear';
 import { adminApi } from './adminApi';
 import { MADA_BOTS } from '@/lib/madaBots';
 import { broadcastAgentChange } from '@/lib/agentBroadcast';

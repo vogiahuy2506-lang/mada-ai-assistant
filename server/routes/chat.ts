@@ -175,20 +175,41 @@ function knowledgeItemToProduct(row: any, effectiveLanguage: string = 'vi'): any
   
   const title = row.title_en && effectiveLanguage === 'en' ? row.title_en : row.title;
   const description = row.description_en && effectiveLanguage === 'en' ? row.description_en : (row.description || '');
-  
+
+  // ⭐ Chuẩn hoá brand + price theo ngôn ngữ người dùng.
+  // Hardcode tiếng Anh ("MADA Qatar AT Portal", "Contact MADA Center") khiến
+  // card hiển thị sai ngôn ngữ với câu trả lời (VD hỏi tiếng Việt nhưng card
+  // ghi "Contact MADA Center").
+  const CONTACT_PRICE: Record<string, string> = {
+    vi: 'Liên hệ MADA Center',
+    en: 'Contact MADA Center',
+    ar: 'تواصل مع مركز MADA',
+    fr: 'Contactez le centre MADA',
+  };
+  const contactPrice = CONTACT_PRICE[effectiveLanguage] || CONTACT_PRICE.vi;
+  const BRAND_LABEL: Record<string, string> = {
+    vi: 'Cổng AT MADA Qatar',
+    en: 'MADA Qatar AT Portal',
+    ar: 'بوابة MADA Qatar للتقنية المساعدة',
+    fr: 'Portail AT MADA Qatar',
+  };
+  const brandLabel = BRAND_LABEL[effectiveLanguage] || BRAND_LABEL.vi;
+
   return {
     id: row.id,
     title: title || '',
     title_en: row.title_en || row.title || '',
     description: description.substring(0, 300) + (description.length > 300 ? '...' : ''),
     category: row.category || 'general',
-    brand: meta.brand || 'MADA Qatar AT Portal',
-    price_range: meta.priceRange || 'Liên hệ MADA Center',
+    brand: meta.brand || brandLabel,
+    price_range: meta.priceRange || contactPrice,
     product_url: row.url || meta.productUrl || meta.sourceUrl || '',
     source_url: row.url || '',
     image_url: toProxyImageUrl(meta.imageUrl || meta.thumbnailUrl || ''),
     confidence: 0.85,
-    match_reason: `Phù hợp với danh mục ${row.category}`,
+    match_reason: (MATCH_REASON_I18N[
+      (['vi', 'en', 'ar', 'fr'].includes(effectiveLanguage) ? effectiveLanguage : 'vi') as 'vi' | 'en' | 'ar' | 'fr'
+    ].category(row.category || '')),
     mada_advice: '',
     warranty: '',
     features: meta.features || [],
@@ -216,20 +237,38 @@ function kbProductToProduct(row: any, effectiveLanguage: string = 'vi'): any {
   
   const title = row.title_en && effectiveLanguage === 'en' ? row.title_en : row.title;
   const description = row.description_en && effectiveLanguage === 'en' ? row.description_en : (row.description || '');
-  
+
+  // ⭐ Chuẩn hoá theo ngôn ngữ — xem knowledgeItemToProduct để biết lý do.
+  const CONTACT_PRICE: Record<string, string> = {
+    vi: 'Liên hệ MADA Center',
+    en: 'Contact MADA Center',
+    ar: 'تواصل مع مركز MADA',
+    fr: 'Contactez le centre MADA',
+  };
+  const contactPrice = CONTACT_PRICE[effectiveLanguage] || CONTACT_PRICE.vi;
+  const BRAND_LABEL: Record<string, string> = {
+    vi: 'Cổng AT MADA Qatar',
+    en: 'MADA Qatar AT Portal',
+    ar: 'بوابة MADA Qatar للتقنية المساعدة',
+    fr: 'Portail AT MADA Qatar',
+  };
+  const brandLabel = BRAND_LABEL[effectiveLanguage] || BRAND_LABEL.vi;
+
   return {
     id: row.id,
     title: title || '',
     title_en: row.title_en || row.title || '',
     description: description.substring(0, 300) + (description.length > 300 ? '...' : ''),
     category: row.category || 'general',
-    brand: row.brand || 'MADA Qatar AT Portal',
-    price_range: row.price_range || 'Liên hệ MADA Center',
+    brand: row.brand || brandLabel,
+    price_range: row.price_range || contactPrice,
     product_url: row.source_url || row.product_url || row.url || '',
     source_url: row.source_url || row.url || '',
     image_url: toProxyImageUrl(row.image_url || ''),
     confidence: 0.85,
-    match_reason: `Phù hợp với danh mục ${row.category}`,
+    match_reason: (MATCH_REASON_I18N[
+      (['vi', 'en', 'ar', 'fr'].includes(effectiveLanguage) ? effectiveLanguage : 'vi') as 'vi' | 'en' | 'ar' | 'fr'
+    ].category(row.category || '')),
     mada_advice: row.mada_advice || '',
     warranty: row.warranty || '',
     features: row.features ? JSON.parse(row.features) : [],
@@ -445,7 +484,7 @@ function findProductByMessage(message: string, _effectiveLanguage: string): any 
  */
 function isExplicitProductRequest(message: string): boolean {
   const contentLower = message.toLowerCase();
-  
+
   // EXPLICIT commands to show products - these should show products IMMEDIATELY
   const explicitCommands = [
     // Vietnamese
@@ -460,6 +499,11 @@ function isExplicitProductRequest(message: string): boolean {
     // ⭐ CRITICAL: "có sp nào hỗ trợ không" pattern - VERY EXPLICIT
     'có sản phẩm nào', 'có sp nào', 'sản phẩm nào hỗ trợ', 'sp nào hỗ trợ',
     'sản phẩm gì', 'thiết bị gì', 'có gì không', 'có cái nào',
+    // ⭐ User tự nhiên hay viết: "xin sản phẩm", "xin sp", "xin vài mẫu",
+    // "xin link sản phẩm", "cho mình xin"…
+    'xin sản phẩm', 'xin sp', 'xin thiết bị', 'xin link', 'xin vài',
+    'cho mình xin', 'cho mình sản phẩm', 'cho mình sp',
+    'vài mẫu', 'mẫu mã',
     // ⭐ SYMPTOM-BASED (tiếng Việt) - mô tả vấn đề AT → show sản phẩm ngay
     // THỊ LỰC
     'nhìn xa', 'nhìn gần', 'nhìn rõ', 'nhìn kém', 'nhìn mờ', 'mắt kém', 'mắt mờ',
@@ -489,7 +533,7 @@ function isExplicitProductRequest(message: string): boolean {
     'show me products', 'show me devices', 'list products', 'list devices',
     'recommend something', 'any products', 'any devices',
   ];
-  
+
   return explicitCommands.some(cmd => contentLower.includes(cmd));
 }
 
@@ -845,12 +889,22 @@ async function getSuggestedProducts(ragSources: any[], message: string, effectiv
   };
   
   // Helper: Check if title is a bot/knowledge base entry (not a real product)
+  //
+  // ⚠️ KB entry của chính hệ thống (agent) hay bị lẫn vào danh sách sản phẩm vì
+  // query lấy chung bảng knowledge_items với sản phẩm đã scrape. Title của các
+  // entry này theo mẫu "Bot 1: Sensory – Hearing — KB" (hoặc "... — KB"),
+  // "Regulatory & Standards — KB"… — đều là TRANG BOT, không phải thiết bị,
+  // nhưng lại có url http hợp lệ nên các filter khác không loại được.
   const isBotEntry = (title: string): boolean => {
     if (!title) return false;
     const lower = title.toLowerCase();
     if (lower.includes('bot ') && lower.includes('kiến thức')) return true;
     if (lower.includes('regulatory & standards')) return true;
     if (lower.includes('bot ') && lower.includes('knowledge')) return true;
+    // Mẫu "Bot 1: ... — KB" / "Bot 2 ... - KB": bắt theo cả hai vế
+    if (/\bbot\s*\d*\s*[:\-–—]/.test(lower)) return true;
+    // Kết thúc bằng "— KB" / "- KB" (nguồn MADA Knowledge Base)
+    if (/[—–-]\s*kb\b/.test(lower)) return true;
     return false;
   };
   

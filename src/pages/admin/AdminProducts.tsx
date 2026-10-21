@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { AdminLayout } from './AdminLayout';
+import { AdminLayout } from './AdminLayoutLinear';
 import { adminApi, Product, Category } from './adminApi';
 import { AIImportCard } from './AIImportCard';
 import { formatPrice } from '../../lib/formatPrice';

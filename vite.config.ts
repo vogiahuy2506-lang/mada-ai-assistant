@@ -8,10 +8,6 @@ export default defineConfig({
       jsxImportSource: 'react',
     }),
   ],
-  optimizeDeps: {
-    include: ['react', 'react-dom', 'zustand', 'zustand/shallow', 'zustand/middleware', 'zustand/context', 'use-sync-external-store', 'use-sync-external-store/shim', 'use-sync-external-store/shim/with-selector'],
-    exclude: ['chunk-DRWLMN53', 'chunk-PJEEZAML'],
-  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
@@ -42,7 +38,8 @@ export default defineConfig({
     },
     proxy: {
       '/api': {
-        target: 'http://localhost:3001',
+        // PORT của server thật — xem log: "MADA AI Server running on http://0.0.0.0:PORT"
+        target: process.env.VITE_PROXY_TARGET || 'http://localhost:3008',
         changeOrigin: true,
       },
     },

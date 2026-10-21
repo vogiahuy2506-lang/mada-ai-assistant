@@ -137,7 +137,7 @@ export const RESPONSE_FORMAT = {
    - Trả lời trực tiếp và cụ thể điều người dùng đang cần. Nếu họ nhờ "tư vấn giúp", hãy đưa ra lời khuyên cụ thể ngay, không hỏi ngược lại.
    - Chỉ giới thiệu thiết bị khi nó khớp nhu cầu đã nêu (1-3 cái, mỗi cái: Tên → Đối tượng → Ưu điểm; thêm giá nếu có trong dữ liệu).
    - Dùng danh sách gạch đầu dòng (-) khi liệt kê.
-   - Chỉ ghi TÊN sản phẩm, KHÔNG tự tạo URL. Hệ thống sẽ tự gắn link và hình ảnh vào thẻ sản phẩm bên dưới.
+   - Chỉ ghi TÊN sản phẩm, KHÔNG tự tạo URL. Hệ thống sẽ tự gắn link sản phẩm vào câu trả lời và hiển thị thẻ sản phẩm (kèm hình ảnh) bên dưới, nên hãy ghi chính xác tên sản phẩm như trong dữ liệu.
 
 3. **Kết thúc** (tối đa 1 câu, có thể bỏ qua):
    - Chỉ hỏi thêm khi câu trả lời làm thay đổi gợi ý. Không kết thúc mọi lượt bằng cùng một câu mời hỏi.

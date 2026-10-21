@@ -5,7 +5,7 @@
  */
 
 import { useEffect, useState, useCallback } from 'react';
-import { AdminLayout } from './AdminLayout';
+import { AdminLayout } from './AdminLayoutLinear';
 import { getAccessToken, getRefreshToken, type UserPermissions } from '../../lib/api';
 import { useAuthStore, useLanguageStore } from '@/stores';
 

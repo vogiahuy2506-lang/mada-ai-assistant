@@ -1,4 +1,6 @@
 import React, { ReactNode } from 'react';
+import { useLanguageStore } from '@/stores';
+import { translations } from '@/lib/translations';
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -33,19 +35,11 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
 
   // Get translations safely - don't call hooks in class components
   private getTranslation(key: string): string {
-    // Try to get language from store using static getState (safe, no hooks)
-    let language = 'vi';
+    // Read language via the store's static getState() (safe in a class component)
     try {
-      // Dynamically import to avoid issues at module load time
-      const { useLanguageStore } = require('@/stores');
-      language = useLanguageStore.getState()?.language ?? 'vi';
-    } catch {
-      // Store not available, use default
-    }
-
-    try {
-      const { translations } = require('@/lib/translations');
-      return translations[language]?.[key] || defaultTranslations[key] || key;
+      const language = useLanguageStore.getState()?.language ?? 'vi';
+      const table = translations[language] as Record<string, string> | undefined;
+      return table?.[key] || defaultTranslations[key] || key;
     } catch {
       return defaultTranslations[key] || key;
     }

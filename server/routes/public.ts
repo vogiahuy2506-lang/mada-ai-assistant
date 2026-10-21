@@ -421,6 +421,36 @@ router.get('/products/by-agent/:agentId', (req, res) => {
     
     let productCategory: string | null = null;
     
+    // ⭐ ƯU TIÊN 1: Sản phẩm admin gán riêng cho bot này (admin_agent_products).
+    // Nếu có gán tay → danh sách đó là nguồn chuẩn, bỏ qua auto-link theo category.
+    let explicitlyLinked: any[] = [];
+    try {
+      explicitlyLinked = db.prepare(`
+        SELECT p.* FROM admin_agent_products ap
+        JOIN kb_products p ON p.id = ap.product_id
+        WHERE ap.agent_id = ?
+        ORDER BY ap.created_at DESC
+      `).all(agentId) as any[];
+
+      if (explicitlyLinked.length > 0) {
+        console.log(`📦 [by-agent] ${agentId}: ${explicitlyLinked.length} products explicitly linked by admin`);
+        const rowsLinked = explicitlyLinked.map(knowledgeItemToProductRow);
+        res.json({
+          success: true,
+          data: {
+            agentId,
+            madaCategory: productCategory,
+            source: 'curated',
+            products: rowsLinked.map((r) => publishRow(r, lang)).slice(0, limit),
+            total: rowsLinked.length,
+          },
+        });
+        return;
+      }
+    } catch (e) {
+      console.warn(`[by-agent] curated lookup failed for ${agentId}:`, e);
+    }
+
     // Bước 1: Thử lookup từ database (agentId là UUID của agent trong admin_agents)
     try {
       const agentRow = db.prepare('SELECT mada_category FROM admin_agents WHERE id = ?').get(agentId) as any;

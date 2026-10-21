@@ -543,6 +543,35 @@ addColumnIfMissing('admin_agents', 'crawl_max_depth', 'crawl_max_depth INTEGER N
 addColumnIfMissing('admin_agents', 'crawl_max_pages', 'crawl_max_pages INTEGER NOT NULL DEFAULT 5');
 addColumnIfMissing('admin_agents', 'sort_order', 'sort_order INTEGER NOT NULL DEFAULT 0');
 
+// ── Per-chatbot config (JSON blob, SQLite không có JSON type) ──
+// Mỗi cột = 1 nhóm cấu hình riêng cho từng chatbot, thay vì 1 config global.
+// NULL/rỗng = kế thừa giá trị global từ widgetStore / chatSettingsStore.
+addColumnIfMissing('admin_agents', 'widget_config',    'widget_config TEXT');
+addColumnIfMissing('admin_agents', 'behavior_config',  'behavior_config TEXT');
+addColumnIfMissing('admin_agents', 'publish_config',   'publish_config TEXT');
+addColumnIfMissing('admin_agents', 'greeting',         'greeting TEXT');
+addColumnIfMissing('admin_agents', 'ai_instructions',  'ai_instructions TEXT');
+addColumnIfMissing('admin_agents', 'emotion_settings', 'emotion_settings TEXT');
+addColumnIfMissing('admin_agents', 'model', "model TEXT NOT NULL DEFAULT 'gemini-2.0-flash'");
+
+// ============== AGENT ↔ PRODUCT LINKING (per-chatbot product curation) ==============
+// Bảng linking giữa admin_agents và kb_products để admin gán sản phẩm riêng cho
+// từng bot (cộng thêm auto-link theo mada_category). Chat đọc qua
+// /api/public/products/by-agent/:agentId.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS admin_agent_products (
+    id TEXT PRIMARY KEY,
+    agent_id TEXT NOT NULL,
+    product_id TEXT NOT NULL,
+    created_by TEXT,
+    created_at TEXT NOT NULL,
+    UNIQUE(agent_id, product_id),
+    FOREIGN KEY (agent_id) REFERENCES admin_agents(id) ON DELETE CASCADE
+  );
+  CREATE INDEX IF NOT EXISTS idx_agent_products_agent ON admin_agent_products(agent_id);
+  CREATE INDEX IF NOT EXISTS idx_agent_products_product ON admin_agent_products(product_id);
+`);
+
 // Initialize sort_order for existing agents (if they don't have it set)
 try {
   const agentsWithoutOrder = db.prepare('SELECT id FROM admin_agents WHERE sort_order = 0 OR sort_order IS NULL').all() as any[];

@@ -536,6 +536,9 @@ router.post('/agents', requireAdmin, (req: Request, res: Response) => {
       id, name, description, avatar, system_prompt, capabilities,
       is_active, mada_category, bot_id, prompt_id,
       avatar_url, knowledge_url, product_urls, sort_order,
+      widget_config, behavior_config, publish_config,
+      greeting, ai_instructions, emotion_settings,
+      model, embed_code,
     } = req.body;
 
     if (!name || !system_prompt) {
@@ -549,6 +552,10 @@ router.post('/agents', requireAdmin, (req: Request, res: Response) => {
     const productUrlList = Array.isArray(product_urls) ? product_urls : [];
     const firstProductUrl = productUrlList[0] || null;
 
+    // Per-chatbot config — serialize object thành chuỗi, null = kế thừa global
+    const serJson = (v: any) =>
+      (v !== null && v !== undefined && typeof v === 'object') ? JSON.stringify(v) : null;
+
     db.prepare(`
       INSERT INTO admin_agents (
         id, name, description, avatar, system_prompt, capabilities, is_active,
@@ -557,9 +564,11 @@ router.post('/agents', requireAdmin, (req: Request, res: Response) => {
         avatar_url, knowledge_url, product_url,
         last_crawl_at, last_crawl_status, last_crawl_count,
         prompt_id, crawl_follow_links, crawl_max_depth, crawl_max_pages,
-        sort_order
+        sort_order, model, embed_code,
+        widget_config, behavior_config, publish_config,
+        greeting, ai_instructions, emotion_settings
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       agentId,
       name,
@@ -584,6 +593,14 @@ router.post('/agents', requireAdmin, (req: Request, res: Response) => {
       1,     // crawl_max_depth
       5,     // crawl_max_pages
       sort_order || 0,
+      model || 'gemini-2.0-flash',
+      embed_code || null,
+      serJson(widget_config),
+      serJson(behavior_config),
+      serJson(publish_config),
+      serJson(greeting),
+      serJson(ai_instructions),
+      serJson(emotion_settings),
     );
 
     const agent = db.prepare('SELECT * FROM admin_agents WHERE id = ?').get(agentId) as any;
@@ -650,11 +667,22 @@ router.patch('/agents/:id', requireAdmin, (req: Request, res: Response) => {
     const updates: string[] = [];
     const params: any[] = [];
 
+    // Cột JSON cần serialize trước khi ghi vào SQLite (TEXT).
+    // `capabilities` là mảng nên đã được xử lý bên dưới.
+    const JSON_FIELDS = new Set([
+      'widget_config', 'behavior_config', 'publish_config',
+      'greeting', 'ai_instructions', 'emotion_settings',
+    ]);
+
     const fields = [
       'name', 'description', 'avatar', 'system_prompt', 'capabilities',
       'is_active', 'mada_category', 'prompt_id',
       'avatar_url', 'knowledge_url', 'product_url',
       'sort_order', 'crawl_follow_links', 'crawl_max_depth', 'crawl_max_pages',
+      'model', 'embed_code', 'bot_id',
+      // ── Per-chatbot config ──
+      'widget_config', 'behavior_config', 'publish_config',
+      'greeting', 'ai_instructions', 'emotion_settings',
     ];
 
     for (const field of fields) {
@@ -662,6 +690,10 @@ router.patch('/agents/:id', requireAdmin, (req: Request, res: Response) => {
         updates.push(`${field} = ?`);
         let value = req.body[field];
         if (field === 'capabilities' && Array.isArray(value)) {
+          value = JSON.stringify(value);
+        }
+        // Object/array → JSON string. null được giữ nguyên để "reset về global".
+        if (JSON_FIELDS.has(field) && value !== null && typeof value === 'object') {
           value = JSON.stringify(value);
         }
         if (field === 'is_active') {
@@ -2920,6 +2952,394 @@ router.patch('/feedback/:id', ...requireAdmin, async (req: Request, res: Respons
     );
 
     res.json({ success: true, data: { id: req.params.id } });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ===================================================================
+// ============== AI ASSISTANTS STUDIO (per-bot deep config) ==============
+// ===================================================================
+// Trang quản lý 1 trang cho 7 bot cố định của hệ thống. Nhóm endpoint
+// dưới đây phục vụ riêng cho UI đó: gán sản phẩm, KB theo bot, câu hỏi
+// gợi ý, và playground test trước khi publish.
+
+// ---------- Helpers ----------
+
+/** Load agent hoặc trả 404. */
+function requireAgent(req: Request, res: Response): any | null {
+  const agent = db.prepare('SELECT * FROM admin_agents WHERE id = ?').get(req.params.id) as any;
+  if (!agent) {
+    res.status(404).json({ success: false, error: 'Trợ lý không tồn tại' });
+    return null;
+  }
+  return agent;
+}
+
+/** Map row kb_products → shape mà frontend dùng. */
+function mapProductRow(row: any) {
+  if (!row) return null;
+  let isoCodes: string[] = [];
+  try { isoCodes = row.iso_codes ? JSON.parse(row.iso_codes) : []; } catch { isoCodes = []; }
+  return {
+    id: row.id,
+    title: row.title,
+    title_en: row.title_en,
+    title_ar: row.title_ar,
+    title_fr: row.title_fr,
+    description: row.description,
+    category: row.category,
+    brand: row.brand,
+    model: row.model,
+    price_range: row.price_range,
+    product_url: row.product_url || row.source_url || '',
+    image_url: row.image_url,
+    iso_codes: isoCodes,
+    wcag_level: row.wcag_level,
+    status: row.status,
+    featured: !!row.featured,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
+}
+
+// ---------- 1. PRODUCTS (gán / bỏ gán sản phẩm riêng cho từng bot) ----------
+
+// GET /api/admin/agents/:id/products — sản phẩm đã gán riêng cho bot
+router.get('/agents/:id/products', requireAdmin, (req: Request, res: Response) => {
+  try {
+    const agent = requireAgent(req, res);
+    if (!agent) return;
+
+    const rows = db.prepare(`
+      SELECT p.* FROM admin_agent_products ap
+      JOIN kb_products p ON p.id = ap.product_id
+      WHERE ap.agent_id = ?
+      ORDER BY ap.created_at DESC
+    `).all(agent.id) as any[];
+
+    res.json({
+      success: true,
+      data: {
+        agentId: agent.id,
+        items: rows.map(mapProductRow),
+        total: rows.length,
+      },
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// POST /api/admin/agents/:id/products — gán sản phẩm vào bot
+router.post('/agents/:id/products', requireAdmin, (req: Request, res: Response) => {
+  try {
+    const agent = requireAgent(req, res);
+    if (!agent) return;
+
+    const { productId } = req.body || {};
+    if (!productId) {
+      return res.status(400).json({ success: false, error: 'productId là bắt buộc' });
+    }
+
+    const product = db.prepare('SELECT id FROM kb_products WHERE id = ?').get(productId) as any;
+    if (!product) {
+      return res.status(404).json({ success: false, error: 'Sản phẩm không tồn tại' });
+    }
+
+    // INSERT OR IGNORE — gán trùng không lỗi
+    db.prepare(`
+      INSERT OR IGNORE INTO admin_agent_products (id, agent_id, product_id, created_by, created_at)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(`ap_${uuidv4().slice(0, 12)}`, agent.id, productId, (req as any).user?.id || null, new Date().toISOString());
+
+    const count = db.prepare('SELECT COUNT(*) as c FROM admin_agent_products WHERE agent_id = ?')
+      .get(agent.id) as { c: number };
+
+    logSystemEvent(
+      'success', 'agents', 'Gán sản phẩm cho trợ lý',
+      { agentId: agent.id, productId },
+      (req as any).user?.id, req.ip, req.headers['user-agent']
+    );
+
+    res.status(201).json({ success: true, data: { agentId: agent.id, productId, total: count.c } });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// DELETE /api/admin/agents/:id/products/:productId — bỏ gán
+router.delete('/agents/:id/products/:productId', requireAdmin, (req: Request, res: Response) => {
+  try {
+    const result = db.prepare('DELETE FROM admin_agent_products WHERE agent_id = ? AND product_id = ?')
+      .run(req.params.id, req.params.productId);
+
+    if (result.changes === 0) {
+      return res.status(404).json({ success: false, error: 'Sản phẩm chưa được gán cho trợ lý này' });
+    }
+
+    res.json({ success: true, data: { agentId: req.params.id, productId: req.params.productId } });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// POST /api/admin/agents/:id/products/sync — gán hàng loạt theo category
+router.post('/agents/:id/products/sync', requireAdmin, (req: Request, res: Response) => {
+  try {
+    const agent = requireAgent(req, res);
+    if (!agent) return;
+
+    const category = req.body?.category || agent.mada_category;
+    if (!category) {
+      return res.status(400).json({ success: false, error: 'Bot chưa có mada_category — không thể auto-gán' });
+    }
+
+    const products = db.prepare(
+      "SELECT id FROM kb_products WHERE category = ? AND status != 'archived'"
+    ).all(category) as any[];
+
+    const stmt = db.prepare(`
+      INSERT OR IGNORE INTO admin_agent_products (id, agent_id, product_id, created_by, created_at)
+      VALUES (?, ?, ?, ?, ?)
+    `);
+    const now = new Date().toISOString();
+    const userId = (req as any).user?.id || null;
+
+    const tx = db.transaction(() => {
+      for (const p of products) {
+        stmt.run(`ap_${uuidv4().slice(0, 12)}`, agent.id, p.id, userId, now);
+      }
+    });
+    tx();
+
+    const total = products.length;
+    res.json({ success: true, data: { agentId: agent.id, category, linked: total } });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ---------- 2. KNOWLEDGE BASE (tài liệu RAG đã ingest cho bot) ----------
+
+// GET /api/admin/agents/:id/knowledge — tài liệu trong vector store của bot
+router.get('/agents/:id/knowledge', requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const agent = requireAgent(req, res);
+    if (!agent) return;
+
+    const limit = Math.min(parseInt(String(req.query.limit || '50'), 10) || 50, 200);
+    const { vectorStore } = await import('../lib/rag/vectorStore');
+    const docs = await vectorStore.listByAgent(agent.id, { limit });
+    const count = await vectorStore.countByAgent(agent.id);
+
+    // Nhóm theo nguồn để UI hiển thị gọn (1 URL cào ra nhiều chunk)
+    const bySource = new Map<string, { source: string; chunks: number; title: string; crawledAt?: string }>();
+    for (const doc of docs) {
+      const key = doc.source || 'unknown';
+      const entry = bySource.get(key) || { source: key, chunks: 0, title: doc.title || '', crawledAt: doc.metadata?.crawledAt };
+      entry.chunks += 1;
+      if (doc.metadata?.crawledAt) entry.crawledAt = doc.metadata.crawledAt;
+      bySource.set(key, entry);
+    }
+
+    res.json({
+      success: true,
+      data: {
+        agentId: agent.id,
+        agentName: agent.name,
+        totalChunks: count,
+        sources: Array.from(bySource.values()).sort(
+          (a, b) => (b.crawledAt || '').localeCompare(a.crawledAt || '')
+        ),
+        documents: docs.slice(0, 20).map((d) => ({
+          id: d.id,
+          title: d.title,
+          source: d.source,
+          preview: (d.content || '').slice(0, 240),
+          crawledAt: d.metadata?.crawledAt || null,
+        })),
+      },
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// POST /api/admin/agents/:id/knowledge — thêm KB thủ công (text hoặc URL)
+router.post('/agents/:id/knowledge', requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const agent = requireAgent(req, res);
+    if (!agent) return;
+
+    const { type, content, title, language = 'vi' } = req.body || {};
+    if (!content || !String(content).trim()) {
+      return res.status(400).json({ success: false, error: 'content là bắt buộc' });
+    }
+
+    const isUrl = type === 'web' || /^https?:\/\//i.test(String(content));
+    if (isUrl && !/^https?:\/\//i.test(String(content))) {
+      return res.status(400).json({ success: false, error: 'URL không hợp lệ (phải bắt đầu bằng http:// hoặc https://)' });
+    }
+
+    const { dataIngestion } = await import('../lib/rag/dataIngestion');
+
+    const result = await Promise.race([
+      dataIngestion.ingestData({
+        type: isUrl ? 'web' : 'text',
+        content: isUrl ? '' : String(content),
+        source: isUrl ? String(content) : `manual:${agent.id}:${Date.now()}`,
+        title: title || `${agent.name} — ${isUrl ? 'KB' : 'Ghi chú'}`,
+        language,
+        metadata: {
+          agentId: agent.id,
+          agentName: agent.name,
+          botId: agent.bot_id,
+          madaCategory: agent.mada_category,
+          crawledAt: new Date().toISOString(),
+        },
+        scrapeOptions: isUrl ? { followLinks: false, maxDepth: 0, maxPages: 1 } : undefined,
+      }),
+      new Promise<any>((_, reject) =>
+        setTimeout(() => reject(new Error('Timeout (90s) — nguồn quá lớn hoặc phản hồi chậm')), 90000)
+      ),
+    ]);
+
+    logSystemEvent(
+      result.success ? 'success' : 'warn', 'agents', 'Thêm knowledge base cho trợ lý',
+      { agentId: agent.id, type: isUrl ? 'web' : 'text', ok: !!result.success },
+      (req as any).user?.id, req.ip, req.headers['user-agent']
+    );
+
+    res.json({ success: true, data: result });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ---------- 3. SUGGESTED QUESTIONS (câu hỏi gợi ý riêng của bot) ----------
+
+// GET /api/admin/agents/:id/questions — chỉ câu hỏi gán riêng cho bot
+router.get('/agents/:id/questions', requireAdmin, (req: Request, res: Response) => {
+  try {
+    const agent = requireAgent(req, res);
+    if (!agent) return;
+
+    const { view_mode, language, is_active } = req.query;
+    let sql = 'SELECT * FROM suggested_questions WHERE agent_id = ?';
+    const params: any[] = [agent.id];
+
+    if (view_mode) { sql += ' AND view_mode = ?'; params.push(view_mode); }
+    if (language) { sql += ' AND language = ?'; params.push(language); }
+    if (is_active !== undefined) { sql += ' AND is_active = ?'; params.push(is_active === 'true' ? 1 : 0); }
+
+    sql += ' ORDER BY view_mode, language, sort_order ASC';
+
+    const rows = db.prepare(sql).all(...params);
+    res.json({ success: true, data: rows });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ---------- 4. PLAYGROUND (test trực tiếp, không cần publish) ----------
+
+// POST /api/admin/agents/:id/playground — gửi 1 lượt chat test với cấu hình hiện tại
+// Dùng `draftPrompt` nếu admin chưa lưu để test thay đổi tức thì.
+router.post('/agents/:id/playground', requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const agent = requireAgent(req, res);
+    if (!agent) return;
+
+    const {
+      message, history = [], language = 'vi', userMode = 'endUser', draftPrompt,
+    } = req.body || {};
+
+    if (!message || !String(message).trim()) {
+      return res.status(400).json({ success: false, error: 'message là bắt buộc' });
+    }
+
+    const chatPort = process.env.PORT || 3003;
+    const startedAt = Date.now();
+
+    // BuildSystemPrompt giống hệt luồng chat thật (identity + persona + emotion…).
+    const { buildSystemPrompt } = await import('../lib/prompts/systemPrompts');
+    const effectiveLang = ['vi', 'en', 'ar', 'fr'].includes(language) ? language : 'vi';
+    const mode = userMode === 'specialist' ? 'specialist' : 'endUser';
+    const systemInstruction = buildSystemPrompt(
+      effectiveLang,
+      mode,
+      draftPrompt || agent.system_prompt,
+      agent.id,
+    );
+
+    const ragConfig: any = { systemInstruction, language: effectiveLang, agentId: agent.id, priority: true };
+    if (agent.bot_id) ragConfig.botId = agent.bot_id;
+    if (agent.mada_category) ragConfig.madaCategory = agent.mada_category;
+
+    const { ragEngine } = await import('../lib/rag/ragEngine');
+
+    const ragResponse = await Promise.race([
+      ragEngine.query(String(message), Array.isArray(history) ? history : [], ragConfig),
+      new Promise<any>((_, reject) =>
+        setTimeout(() => reject(new Error('Playground timeout (60s)')), 60000)
+      ),
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        answer: ragResponse.answer,
+        confidence: ragResponse.confidence,
+        contextUsed: ragResponse.contextUsed,
+        latencyMs: Date.now() - startedAt,
+        language: effectiveLang,
+        userMode: mode,
+        agentName: agent.name,
+        sources: (ragResponse.sources || []).slice(0, 5).map((s: any) => ({
+          title: s.metadata?.title || '',
+          source: s.source || '',
+          score: s.score ?? null,
+          preview: (s.content || '').slice(0, 200),
+        })),
+        systemInstructionPreview: systemInstruction.slice(0, 400),
+      },
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// GET /api/admin/agents/:id/preview-prompt — xem system prompt đầy đủ sẽ gửi cho AI
+router.get('/agents/:id/preview-prompt', requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const agent = requireAgent(req, res);
+    if (!agent) return;
+
+    const { language = 'vi', userMode = 'endUser', draftPrompt } = req.query;
+    const { buildSystemPrompt } = await import('../lib/prompts/systemPrompts');
+
+    const effectiveLang = ['vi', 'en', 'ar', 'fr'].includes(String(language)) ? String(language) : 'vi';
+    const mode = userMode === 'specialist' ? 'specialist' : 'endUser';
+
+    const instruction = buildSystemPrompt(
+      effectiveLang,
+      mode,
+      draftPrompt || agent.system_prompt,
+      agent.id,
+    );
+
+    res.json({
+      success: true,
+      data: {
+        agentId: agent.id,
+        agentName: agent.name,
+        language: effectiveLang,
+        userMode: mode,
+        systemInstruction: instruction,
+        chars: instruction.length,
+      },
+    });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
   }

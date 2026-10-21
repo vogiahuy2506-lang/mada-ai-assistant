@@ -10,7 +10,7 @@
  * - Chat Review Drawer
  */
 import React, { useState, useEffect, useCallback } from 'react';
-import { AdminLayout } from './AdminLayout';
+import { AdminLayout } from './AdminLayoutLinear';
 import { adminApi } from './adminApi';
 import { getAccessToken } from '@/lib/api';
 import { useAuthStore, useLanguageStore } from '@/stores';
@@ -270,7 +270,9 @@ interface FeedbackItem {
   rating: 'like' | 'dislike';
   reason: string;
   feedback: string;
-  status: 'pending' | 'fine-tuned' | 'resolved' | 'ignored';
+  // Server có thể gửi nhiều status ngoài 4 giá trị này (vd 'reviewed'),
+  // nên type là string — badge đã có fallback cho giá trị lạ.
+  status: string;
   chatTranscript?: {
     user: string;
     ai: string;
@@ -289,14 +291,26 @@ interface ModuleStats {
 
 
 
-function getStatusBadge(status: FeedbackItem['status']) {
-  const statusConfig = {
-    pending: { bg: 'bg-surface-container-high', text: 'text-on-surface-variant', label: 'Chờ chuyên gia', pulse: true },
-    'fine-tuned': { bg: 'bg-tertiary/20', text: 'text-tertiary', label: 'Đã nạp fine-tune', pulse: false },
-    resolved: { bg: 'bg-secondary/20', text: 'text-secondary', label: 'Đã giải quyết', pulse: false },
-    ignored: { bg: 'bg-outline', text: 'text-on-surface-variant', label: 'Bỏ qua', pulse: false },
-  };
-  const config = statusConfig[status];
+type FeedbackStatus = FeedbackItem['status'];
+
+// Server có thể trả nhiều status khác nhau (vd 'reviewed' ở
+// /admin/feedback-with-transcript) ngoài 4 giá trị trong type. Nếu index
+// thẳng vào object rồi đọc .bg thì status lạ sẽ làm `config` = undefined và
+// ném "undefined is not an object (evaluating 'config.bg')" — crash cả trang.
+// Lookup qua Record<string, ...> + fallback 'unknown' để chịu được mọi giá trị.
+const STATUS_CONFIG: Record<string, { bg: string; text: string; label: string; pulse: boolean }> = {
+  pending: { bg: 'bg-surface-container-high', text: 'text-on-surface-variant', label: 'Chờ chuyên gia', pulse: true },
+  'fine-tuned': { bg: 'bg-tertiary/20', text: 'text-tertiary', label: 'Đã nạp fine-tune', pulse: false },
+  resolved: { bg: 'bg-secondary/20', text: 'text-secondary', label: 'Đã giải quyết', pulse: false },
+  ignored: { bg: 'bg-outline', text: 'text-on-surface-variant', label: 'Bỏ qua', pulse: false },
+  // Server trả 'reviewed' cho feedback đã xem nhưng chưa xử lý.
+  reviewed: { bg: 'bg-primary/15', text: 'text-primary', label: 'Đã xem', pulse: false },
+  // Fallback cho status lạ (future-proof): hiển thị thay vì crash.
+  unknown: { bg: 'bg-outline', text: 'text-on-surface-variant', label: 'Không rõ', pulse: false },
+};
+
+function getStatusBadge(status: FeedbackStatus | string | null | undefined) {
+  const config = STATUS_CONFIG[status ?? ''] ?? STATUS_CONFIG.unknown;
   return (
     <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg ${config.bg} ${config.text} text-xs font-semibold`}>
       {config.pulse && <span className="w-2 h-2 rounded-full bg-error animate-ping" />}
@@ -380,7 +394,10 @@ function AnalyticsTab() {
           rating: item.rating,
           reason: item.reason || '',
           feedback: item.reason || '',
-          status: item.status as 'pending' | 'fine-tuned' | 'resolved' | 'ignored',
+          // Không ép cast: giữ status thô từ server và để getStatusBadge xử lý
+          // giá trị lạ. Ép cast chỉ làm TypeScript im, không bảo vệ runtime —
+          // đó chính là lý do status 'reviewed' từ server làm crash cả trang.
+          status: item.status,
           userId: item.userId,
           sessionId: item.sessionId,
           messageId: item.messageId,

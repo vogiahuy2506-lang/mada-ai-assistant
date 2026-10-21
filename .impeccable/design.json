@@ -1,0 +1,58 @@
+{
+  "schema": 1,
+  "platform": "web",
+  "world": "Linear Minimalism × Google AI Studio Console",
+  "applied": {
+    "primarySurface": "src/pages/admin/AIAssistants/index.tsx",
+    "shell": "src/pages/admin/AdminShell.tsx",
+    "designTokens": "src/styles/linear-admin.css"
+  },
+  "palette": {
+    "accent": "#5e6ad2",
+    "bg": "#f7f8f9",
+    "bgElevated": "#ffffff",
+    "bgSunken": "#fcfcfd",
+    "border": "#e4e6ea",
+    "textPrimary": "#0f1013",
+    "textTertiary": "#7c828f",
+    "textQuaternary": "#9da3ae",
+    "success": "#10b981",
+    "warning": "#f59e0b",
+    "danger": "#ef4444"
+  },
+  "typography": {
+    "display": "Inter",
+    "body": "Inter",
+    "mono": "ui-monospace, SFMono-Regular"
+  },
+  "components": [
+    "lin-btn", "lin-input", "lin-textarea", "lin-select",
+    "lin-card", "lin-badge", "Modal", "Tabs", "Toggle",
+    "Field", "SearchInput", "EmptyState", "PageHeader", "StatTile"
+  ],
+  "bans": [
+    "kicker-eyebrow",
+    "hard-offset-shadow",
+    "gradient-text-as-decoration",
+    "monospace-as-costume",
+    "border-left-thick-on-cards",
+    "emoji-as-icon-in-chrome"
+  ],
+  "iconLibrary": "lucide-react",
+  "primaryLayout": {
+    "pattern": "3-pane",
+    "left": { "width": 240, "purpose": "Bot list 7 fixed + search" },
+    "center": { "flex": "grow", "purpose": "Live playground chat" },
+    "right": { "width": 320, "purpose": "Inspector + config grid" }
+  },
+  "configFlow": {
+    "modal": {
+      "maxWidth": 920,
+      "tabs": ["basics", "prompt", "knowledge", "questions", "appearance", "behavior"]
+    },
+    "keybindings": {
+      "CmdOrCtrl+S": "save draft",
+      "Escape": "close modal"
+    }
+  }
+}

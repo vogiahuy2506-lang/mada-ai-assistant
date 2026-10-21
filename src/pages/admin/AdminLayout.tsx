@@ -19,6 +19,7 @@ const tL = (key: string): string => {
       'admin.layout.navActivityLogs': 'Nhật ký hoạt động',
       'admin.layout.navAnalytics': 'Báo cáo',
       'admin.layout.navAgents': 'AI Agents',
+      'admin.layout.navChatbotCenter': 'Chatbot Center',
       'admin.layout.navSuggestedQuestions': 'Câu hỏi gợi ý',
       'admin.layout.navSystemPrompts': 'System Prompts',
       'admin.layout.navConsultations': 'Hỗ trợ',
@@ -85,6 +86,7 @@ const tL = (key: string): string => {
       'admin.layout.navActivityLogs': 'Activity Logs',
       'admin.layout.navAnalytics': 'Reports',
       'admin.layout.navAgents': 'AI Agents',
+      'admin.layout.navChatbotCenter': 'Chatbot Center',
       'admin.layout.navSuggestedQuestions': 'Suggested Questions',
       'admin.layout.navSystemPrompts': 'System Prompts',
       'admin.layout.navConsultations': 'Support',
@@ -151,6 +153,7 @@ const tL = (key: string): string => {
       'admin.layout.navActivityLogs': 'سجلات النشاط',
       'admin.layout.navAnalytics': 'التقارير',
       'admin.layout.navAgents': 'وكلاء الذكاء الاصطناعي',
+      'admin.layout.navChatbotCenter': 'مركز الشات بوت',
       'admin.layout.navSuggestedQuestions': 'الأسئلة المقترحة',
       'admin.layout.navSystemPrompts': 'طلبات النظام',
       'admin.layout.navConsultations': 'الدعم',
@@ -217,6 +220,7 @@ const tL = (key: string): string => {
       'admin.layout.navActivityLogs': 'Journaux d\'activité',
       'admin.layout.navAnalytics': 'Rapports',
       'admin.layout.navAgents': 'Agents IA',
+      'admin.layout.navChatbotCenter': 'Centre Chatbot',
       'admin.layout.navSuggestedQuestions': 'Questions suggérées',
       'admin.layout.navSystemPrompts': 'Prompts système',
       'admin.layout.navConsultations': 'Support',
@@ -293,6 +297,7 @@ const NAV_ITEMS: NavItem[] = [
   // Gộp Nhật ký hoạt động + Phân tích → chỉ còn "Báo cáo" (trỏ /admin/analytics)
   { labelKey: 'admin.layout.navAnalytics', href: '/admin/analytics', icon: 'analytics' },
   { labelKey: 'admin.layout.navAgents', href: '/admin/agents', icon: 'smart_toy' },
+  { labelKey: 'admin.layout.navChatbotCenter', href: '/admin/chatbots', icon: 'hub' },
   // Gộp Câu hỏi gợi ý vào AI Agents tab → xoá khỏi sidebar
   { labelKey: 'admin.layout.navSystemPrompts', href: '/admin/prompts', icon: 'edit_note' },
   { labelKey: 'admin.layout.navConsultations', href: '/admin/consultations', icon: 'support_agent' },
@@ -312,6 +317,10 @@ interface AdminLayoutProps {
   showLayoutTitle?: boolean;
 }
 
+/**
+ * @deprecated Dùng AdminShell trực tiếp cho layout Linear-style mới.
+ * Giữ lại để các trang admin cũ vẫn hoạt động.
+ */
 export function AdminLayout({
   children,
   title,

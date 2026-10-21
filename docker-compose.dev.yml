@@ -1,0 +1,47 @@
+# ===========================================
+# MADA AI Assistant - Local Development Database Stack
+# ===========================================
+# Mục đích: cung cấp SQLite CLI trong container + công cụ query DB,
+#           kèm volume chuẩn cho dữ liệu local.
+#
+# Lý do KHÔNG chạy Node server trong container:
+#   better-sqlite3 là native module. Build trên macOS (darwin-arm64) không chạy
+#   được trong container Linux. Nếu muốn chạy server trong container, phải cài
+#   lại toàn bộ deps bên trong image (chậm, nặng) — không đáng cho local dev.
+#
+#   → Local dev chạy:  npm run server   (trên host, dùng node_modules sẵn có)
+#   → Database + sqlite CLI chạy trong container này.
+#
+# Cách dùng:
+#   docker compose -f docker-compose.dev.yml up -d
+#   docker compose -f docker-compose.dev.yml exec db sqlite3 /data/mada.db "SELECT COUNT(*) FROM users;"
+#   docker compose -f docker-compose.dev.yml down
+#
+# Lệnh seed (chạy trên host, dùng deps sẵn có):
+#   npm run seed
+# ===========================================
+
+services:
+  # ---- SQLite database workspace ----
+  # Mount ./data để file mada.db dùng chung với app chạy trên host.
+  db:
+    build:
+      context: .
+      dockerfile: Dockerfile.sqlite
+    image: mada-sqlite-dev
+    container_name: mada-db-dev
+    working_dir: /data
+    volumes:
+      - ./data:/data
+    command: tail -f /dev/null
+    healthcheck:
+      test: ["CMD-SHELL", "sqlite3 /data/mada.db 'SELECT 1;' >/dev/null 2>&1 || echo 'no db yet (sẽ tạo khi app khởi động)'"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"

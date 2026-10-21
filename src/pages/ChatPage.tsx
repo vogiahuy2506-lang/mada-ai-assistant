@@ -14,7 +14,7 @@ import {
   LogOut, Sparkles,
   Search, MessageSquare, Loader2,
   Accessibility,
-  Globe,
+  Globe, Menu,
   ThumbsUp, ThumbsDown,
 } from 'lucide-react';
 import clsx from 'clsx';
@@ -492,6 +492,47 @@ function convertProductNamesToLinks(
   }
 
   return result;
+}
+
+const PRODUCT_LINKS_HEADING: Record<string, string> = {
+  vi: 'Link sản phẩm',
+  en: 'Product links',
+  ar: 'روابط المنتجات',
+  fr: 'Liens des produits',
+};
+
+/**
+ * ⭐ HELPER: Đảm bảo câu trả lời luôn kèm link sản phẩm.
+ * Tên sản phẩm nào đã được gắn link trong nội dung thì giữ nguyên;
+ * sản phẩm chưa có link trong nội dung sẽ được liệt kê ở cuối câu trả lời.
+ */
+function ensureProductLinksInContent(
+  content: string,
+  products: SuggestedProduct[] | undefined,
+  language: string
+): string {
+  if (!content || !products || products.length === 0) return content;
+
+  const linked = convertProductNamesToLinks(content, products);
+  const seen = new Set<string>();
+  const missing: { title: string; url: string }[] = [];
+
+  for (const product of products) {
+    if (missing.length >= 3) break; // khớp quy tắc "gợi ý 1-3 sản phẩm"
+    const url = product.product_url || product.source_url;
+    if (!url || !url.startsWith('http') || seen.has(url)) continue;
+    seen.add(url);
+    if (linked.includes(`](${url})`)) continue;
+    const title = (language === 'en' && product.title_en) ? product.title_en : product.title;
+    if (!title) continue;
+    missing.push({ title: title.replace(/[\[\]]/g, ''), url });
+  }
+
+  if (missing.length === 0) return linked;
+
+  const heading = PRODUCT_LINKS_HEADING[language] || PRODUCT_LINKS_HEADING.en;
+  const list = missing.map(m => `- [${m.title}](${m.url})`).join('\n');
+  return `${linked}\n\n**${heading}:**\n${list}`;
 }
 
 interface Message {
@@ -2271,6 +2312,10 @@ export function ChatPage() {
       'what products', 'what devices', 'which products', 'which devices',
       'có sản phẩm nào', 'có thiết bị nào', 'danh sách sản phẩm', 'danh sách thiết bị',
       'list of products', 'list of devices',
+      // ⭐ Pattern người dùng tự nhiên hay dùng
+      'xin sản phẩm', 'xin sp', 'xin thiết bị', 'xin link', 'xin vài',
+      'cho mình sản phẩm', 'cho mình xin', 'cho mình sp',
+      'vài mẫu', 'mẫu mã',
       // ⭐ THÊM: Khi user đồng ý xem sản phẩm
       'ok', 'có', 'có', 'được', 'có đi', 'vâng', 'đồng ý', '同意', 'نعم', 'yes', 'si', 'oui',
       'xem đi', 'xem đi', 'muốn xem', 'cho xem', 'hiển thị', 'đưa ra',
@@ -2351,19 +2396,27 @@ export function ChatPage() {
   // This triggers product cards to show IMMEDIATELY without waiting for 4 questions
   const isExplicitProductRequest = (message: string): boolean => {
     const contentLower = message.toLowerCase();
-    
+
     // Explicit product requests - user wants to see products NOW
     const explicitCommands = [
-      // Vietnamese
+      // Vietnamese — các cụm tự nhiên user hay dùng
       'sản phẩm', 'thiết bị', 'máy', 'có sp nào', 'có thiết bị nào',
       'xem sản phẩm', 'xem sp', 'xem thiết bị', 'coi sản phẩm',
+      'xin sản phẩm', 'xin sp', 'xin thiết bị', 'xin link', 'xin vài',
+      'cho mình sản phẩm', 'cho mình sp', 'cho mình xin',
       'gợi ý thiết bị', 'đề xuất sản phẩm', 'tìm sản phẩm', 'tìm thiết bị',
       'mua ở đâu', 'nơi bán', 'giá bao nhiêu', 'giá là bao nhiêu',
       'cho xem', 'hiển thị', 'liệt kê', 'giới thiệu',
       'hình ảnh', 'xem hình', 'coi hình', 'pic', 'ảnh sp',
+      'mẫu', 'vài mẫu', 'mẫu mã',
       // English
       'what products', 'what devices', 'which products', 'which devices',
       'show products', 'show me products', 'recommend products', 'suggest devices',
+      // ⭐ Các biến thể đặt từ khóa ở GIỮA câu — trước đây chỉ khớp dạng
+      // "show me products", nên câu rất tự nhiên như "show me hearing products"
+      // không match → server có gửi suggestedProducts nhưng UI lại bỏ vì
+      // userExplicitlyRequestsProducts = false.
+      'products', 'devices', 'product', 'device',
       'buy', 'purchase', 'price', 'where to buy', 'cost',
       'wheelchair', 'hearing aid', 'screen reader', 'aac device',
       'product list', 'device list', 'available products',
@@ -2863,14 +2916,18 @@ export function ChatPage() {
             }
           }
 
+          // ⭐ LUÔN hiển thị sản phẩm khi server gửi về — không gate bởi approval.
+          // Trước đây chỉ gán khi (userHasApproved || userExplicitlyRequestsProducts) → mất
+          // sản phẩm với câu tự nhiên như "xin vài mẫu sản phẩm máy trợ thính" khi user
+          // mở chat mới chưa qua vòng 4-câu hỏi. Bây giờ nếu server thấy user hỏi về
+          // sản phẩm thì trả luôn và UI phải show.
           addMessage({
             role: 'assistant',
             content: finalContent,
             confidence: confidence,
             sources: sources,
             contextUsed: sources.length > 0,
-            // ⭐ Show products nếu user đã approve HOẶC user hỏi trực tiếp về sản phẩm
-            suggestedProducts: (userHasApproved || userExplicitlyRequestsProducts) ? suggestedProducts : undefined,
+            suggestedProducts: suggestedProducts.length > 0 ? suggestedProducts : undefined,
           });
 
           // 💾 Save assistant message vào backend (DB persistence)
@@ -3021,8 +3078,10 @@ export function ChatPage() {
           confidence: data.data.confidence,
           sources: data.data.sources,
           contextUsed: data.data.contextUsed,
-          // ⭐ Show products nếu user đã approve HOẶC user hỏi trực tiếp về sản phẩm
-          suggestedProducts: (userHasApproved || userExplicitlyRequestsProducts) ? data.data.suggestedProducts : undefined,
+          // ⭐ LUÔN lấy suggestedProducts khi server trả về — không gate bởi approval.
+          // Trước đây chỉ gán khi (userHasApproved || userExplicitlyRequestsProducts) → câu tự
+          // nhiên như "xin vài mẫu sản phẩm máy trợ thính" bị bỏ qua mặc dù server đã gửi.
+          suggestedProducts: (data.data.suggestedProducts?.length ?? 0) > 0 ? data.data.suggestedProducts : undefined,
         });
 
         // ⭐ THÊM CÂU HỎI FOLLOW-UP KHI CHƯA ĐỦ CONTEXT (non-streaming mode)
@@ -3706,7 +3765,7 @@ export function ChatPage() {
         className={clsx(
           'h-screen bg-white border-r border-slate-200 flex flex-col transition-all duration-300 shrink-0',
           sidebarOpen ? 'w-72' : 'w-0 overflow-hidden',
-          'max-md:fixed max-md:left-0 max-md:top-0 max-md:z-50',
+          'max-md:fixed max-md:left-0 max-md:top-0 max-md:z-[70]',
           !sidebarOpen && 'max-md:-translate-x-full'
         )}
       >
@@ -3826,7 +3885,10 @@ export function ChatPage() {
                       // ⭐ FIX: Khi chọn category, cũng chọn bot tương ứng
                       // Tìm agent có madaCategory khớp với category đã chọn (dùng mapping)
                       const mappedMadaCategory = CATEGORY_TO_MADA_CATEGORY[category];
-                      const correspondingAgent = activeAgents.find(a => a.madaCategory === mappedMadaCategory);
+                      // Ưu tiên khớp theo botId (ổn định), fallback theo madaCategory
+                      const correspondingAgent =
+                        activeAgents.find(a => a.botId && BOT_ID_TO_CATEGORY[a.botId] === category) ||
+                        activeAgents.find(a => a.madaCategory === mappedMadaCategory);
                       if (correspondingAgent) {
 
                         useSelectedAgentStore.getState().setSelectedAgentId(correspondingAgent.id);
@@ -4208,7 +4270,104 @@ export function ChatPage() {
 
       {/* ============== MAIN CONTENT ============== */}
       <main className="flex-1 flex flex-col relative overflow-hidden h-full">
-        
+
+        {/* Mobile Top Bar - only visible < md: contains sidebar toggle + language switcher */}
+        <header className="md:hidden flex items-center justify-between gap-2 px-3 py-2.5 bg-white/80 backdrop-blur-md border-b border-slate-200 sticky top-0 z-20 min-h-[52px]">
+          {/* Open sidebar button */}
+          <button
+            type="button"
+            onClick={() => setSidebarOpen(true)}
+            className="flex items-center justify-center w-10 h-10 rounded-xl bg-slate-100 hover:bg-slate-200 active:scale-95 transition-all"
+            aria-label={t('chat.openMenu') || 'Open menu'}
+          >
+            <Menu className="w-5 h-5 text-slate-700" />
+          </button>
+
+          {/* Brand mini */}
+          <div className="flex-1 flex justify-center min-w-0">
+            <img src={madaLogo} alt="MADA" className="h-7" />
+          </div>
+
+          {/* Language Switcher - opens dropdown below the header */}
+          <div className="relative" data-language-dropdown-mobile>
+            <button
+              type="button"
+              onClick={() => setShowLanguageMenu(!showLanguageMenu)}
+              className={clsx(
+                'flex items-center justify-center w-10 h-10 rounded-xl transition-all active:scale-95',
+                showLanguageMenu ? 'bg-primary/10 text-primary' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+              )}
+              title={LANGUAGES.find(l => l.code === language)?.name || 'Ngôn ngữ'}
+              aria-label="Đổi ngôn ngữ"
+              aria-expanded={showLanguageMenu}
+              aria-haspopup="menu"
+            >
+              <Globe className="w-5 h-5" />
+            </button>
+          </div>
+        </header>
+
+        {/* Mobile language dropdown — anchored below header, click-outside closes */}
+        {showLanguageMenu && (
+          <>
+            <div
+              className="md:hidden fixed inset-0 z-30"
+              onClick={() => setShowLanguageMenu(false)}
+              aria-hidden="true"
+            />
+            <div
+              className="md:hidden fixed right-3 top-[58px] w-52 max-w-[calc(100vw-1.5rem)] bg-white border border-black/10 rounded-2xl shadow-2xl overflow-hidden z-40 animate-in slide-in-from-top-2 duration-200"
+              role="menu"
+            >
+              <div className="px-3 py-2 border-b border-slate-100">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                  {language === 'vi' ? 'Chọn ngôn ngữ' : language === 'en' ? 'Select language' : language === 'ar' ? 'اختر اللغة' : 'Choisir la langue'}
+                </p>
+              </div>
+              <div className="p-1.5 space-y-0.5">
+                {LANGUAGES.map((lang) => {
+                  const active = language === lang.code;
+                  return (
+                    <button
+                      key={lang.code}
+                      onClick={() => {
+                        setLanguage(lang.code);
+                        setShowLanguageMenu(false);
+                      }}
+                      role="menuitemradio"
+                      aria-checked={active}
+                      className={clsx(
+                        'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors duration-150 text-left',
+                        active
+                          ? 'bg-emerald-500 text-white'
+                          : 'hover:bg-slate-50 text-slate-700 active:bg-slate-100'
+                      )}
+                    >
+                      <span className="text-base leading-none flex-shrink-0">{lang.flag}</span>
+                      <span className={clsx('flex-1 text-sm font-medium truncate', active ? 'text-white' : '')}>
+                        {lang.name}
+                      </span>
+                      <span className={clsx('text-[10px] font-bold uppercase tracking-wider', active ? 'text-white/80' : 'text-slate-400')}>
+                        {lang.code}
+                      </span>
+                      {active && <Check className="w-4 h-4 flex-shrink-0" />}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* Mobile backdrop to close sidebar by tapping outside */}
+        {sidebarOpen && (
+          <div
+            className="md:hidden fixed inset-0 bg-black/40 backdrop-blur-sm z-[60]"
+            onClick={() => setSidebarOpen(false)}
+            aria-hidden="true"
+          />
+        )}
+
         {/* Top Navigation Bar - Glass Morphism - Unified Style */}
         <header className="hidden md:flex items-center justify-between p-4 bg-white/40 backdrop-blur-md border-b border-white/40 z-20 sticky top-0 h-16">
           {/* Left Section */}
@@ -4230,8 +4389,8 @@ export function ChatPage() {
             {/* Divider */}
             <div className="w-px h-6 bg-outline-variant/50"></div>
             
-            {/* Language Selector - Dropdown Style */}
-            <div className="relative" data-language-dropdown>
+            {/* Language Selector - Dropdown Style (desktop only) */}
+            <div className="relative hidden md:block" data-language-dropdown>
               <button
                 onClick={() => setShowLanguageMenu(!showLanguageMenu)}
                 className="flex items-center gap-2 bg-white/60 px-3 py-2 rounded-full border border-white/80 hover:bg-white/80 transition-colors"
@@ -4243,7 +4402,7 @@ export function ChatPage() {
               </button>
 
               {showLanguageMenu && (
-                <div 
+                <div
                   className="absolute right-0 top-full mt-2 w-56 bg-white border border-black/10 rounded-2xl shadow-2xl overflow-hidden z-50"
                   dir="ltr"
                 >
@@ -4818,51 +4977,6 @@ export function ChatPage() {
 
                 {/* Right Icons & Send - Material Design 3 Style */}
                 <div className="flex items-center gap-1 pr-1">
-                  {/* Language Switcher - Mobile Only */}
-                  <div className="relative md:hidden" data-language-dropdown>
-                    <button
-                      onClick={() => setShowLanguageMenu(!showLanguageMenu)}
-                      className="flex items-center justify-center w-9 h-9 rounded-full bg-white/60 hover:bg-white/80 transition-colors"
-                      title={LANGUAGES.find(l => l.code === language)?.name || 'Ngôn ngữ'}
-                      aria-label="Đổi ngôn ngữ"
-                    >
-                      <Globe className="w-5 h-5 text-slate-600" />
-                    </button>
-
-                    {showLanguageMenu && (
-                      <div className="absolute right-0 bottom-full mb-2 w-44 bg-white border border-black/10 rounded-2xl shadow-2xl overflow-hidden z-50">
-                        <div className="p-2 space-y-0.5">
-                          {LANGUAGES.map((lang) => (
-                            <button
-                              key={lang.code}
-                              onClick={() => {
-                                setLanguage(lang.code);
-                                setShowLanguageMenu(false);
-                              }}
-                              className={clsx(
-                                'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200',
-                                language === lang.code
-                                  ? 'bg-emerald-500 text-white'
-                                  : 'hover:bg-gray-50 text-gray-700'
-                              )}
-                            >
-                              <span className="text-base flex-shrink-0">{lang.flag}</span>
-                              <span className={clsx(
-                                'flex-1 text-left text-xs font-medium',
-                                language === lang.code ? 'text-white' : ''
-                              )}>
-                                {lang.name}
-                              </span>
-                              {language === lang.code && (
-                                <Check className="w-4 h-4 flex-shrink-0" />
-                              )}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
                   {/* Voice Button */}
                   <button
                     onClick={handleVoiceRecord}
@@ -5070,22 +5184,73 @@ function ProductCardItem({ product, language, onRequestConsultation }: ProductCa
 }
 
 // ============== PRODUCT CARDS GRID ==============
+
+// Số card hiển thị mặc định. Backend có thể trả 6–12 sản phẩm; trước đây
+// slice(0, 3) cắt cứng khiến phần còn lại không bao giờ hiện và không có cách
+// xem tiếp. Giờ hiện 3 card đầu + nút "xem thêm" để mở dần.
+const PRODUCT_COLLAPSED_COUNT = 3;
+
 function ProductCardsGrid({ products, language, onRequestConsultation }: {
   products: SuggestedProduct[];
   language: string;
   onRequestConsultation: () => void;
 }) {
+  const [expanded, setExpanded] = useState(false);
+
+  // products có thể thay đổi theo message mới → reset về trạng thái thu gọn.
+  useEffect(() => {
+    setExpanded(false);
+  }, [products]);
+
+  const visibleProducts = expanded
+    ? products
+    : products.slice(0, PRODUCT_COLLAPSED_COUNT);
+  const hiddenCount = products.length - visibleProducts.length;
+
+  const showMoreLabels: Record<string, string> = {
+    vi: `Xem thêm ${hiddenCount} sản phẩm khác`,
+    en: `Show ${hiddenCount} more products`,
+    ar: `عرض ${hiddenCount} منتجات أخرى`,
+    fr: `Voir ${hiddenCount} autres produits`,
+  };
+  const showLessLabels: Record<string, string> = {
+    vi: 'Thu gọn lại',
+    en: 'Show less',
+    ar: 'عرض أقل',
+    fr: 'Réduire',
+  };
+
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-      {products.slice(0, 3).map((product, index) => (
-        <ProductCardItem
-          key={product.id || index}
-          product={product}
-          language={language}
-          onRequestConsultation={onRequestConsultation}
-        />
-      ))}
-    </div>
+    <>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        {visibleProducts.map((product, index) => (
+          <ProductCardItem
+            key={product.id || index}
+            product={product}
+            language={language}
+            onRequestConsultation={onRequestConsultation}
+          />
+        ))}
+      </div>
+
+      {products.length > PRODUCT_COLLAPSED_COUNT && (
+        <div className="mt-3 flex justify-center">
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            aria-expanded={expanded}
+            className="group inline-flex items-center gap-2 rounded-full border border-[#83C5BE]/60 bg-white px-4 py-2 text-[12.5px] font-semibold text-[#006D77] shadow-sm transition-all duration-200 hover:border-[#006D77] hover:bg-[#EDF6F9] active:scale-[0.98]"
+          >
+            <span>{expanded ? (showLessLabels[language] || showLessLabels.vi) : (showMoreLabels[language] || showMoreLabels.vi)}</span>
+            <ChevronDown
+              className={`h-4 w-4 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
+              strokeWidth={2}
+              aria-hidden="true"
+            />
+          </button>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -5294,7 +5459,7 @@ function MessageBubble({
           <div className="relative bg-white/80 backdrop-blur-sm rounded-2xl rounded-tl-sm border border-slate-200/50 p-4 shadow-sm group-hover:shadow-md group-hover:bg-white/90 transition-all duration-300">
             <div className="text-sm text-slate-700 leading-relaxed [&_p]:mb-3 [&_p]:leading-relaxed [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:my-3 [&_ul]:space-y-1.5 [&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:my-3 [&_ol]:space-y-1.5 [&_li]:leading-relaxed [&_li]:mb-1 [&_h3]:text-base [&_h3]:font-bold [&_h3]:mt-4 [&_h3]:mb-2 [&_h2]:text-lg [&_h2]:font-bold [&_h2]:mt-4 [&_h2]:mb-2 [&_strong]:font-bold [&_code]:bg-slate-100 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-xs [&_pre]:bg-slate-100 [&_pre]:p-3 [&_pre]:rounded-lg [&_pre]:overflow-x-auto [&_pre]:my-3 [&_blockquote]:border-l-4 [&_blockquote]:border-slate-300 [&_blockquote]:pl-3 [&_blockquote]:italic [&_blockquote]:text-slate-600 [&_a]:text-blue-500 [&_a]:underline" dir={language === 'ar' ? 'rtl' : 'ltr'}>
               <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                {convertProductNamesToLinks(message.content, message.suggestedProducts)}
+                {ensureProductLinksInContent(message.content, message.suggestedProducts, language)}
               </ReactMarkdown>
             </div>
           </div>

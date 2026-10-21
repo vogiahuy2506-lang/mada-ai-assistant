@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Loader2, Search, Star, X, Check, Zap, FileText, ArrowRight } from 'lucide-react';
-import { AdminLayout } from './AdminLayout';
+import { AdminLayout } from './AdminLayoutLinear';
 import { adminApi } from './adminApi';
 import { usePromptStore, useLanguageStore } from '@/stores';
 

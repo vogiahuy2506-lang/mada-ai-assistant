@@ -298,6 +298,7 @@ const NAV_ITEMS: NavItem[] = [
   { labelKey: 'admin.layout.navAnalytics', href: '/admin/analytics', icon: 'analytics' },
   { labelKey: 'admin.layout.navAgents', href: '/admin/agents', icon: 'smart_toy' },
   { labelKey: 'admin.layout.navChatbotCenter', href: '/admin/chatbots', icon: 'hub' },
+  { labelKey: 'admin.layout.navSuggestedQuestions', href: '/admin/suggested-questions', icon: 'quiz', superAdminOnly: true },
   // Gộp Câu hỏi gợi ý vào AI Agents tab → xoá khỏi sidebar
   { labelKey: 'admin.layout.navSystemPrompts', href: '/admin/prompts', icon: 'edit_note' },
   { labelKey: 'admin.layout.navConsultations', href: '/admin/consultations', icon: 'support_agent' },

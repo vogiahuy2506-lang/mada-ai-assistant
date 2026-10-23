@@ -381,6 +381,9 @@ export function EmbedWidget({
         if (!reader) throw new Error('No response body');
 
         const decoder = new TextDecoder();
+        // ⭐ Buffer SSE + decode stream: event có thể bị tách giữa các lần đọc,
+        // và byte đầu của ký tự Unicode có thể bị cắt đôi.
+        let sseBuffer = '';
         let fullContent = '';
         let confidence = 0.5;
 
@@ -396,22 +399,26 @@ export function EmbedWidget({
           const { done, value } = await reader.read();
           if (done) break;
 
-          const chunk = decoder.decode(value);
-          const lines = chunk.split('\n');
+          sseBuffer += decoder.decode(value, { stream: true });
+          const events = sseBuffer.split('\n\n');
+          sseBuffer = events.pop() ?? '';
 
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
+          for (const event of events) {
+            for (const line of event.split('\n')) {
+              if (!line.startsWith('data: ')) continue;
               try {
                 const data = JSON.parse(line.slice(6));
                 if (data.type === 'chunk') {
                   fullContent += data.chunk;
-                  setMessages(prev => prev.map(m => 
+                  setMessages(prev => prev.map(m =>
                     m.id === assistantMsgId ? { ...m, content: fullContent } : m
                   ));
                 } else if (data.type === 'done') {
                   confidence = data.confidence || 0.5;
                 }
-              } catch {}
+              } catch (e) {
+                console.error('[Widget SSE] Không parse được event:', line.slice(0, 120), e);
+              }
             }
           }
         }
@@ -491,6 +498,9 @@ export function EmbedWidget({
       if (!reader) throw new Error('No response body');
 
       const decoder = new TextDecoder();
+      // ⭐ Buffer SSE + decode stream: event có thể bị tách giữa các lần đọc,
+      // và byte đầu của ký tự Unicode có thể bị cắt đôi.
+      let sseBuffer = '';
       let fullContent = '';
       let confidence = 0.5;
 
@@ -506,22 +516,26 @@ export function EmbedWidget({
         const { done, value } = await reader.read();
         if (done) break;
 
-        const chunk = decoder.decode(value);
-        const lines = chunk.split('\n');
+        sseBuffer += decoder.decode(value, { stream: true });
+        const events = sseBuffer.split('\n\n');
+        sseBuffer = events.pop() ?? '';
 
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
+        for (const event of events) {
+          for (const line of event.split('\n')) {
+            if (!line.startsWith('data: ')) continue;
             try {
               const data = JSON.parse(line.slice(6));
               if (data.type === 'chunk') {
                 fullContent += data.chunk;
-                setMessages(prev => prev.map(m => 
+                setMessages(prev => prev.map(m =>
                   m.id === assistantMsgId ? { ...m, content: fullContent } : m
                 ));
               } else if (data.type === 'done') {
                 confidence = data.confidence || 0.5;
               }
-            } catch {}
+            } catch (e) {
+              console.error('[Widget SSE] Không parse được event:', line.slice(0, 120), e);
+            }
           }
         }
       }

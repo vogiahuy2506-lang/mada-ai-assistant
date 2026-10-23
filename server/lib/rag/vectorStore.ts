@@ -486,7 +486,11 @@ class VectorStore {
     let vectorResults: SearchResult[] = [];
     if (provider) {
       try {
-        vectorResults = await this.search(query, topK * 2, filter);
+        // ⚠️ PHẢI truyền filter qua options object.
+        // `search()` chỉ nhận (query, topKOrOptions) — gọi `search(q, k, filter)`
+        // sẽ SILENTLY DROP filter, khiến vector search trả về docs của mọi bot
+        // và trộn chúng vào kết quả (BM25 vẫn filter → kết quả lệch).
+        vectorResults = await this.search(query, { topK: topK * 2, filter });
       } catch (e) {
         console.warn('⚠️ Vector search failed in hybrid:', (e as Error).message);
       }

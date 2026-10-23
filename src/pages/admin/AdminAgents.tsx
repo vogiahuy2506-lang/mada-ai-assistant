@@ -1916,7 +1916,7 @@ export function AdminAgents() {
                               className="w-full px-2 py-1.5 rounded-lg border border-slate-200 text-[10px] font-medium text-slate-700 bg-white hover:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400 transition-all cursor-pointer"
                             >
                               {SQ_CATEGORIES.map(c => (
-                                <option key={c.value} value={c.value}>{c.icon} {c.label}</option>
+                                <option key={c.value} value={c.value}>{c.label}</option>
                               ))}
                             </select>
                           </div>

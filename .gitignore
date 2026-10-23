@@ -45,6 +45,7 @@ Thumbs.db
 *.tmp
 *.temp
 .tmp/
+.tmp-shots/
 .cache/
 .temp/
 
@@ -75,6 +76,11 @@ data/*.db-wal
 *.sqlite3
 *.db-shm
 *.db-wal
+# Database backups (local only, never commit)
+*.db.backup
+*.db.bak*
+# Crawl caches (regenerate bằng scripts/crawl-product-taxonomy.ts)
+data/mada-product-taxonomy.json
 
 # Docker
 .dockerignore

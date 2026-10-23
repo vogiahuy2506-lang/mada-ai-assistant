@@ -120,6 +120,12 @@ export interface SuggestedProduct {
   insurance_coverage?: string[]; // Bảo hiểm chi trả
   mada_advice?: string; // Lời khuyến từ MADA
   warranty?: string; // Bảo hành
+  /**
+   * ⭐ HẢI ĐẾN ĐÚNG 1 SẢN PHẨM mà user nêu tên.
+   * Frontend dùng cờ này để đổi câu dẫn: "Tôi đang có sản phẩm này…" thay vì
+   * "Với các biểu hiện của bạn…". Cờ do server gắn, không phải bot tự nói.
+   */
+  isSpecificProduct?: boolean;
 }
 
 // Consultation Request

@@ -97,8 +97,8 @@
   --lin-duration: 180ms;
 
   /* ── Layout ── */
-  --lin-sidebar-w: 232px;
-  --lin-sidebar-w-collapsed: 52px;
+  --lin-sidebar-w: 240px;
+  --lin-sidebar-w-collapsed: 56px;
   --lin-topbar-h: 48px;
   --lin-content-max: 1400px;
 }
@@ -161,6 +161,30 @@
 @media (max-width: 767px) {
   .lin-main-offset {
     margin-left: 0;
+  }
+}
+
+/* ── Sidebar: nới rule tap-target 44px của index.css ──
+   index.css đặt `min-height: 44px` cho mọi a/button khi (pointer: coarse).
+   Trong admin shell (sidebar desktop) điều đó làm mọi mục nav cao 44px —
+   sidebar thô, dài, lệch chuẩn Linear (32px). Chỉ giữ 44px khi thật sự
+   là màn hình cảm ứng (mobile), nơi sidebar overlay cần vùng chạm lớn. */
+.lin-shell aside a,
+.lin-shell aside button,
+.lin-shell aside input,
+.lin-shell aside kbd {
+  min-height: 0;
+  min-width: 0;
+}
+
+.lin-shell aside .lin-nav-item {
+  min-height: 32px;
+}
+
+/* Vùng chạm lớn lại khi là thiết bị cảm ứng thật (mobile sidebar overlay). */
+@media (pointer: coarse) {
+  .lin-shell aside .lin-nav-item {
+    min-height: 40px;
   }
 }
 

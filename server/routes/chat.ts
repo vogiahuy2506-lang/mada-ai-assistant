@@ -24,6 +24,12 @@ import { chatHistory, waitForRagReady } from '../lib/chat-context';
 import { parseAttachment } from '../lib/fileProcessor';
 import { translateContent } from '../lib/translationService';
 import { productExtractor, type ExtractedProduct } from '../lib/scraping/productExtractor';
+import { buildCatalogPromptBlock, enrichProductsWithMentions } from '../lib/productLinker';
+import {
+  AGENT_TO_MADA as AGENT_TO_MADA_MAP,
+  MADA_CATEGORY_TO_DB as MADA_CATEGORY_TO_DB_MAP,
+} from '../lib/categoryMapping';
+import { routeToSpecialistBot } from '../lib/specialistRouter';
 import { logActivity } from '../index';
 
 const router = express.Router();
@@ -280,39 +286,12 @@ function kbProductToProduct(row: any, effectiveLanguage: string = 'vi'): any {
 }
 
 // MADA Agent to Category mapping
-const AGENT_TO_MADA: Record<string, { botId: string; madaCategory: string }> = {
-  'bot-hearing':    { botId: 'bot-hearing',    madaCategory: 'sensory-hearing' },
-  'bot-vision':     { botId: 'bot-vision',     madaCategory: 'sensory-vision' },
-  'bot-speech':     { botId: 'bot-speech',     madaCategory: 'voice-and-speech' },
-  'bot-cognitive':  { botId: 'bot-cognitive',  madaCategory: 'mental-cognitive' },
-  'bot-neuro':      { botId: 'bot-neuro',      madaCategory: 'neuromusculoskeletal-movement' },
-  'bot-mobility':   { botId: 'bot-mobility',   madaCategory: 'mobility-and-transportation' },
-  'bot-regulatory': { botId: 'bot-regulatory', madaCategory: 'regulatory-standards' },
-};
+// ⭐ Dùng mapping dùng chung từ `lib/categoryMapping` (source-of-truth),
+// tránh lệch với `kb_categories` và `syncKbProducts`.
+const AGENT_TO_MADA = AGENT_TO_MADA_MAP;
 
 // ⭐ Product Request Category Mapping (MADA bot category → kb_products.category)
-// ⭐ CRITICAL: Maps old MADA category names to NEW category IDs used in kb_products
-// This is a 1:1 mapping but with name transformation
-const MADA_CATEGORY_TO_DB: Record<string, string> = {
-  // Old MADA category → New kb_products category
-  'sensory-hearing': 'hearing',
-  'sensory-vision': 'vision',
-  'voice-and-speech': 'voice-and-speech',
-  'mental-cognitive': 'cognition',
-  'neuromusculoskeletal-movement': 'mobility',
-  'mobility-and-transportation': 'mobility',
-  'regulatory-standards': 'education',
-  // Also support new category names directly
-  'hearing': 'hearing',
-  'vision': 'vision',
-  'cognition': 'cognition',
-  'mobility': 'mobility',
-  'daily_living': 'daily_living',
-  'communication': 'communication',
-  'web_accessibility': 'web_accessibility',
-  'general': 'general',
-  'education': 'education',
-};
+const MADA_CATEGORY_TO_DB = MADA_CATEGORY_TO_DB_MAP;
 
 // ⭐ Product request response templates
 const PRODUCT_REQUEST_RESPONSES: Record<string, string> = {
@@ -397,11 +376,77 @@ function getMatchReason(lang: string, kind: 'found' | 'category', context?: stri
 // ============== PRODUCT DETECTION ==============
 
 /**
+ * ⭐ Tìm sản phẩm KHÁC CÙNG LOẠI với sản phẩm user vừa hỏi.
+ *
+ * DÙNG KHI NÀO:
+ * User hỏi về 1 sản phẩm cụ thể (VD "VisionBuddy là gì?") nhưng sản phẩm đó
+ * ĐÃ HIỂN THỊ ở lượt trước. Lúc này không nên im lặng, cũng không nên list 12
+ * sản phẩm — chỉ gợi ý vài sản phẩm cùng nhóm để khách so sánh.
+ *
+ * @param product Sản phẩm gốc user đã hỏi.
+ * @param effectiveLanguage Ngôn ngữ hiển thị (vi/en/ar/fr).
+ * @param limit Số sản phẩm tối đa (mặc định 3 — đủ so sánh mà không rối).
+ * @param shownProductIds Sản phẩm đã hiện, để không lặp lại.
+ */
+async function findSimilarProducts(
+  product: any,
+  effectiveLanguage: string = 'vi',
+  limit = 3,
+  shownProductIds: string[] = []
+): Promise<any[]> {
+  if (!product) return [];
+
+  const category = (product.category || '').toLowerCase();
+
+  try {
+    const rows = await new Promise<any[]>((resolve, reject) => {
+      if (category) {
+        db.prepare(`
+          SELECT * FROM kb_products
+          WHERE status = 'published' AND image_url IS NOT NULL AND image_url <> ''
+            AND LOWER(category) = ?
+          ORDER BY featured DESC, sort_order ASC, created_at DESC
+          LIMIT 12
+        `).all(category, (err: any, res: any) => (err ? reject(err) : resolve(res as any[])));
+      } else {
+        db.prepare(`
+          SELECT * FROM kb_products
+          WHERE status = 'published' AND image_url IS NOT NULL AND image_url <> ''
+          ORDER BY featured DESC, sort_order ASC, created_at DESC
+          LIMIT 12
+        `).all((err: any, res: any) => (err ? reject(err) : resolve(res as any[])));
+      }
+    });
+
+    const out: any[] = [];
+    const seen = new Set<string>([...(shownProductIds || []), product.id]);
+
+    for (const row of rows) {
+      const url = row.product_url || row.source_url || '';
+      if (!url.startsWith('http')) continue;
+      if (seen.has(row.id) || seen.has(url)) continue;
+      seen.add(row.id);
+      out.push(kbProductToProduct(row, effectiveLanguage));
+      if (out.length >= limit) break;
+    }
+
+    return out;
+  } catch (err) {
+    console.warn('[findSimilarProducts] Error:', err);
+    return [];
+  }
+}
+
+/**
  * ⭐ FEATURE 1: Find a specific product by detecting product name in user message.
  * If user mentions a specific product (e.g. "Victor Reader", "OrCam MyEye"),
  * return ONLY that product instead of showing all products in the category.
+ *
+ * @param agentId Bot chuyên môn đang trả lời — dùng để ưu tiên sản phẩm đúng nhóm
+ *                (người hỏi bot thị giác về "VisionBuddy" không nên nhận sản
+ *                phẩm thính giác chỉ vì có chung từ chung).
  */
-function findProductByMessage(message: string, _effectiveLanguage: string): any | null {
+function findProductByMessage(message: string, _effectiveLanguage: string, agentId?: string): any | null {
   if (!message || message.length < 3) return null;
 
   try {
@@ -470,12 +515,187 @@ function findProductByMessage(message: string, _effectiveLanguage: string): any 
       }
     }
 
+    // ⭐⭐ FALLBACK: tìm trong kb_products.
+    //
+    // VÌ SAO CẦN:
+    // knowledge_items gần như trống với sản phẩm MADA (chỉ 9 dòng, 0 dòng
+    // web/published) — danh mục thật nằm ở kb_products (349 sản phẩm, 100%
+    // có image_url). Nếu chỉ query knowledge_items thì câu hỏi riêng về 1 tên
+    // sản phẩm (VD "VisionBuddy là gì?") KHÔNG bao giờ ra được card → người
+    // dùng chỉ thấy danh sách chung hoặc không thấy gì.
+    const kbProduct = findKbProductByMessage(cleaned, message, _effectiveLanguage, agentId);
+    if (kbProduct) {
+      return kbProduct;
+    }
 
     return null;
   } catch (err) {
     console.warn('[findProductByMessage] Error:', err);
     return null;
   }
+}
+
+/**
+ * Tìm đúng 1 sản phẩm trong kb_products theo tên người dùng nhắc.
+ *
+ * ƯU TIÊN KHỚP DẦN (từ chính xác → rời rạc):
+ *   1. Khớp CHÍNH XÁC toàn bộ tên  → thẻ card đúng tuyệt đối
+ *   2. Khớp "tên nằm trọn trong câu" (VisionBuddy trong "... VisionBuddy ...")
+ *   3. Khớp "tên viết tắt" — bỏ phần mô tả dài ở cuối
+ *      ("Pocket Talker" → "Pocket Talker with Headphones or Neck Loop")
+ *   → KHÔNG dùng LIKE '%tên%' trần: "Bell" sẽ khớp "BellBuds", "Google Home
+ *     Mini" sẽ khớp hàng loạt → trả về sai sản phẩm.
+ */
+function findKbProductByMessage(
+  cleaned: string,
+  rawMessage: string,
+  effectiveLanguage: string = 'vi',
+  agentId?: string
+): any | null {
+  const candidates = db.prepare(`
+    SELECT * FROM kb_products
+    WHERE status = 'published' AND image_url IS NOT NULL AND image_url <> ''
+    ORDER BY featured DESC, sort_order ASC, created_at DESC
+  `).all() as any[];
+
+  if (candidates.length === 0) return null;
+
+  const norm = (s: string) =>
+    (s || '')
+      .toLowerCase()
+      .replace(/[®™©°]/g, '')
+      .replace(/[-_/]/g, ' ')
+      .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+  const messageNorm = norm(cleaned || rawMessage);
+  // Câu hỏi tiếng Việt chứa rất nhiều từ bổ nghĩa không liên quan; chỉ dùng
+  // chúng để đối chiếu chứ không để yêu cầu tên xuất hiện đúng trong câu.
+  const STOP = new Set([
+    'cho','cho toi','cho minh','toi','minh','ban','gia','bao','nhieu','gi',
+    'san','pham','may','thiet','bi','la','gi','co','khong','nua','ve','cua',
+    'mua','o','dau','link','ten','nay','do','hay','the','nao','ban','muon',
+    'xem','tim','thong','tin','gioi','thieu','up','load','dung','ho','hop',
+    'the','bao','lau','anh','hinh','product','device','price','cost','what','is',
+    'how','much','show','find','me','my','this','that','the','a','an','about',
+    'for','with','please','can','you','do','i','it','of','to','in','on',
+  ]);
+  const messageTokens = new Set(messageNorm.split(' ').filter(w => w && !STOP.has(w)));
+
+  // ⭐ Ưu tiên sản phẩm đúng chuyên môn bot đang trả lời.
+  //
+  // VÌ SAO CẦN:
+  // Tên sản phẩm AT hay trùng chữ ("Buddy" nằm trong cả VisionBuddy lẫn Big
+  // Buddy Button; "Zoom" trong nhiều thiết bị). Nếu không ưu tiên đúng nhóm,
+  // người dùng hỏi bot THỊ GIÁC về "VisionBuddy" có thể nhận card thiết bị
+  // VẬN ĐỘNG → sai hoàn toàn.
+  const dbCategory = agentId ? MADA_CATEGORY_TO_DB[agentId] : undefined;
+  const inSpecialty = (p: any) => {
+    if (!dbCategory) return true;
+    const c = (p.category || '').toLowerCase();
+    return c === dbCategory || c.includes(dbCategory) || dbCategory.includes(c);
+  };
+
+  /** Tên trong DB đã chuẩn hoá. */
+  const productNames = candidates.map((p: any) => ({
+    row: p,
+    en: norm(p.title_en || ''),
+    vi: norm(p.title || ''),
+    specialty: inSpecialty(p),
+  }));
+
+  /** Sắp xếp: đúng chuyên môn trước, tên dài (cụ thể hơn) sau. */
+  const bySpecificity = (a: any, b: any) =>
+    Number(b.specialty) - Number(a.specialty) || b.len - a.len;
+
+  // Tầng 1: tên khớp chính xác toàn bộ
+  for (const { row, en, vi, specialty } of productNames) {
+    if ((en && messageNorm === en) || (vi && messageNorm === vi)) {
+      if (specialty || !dbCategory) return kbProductToProduct(row, effectiveLanguage);
+    }
+  }
+  // Tầng 1b: nếu có khớp chính xác nhưng KHÔNG đúng chuyên môn → bỏ qua,
+  //          để tầng dưới xử lý (an toàn hơn là trả nhầm nhóm).
+  for (const { row, en, vi } of productNames) {
+    if ((en && messageNorm === en) || (vi && messageNorm === vi)) {
+      if (!inSpecialty(row)) return kbProductToProduct(row, effectiveLanguage);
+    }
+  }
+
+  // Tầng 2: tên sản phẩm nằm TRỌN VEN trong câu hỏi.
+  //
+  // VÌ SAO KHÔNG DÙNG "tiền tố": câu "Victor Reader StreetBox giá?" có tên
+  // "Victor Reader StreetBox" không tồn tại trong DB; các bản thật là
+  // "Victor Reader Stratus4 M…", "Victor Reader Trek…". Khớp tiền tố sẽ bắt
+  // đúng, nhưng câu "cho tôi xem VisionBuddy" có "VisionBuddy" ở GIỮA câu
+  // (sau "xem") nên không khớp. → So khớp toàn bộ tên nằm trong câu.
+  const padded = ` ${messageNorm} `;
+  const contained: Array<{ row: any; len: number; specialty: boolean }> = [];
+  for (const { row, en, vi, specialty } of productNames) {
+    for (const name of [en, vi]) {
+      if (!name || name.length < 4) continue;
+      if (padded.includes(` ${name} `)) {
+        contained.push({ row, len: name.length, specialty });
+        break;
+      }
+    }
+  }
+  if (contained.length > 0) {
+    contained.sort(bySpecificity);
+    return kbProductToProduct(contained[0].row, effectiveLanguage);
+  }
+
+  // Tầng 3: TÊN VIẾT TẮT — user bỏ phần mô tả dài ở cuối tên sản phẩm.
+  //
+  // VÌ SAO CẦN:
+  // "Pocket Talker with Headphones or Neck Loop" là tên đầy đủ trong DB, nhưng
+  // ai cũng gọi tắt là "Pocket Talker". Khớp tiền tố kiểu cũ bỏ sót vì có thể
+  // khớp nhầm "Pocket Sign Language Translator". Vì vậy chỉ nhận tên viết tắt
+  // khi nó là TIỀN TỐ của tên đầy đủ VÀ câu hỏi không chứa phần bị cắt.
+  const abbreviated: Array<{ row: any; len: number; specialty: boolean }> = [];
+  for (const { row, en, vi, specialty } of productNames) {
+    for (const name of [en, vi]) {
+      const words = (name || '').split(' ').filter(Boolean);
+      if (words.length < 2) continue;
+      // Thử mọi vị trí cắt từ 2 đến trước hết; lấy cụm dài nhất khớp.
+      for (let take = words.length - 1; take >= 2; take--) {
+        const short = words.slice(0, take).join(' ');
+        if (short.length < 5) continue;
+        if (!padded.includes(` ${short} `)) continue;
+        abbreviated.push({ row, len: short.length, specialty });
+        break;
+      }
+    }
+  }
+  // ⚠️ Chỉ nhận tên viết tắt khi KHÔNG mơ hồ: đây là phương án cuối cùng,
+  // nên yêu cầu tên khớp dài hơn (≥ 2 từ) và đúng chuyên môn bot.
+  if (abbreviated.length > 0) {
+    const viable = abbreviated.filter((a) => a.len >= 8 && (!dbCategory || a.specialty));
+    const pool = viable.length > 0 ? viable : abbreviated;
+    pool.sort((a, b) => Number(b.specialty) - Number(a.specialty) || b.len - a.len);
+    return kbProductToProduct(pool[0].row, effectiveLanguage);
+  }
+
+  // Tầng 4: mọi từ trong tên đều xuất hiện trong câu hỏi (khớp cụm từ)
+  const scored: Array<{ row: any; len: number; specialty: boolean }> = [];
+  for (const { row, en, vi, specialty } of productNames) {
+    for (const name of [en, vi]) {
+      if (!name || name.length < 4) continue;
+      const nameTokens = name.split(' ').filter((w: string) => w.length > 1 && !STOP.has(w));
+      if (nameTokens.length === 0) continue;
+      if (nameTokens.every((t: string) => messageTokens.has(t))) {
+        scored.push({ row, len: name.length, specialty });
+        break;
+      }
+    }
+  }
+  if (scored.length > 0) {
+    scored.sort(bySpecificity);
+    return kbProductToProduct(scored[0].row, effectiveLanguage);
+  }
+
+  return null;
 }
 
 /**
@@ -534,7 +754,103 @@ function isExplicitProductRequest(message: string): boolean {
     'recommend something', 'any products', 'any devices',
   ];
 
-  return explicitCommands.some(cmd => contentLower.includes(cmd));
+  if (explicitCommands.some(cmd => contentLower.includes(cmd))) {
+    return true;
+  }
+
+  // ⭐⭐ Nhắc đúng TÊN sản phẩm trong danh mục MADA (VD "VisionBuddy là gì?",
+  // "Giá Pocket Talker bao nhiêu?") → coi như yêu cầu XEM SẢN PHẨM đó.
+  //
+  // VÌ SAO CẦN:
+  // Danh sách explicitCommands ở trên thiếu các câu hỏi dạng "TÊN + là gì /
+  // giá bao nhiêu / dùng thế nào". Người dùng hỏi riêng 1 sản phẩm là câu hỏi
+  // tự nhiên và phổ biến nhất — nhưng vì không có mục nào khớp nên hệ thống
+  // chỉ trả lời chữ, KHÔNG hiện card sản phẩm có ảnh.
+  if (messageMentionsKnownProduct(message)) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * ⭐ Suy luận category sản phẩm từ câu hỏi của người dùng.
+ *
+ * Dùng khi chat KHÔNG có agentId (chat tổng quát) — lúc đó `getSuggestedProducts`
+ * lấy sản phẩm từ MỌI category nên ra sản phẩm không liên quan
+ * (VD: hỏi "máy trợ thính" lại ra "Dragon Professional", "Smyle Mouse").
+ *
+ * Trả về category của kb_products (hearing/vision/mobility/…) hoặc null nếu
+ * không suy luận được.
+ */
+function inferProductCategory(message: string): string | null {
+  if (!message) return null;
+  const q = message.toLowerCase();
+
+  const patterns: Array<{ category: string; keywords: string[] }> = [
+    {
+      category: 'hearing',
+      keywords: [
+        'máy trợ thính', 'trợ thính', 'thính giác', 'nghe kém', 'khó nghe', 'không nghe rõ',
+        'ù tai', 've kêu', 'điếc', 'lãng tai', 'mất thính lực', 'thính lực kém',
+        'tai nghe trợ thính', 'phục hồi thính', 'khuếch đại âm thanh',
+        'hearing aid', 'hearing', 'tinnitus', 'deaf', 'hard of hearing', 'amplifier',
+        'neckloop', 'fm system', 'sound field',
+      ],
+    },
+    {
+      category: 'vision',
+      keywords: [
+        'kính', 'kính mắt', 'kính nhìn', 'mắt kém', 'mắt mờ', 'nhìn mờ', 'nhìn kém',
+        'thị giác', 'mù', 'mất thị lực', 'thị lực kém', 'đọc sách khó', 'đọc chữ khó',
+        'chữ nhỏ', 'phóng to chữ', 'tăng độ tương phản', 'tương phản cao',
+        'braille', 'magnifier', 'low vision', 'vision loss', 'blind', 'visually impaired',
+        'sight', 'eye',
+      ],
+    },
+    {
+      category: 'mobility',
+      keywords: [
+        'xe lăn', 'xe điện', 'xe lăn điện', 'khung đi', 'gậy', 'gậy chống', 'nạng',
+        'chân giả', 'tay giả', 'chân yếu', 'tay yếu', 'chân run', 'tay run',
+        'bại liệt', 'liệt', 'đi lại khó', 'khó đi lại', 'vận động', 'phục hồi chức năng',
+        'wheelchair', 'walker', 'crutch', 'cane', 'prosthetic', 'orthotic', 'mobility',
+        'paralysis', 'walking difficulty',
+      ],
+    },
+    {
+      category: 'voice-and-speech',
+      keywords: [
+        'giao tiếp', 'nói khó', 'khó nói', 'không nói được', 'âm lượng yếu', 'giọng nói yếu',
+        'mất giọng', 'khàn giọng', 'rối loạn ngôn ngữ', 'aphasia', 'aac', 'nói lại',
+        'speech', 'communication', 'voice', 'mute', 'voicemail', 'text to speech',
+      ],
+    },
+    {
+      category: 'cognition',
+      keywords: [
+        'trí nhớ', 'hay quên', 'quên', 'nhận thức', 'tập trung', 'rối loạn tăng động',
+        'adhd', 'tự kỷ', 'autism', 'học tập', 'đọc hiểu', 'ghi chép',
+        'memory', 'cognitive', 'dementia', 'alzheimer', 'learning', 'note taker',
+      ],
+    },
+    {
+      category: 'daily_living',
+      keywords: [
+        'sinh hoạt', 'ăn uống', 'nhà tắm', 'nhà bếp', 'tự ăn', 'uống', 'thuốc',
+        'mở nắp', 'mở hộp', 'dressing', 'bathing', 'eating', 'toilet', 'medication',
+        'daily living', 'self-care',
+      ],
+    },
+  ];
+
+  for (const { category, keywords } of patterns) {
+    if (keywords.some((kw) => q.includes(kw))) {
+      return category;
+    }
+  }
+
+  return null;
 }
 
 /**
@@ -655,8 +971,98 @@ function shouldShowProducts(message: string): boolean {
     'fauteuils roulants', 'prothèses', 'orthèses', 'aides à la marche',
     'low vision', 'vision loss', 'hearing loss', 'assistive technology',
   ];
-  
-  return productKeywords.some(kw => contentLower.includes(kw));
+
+  if (productKeywords.some(kw => contentLower.includes(kw))) {
+    return true;
+  }
+
+  // ⭐⭐ User nhắc ĐÚNG TÊN một sản phẩm có thật trong danh mục MADA
+  // (VD "VisionBuddy là gì?", "Giá VisionBuddy bao nhiêu?") → coi như yêu
+  // cầu xem sản phẩm đó.
+  //
+  // VÌ SAO CẦN:
+  // Câu hỏi về 1 sản phẩm cụ thể thường chỉ chứa TÊN + "là gì"/"giá bao nhiêu",
+  // không trùng từ khóa nào trong danh sách trên. Nếu không có nhánh này,
+  // shouldShowProducts trả false → server KHÔNG gửi card → người dùng hỏi
+  // riêng 1 sản phẩm thì không bao giờ thấy thẻ sản phẩm có ảnh.
+  if (messageMentionsKnownProduct(message)) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Kiểm tra câu hỏi có chứa tên sản phẩm THẬT trong kb_products không.
+ *
+ * Dùng bộ cache trong RAM (5 phút) + so khớp có ranh giới TỪ để:
+ *   • "Bell" KHÔNG khớp "BellBuds"; "Zoom" KHÔNG khớp "ZoomText"
+ *   • không tốn query DB mỗi lượt chat
+ */
+const PRODUCT_NAME_MATCH_CACHE: { expires: number; names: string[] } = {
+  expires: 0,
+  names: [],
+};
+
+function getProductNameTokens(): string[] {
+  const now = Date.now();
+  if (PRODUCT_NAME_MATCH_CACHE.expires > now) return PRODUCT_NAME_MATCH_CACHE.names;
+
+  try {
+    const rows = db.prepare(`
+      SELECT title, title_en FROM kb_products
+      WHERE status = 'published'
+    `).all() as any[];
+
+    const names = new Set<string>();
+    for (const r of rows) {
+      for (const raw of [r.title, r.title_en]) {
+        const name = (raw || '').trim();
+        // Bỏ tên quá ngắn ("VN", "ST") vì dễ khớp nhầm với từ thường.
+        if (name.length >= 5) names.add(name.toLowerCase());
+
+        // ⭐ Thêm cả TÊN VIẾT TẮT (2 từ đầu) vì người dùng gọi tắt:
+        // "Pocket Talker with Headphones or Neck Loop" → "Pocket Talker".
+        const words = name.split(/\s+/).filter(Boolean);
+        if (words.length >= 2) {
+          const short = words.slice(0, 2).join(' ');
+          if (short.length >= 5) names.add(short.toLowerCase());
+        }
+      }
+    }
+
+    PRODUCT_NAME_MATCH_CACHE.names = [...names];
+    PRODUCT_NAME_MATCH_CACHE.expires = now + 5 * 60 * 1000;
+  } catch (err) {
+    console.warn('[shouldShowProducts] Không đọc được danh mục sản phẩm:', err);
+    return [];
+  }
+
+  return PRODUCT_NAME_MATCH_CACHE.names;
+}
+
+/** Chuẩn hoá để so khớp: bỏ ký tự đặc biệt, gộp khoảng trắng, hạ chữ thường. */
+function normalizeForProductMatch(text: string): string {
+  return (text || '')
+    .toLowerCase()
+    .replace(/[®™©°]/g, '')
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function messageMentionsKnownProduct(message: string): boolean {
+  const normalized = normalizeForProductMatch(message);
+  if (!normalized) return false;
+
+  const padded = ` ${normalized} `;
+  const names = getProductNameTokens().map(normalizeForProductMatch);
+
+  return names.some((name) => {
+    if (!name) return false;
+    // Tách bằng khoảng trắng → ranh giới từ, tránh "bell" khớp "bellbuds".
+    return padded.includes(` ${name} `) || padded.endsWith(` ${name} `) || padded.startsWith(`${name} `);
+  });
 }
 
 // Language detection
@@ -816,14 +1222,16 @@ async function getSuggestedProducts(ragSources: any[], message: string, effectiv
 
   // ⭐ FEATURE 1: Try to detect a SPECIFIC product name from user message FIRST
   // If user mentions "Victor Reader", "OrCam", etc. → return ONLY that product
-  const specificProduct = findProductByMessage(message, effectiveLanguage);
+  const specificProduct = findProductByMessage(message, effectiveLanguage, agentId);
   if (specificProduct) {
-    // ⭐ Nếu sản phẩm này đã hiển thị rồi → tìm sản phẩm khác
+    // ⭐ Nếu sản phẩm này đã hiển thị rồi → tìm sản phẩm KHÁC CÙNG LOẠI.
+    // ⚠️ KHÔNG được rơi xuống nhánh list 12 sản phẩm bên dưới (bot-regulatory
+    // luôn kéo tất cả) — khách hàng hỏi 1 sản phẩm mà thấy 12 card là rối.
     if (shownProductIds.includes(specificProduct.id)) {
-      // Tìm sản phẩm khác cùng loại
-    } else {
-      return [specificProduct];
+      return (await findSimilarProducts(specificProduct, effectiveLanguage, 3, shownProductIds))
+        .map((p) => ({ ...p, isSpecificProduct: true }));
     }
+    return [{ ...specificProduct, isSpecificProduct: true }];
   }
 
   // ⭐ CRITICAL: Get agent's MADA category - lookup từ DB TRƯỚC, fallback sang hardcoded mapping
@@ -873,10 +1281,24 @@ async function getSuggestedProducts(ragSources: any[], message: string, effectiv
 
     agentCategory = mapped;
   }
-  
+
+  // ⭐ CHAT TỔNG QUÁT (không có agent): suy luận category từ câu hỏi.
+  // Không có bước này thì lấy sản phẩm từ MỌI category → ra sản phẩm không
+  // liên quan (VD: hỏi "máy trợ thính" lại ra "Dragon Professional", "Smyle Mouse").
+  let inferredCategory: string | null = null;
+  if (!agentCategory && !isRegulatoryBot) {
+    inferredCategory = inferProductCategory(message);
+    if (inferredCategory) {
+      agentCategory = inferredCategory;
+      console.log(
+        `[getSuggestedProducts] Inferred category "${inferredCategory}" from user message`
+      );
+    }
+  }
+
   // ⭐ Bot Thông tin bổ trợ được xem TẤT CẢ sản phẩm, các bot khác bị giới hạn theo category
   const shouldFilterByCategory = !isRegulatoryBot && agentCategory !== null;
-  
+
 
 
   // Helper: Check if URL is valid for product
@@ -1210,9 +1632,18 @@ async function getSuggestedProducts(ragSources: any[], message: string, effectiv
   // vì RAG sources chỉ chứa sản phẩm từ 1 category duy nhất
   // Đối với các bot thường: fallback như bình thường
   const hasEnoughProducts = suggestedProducts.length >= 3;
-  const needsAllProducts = isRegulatoryBot;
+  // ⭐ QUY TẮC MỚI: Nếu câu hỏi nhắc rõ 1 SẢN PHẨM CỤ THỂ thì chỉ được
+  // hiện sản phẩm đó — TUYỆT ĐỐI KHÔNG list thêm sản phẩm khác.
+  //
+  // LÝ DO: Bot "Thông tin bổ trợ" (bot-regulatory) có `needsAllProducts = true`
+  // nên trước đây LUÔN kéo 12 sản phẩm bất kể user hỏi gì. Khách hàng hỏi
+  // "VisionBuddy là gì?" lại thấy 12 card → rối mắt, không ra sản phẩm họ hỏi.
+  //
+  // → Chặn fallback list hàng loạt; chỉ trả về đúng sản phẩm đã nhận diện.
+  const askingSpecificProduct = !!specificProduct;
+  const needsAllProducts = isRegulatoryBot && !askingSpecificProduct;
 
-  if (needsAllProducts || suggestedProducts.length < 3) {
+  if (!askingSpecificProduct && (needsAllProducts || suggestedProducts.length < 3)) {
 
 
     // Fetch directly from kb_products by category (or all if regulatory bot)
@@ -1347,6 +1778,13 @@ async function getSuggestedProducts(ragSources: any[], message: string, effectiv
     }
   }
   
+
+  // ⭐ HỎI VỀ SẢN PHẨM CỤ THỂ → chỉ trả về ĐÚNG sản phẩm đó (không kèm
+  // sản phẩm khác). Đây là chốt chặn cuối: dù nhánh nào chạy trước, danh
+  // sách cũng chỉ còn tối đa 1 sản phẩm → giao diện gọn, dễ đọc.
+  if (askingSpecificProduct) {
+    return [{ ...specificProduct, isSpecificProduct: true }];
+  }
 
   // ⭐ Regulatory bot: trả về nhiều hơn (12), các bot thường: 6
   const MAX_PRODUCTS = isRegulatoryBot ? 12 : 6;
@@ -1517,6 +1955,44 @@ router.post('/', async (req, res) => {
       ragConfig.agentId = agentId; // ⭐ Luôn pass agentId để filter chính xác
       ragConfig.priority = true;
     }
+
+    // ⭐ Đưa danh mục tên sản phẩm THẬT của MADA vào prompt → bot không bịa
+    // tên sản phẩm → mọi tên bot nhắc đều tồn tại trong DB → gắn được link.
+    //
+    // ⚠️ CHỈ đưa catalog khi đã đủ 4 câu hỏi (hoặc user hỏi thẳng về tên
+    // sản phẩm cụ thể). Nếu luôn đưa, bot sẽ tự liệt kê sản phẩm ngay ở câu
+    // đầu tiên → vi phạm quy tắc "hỏi đủ 4 câu rồi mới tư vấn".
+    const consultedDone = req.body?.consultQuestionsCompleted === true;
+    // ⭐ Server tự nhận diện tên sản phẩm (xem giải thích ở nhánh /stream:
+    // cờ của client dựa trên danh sách hardcode nên thiếu tên sản phẩm mới).
+    const explicitProductQuery =
+      req.body?.isExplicitProductQuery === true ||
+      !!findKbProductByMessage(message, message, effectiveLanguage, agentId || undefined);
+    if (consultedDone || explicitProductQuery) {
+      try {
+        ragConfig.productCatalog = buildCatalogPromptBlock(
+          madaCategory ? MADA_CATEGORY_TO_DB[madaCategory] || madaCategory : null,
+          effectiveLanguage,
+          40,
+          (() => {
+            // ⭐ HỎI RIÊNG 1 SẢN PHẨM (xem giải thích ở nhánh /stream).
+            if (!explicitProductQuery) return null;
+            const m = findKbProductByMessage(message, message, effectiveLanguage, agentId || undefined);
+            if (!m) return null;
+            const t = (effectiveLanguage === 'en' && m.title_en) || m.title;
+            if (t) ragConfig.singleProductFocus = t;
+            return t;
+          })(),
+          // ⭐ Lọc theo bot để không đưa sản phẩm của bot khác vào prompt
+          agentId || null
+        );
+      } catch (catErr) {
+        console.warn('[chat] Failed to build product catalog:', catErr);
+      }
+    } else {
+      // Chưa đủ 4 câu → cấm bot nhắc tên sản phẩm.
+      ragConfig.noProductRecommendation = true;
+    }
     
 
     
@@ -1547,7 +2023,12 @@ router.post('/', async (req, res) => {
     // ⭐ CHỉ gửi products khi đã có đủ context HOẶC user EXPLICITLY yêu cầu
     const suggestedProducts: any[] = [];
     const isExplicitRequest = isExplicitProductRequest(message); // ⭐ CRITICAL FIX
-    if (shouldShowProducts(message) && (conversationTurns >= 3 || isReadyForProductSuggestion || isExplicitRequest)) {
+    // ⭐ Chỉ gợi ý sản phẩm khi ĐÃ ĐỦ 4 CÂU HỎI, hoặc user hỏi thẳng về
+    // tên sản phẩm cụ thể. Nếu không, bot sẽ tư vấn sản phẩm ngay ở câu 1.
+    const allowProducts = consultedDone || explicitProductQuery;
+    // ⭐⭐ Đủ 4 câu hỏi → KHÔNG được chặn bởi shouldShowProducts (xem giải thích
+    // ở nhánh streaming: 3 câu cuối khách trả lời ngắn, không có từ khoá SP).
+    if (allowProducts && (shouldShowProducts(message) || allowProducts) && (conversationTurns >= 3 || isReadyForProductSuggestion || isExplicitRequest)) {
       // ⭐ Đợi user cung cấp đủ context trước khi gợi ý sản phẩm
       try {
         // ⭐ Truyền shownProductIds và isAskingForOtherProducts để không lặp lại sản phẩm
@@ -1566,14 +2047,28 @@ router.post('/', async (req, res) => {
     logActivity('info', `Chat: ${agentId || 'default'} - "${message.slice(0, 50)}..."`, 'Chat');
     
     // ⭐ Merge scraped products with suggested products (avoid duplicates by URL)
-    const allProducts = [...scrapedProducts];
+    let allProducts = [...scrapedProducts];
     for (const p of suggestedProducts) {
       const exists = allProducts.some((ap: any) => ap.product_url === p.product_url || ap.source_url === p.source_url);
       if (!exists) {
         allProducts.push(p);
       }
     }
-    
+
+    // ⭐ CRITICAL: Bảo đảm mọi sản phẩm bot ĐÃ NHẮC TÊN trong câu trả lời đều có
+    // mặt trong danh sách → frontend gắn link ngay tên đó.
+    //
+    // ⚠️ HỎI RIÊNG 1 SẢN PHẨM → không thêm sản phẩm bot "kể thêm" (xem giải
+    // thích ở nhánh /stream: bot nhắc Snow 12, Helix HD → thành card → rối).
+    allProducts = ragConfig.singleProductFocus
+      ? allProducts
+      : enrichProductsWithMentions(
+          ragResponse.answer,
+          allProducts,
+          effectiveLanguage,
+          12
+        );
+
     res.json({
       success: true,
       data: {
@@ -1772,11 +2267,31 @@ router.post('/with-file', async (req, res) => {
     
     // Build RAG config with file context
     const agentInstruction = getSystemInstruction(effectiveLanguage, agentPrompt, 'endUser', agentId);
-    const ragConfig: any = { 
-      systemInstruction: agentInstruction, 
+    const ragConfig: any = {
+      systemInstruction: agentInstruction,
       language: effectiveLanguage,
     };
-    
+
+    // ⭐ Danh mục tên sản phẩm THẬT của MADA → bot không bịa tên → luôn có link
+    try {
+      // ⚠️ KHÔNG truyền `null` (null = TOÀN BỘ catalog mọi bot) — bot sẽ nhắc tên
+      // sản phẩm thuộc bot khác. Lọc theo category + botId của bot đang chat.
+      // `with-file` không có sẵn biến `madaCategory` → derive từ agentId.
+      const withFileMadaCategory = AGENT_TO_MADA[agentId || '']?.madaCategory;
+      const cat = withFileMadaCategory
+        ? MADA_CATEGORY_TO_DB[withFileMadaCategory] || withFileMadaCategory
+        : null;
+      ragConfig.productCatalog = buildCatalogPromptBlock(
+        cat,
+        effectiveLanguage,
+        40,
+        null,
+        agentId || null
+      );
+    } catch (catErr) {
+      console.warn('[chat/with-file] Failed to build product catalog:', catErr);
+    }
+
     // Append file context to message if present
     const fullMessage = fileContext ? `${message}\n\n--- Attachment Context ---\n${fileContext}` : message;
     
@@ -1990,19 +2505,50 @@ router.post('/stream', async (req: any, res: any) => {
       chatHistory.set(convId, []);
     }
     chatHistory.get(convId)!.push({ role: 'user', content: message });
-    
+
+    // ⭐ ĐỊNH TUYẾN CHUYÊN MÔN: đang chat với Bot 7 (Thông tin bổ trợ) mà câu
+    // hỏi thuộc lĩnh vực riêng (thị giác, thính giác…) thì chuyển sang đúng bot
+    // chuyên môn, để header + tên bot khớp với nội dung trả lời.
+    let activeAgentId = agentId;
+    // ⭐ Client báo đã hỏi đủ 4 câu tiêu chuẩn chưa + user có hỏi thẳng về
+    // tên sản phẩm cụ thể không → quyết định có đưa catalog cho bot hay không.
+    const consultedQuestionsCompleted = req.body?.consultQuestionsCompleted === true;
+    // ⭐ Server TỰ nhận diện tên sản phẩm trong câu hỏi, KHÔNG tin cờ của client.
+    //
+    // ⚠️ VÌ SAO CẦN: `isExplicitProductQuery` do frontend gửi lên dựa trên danh
+    // sách TÊN SẢN PHẨM HARDCODED. Danh sách đó thiếu tên (VD "Luna Series"),
+    // nên khi khách hỏi "Luna Series là gì?" → cờ = false → server coi như
+    // câu hỏi chung → bot tự liệt kê Snow 12, Helix HD… dù khách chỉ hỏi 1 sản
+    // phẩm. Cờ client chỉ dùng để BỔ SUNG, không quyết định một mình.
+    const clientClaimsSpecific = req.body?.isExplicitProductQuery === true;
+    const isExplicitProductQuery =
+      clientClaimsSpecific || !!findKbProductByMessage(message, message, effectiveLanguage, agentId || undefined);
+    const currentBotId = agentId
+      ? (db.prepare('SELECT bot_id FROM admin_agents WHERE id = ?').get(agentId) as any)?.bot_id || agentId
+      : null;
+    const routedBotId = routeToSpecialistBot(message, currentBotId);
+    if (routedBotId) {
+      const routedAgent = db.prepare('SELECT id FROM admin_agents WHERE bot_id = ? AND is_active = 1').get(routedBotId) as any;
+      if (routedAgent) {
+        activeAgentId = routedAgent.id;
+        console.log(`🔀 [chat/stream] Route Bot 7 → ${routedBotId} (${routedAgent.id}) cho: "${message.slice(0, 60)}"`);
+        // Báo client để đổi header/label của khung chat cho khớp bot mới.
+        sendEvent({ type: 'agentSwitched', botId: routedBotId, agentId: routedAgent.id });
+      }
+    }
+
     // Build RAG config
     const validUserMode: 'endUser' | 'specialist' = userMode === 'specialist' ? 'specialist' : 'endUser';
-    const agentInstruction = getSystemInstruction(effectiveLanguage, agentPrompt, validUserMode, agentId);
+    const agentInstruction = getSystemInstruction(effectiveLanguage, agentPrompt, validUserMode, activeAgentId);
     
     // ⭐ FIX: Lấy botId/madaCategory từ DATABASE (không chỉ từ hardcoded mapping)
     let botId: string | null = null;
     let madaCategory: string | null = null;
     
-    if (agentId) {
+    if (activeAgentId) {
       // Bước 1: Thử lấy từ DB của agent
       try {
-        const agentRow = db.prepare('SELECT bot_id, mada_category FROM admin_agents WHERE id = ?').get(agentId) as any;
+        const agentRow = db.prepare('SELECT bot_id, mada_category FROM admin_agents WHERE id = ?').get(activeAgentId) as any;
         if (agentRow) {
           botId = agentRow.bot_id || null;
           madaCategory = agentRow.mada_category || null;
@@ -2013,7 +2559,7 @@ router.post('/stream', async (req: any, res: any) => {
       
       // Bước 2: Fallback sang AGENT_TO_MADA mapping nếu DB không có
       if (!botId || !madaCategory) {
-        const madaMapping = AGENT_TO_MADA[agentId];
+        const madaMapping = AGENT_TO_MADA[activeAgentId];
         if (madaMapping) {
           botId = botId || madaMapping.botId;
           madaCategory = madaCategory || madaMapping.madaCategory;
@@ -2028,7 +2574,51 @@ router.post('/stream', async (req: any, res: any) => {
       ragConfig.agentId = agentId; // ⭐ Luôn pass agentId để filter chính xác
       ragConfig.priority = true;
     }
-    
+
+    // ⭐ Đưa danh mục tên sản phẩm THẬT của MADA vào prompt.
+    // Nhờ vậy bot không bịa tên sản phẩm (tên bịa sẽ không có trong DB → không
+    // gắn được link) và mọi tên bot nhắc đều tồn tại → luôn có link sản phẩm.
+    //
+    // ⚠️ CHỈ đưa catalog khi client báo đã đủ 4 câu hỏi (hoặc user hỏi thẳng
+    // về sản phẩm cụ thể). Nếu luôn đưa, bot sẽ tự liệt kê sản phẩm ngay ở
+    // câu đầu tiên → vi phạm quy tắc "hỏi đủ 4 câu rồi mới tư vấn".
+    const dbCategoryForCatalog = madaCategory
+      ? MADA_CATEGORY_TO_DB[madaCategory] || madaCategory
+      : null;
+    // ⭐ Truyền botId để catalog chỉ chứa sản phẩm của ĐÚNG bot này
+    // (lọc theo category là chưa đủ vì `mobility`/`daily_living` bị chia sẻ).
+    const botIdForCatalog = activeAgentId || (madaCategory ? MADA_CATEGORY_TO_DB[madaCategory] : null);
+    const canRecommendProducts = consultedQuestionsCompleted || isExplicitProductQuery;
+    if (canRecommendProducts) {
+      try {
+        // ⭐ HỎI RIÊNG 1 SẢN PHẨM: tìm sản phẩm user nhắc tên. Nếu khớp được
+        // thì chỉ đưa ĐÚNG sản phẩm đó vào catalog + dặn bot không ra thêm
+        // sản phẩm khác (yêu cầu: hỏi gì tư vấn nấy, kèm ảnh).
+        const matched = isExplicitProductQuery
+          ? findKbProductByMessage(message, message, effectiveLanguage, activeAgentId || undefined)
+          : null;
+        const focusTitle = matched
+          ? (effectiveLanguage === 'en' && matched.title_en) || matched.title
+          : null;
+        if (focusTitle) {
+          ragConfig.singleProductFocus = focusTitle;
+        }
+
+        ragConfig.productCatalog = buildCatalogPromptBlock(
+          dbCategoryForCatalog,
+          effectiveLanguage,
+          40,
+          focusTitle,
+          botIdForCatalog
+        );
+      } catch (catErr) {
+        console.warn('[chat/stream] Failed to build product catalog:', catErr);
+      }
+    } else {
+      // Chưa đủ 4 câu → cấm bot nhắc tên sản phẩm.
+      ragConfig.noProductRecommendation = true;
+    }
+
     // ⭐ Track product IDs sent in this response (for done event + dedup on next turn)
     let sentProductIds: string[] = [];
 
@@ -2064,42 +2654,19 @@ router.post('/stream', async (req: any, res: any) => {
 
       // ⭐ Đợi user cung cấp đủ context trước khi gợi ý sản phẩm
       // ⭐ NHƯNG: Nếu user EXPLICITLY yêu cầu xem sản phẩm → show NGAY LẬP TỨC
-      if (shouldShow && (conversationTurns >= 3 || isReadyForProductSuggestion || isExplicitRequest)) {
-        // ⭐ Chỉ gợi ý sản phẩm KHI đã đủ context HOẶC user explicit yêu cầu
-        try {
-          let allProducts = [...scrapedProducts]; // Start with scraped products
-          // ⭐ Truyền shownProductIds và isAskingForOtherProducts để không lặp lại sản phẩm
-          const suggestedProducts = await getSuggestedProducts(streamResult.sources || [], message, effectiveLanguage, agentId, shownProductIds, isAskingForOtherProducts);
-
-
-          // Merge without duplicates
-          for (const p of suggestedProducts) {
-            const exists = allProducts.some((ap: any) => ap.product_url === p.product_url || ap.source_url === p.source_url);
-            if (!exists) {
-              allProducts.push(p);
-            }
-          }
-
-          if (allProducts.length > 0) {
-            sentProductIds = allProducts.map((p: any) => p.id).filter(Boolean);
-            // ⭐ ANTI-REPEAT: Track recommended products
-            sendEvent({ type: 'suggestedProducts', suggestedProducts: allProducts, autoScraped: scrapedProducts.length > 0 });
-          }
-        } catch (suggErr) {
-
-        }
-      } else if (scrapedProducts.length > 0) {
-        // Still send scraped products from URLs in message even if context not ready
-        sentProductIds = scrapedProducts.map((p: any) => p.id).filter(Boolean);
-        sendEvent({ type: 'suggestedProducts', suggestedProducts: scrapedProducts, autoScraped: true });
-      } else if (!shouldSuggestProducts && !isExplicitRequest && missingContext.length > 0) {
-        // ⭐ Chưa đủ context: gửi event để frontend biết cần hỏi thêm
-        sendEvent({ type: 'contextNeeded', missingContext, message: 'Cần hỏi thêm thông tin trước khi gợi ý sản phẩm' });
-      }
-      // Stream response (gom lại toàn bộ câu trả lời để lưu vào lịch sử hội thoại)
+      // ⭐ Stream response TRƯỚC, gom toàn bộ câu trả lời (cần biết bot nhắc tên
+      //    sản phẩm nào → gắn link đúng tên đó, không cần khách phải hỏi lại).
       let fullStreamedAnswer = '';
       if (streamResult.stream) {
         for await (const chunk of streamResult.stream) {
+          // ⭐ Engine yêu cầu thay toàn bộ nội dung đã stream (dùng khi cần
+          // gỡ tên sản phẩm vì người dùng chưa đủ 4 câu hỏi).
+          if ((chunk as any).__replaceFull) {
+            const replacement = String((chunk as any).__replaceFull || '');
+            sendEvent({ type: 'replaceFull', content: replacement });
+            fullStreamedAnswer = replacement;
+            continue;
+          }
           const chunkText = chunk.text();
           if (chunkText) {
             fullStreamedAnswer += chunkText;
@@ -2109,6 +2676,68 @@ router.post('/stream', async (req: any, res: any) => {
       } else if (streamResult.answer) {
         fullStreamedAnswer = streamResult.answer;
         sendEvent({ type: 'chunk', chunk: streamResult.answer });
+      }
+
+      // ⭐ Đợi user cung cấp đủ context trước khi gợi ý sản phẩm
+      // ⭐ NHƯNG: Nếu user EXPLICITLY yêu cầu xem sản phẩm → show NGAY LẬP TỨC
+      // ⭐⭐ FIX: `shouldShow &&` khiến bot đủ 4 câu rồi VẪN không hiện sản phẩm.
+      // 3 câu cuối khách chỉ trả lời ngắn ("45 tuổi", "2 năm rồi", "khó đọc
+      // sách") → không chứa từ khoá "sản phẩm/thiết bị/máy/gợi ý" →
+      // shouldShowProducts() = false → server KHÔNG gọi getSuggestedProducts.
+      //
+      // Đã đủ 4 câu hỏi (isReadyForProductSuggestion) là đủ điều kiện tư vấn:
+      // mỗi bot chuyên môn đã hỏi đủ bối cảnh thì PHẢI ra sản phẩm.
+      const shouldFetchProducts =
+        (shouldShow || isReadyForProductSuggestion) &&
+        (conversationTurns >= 3 || isReadyForProductSuggestion || isExplicitRequest);
+
+      if (shouldFetchProducts) {
+        // ⭐ Chỉ gợi ý sản phẩm KHI đã đủ context HOẶC user explicit yêu cầu
+        try {
+          let allProducts = [...scrapedProducts]; // Start with scraped products
+          // ⭐ Truyền shownProductIds và isAskingForOtherProducts để không lặp lại sản phẩm
+          const suggestedProducts = await getSuggestedProducts(streamResult.sources || [], message, effectiveLanguage, activeAgentId, shownProductIds, isAskingForOtherProducts);
+
+          // Merge without duplicates
+          for (const p of suggestedProducts) {
+            const exists = allProducts.some((ap: any) => ap.product_url === p.product_url || ap.source_url === p.source_url);
+            if (!exists) {
+              allProducts.push(p);
+            }
+          }
+
+          // ⭐ CRITICAL: Bảo đảm mọi sản phẩm bot ĐÃ NHẮC TÊN trong câu trả lời đều
+          // có mặt trong danh sách → frontend gắn link ngay tên đó.
+          // (Trước đây bot nhắc tên sản phẩm không nằm trong list → không có link.)
+          //
+          // ⚠️ HỎI RIÊNG 1 SẢN PHẨM → KHÔNG được thêm sản phẩm khác. Bot hay tự
+          // kể "có thể tham khảo thêm Snow 12, Helix HD…" → hàm này biến mấy tên
+          // đó thành card → khách hỏi riêng Luna Series lại thấy 4 card, rối.
+          // Ở đây chỉ giữ đúng sản phẩm bot tập trung.
+          allProducts = ragConfig.singleProductFocus
+            ? allProducts
+            : enrichProductsWithMentions(
+                fullStreamedAnswer,
+                allProducts,
+                effectiveLanguage,
+                12
+              );
+
+          if (allProducts.length > 0) {
+            sentProductIds = allProducts.map((p: any) => p.id).filter(Boolean);
+            // ⭐ ANTI-REPEAT: Track recommended products
+            sendEvent({ type: 'suggestedProducts', suggestedProducts: allProducts, autoScraped: scrapedProducts.length > 0 });
+          }
+        } catch (suggErr) {
+          console.warn('[chat/stream] getSuggestedProducts error:', suggErr);
+        }
+      } else if (scrapedProducts.length > 0) {
+        // Still send scraped products from URLs in message even if context not ready
+        sentProductIds = scrapedProducts.map((p: any) => p.id).filter(Boolean);
+        sendEvent({ type: 'suggestedProducts', suggestedProducts: scrapedProducts, autoScraped: true });
+      } else if (!shouldSuggestProducts && !isExplicitRequest && missingContext.length > 0) {
+        // ⭐ Chưa đủ context: gửi event để frontend biết cần hỏi thêm
+        sendEvent({ type: 'contextNeeded', missingContext, message: 'Cần hỏi thêm thông tin trước khi gợi ý sản phẩm' });
       }
       
       sendEvent({
@@ -2233,10 +2862,12 @@ router.post('/stream', async (req: any, res: any) => {
         // ⭐ Detect nếu user hỏi về "sản phẩm khác"
         const messageLower = (message || '').toLowerCase();
         const isAskingForOtherProductsFallback = /((còn|co|khác|other|another|more|another)|(sản phẩm|sp|thiết bị|product|device)(khác|else|more|additional)|(có|gì|có gì)(khác|else|nữa|more)|(list|show|hiển thị|gợi ý)(thêm|more|additional)|more products|more devices|more options|additional products)/i.test(messageLower);
-        if (shouldShowProducts(message) && (conversationTurns >= 3 || isReadyForProductSuggestion || isExplicitRequest)) {
+        const allowProductsStream = canRecommendProducts;
+      // ⭐⭐ Cùng lý do trên: đủ 4 câu thì KHÔNG được chặn bởi shouldShowProducts.
+      if (allowProductsStream && (shouldShowProducts(message) || canRecommendProducts) && (conversationTurns >= 3 || isReadyForProductSuggestion || isExplicitRequest)) {
           try {
             // ⭐ Truyền shownProductIds và isAskingForOtherProducts để không lặp lại sản phẩm
-            const suggestedProducts = await getSuggestedProducts([], message, effectiveLanguage, agentId, shownProductIds, isAskingForOtherProductsFallback);
+            const suggestedProducts = await getSuggestedProducts([], message, effectiveLanguage, activeAgentId, shownProductIds, isAskingForOtherProductsFallback);
             if (suggestedProducts.length > 0) {
               sentProductIds = suggestedProducts.map((p: any) => p.id).filter(Boolean);
               sendEvent({ type: 'suggestedProducts', suggestedProducts });
@@ -2824,6 +3455,22 @@ router.post('/consultation/direct', async (req, res) => {
         ragConfig.agentId = agentId;
         ragConfig.priority = true;
       }
+    }
+
+    // ⭐ Danh mục tên sản phẩm THẬT của MADA → bot không bịa tên → luôn có link
+    try {
+      const cat = ragConfig.madaCategory
+        ? MADA_CATEGORY_TO_DB[ragConfig.madaCategory] || ragConfig.madaCategory
+        : null;
+      ragConfig.productCatalog = buildCatalogPromptBlock(
+        cat,
+        effectiveLanguage,
+        40,
+        null,
+        agentId || null
+      );
+    } catch (catErr) {
+      console.warn('[chat] Failed to build product catalog:', catErr);
     }
     
     const ragResponse = await ragEngine.query(message, [], ragConfig);

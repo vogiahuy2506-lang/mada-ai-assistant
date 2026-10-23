@@ -653,4 +653,158 @@ router.get('/pricing-plans', (req, res) => {
   }
 });
 
+// ============== SUGGESTED QUESTIONS (Public - for ChatPage) ==============
+// GET /api/public/suggested-questions - Get suggested questions for chat UI (no auth required)
+
+router.get('/suggested-questions', (req, res) => {
+  try {
+    const { category, view_mode, language, agent_id, limit = '50' } = req.query;
+    const userLang: SupportedLang = ['vi', 'en', 'ar', 'fr'].includes(String(language))
+      ? String(language) as SupportedLang
+      : 'vi';
+    const lim = Math.min(parseInt(String(limit)) || 50, 100);
+
+    // Check if table exists
+    const tableCheck = db
+      .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='suggested_questions'")
+      .get();
+    if (!tableCheck) {
+      return res.json({
+        success: true,
+        data: [],
+        message: 'Suggested questions table not found',
+      });
+    }
+
+    let sql = `
+      SELECT * FROM suggested_questions 
+      WHERE is_active = 1
+    `;
+    const params: any[] = [];
+
+    // Filter by category
+    if (category) {
+      sql += ' AND category = ?';
+      params.push(category);
+    }
+
+    // Filter by view_mode (end_user or at_specialist)
+    if (view_mode) {
+      sql += ' AND view_mode = ?';
+      params.push(view_mode);
+    }
+
+    // Filter by language - prefer user's language, fallback to Vietnamese
+    if (userLang === 'vi') {
+      sql += ' AND language = ?';
+      params.push('vi');
+    } else {
+      // Try to get user's language, fallback to Vietnamese
+      sql += ' AND language IN (?, ?)';
+      params.push(userLang, 'vi');
+    }
+
+    // Filter by agent_id (optional - for agent-specific questions)
+    if (agent_id) {
+      sql += ' AND (agent_id = ? OR agent_id IS NULL)';
+      params.push(agent_id);
+    } else {
+      // By default, only get general questions (no specific agent)
+      sql += ' AND agent_id IS NULL';
+    }
+
+    sql += ' ORDER BY sort_order ASC LIMIT ?';
+    params.push(lim);
+
+    const questions = db.prepare(sql).all(...params);
+
+    res.json({
+      success: true,
+      data: questions,
+      meta: {
+        category: category || 'all',
+        view_mode: view_mode || 'all',
+        language: userLang,
+        count: questions.length,
+      },
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/public/suggested-questions/all - Get all suggested questions grouped by category (for welcome screen)
+
+router.get('/suggested-questions/all', (req, res) => {
+  try {
+    const { view_mode, language } = req.query;
+    const userLang: SupportedLang = ['vi', 'en', 'ar', 'fr'].includes(String(language))
+      ? String(language) as SupportedLang
+      : 'vi';
+
+    // Check if table exists
+    const tableCheck = db
+      .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='suggested_questions'")
+      .get();
+    if (!tableCheck) {
+      return res.json({
+        success: true,
+        data: {},
+        message: 'Suggested questions table not found',
+      });
+    }
+
+    // Build query to get questions grouped by category
+    let sql = `
+      SELECT * FROM suggested_questions 
+      WHERE is_active = 1
+        AND (agent_id IS NULL)
+    `;
+    const params: any[] = [];
+
+    if (view_mode) {
+      sql += ' AND view_mode = ?';
+      params.push(view_mode);
+    }
+
+    sql += ' ORDER BY category, sort_order ASC';
+    const questions = db.prepare(sql).all(...params) as any[];
+
+    // Group by category
+    const grouped: Record<string, any[]> = {};
+    for (const q of questions) {
+      const cat = q.category || 'general';
+      if (!grouped[cat]) grouped[cat] = [];
+      grouped[cat].push(q);
+    }
+
+    // For each category, prefer user's language, fallback to Vietnamese
+    const result: Record<string, any[]> = {};
+    for (const [cat, catQuestions] of Object.entries(grouped)) {
+      // Find question in user's language
+      const langQuestion = catQuestions.find((q: any) => q.language === userLang);
+      // Fallback to Vietnamese
+      const viQuestion = catQuestions.find((q: any) => q.language === 'vi');
+      // Use whichever found, prefer user's lang
+      result[cat] = [{
+        ...(langQuestion || viQuestion || catQuestions[0]),
+        // Include all languages as fallback
+        allLanguages: catQuestions,
+      }];
+    }
+
+    res.json({
+      success: true,
+      data: result,
+      meta: {
+        view_mode: view_mode || 'all',
+        language: userLang,
+        categories: Object.keys(result),
+      },
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 export default router;

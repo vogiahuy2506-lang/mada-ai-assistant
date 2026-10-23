@@ -43,7 +43,15 @@ async function callGeminiWithProxy(apiKey: string, modelName: string, prompt: st
   try {
     const body: any = {
       contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.1, maxOutputTokens: 2048 },
+      generationConfig: {
+        temperature: 0.1,
+        // ⚠️ PHẢI đủ lớn: Gemini 2.5 dùng "thinking tokens" trước khi trả lời.
+        // Với maxOutputTokens=2048 và 28 tài liệu, phần thinking + JSON bị TRUNCATE
+        // → parse fail → fallback về RRF score (~0.016) → threshold 0.5 loại hết docs.
+        maxOutputTokens: 8192,
+        // Tắt thinking để không đốt token budget vào suy luận thừa.
+        thinkingConfig: { thinkingBudget: 0 },
+      },
     };
     if (tools?.length > 0) body.tools = tools;
 
@@ -185,6 +193,7 @@ export class RerankService {
             scores = this.parseScores(text, items.length);
           }
         }
+        console.log(`🔬 [rerank] rawScores=${scores.length} sample=${JSON.stringify(scores.slice(0, 5))} max=${Math.max(...scores, 0)}`);
       } catch (schemaError: any) {
         // Schema failed - fallback to text parsing
         console.warn('⚠️ Rerank schema parsing failed, using text fallback:', schemaError.message?.slice(0, 80));
@@ -204,6 +213,14 @@ export class RerankService {
       // Nếu vẫn không có scores, dùng fallback ranking
       if (scores.length === 0) {
         console.warn('⚠️ RerankService: No scores extracted, falling back to original scores');
+        return this.fallbackRank(items, cfg);
+      }
+
+      // ⚠️ Lưới an toàn: model trả toàn 0 (đọc nhầm prompt / response rỗng) sẽ khiến
+      // filter `score >= minScore` loại sạch mọi docs → RAG mất hoàn toàn context.
+      // Trong trường hợp này coi như rerank thất bại và dùng fallback ranking.
+      if (scores.every((s) => !Number.isFinite(s) || s <= 0)) {
+        console.warn('⚠️ RerankService: All scores are 0 — model returned no usable signal. Using fallback ranking.');
         return this.fallbackRank(items, cfg);
       }
 
@@ -272,29 +289,74 @@ QUAN TRỌNG: Chỉ trả về JSON object, không thêm markdown code block hay
   }
 
   private parseScores(text: string, expectedCount: number): number[] {
+    const cleaned = text
+      .replace(/^```json\s*/i, '')
+      .replace(/^```\s*/i, '')
+      .replace(/```\s*$/i, '')
+      .trim();
+
+    // 1) JSON đầy đủ
     try {
-      // Loại bỏ markdown code block nếu có
-      const cleaned = text
-        .replace(/^```json\s*/i, '')
-        .replace(/^```\s*/i, '')
-        .replace(/```\s*$/i, '')
-        .trim();
-
       const parsed = JSON.parse(cleaned);
-
-      if (Array.isArray(parsed.scores) && parsed.scores.length === expectedCount) {
-        return parsed.scores.map((s) => {
-          const n = Number(s);
-          if (Number.isNaN(n)) return 0;
-          return Math.max(0, Math.min(1, n));
-        });
+      if (Array.isArray(parsed?.scores)) {
+        return this.normalizeScores(parsed.scores, expectedCount);
       }
-    } catch (err) {
-      console.warn('⚠️ RerankService: Failed to parse scores', { text: text.slice(0, 200) });
+    } catch {
+      // tiếp tục thử các cách khác
     }
 
-    // Fallback: đều 0.5
+    // 2) ⭐ JSON BỊ TRUNCATE (Gemini hết maxOutputTokens) — thường dạng:
+    //    `{"scores": [0.9, 0.7, 0.8, ...` (thiếu dấu `]}`).
+    //    ⚠️ Regex cũ `"scores"\s*:\s*\[([\s\S]*?)\]?` SAI: `\]?` optional + lazy
+    //    khiến capture rỗng ("" → Number("")=0 → mảng toàn 0 → threshold 0.5 loại hết docs).
+    //    Dùng `*?` thay vì `*` + non-greedy để dừng tại `]` ĐẦU TIÊN có thật;
+    //    nếu không có `]` (truncate) thì lấy hết phần còn lại.
+    const arrMatch = cleaned.match(/"scores"\s*:\s*\[([^\]]*)\]?/i);
+    if (arrMatch) {
+      const nums = arrMatch[1]
+        .split(',')
+        .map((s) => Number(s.trim()))
+        .filter((n) => !Number.isNaN(n));
+      if (nums.length > 0) {
+        return this.normalizeScores(nums, expectedCount);
+      }
+    }
+
+    // 3) Mảng số trần, không có key
+    const bareMatch = cleaned.match(/\[[\s\S]*?\]/);
+    if (bareMatch) {
+      try {
+        const arr = JSON.parse(bareMatch[0]);
+        if (Array.isArray(arr) && arr.length > 0) {
+          return this.normalizeScores(arr, expectedCount);
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    console.warn('⚠️ RerankService: Could not parse scores, defaulting to 0.5');
     return new Array(expectedCount).fill(0.5);
+  }
+
+  /**
+   * Chuẩn hoá scores về đúng độ dài expectedCount và ép về khoảng [0,1].
+   * Nếu model trả về nhiều hơn → cắt; ít hơn → pad bằng giá trị cuối.
+   */
+  private normalizeScores(scores: any[], expectedCount: number): number[] {
+    const cleaned = scores.map((s) => {
+      const n = Number(s);
+      if (Number.isNaN(n)) return 0;
+      return Math.max(0, Math.min(1, n));
+    });
+
+    if (cleaned.length === expectedCount) return cleaned;
+    if (cleaned.length > expectedCount) return cleaned.slice(0, expectedCount);
+
+    // Pad: lấy trung bình phần còn lại (giữ nguyên tín hiệu thay vì 0 tuyệt đối)
+    const avg = cleaned.length > 0 ? cleaned.reduce((a, b) => a + b, 0) / cleaned.length : 0.5;
+    while (cleaned.length < expectedCount) cleaned.push(avg);
+    return cleaned;
   }
 
   private explainScore(query: string, item: RerankableItem, score: number): string {
@@ -314,18 +376,38 @@ QUAN TRỌNG: Chỉ trả về JSON object, không thêm markdown code block hay
   }
 
   /**
-   * Fallback: dùng original score từ vector search
+   * Fallback khi không có rerank model (Gemini lỗi / hết token).
+   *
+   * ⚠️ `item.score` từ hybrid search là RRF fused score — giá trị RẤT NHỎ
+   * (thường ~0.01-0.02) vì công thức 1/(60+rank). Dùng trực tiếp làm
+   * `rerankScore` sẽ bị threshold 0.5 loại sạch mọi docs → RAG rỗng.
+   *
+   * Vì vậy: chuẩn hoá score về thang [0,1] theo max score trong batch,
+   * rồi map sang khoảng [0.5, 0.9] để tài liệu đã retrieve vẫn được giữ
+   * (context có giá trị hơn là không có context) nhưng vẫn thấp hơn điểm
+   * rerank thật (0.9+) để ưu tiên đúng.
    */
   private fallbackRank<T extends RerankableItem>(
     items: T[],
     cfg: RerankConfig
   ): RerankResult<T>[] {
+    const scores = items.map((i) => i.score ?? 0);
+    const maxScore = Math.max(...scores, 0);
+    const minScore = Math.min(...scores, 0);
+    const range = maxScore - minScore;
+
+    const normalize = (s: number): number => {
+      if (range <= 0) return 0.6;
+      const rel = (s - minScore) / range; // 0..1
+      return 0.5 + rel * 0.4; // map sang [0.5, 0.9]
+    };
+
     return items
       .map((item) => ({
         item,
-        rerankScore: item.score ?? 0.5,
+        rerankScore: normalize(item.score ?? 0),
         originalScore: item.score,
-        reason: 'Ranked by original vector similarity (no rerank model)',
+        reason: 'Ranked by original vector similarity (rerank model unavailable)',
       }))
       .sort((a, b) => b.rerankScore - a.rerankScore)
       .slice(0, cfg.topN);

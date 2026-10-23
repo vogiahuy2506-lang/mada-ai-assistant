@@ -31,6 +31,12 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error('🔴 React Error:', error, errorInfo);
+    // Expose the stack on window so devtools/CDP can read it directly.
+    (window as any).__REACT_ERROR_STACK__ = {
+      message: error?.message,
+      stack: error?.stack,
+      componentStack: errorInfo?.componentStack,
+    };
   }
 
   // Get translations safely - don't call hooks in class components

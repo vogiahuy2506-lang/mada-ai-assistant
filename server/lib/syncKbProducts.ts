@@ -14,6 +14,7 @@
  */
 
 import db from '../lib/db';
+import { resolveMadaCategory } from './categoryMapping';
 
 export interface KbProduct {
   id: string;
@@ -81,13 +82,18 @@ export function syncProductToKnowledge(product: KbProduct): {
   const existing = findKnowledgeItemByProduct(product);
 
   // Build content body (giúp AI semantic search)
+  // ⚠️ ƯU TIÊN `product.content` — đây là field chứa mô tả chi tiết thật.
+  // `product.description` thường chỉ là metadata ("Operating System: Other")
+  // → dùng nó làm body sẽ khiến vector store index toàn bộ chuỗi vô nghĩa.
+  const body = (product.content || '').trim() || (product.description || '').trim();
+
   const contentParts = [
     product.title,
     product.title_en ? `(${product.title_en})` : '',
     product.brand ? `Thương hiệu: ${product.brand}` : '',
     product.model ? `Model: ${product.model}` : '',
     product.price_range ? `Giá: ${product.price_range}` : '',
-    product.description || '',
+    body,
     product.description_en ? `[EN] ${product.description_en}` : '',
     product.wcag_level ? `WCAG level: ${product.wcag_level}` : '',
     product.who_gate_area ? `WHO GATE area: ${product.who_gate_area}` : '',
@@ -97,6 +103,9 @@ export function syncProductToKnowledge(product: KbProduct): {
   const content = contentParts.join('\n');
 
   // Build metadata (bao gồm thumbnailUrl cho chat UI)
+  // ⭐ botId + madaCategory BẮT BUỘC: vector store lọc theo 2 field này.
+  // Thiếu chúng → filter theo bot (VD bot-hearing) khớp 0 docs → RAG rỗng.
+  const cat = resolveMadaCategory(product.category);
   const metadata: any = {
     productId: product.id,
     productUrl: product.product_url || product.source_url || '',
@@ -112,6 +121,8 @@ export function syncProductToKnowledge(product: KbProduct): {
     sortOrder: product.sort_order,
     importedFromKbProduct: true,
     importedAt: new Date().toISOString(),
+    category: product.category || 'general',
+    ...(cat ? { botId: cat.botId, madaCategory: cat.madaCategory } : {}),
   };
 
   if (existing) {

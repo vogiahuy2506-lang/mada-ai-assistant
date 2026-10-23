@@ -27,6 +27,31 @@ import { getImageUrl } from '@/lib/imageProxy';
 import { onAgentChange } from '@/lib/agentBroadcast';
 import { onSettingsChange } from '@/lib/settingsBroadcast';
 import { MADA_BOTS } from '@/lib/madaBots';
+import {
+  getNextConsultQuestion,
+  hasCompletedConsultQuestions,
+  getSafeNextConsultQuestion,
+  detectAskedQuestions,
+  stripAlreadyAskedQuestions,
+} from '@/lib/consultQuestions';
+
+/** Bỏ dấu + hạ chữ + gộp khoảng trắng, để so khớp câu hỏi không vướng format. */
+function normalizeText(s: string): string {
+  return (s || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[?!.,;:]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * ⭐⭐⭐ TUYỆT ĐỐI KHÔNG LẶP CÂU HỎI.
+ *
+ * Hàm `stripAlreadyAskedQuestions` nằm trong `@/lib/consultQuestions` để dùng
+ * chung và kiểm thử được. Xem file đó để biết chi tiết.
+ */
 
 // ⭐ Helper: Staggered fetch with retry to avoid 429 rate limiting
 async function staggeredFetch(url: string, delayMs: number = 100, retries: number = 3): Promise<Response> {
@@ -400,6 +425,18 @@ function detectCategoryFromQuery(query: string): string {
 /**
  * ⭐ HELPER: Convert product names in markdown text to clickable links
  * Finds product names in the content and replaces them with markdown links using product_url
+ *
+ * ⚠️ VÌ SAO CẦN VIẾT LẠI:
+ * 1. Bản cũ dùng `result.indexOf(match)` để lấy vị trí → luôn trả về vị trí
+ *    ĐẦU TIÊN của tên, nên khi tên xuất hiện nhiều lần thì các lần sau bị
+ *    gắn link sai (hoặc không gắn). Nay dùng `offset` từ callback `replace`.
+ * 2. `\b` (word boundary) KHÔNG khớp với tên sản phẩm kết thúc bằng ký tự
+ *    không phải chữ/số — VD "Chatpack Desktop Sound Field System (Model TA-1)"
+ *    hay "Echo® 2.4G Wireless Neckloop System" → tên sản phẩm bị bỏ sót,
+ *    không có link. Nay dùng kiểm tra biên "ký tự trước/sau" tự định nghĩa.
+ * 3. Bản cũ nuốt mất **bold** khi gắn link (`**Tên**` → `[Tên](url)`).
+ *    Nay giữ nguyên bold: `**[Tên](url)**`.
+ * 4. Bỏ qua nội dung đã nằm trong markdown link sẵn.
  */
 function convertProductNamesToLinks(
   content: string,
@@ -409,89 +446,134 @@ function convertProductNamesToLinks(
     return content;
   }
 
-  let result = content;
+  // ============== BƯỚC 1: TÁCH CÁC ĐOẠN ĐÃ ĐƯỢC LINK SẴN ==============
+  // Tách ra trước để không bao giờ gắn link chồng lên link.
+  const segments: Array<{ text: string; isLink: boolean }> = [];
+  const linkRegex = /\[([^\]]*)\]\(([^)]+)\)/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while ((match = linkRegex.exec(content)) !== null) {
+    if (match.index > lastIndex) {
+      segments.push({ text: content.slice(lastIndex, match.index), isLink: false });
+    }
+    segments.push({ text: match[0], isLink: true });
+    lastIndex = match.index + match[0].length;
+  }
+  if (lastIndex < content.length) {
+    segments.push({ text: content.slice(lastIndex), isLink: false });
+  }
 
-  // Track which positions have already been linked to avoid double-linking
-  const linkedRanges: { start: number; end: number }[] = [];
+  // ============== BƯỚC 2: TÌM TẤT CẢ VỊ TRÍ KHỚP (một lần quét duy nhất) ==============
+  // ⚠️ Vì sao không làm `for (candidate) { text = text.replace(...) }`:
+  // Sau khi candidate #1 đã gắn link, candidate #2 (biến thể lỏng) sẽ quét lại
+  // text đã thay đổi → có thể gắn link lồng nhau. Vì vậy ta gom TẤT CẢ vị trí
+  // khớp trước, chọn match dài nhất tại mỗi vị trí, rồi mới áp dụng từ cuối
+  // về đầu (để offset không bị dịch).
+  type NameCandidate = { pattern: RegExp; url: string; name: string };
+  const candidates: NameCandidate[] = [];
+
+  /**
+   * Tạo "biến thể lỏng" của tên sản phẩm để khớp khi bot viết khác một chút:
+   *   • Bỏ ký hiệu ® ™ © ° (VD: "Echo® 2.4G" vs "Echo 2.4G")
+   *   • Cho phép khoảng trắng linh hoạt giữa các từ (VD: "TA-1" vs "TA - 1")
+   * Không dùng cho tên quá ngắn (< 5 ký tự) để tránh match nhầm.
+   */
+  const buildLoosePattern = (rawName: string): RegExp | null => {
+    const stripped = rawName.replace(/[\u00ae\u2122\u00a9\u00b0]/g, '').trim();
+    if (stripped.length < 5) return null;
+
+    // Escape từng phần, cho phép khoảng trắng linh hoạt giữa các token
+    const tokens = stripped.split(/\s+/).map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    const body = tokens.join('\\s+');
+    return new RegExp(`(?<![A-Za-z0-9])(${body})(?![A-Za-z0-9])`, 'gi');
+  };
 
   for (const product of products) {
-    // Get the best URL for this product
     const url = product.product_url || product.source_url;
     if (!url || !url.startsWith('http')) continue;
 
-    // Create a regex-friendly version of the product name
-    const productName = product.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    if (productName.length < 2) continue; // Skip very short names
-
-    // Helper to check if a position is already linked
-    const isPositionLinked = (pos: number): boolean => {
-      return linkedRanges.some(range => pos >= range.start && pos <= range.end);
-    };
-
-    // Helper to mark a range as linked
-    const markAsLinked = (start: number, end: number) => {
-      linkedRanges.push({ start, end });
-    };
-
-    // Pattern 1: Bold markdown **ProductName**
-    const boldPattern = new RegExp(`\\*\\*(${productName})\\*\\*`, 'gi');
-    
-    result = result.replace(boldPattern, (match, name) => {
-      // Don't link if already linked
-      const matchIndex = result.indexOf(match);
-      if (isPositionLinked(matchIndex)) return match;
-      
-      markAsLinked(matchIndex, matchIndex + match.length);
-      return `[${name}](${url})`;
-    });
-
-    // Pattern 2: Plain product name (not already linked)
-    // Use word boundary for better matching
-    const plainPattern = new RegExp(`\\b(${productName})\\b`, 'gi');
-    
-    result = result.replace(plainPattern, (match) => {
-      // Don't link if it's inside a markdown link [text](url)
-      const matchIndex = result.indexOf(match);
-      if (isPositionLinked(matchIndex)) return match;
-      
-      // Check context: don't link if preceded by []( or similar
-      const beforeStart = Math.max(0, matchIndex - 5);
-      const beforeContext = result.substring(beforeStart, matchIndex);
-      if (beforeContext.endsWith('](') || beforeContext.endsWith('[')) return match;
-      
-      markAsLinked(matchIndex, matchIndex + match.length);
-      return `[${match}](${url})`;
-    });
-
-    // Pattern 3: Also try with title_en if different from title
+    const names = [product.title];
     if (product.title_en && product.title_en !== product.title) {
-      const productNameEn = product.title_en.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      if (productNameEn.length >= 2) {
-        // Bold pattern for English name
-        const boldPatternEn = new RegExp(`\\*\\*(${productNameEn})\\*\\*`, 'gi');
-        result = result.replace(boldPatternEn, (match, name) => {
-          const matchIndex = result.indexOf(match);
-          if (isPositionLinked(matchIndex)) return match;
-          markAsLinked(matchIndex, matchIndex + match.length);
-          return `[${name}](${url})`;
-        });
+      names.push(product.title_en);
+    }
 
-        // Plain pattern for English name
-        const plainPatternEn = new RegExp(`\\b(${productNameEn})\\b`, 'gi');
-        result = result.replace(plainPatternEn, (match) => {
-          const matchIndex = result.indexOf(match);
-          if (isPositionLinked(matchIndex)) return match;
-          const beforeStart = Math.max(0, matchIndex - 5);
-          const beforeContext = result.substring(beforeStart, matchIndex);
-          if (beforeContext.endsWith('](') || beforeContext.endsWith('[')) return match;
-          markAsLinked(matchIndex, matchIndex + match.length);
-          return `[${match}](${url})`;
-        });
+    for (const rawName of names) {
+      if (!rawName || rawName.length < 2) continue;
+
+      const escaped = rawName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      // Không dùng \b — dùng lookahead/lookbehind trên ranh giới từ tự định nghĩa.
+      // (?<![A-Za-z0-9]) : ký tự trước không phải chữ/số
+      // (?![A-Za-z0-9])  : ký tự sau không phải chữ/số
+      const pattern = new RegExp(
+        `(?<![A-Za-z0-9])(${escaped})(?![A-Za-z0-9])`,
+        'gi'
+      );
+      candidates.push({ pattern, url, name: rawName });
+
+      // Thêm biến thể lỏng (bỏ ký hiệu đặc biệt, khoảng trắng linh hoạt)
+      const loose = buildLoosePattern(rawName);
+      if (loose) {
+        candidates.push({ pattern: loose, url, name: rawName });
       }
     }
   }
 
-  return result;
+  if (candidates.length === 0) return content;
+
+  for (const segment of segments) {
+    if (segment.isLink) continue;
+
+    const text = segment.text;
+
+    // --- Gom tất cả vị trí khớp ---
+    type Hit = { start: number; end: number; url: string; len: number };
+    const hits: Hit[] = [];
+
+    for (const { pattern, url } of candidates) {
+      // Dùng matchAll để lấy chính xác index của từng lần khớp
+      const re = new RegExp(pattern.source, pattern.flags.includes('g') ? pattern.flags : pattern.flags + 'g');
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(text)) !== null) {
+        const start = m.index;
+        const end = start + m[0].length;
+
+        // Bỏ qua nến nằm ngay sau "[" hoặc "](" (đã nằm trong markdown link)
+        const before = text.slice(Math.max(0, start - 2), start);
+        if (before.endsWith('](') || before.endsWith('[')) continue;
+
+        hits.push({ start, end, url, len: m[0].length });
+        if (m[0].length === 0) re.lastIndex++; // tránh vòng lặp vô hạn
+      }
+    }
+
+    if (hits.length === 0) continue;
+
+    // --- Loại bỏ các hit bị chồng lấn, ưu tiên match DÀI NHẤT ---
+    hits.sort((a, b) => (a.start - b.start) || (b.len - a.len));
+    const accepted: Hit[] = [];
+    let lastEnd = -1;
+    for (const hit of hits) {
+      if (hit.start < lastEnd) continue; // chồng lấn với hit trước → bỏ
+      accepted.push(hit);
+      lastEnd = hit.end;
+    }
+
+    // --- Áp dụng từ cuối về đầu để offset không bị dịch ---
+    let result = text;
+    for (let i = accepted.length - 1; i >= 0; i--) {
+      const { start, end, url } = accepted[i];
+      const original = result.slice(start, end);
+
+      // ⭐ Giữ nguyên **bold**: các dấu ** đã nằm sẵn trong text quanh tên
+      //    (VD "**Tên**") nên chỉ cần thay tên bằng link là ra
+      //    "**[Tên](url)**" — KHÔNG tự thêm ** (sẽ thành ****).
+      result = result.slice(0, start) + `[${original}](${url})` + result.slice(end);
+    }
+
+    segment.text = result;
+  }
+
+  return segments.map(s => s.text).join('');
 }
 
 const PRODUCT_LINKS_HEADING: Record<string, string> = {
@@ -1008,8 +1090,8 @@ export function ChatPage() {
   const logout = useAuthStore((s) => s.logout);
   const authModal = useAuthModalStore();
 
-  // Chat settings from admin
-  const { greeting, description, suggestedPrompts, fileAttachmentEnabled, showSuggestedQuestions, loadFromBackend: loadChatSettings } = useChatSettingsStore();
+  // Chat settings from admin (greeting, description, showSuggestedQuestions, fileAttachmentEnabled)
+  const { greeting, description, showSuggestedQuestions, fileAttachmentEnabled, loadFromBackend: loadChatSettings } = useChatSettingsStore();
 
   const [inputValue, setInputValue] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -2011,6 +2093,33 @@ export function ChatPage() {
   const attachmentMenuRef = useRef<HTMLDivElement>(null);
 
   const isEndUser = viewMode === 'end_user';
+
+  // ⭐ Suggested Questions from database (linked with AdminSuggestedQuestions)
+  const [suggestedQuestionsData, setSuggestedQuestionsData] = useState<Record<string, any[]>>({});
+  const [suggestedQuestionsLoading, setSuggestedQuestionsLoading] = useState(true);
+
+  // Fetch suggested questions from public API
+  const fetchSuggestedQuestions = useCallback(async () => {
+    try {
+      setSuggestedQuestionsLoading(true);
+      const vm = isEndUser ? 'end_user' : 'at_specialist';
+      const res = await fetch(`/api/public/suggested-questions/all?view_mode=${vm}&language=${language}`);
+      const data = await res.json();
+      if (data.success) {
+        setSuggestedQuestionsData(data.data || {});
+      }
+    } catch (err) {
+      console.error('[ChatPage] Failed to fetch suggested questions:', err);
+    } finally {
+      setSuggestedQuestionsLoading(false);
+    }
+  }, [language, isEndUser]);
+
+  // Fetch on mount and when language/viewMode changes
+  useEffect(() => {
+    fetchSuggestedQuestions();
+  }, [fetchSuggestedQuestions]);
+
   const currentQuestions = activeCategory 
     ? getSampleQuestionsByLang(activeCategory, language)
     : [];
@@ -2452,6 +2561,51 @@ export function ChatPage() {
     return explicitCommands.some(cmd => contentLower.includes(cmd));
   };
 
+  // ⭐ Danh sách tên sản phẩm thật (đồng bộ từ kb_products, cập nhật 22/10/2026).
+  // Dùng để nhận diện "user hỏi thẳng về SẢN PHẨM CỤ THỂ" — trường hợp này
+  // được phép bỏ qua bộ 4 câu hỏi và tư vấn ngay.
+  //
+  // ⚠️ ĐÂY CHỈ LÀ "MẪU ĐỂNH HÌNH"; KHÔNG phải nguồn sự thật:
+  // server tự nhận diện tên sản phẩm từ DB (`findKbProductByMessage`), nên tên
+  // có trong catalog mà thiếu ở đây vẫn chạy đúng. Danh sách này chỉ giúp
+  // client biết sớm để bỏ qua bộ 4 câu hỏi.
+  //
+  // ⚠️ Cố ý KHÔNG dùng các cụm chung như "thiết bị", "máy", "sản phẩm",
+  // "khó đọc" vì gần như mọi câu hỏi về AT đều chứa chúng → bot sẽ tư vấn
+  // ngay mà không hỏi đủ 4 câu.
+  const KNOWN_PRODUCT_NAMES = [
+    'orcam', 'orcam read', 'orcam myeye', 'orcam advance',
+    'jaws', 'nvda', 'zoomtext', 'izoom', 'dragon professional', 'dragon',
+    'screen reader', 'mách đọc màn hình',
+    'reveal', 'aurora hd', 'helix hd', 'compact 6', 'focus 14', 'blaze et',
+    'clearview', 'clareo', 'smart magnifier', 'luna', 'luna series',
+    'snow 12', 'pegasus', 'mira', 'argus',
+    'braillenote', 'braillesense', 'braille display', 'màn hình chữ nổi',
+    'bookman', 'pedant', 'type 4', 'braille embosser',
+    'tele tv', 'envision glasses', 'acesight', 'mắt kính thông minh',
+    'phonic', 'myvoice', 'vn', 'voice', 'talking tablet',
+    'dragon', 'dragon speech', 'tobi dynavox', 'proloquo', 'go talk',
+    'grid', 'neuro node', 'mega core',
+    'oticon', 'phonak', 'widex', 'signia', 'resound', 'rexton', 'unitron',
+    'liestech', 'comfort audio', 'oticon charm', 'xelsys', 'mỏm chú ý',
+    'oticon bone', 'cochlear', 'baha', 'bionik',
+    'wheelchair', 'xe lăn', 'permobil', 'quickie', 'ottobock', 'sunrise',
+    'electric wheelchair', 'xe điện', 'ghế xe điện',
+    'walkaid', 'rollator', 'giày thông minh', 'smart shoes',
+    'hands-free', 'lightbox', 'emotion', 'talking watch',
+  ];
+
+  /**
+   * ⭐ "Hỏi thẳng về sản phẩm" = user nhắc TÊN SẢN PHẨM CỤ THỂ.
+   * Các cụm chung ("cần thiết bị gì", "khó đọc sách") KHÔNG được tính —
+   * những trường hợp đó vẫn phải qua bộ 4 câu hỏi.
+   */
+  const mentionsSpecificProduct = (message: string): boolean => {
+    const lower = (message || '').toLowerCase();
+    if (!lower.trim()) return false;
+    return KNOWN_PRODUCT_NAMES.some(name => lower.includes(name));
+  };
+
   const handleSend = async () => {
     if (!inputValue.trim() || isLoading) return;
 
@@ -2462,7 +2616,9 @@ export function ChatPage() {
     );
 
     // ⭐ NEW: Check if user is explicitly asking about products (show products immediately)
-    const userExplicitlyRequestsProducts = isExplicitProductRequest(userMessage);
+    // ⭐ Chỉ coi là "hỏi thẳng" khi nhắc TÊN SẢN PHẨM cụ thể (VD "cho tôi xem OrCam Read").
+    // Cụm chung như "cần thiết bị gì" vẫn phải qua bộ 4 câu hỏi.
+    const userExplicitlyRequestsProducts = mentionsSpecificProduct(userMessage);
     
     // If user explicitly asks about products, set approval to true to show products
     if (userExplicitlyRequestsProducts) {
@@ -2512,8 +2668,29 @@ export function ChatPage() {
     // ⚠️ Lưu ý: setState trong React là async batched, nên cần tính toán context ngay
     // để truyền vào request body (ko chờ re-render)
     
-    // ⭐ MỚI: Lấy toàn bộ lịch sử hội thoại để phân tích context
-    const allMessages = useChatStore.getState().messages;
+// ⭐ MỚI: Lấy toàn bộ lịch sử hội thoại để phân tích context
+  const allMessages = useChatStore.getState().messages;
+
+    // ⭐ Danh sách nội dung tin nhắn của USER (không tính tin của bot) — dùng để
+    // biết user đã trả lời câu nào trong bộ 4 câu hỏi tiêu chuẩn.
+    const pastUserMessages = allMessages
+      .filter((m: Message) => m.role === 'user')
+      .map((m: Message) => m.content || '');
+    // Tin nhắn hiện tại của user cũng phải được tính (nó vừa được add vào store).
+    if (userMessage && !pastUserMessages.includes(userMessage)) {
+      pastUserMessages.push(userMessage);
+    }
+
+    // ⭐⭐ LỊCH SỬ TIN NHẮN CỦA BOT — dùng để CHẶN HỎI LẶP.
+    // Yêu cầu cứng: mỗi câu tiêu chuẩn chỉ được hỏi đúng 1 lần. Bot đã hỏi
+    // rồi thì tuyệt đối không hỏi lại, kể cả user chưa trả lời hoặc LLM
+    // diễn đạt lại câu hỏi theo cách khác.
+    const pastAssistantMessages = allMessages
+      .filter((m: Message) => m.role === 'assistant')
+      .map((m: Message) => m.content || '');
+    // Câu nào bot đã hỏi rồi (nhận diện theo vân tay câu hỏi, chịu được
+    // cả cách diễn đạt khác nhau của LLM).
+    const alreadyAskedTypes = detectAskedQuestions(pastAssistantMessages);
     
     // ⭐ Sử dụng analyzeConversationHistory để phân tích toàn bộ lịch sử
     const historyContext = analyzeConversationHistory(allMessages);
@@ -2764,6 +2941,10 @@ export function ChatPage() {
         followUpQuestionsAsked,
         shouldShowProductsNow,
         isInQuestionGatheringMode,
+        // ⭐ Server cần biết đã đủ 4 câu chưa để QUYẾT ĐỊNH có đưa catalog
+        // sản phẩm cho bot không. Chưa đủ 4 câu → cấm bot nhắc sản phẩm.
+        consultQuestionsCompleted: hasCompletedConsultQuestions(pastUserMessages),
+        isExplicitProductQuery: mentionsSpecificProduct(userMessage),
         userApprovedProducts: userHasApproved, // Dùng biến local thay vì state
         shownProductIds: allShownProductIds,
       };
@@ -2830,6 +3011,13 @@ export function ChatPage() {
         }
 
         const decoder = new TextDecoder();
+        // ⭐⭐ BUFFER SSE: server gửi `data: {...}\n\n` (chuẩn SSE). Một event có
+        // thể bị TÁCH RA nhiều lần đọc của reader (phân đoạn TCP, nén, proxy…),
+        // và 1 byte đa năng (tiếng Việt) có thể bị cắt đôi.
+        // Trước đây: decode(value) không {stream:true} + split('\n') không buffer
+        // → JSON.parse lỗi bị `catch {}` nuốt im lặng → MẤT TRỌN event, câu trả
+        // lời hiển thị cụt ("...nhu cầu **specific**"), đầu câu là "...".
+        let sseBuffer = '';
         let fullContent = '';
         let sources: any[] = [];
         let confidence = 0.5;
@@ -2843,11 +3031,19 @@ export function ChatPage() {
           const { done, value } = await reader.read();
           if (done) break;
 
-          const chunk = decoder.decode(value);
-          const lines = chunk.split('\n');
+          // ⚠️ { stream: true } BẮT BUỘC — nếu không, byte đầu tiên của ký tự
+        // Unicode (tiếng Việt dùng 2 byte) có thể bị đổi thành U+FFFD.
+          const chunk = decoder.decode(value, { stream: true });
+          sseBuffer += chunk;
 
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
+          // Chỉ xử lý event ĐÃ HOÀN CHỈNH (kết thúc bằng \n\n). Phần chưa đủ
+          // giữ lại cho lần đọc kế tiếp — không được parse event dở dang.
+          const events = sseBuffer.split('\n\n');
+          sseBuffer = events.pop() ?? '';
+
+          for (const event of events) {
+            for (const line of event.split('\n')) {
+              if (!line.startsWith('data: ')) continue;
               try {
                 const data = JSON.parse(line.slice(6));
                 
@@ -2855,8 +3051,19 @@ export function ChatPage() {
                   // Stream character by character for smooth animation
                   fullContent += data.chunk;
                   setStreamingContent(fullContent);
+                } else if (data.type === 'replaceFull') {
+                  // ⭐ Server yêu cầu thay toàn bộ nội dung đã stream — dùng khi
+                  // cần gỡ tên sản phẩm vì người dùng chưa đủ 4 câu hỏi.
+                  fullContent = data.content || '';
+                  setStreamingContent(fullContent);
                 } else if (data.type === 'sources') {
                   sources = data.sources || [];
+                } else if (data.type === 'agentSwitched') {
+                  // ⭐ Server đã chuyển Bot 7 sang bot chuyên môn đúng với câu hỏi
+                  // → đổi selectedAgentId để header + tên bot trong UI khớp.
+                  if (data.agentId) {
+                    useSelectedAgentStore.getState().setSelectedAgentId(data.agentId);
+                  }
                 } else if (data.type === 'suggestedProducts') {
                   // ⭐ Nhận sản phẩm gợi ý từ server
                   suggestedProducts = data.suggestedProducts || [];
@@ -2871,9 +3078,29 @@ export function ChatPage() {
                   throw new Error(data.error);
                 }
               } catch (e) {
-                // Ignore JSON parse errors for incomplete chunks
+                // Event hỏng thật sự (không phải do đọc dở dang) → ghi log để
+                // debug, nhưng KHÔNG làm hỏng cả lượt trả lời.
+                console.error('[Chat SSE] Không parse được event:', line.slice(0, 120), e);
               }
             }
+          }
+        }
+
+        // ⭐ Đọc nốt phần cuối nếu server đóng stream mà không kết thúc bằng \n\n.
+        sseBuffer += decoder.decode();
+        for (const event of sseBuffer.split('\n\n')) {
+          for (const line of event.split('\n')) {
+            if (!line.startsWith('data: ')) continue;
+            try {
+              const data = JSON.parse(line.slice(6));
+              if (data.type === 'chunk' && data.chunk) fullContent += data.chunk;
+              if (data.type === 'replaceFull') fullContent = data.content || '';
+              if (data.type === 'done') {
+                confidence = data.confidence || confidence;
+                if (data.answer) fullContent = data.answer;
+                if (data.detectedLanguage) responseLanguage = data.detectedLanguage;
+              }
+            } catch { /* bỏ qua phần dở dang */ }
           }
         }
 
@@ -2885,49 +3112,79 @@ export function ChatPage() {
           // Bot sẽ hỏi thêm thông tin trước khi đề xuất sản phẩm
           // ⭐ Use responseLanguage (detected from user message) instead of UI language
           // ⭐ Dùng freshIsReady/freshMissingCtx (computed ngay khi gửi message, không stale)
-          // ⭐ NEW LOGIC:
-          // - Nếu đang trong question gathering mode (đã hỏi < 4 câu): hỏi thêm câu hỏi
-          // - Nếu đã hỏi đủ 4 câu VÀ trigger product suggestion: hỏi có muốn xem sản phẩm không
-          // - Nếu user đã approve products: show sản phẩm (không thêm câu hỏi)
-          let finalContent = fullContent;
-          const currentFollowUpCount = followUpQuestionsAsked; // Use the current state value
+          // ⭐ LOGIC MỚI: hỏi đủ 4 câu tiêu chuẩn rồi mới tư vấn sản phẩm.
+          // - User hỏi thẳng về sản phẩm cụ thể → trả luôn, không hỏi.
+          // - Chưa đủ 4 câu → trả lời user + hỏi câu tiếp theo, KHÔNG tư vấn sản phẩm.
+          // - Đủ 4 câu → mới tư vấn sản phẩm kèm link.
+          let allowProductAdvice = userHasApproved || userExplicitlyRequestsProducts;
 
-          if (userHasApproved || userExplicitlyRequestsProducts) {
-            // User đã đồng ý HOẶC hỏi trực tiếp về sản phẩm → không thêm câu hỏi, chỉ show products
-            // Products sẽ được hiển thị từ suggestedProducts
-          } else if (currentFollowUpCount >= 4 && triggersProductSuggestion) {
-            // Đã hỏi đủ 4 câu → hỏi có muốn xem sản phẩm không
-            const productOfferQuestion = getProductOfferQuestion(responseLanguage);
-            finalContent = `${fullContent}\n\n*${productOfferQuestion}*`;
-            // Reset follow-up count sau khi hỏi xong
-            setFollowUpQuestionsAsked(0);
-          } else if (!freshIsReady && freshMissingCtx.length > 0) {
-            // Chưa đủ context → hỏi thêm câu hỏi follow-up
-            // ⭐ FIX: Truyền conversationMessages và lastAskedQuestion.type để tránh lặp lại
-            const { question: followUpQuestion, type: questionType } = getNextFollowUpQuestionWithType(
-              responseLanguage, 
-              messages,
-              lastAskedQuestion.type
-            );
-            if (followUpQuestion) {
-              finalContent = `${fullContent}\n\n*${followUpQuestion}*`;
-              // ⭐ Cập nhật state: lưu câu hỏi vừa hỏi để không hỏi lại
-              setLastAskedQuestion({ type: questionType, text: followUpQuestion });
-            }
+          const alreadyConsulted = hasCompletedConsultQuestions(pastUserMessages);
+
+          // ⭐⭐⭐ LỚP CHỐNG LẶP (3 tầng):
+          //  Tầng 1: bỏ qua câu bot đã hỏi (detectAskedQuestions — nhận diện theo
+          //          vân tay, chịu được LLM diễn đạt lại câu hỏi).
+          //  Tầng 2: chặn theo so khớp chuỗi (isQuestionAlreadyAsked).
+          //  Tầng 3: dọn sạch mọi câu tiêu chuẩn đã hỏi còn sót trong câu trả
+          //          lời của LLM — kể cả LLM tự hỏi lại.
+          const nextConsult = getSafeNextConsultQuestion(
+            responseLanguage,
+            pastUserMessages,
+            pastAssistantMessages
+          );
+
+          // ⭐ Dọn mọi câu hỏi ĐÃ HỎI (hoặc user ĐÃ TRẢ LỜI) còn sót trong text.
+          let cleanContent = stripAlreadyAskedQuestions(
+            fullContent,
+            pastAssistantMessages,
+            pastUserMessages
+          );
+
+          // ⭐ Bot có vừa hỏi câu này không? Phải dùng VÂN TAY câu hỏi, KHÔNG
+          // so khớp chuỗi — vì LLM thường hỏi bản rút gọn ("Hôm nay bạn thế nào?")
+          // khác câu chuẩn ("Hôm nay bạn thế nào, bạn cần tôi giúp gì?").
+          // Nếu so chuỗi, sẽ thêm câu chuẩn vào → người dùng thấy CÙNG 1 CÂU HỎI
+          // HAI LẦN (đúng thứ bạn đã cấm tuyệt đối).
+          let botAlreadyAsked = false;
+          if (nextConsult) {
+            botAlreadyAsked = detectAskedQuestions([
+              ...pastAssistantMessages,
+              cleanContent,
+            ]).has(nextConsult.type);
           }
 
-          // ⭐ LUÔN hiển thị sản phẩm khi server gửi về — không gate bởi approval.
-          // Trước đây chỉ gán khi (userHasApproved || userExplicitlyRequestsProducts) → mất
-          // sản phẩm với câu tự nhiên như "xin vài mẫu sản phẩm máy trợ thính" khi user
-          // mở chat mới chưa qua vòng 4-câu hỏi. Bây giờ nếu server thấy user hỏi về
-          // sản phẩm thì trả luôn và UI phải show.
+          if (!allowProductAdvice && nextConsult && !botAlreadyAsked) {
+            // ⭐ Trả lời câu hỏi của user, rồi hỏi câu tiếp theo ở cuối.
+            cleanContent = `${cleanContent}\n\n*${nextConsult.question}*`;
+            // Chưa đủ 4 câu → không tư vấn sản phẩm.
+            allowProductAdvice = false;
+          } else if (!allowProductAdvice && nextConsult && botAlreadyAsked) {
+            // Bot đã tự hỏi đúng câu tiêu chuẩn → không thêm nữa.
+            allowProductAdvice = false;
+          } else if (!allowProductAdvice && alreadyConsulted && triggersProductSuggestion) {
+            // Đủ 4 câu + user muốn xem sản phẩm → cho phép tư vấn.
+            allowProductAdvice = true;
+          } else if (!allowProductAdvice && alreadyConsulted && isReadyForProducts) {
+            // ⭐⭐⭐ FIX LỚN: ĐÃ HỎI ĐỦ 4 CÂU thì PHẢI ra sản phẩm, không cần khách
+            // phải nói "cho tôi xem sản phẩm".
+            //
+            // LỖI TRƯỚC ĐÂY: lượt cuối khách chỉ trả lời ngắn ("45 tuổi",
+            // "2 năm rồi") → triggersProductSuggestion = false. Kết hợp với
+            // nextConsult = null (đã hỏi đủ) → KHÔNG nhánh nào set true →
+            // allowProductAdvice = false → không gắn sản phẩm vào message →
+            // UI không hiện card dù bot đã đủ thông tin tư vấn.
+            allowProductAdvice = true;
+          }
+          const finalContent = cleanContent;
+
           addMessage({
             role: 'assistant',
             content: finalContent,
             confidence: confidence,
             sources: sources,
             contextUsed: sources.length > 0,
-            suggestedProducts: suggestedProducts.length > 0 ? suggestedProducts : undefined,
+            // ⭐ Chỉ gắn sản phẩm khi đã đủ 4 câu hỏi (hoặc user hỏi thẳng/đồng ý).
+            suggestedProducts:
+              allowProductAdvice && suggestedProducts.length > 0 ? suggestedProducts : undefined,
           });
 
           // 💾 Save assistant message vào backend (DB persistence)
@@ -3056,8 +3313,15 @@ export function ChatPage() {
         const fullContent = data.data.answer || data.data.message || '';
         // ⭐ Use response language for follow-up (match bot's language)
         const responseLanguage = data.data.detectedLanguage || language;
-        // ⭐ Dùng fresh values cho non-streaming mode (tránh stale closure state)
-        const nonStreamIsReady = isReadyForProducts;
+// ⭐ Dùng fresh values cho non-streaming mode (tránh stale closure state)
+      const nonStreamIsReady = isReadyForProducts;
+
+        // ⭐ Chỉ được hiện sản phẩm khi đã đủ 4 câu hỏi tiêu chuẩn, hoặc user
+        // hỏi thẳng tên sản phẩm, hoặc đã đồng ý xem sản phẩm.
+        const allowNonStreamProducts =
+          hasCompletedConsultQuestions(pastUserMessages) ||
+          mentionsSpecificProduct(userMessage) ||
+          userApprovedProducts;
         const nonStreamMissingCtx = newMissingContext;
         
         if (!fullContent) {
@@ -3078,56 +3342,71 @@ export function ChatPage() {
           confidence: data.data.confidence,
           sources: data.data.sources,
           contextUsed: data.data.contextUsed,
-          // ⭐ LUÔN lấy suggestedProducts khi server trả về — không gate bởi approval.
-          // Trước đây chỉ gán khi (userHasApproved || userExplicitlyRequestsProducts) → câu tự
-          // nhiên như "xin vài mẫu sản phẩm máy trợ thính" bị bỏ qua mặc dù server đã gửi.
-          suggestedProducts: (data.data.suggestedProducts?.length ?? 0) > 0 ? data.data.suggestedProducts : undefined,
+          // ⭐ Chỉ gắn sản phẩm khi ĐÃ ĐỦ 4 CÂU HỎI (hoặc user hỏi thẳng
+          // tên sản phẩm / đã đồng ý xem). Nếu chưa đủ thì tuyệt đối không
+          // hiện sản phẩm — đây là yêu cầu nghiệp vụ.
+          suggestedProducts:
+            allowNonStreamProducts && (data.data.suggestedProducts?.length ?? 0) > 0
+              ? data.data.suggestedProducts
+              : undefined,
         });
 
         // ⭐ THÊM CÂU HỎI FOLLOW-UP KHI CHƯA ĐỦ CONTEXT (non-streaming mode)
         // ⭐ Dùng nonStreamIsReady/nonStreamMissingCtx (computed ngay khi gửi message)
-        // ⭐ NEW LOGIC:
-        // - Nếu đang trong question gathering mode (đã hỏi < 4 câu): hỏi thêm câu hỏi
-        // - Nếu đã hỏi đủ 4 câu VÀ trigger product suggestion: hỏi có muốn xem sản phẩm không
-        // ⭐ NEW LOGIC: Nếu user hỏi trực tiếp về sản phẩm thì KHÔNG hỏi thêm
-        if (userHasApproved || userExplicitlyRequestsProducts) {
-          // User đã đồng ý HOẶC hỏi trực tiếp về sản phẩm → không thêm câu hỏi
-        } else if (followUpQuestionsAsked >= 4 && triggersProductSuggestion) {
-          // Đã hỏi đủ 4 câu → hỏi có muốn xem sản phẩm không
-          const productOfferQuestion = getProductOfferQuestion(responseLanguage);
+        // ⭐ NEW LOGIC (khớp với luồng streaming):
+        // - Chưa đủ 4 câu → thêm câu hỏi tiêu chuẩn (trừ khi bot đã hỏi rồi).
+        // - Đã đủ 4 câu → cho phép tư vấn sản phẩm.
+        // - User hỏi thẳng tên sản phẩm → không hỏi.
+        const nsNextConsult = getSafeNextConsultQuestion(
+          responseLanguage,
+          pastUserMessages,
+          pastAssistantMessages
+        );
+
+        // ⭐ Dọn mọi câu tiêu chuẩn đã hỏi trước đây còn sót trong câu trả lời
+        // của LLM (kể cả LLM tự hỏi lại) — trước khi lưu vào lịch sử.
+        const nsCleaned = stripAlreadyAskedQuestions(
+          data.data.answer || '',
+          pastAssistantMessages,
+          pastUserMessages
+        );
+
+        // ⭐ Bot có vừa hỏi câu này không? Dùng VÂN TAY câu hỏi (chịu được LLM hỏi
+        // bản rút gọn) — KHÔNG so chuỗi, để tuyệt đối không hỏi trùng.
+        const nsBotAlreadyAsked = nsNextConsult
+          ? detectAskedQuestions([...pastAssistantMessages, nsCleaned]).has(nsNextConsult.type)
+          : false;
+
+        // Cập nhật lại tin nhắn bot vừa thêm, đã loại bỏ câu lặp.
+        if (nsCleaned !== (data.data.answer || '')) {
           const updatedMessages = useChatStore.getState().messages;
           if (updatedMessages.length > 0) {
             const lastMsg = updatedMessages[updatedMessages.length - 1];
             if (lastMsg.role === 'assistant') {
-              const updatedContent = `${lastMsg.content}\n\n*${productOfferQuestion}*`;
               const newMessages = [...updatedMessages];
-              newMessages[newMessages.length - 1] = { ...lastMsg, content: updatedContent };
+              newMessages[newMessages.length - 1] = { ...lastMsg, content: nsCleaned };
               setMessages(newMessages);
-            }
-          }
-          // Reset follow-up count sau khi hỏi xong
-          setFollowUpQuestionsAsked(0);
-        } else if (!nonStreamIsReady && nonStreamMissingCtx.length > 0) {
-          // ⭐ FIX: Truyền messages và lastAskedQuestion.type để tránh lặp lại
-          const { question: followUpQuestion, type: questionType } = getNextFollowUpQuestionWithType(
-            responseLanguage, 
-            messages,
-            lastAskedQuestion.type
-          );
-          // Cập nhật message cuối cùng với follow-up question (chỉ nếu có câu hỏi)
-          const updatedMessages = useChatStore.getState().messages;
-          if (updatedMessages.length > 0 && followUpQuestion) {
-            const lastMsg = updatedMessages[updatedMessages.length - 1];
-            if (lastMsg.role === 'assistant') {
-              const updatedContent = `${lastMsg.content}\n\n*${followUpQuestion}*`;
-              const newMessages = [...updatedMessages];
-              newMessages[newMessages.length - 1] = { ...lastMsg, content: updatedContent };
-              setMessages(newMessages);
-              // ⭐ Cập nhật state: lưu câu hỏi vừa hỏi để không hỏi lại
-              setLastAskedQuestion({ type: questionType, text: followUpQuestion });
             }
           }
         }
+
+        if (userHasApproved || userExplicitlyRequestsProducts) {
+          // User đã đồng ý HOẶC hỏi trực tiếp về sản phẩm → không thêm câu hỏi
+        } else if (nsNextConsult && !nsBotAlreadyAsked) {
+          // Chưa đủ 4 câu → thêm câu hỏi tiêu chuẩn ở cuối.
+          const updatedMessages = useChatStore.getState().messages;
+          if (updatedMessages.length > 0) {
+            const lastMsg = updatedMessages[updatedMessages.length - 1];
+            if (lastMsg.role === 'assistant') {
+              const updatedContent = `${lastMsg.content}\n\n*${nsNextConsult.question}*`;
+              const newMessages = [...updatedMessages];
+              newMessages[newMessages.length - 1] = { ...lastMsg, content: updatedContent };
+              setMessages(newMessages);
+            }
+          }
+        }
+        // ⚠️ Không gắn sản phẩm khi chưa đủ 4 câu — server đã chặn nhưng client
+        // cũng phải chặn để phòng khi server trả về products sót.
 
         // 💾 Save assistant message vào backend (non-streaming)
         if (currentUser && currentConvId) {
@@ -4526,15 +4805,38 @@ export function ChatPage() {
                 {showSuggestedQuestions && (
                 <div className="w-full max-w-3xl">
                   <div className="grid grid-cols-2 gap-3">
-                    {(activeCategory ? currentQuestions : suggestedPrompts.map(prompt => ({
-                      text: language === 'vi' ? prompt.text : prompt.textEn,
-                      desc: language === 'vi' ? prompt.desc : prompt.descEn,
-                      icon: prompt.icon,
-                    }))).map((item, index) => (
+                    {/* ⭐ Use new suggestedQuestionsData from API (linked with Admin) */}
+                    {suggestedQuestionsLoading ? (
+                      // Loading skeleton
+                      Array.from({ length: 4 }).map((_, i) => (
+                        <div key={`skeleton-${i}`} className="bg-white border border-outline-variant rounded-2xl p-4 animate-pulse">
+                          <div className="flex items-start gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-slate-200 shrink-0" />
+                            <div className="flex-1">
+                              <div className="h-4 bg-slate-200 rounded w-3/4 mb-2" />
+                              <div className="h-3 bg-slate-100 rounded w-full" />
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      /* Convert API data to display format */
+                      (activeCategory 
+                        ? (currentQuestions || [])
+                        : Object.entries(suggestedQuestionsData)
+                            .slice(0, 4) // Show max 4 categories on welcome screen
+                            .flatMap(([cat, questions]) => 
+                              (questions as any[]).slice(0, 1).map((q: any) => ({
+                                question: q.question,
+                                category: cat,
+                                allLanguages: q.allLanguages || [],
+                              }))
+                            )
+                      ).map((item: any, index: number) => (
                       <button
-                        key={index}
+                        key={`${item.category || 'general'}-${index}`}
                         onClick={() => {
-                          setInputValue(typeof item === 'string' ? item : item.text);
+                          setInputValue(item.question);
                         }}
                         className="group bg-white border border-outline-variant rounded-2xl p-4 text-left hover:shadow-lg hover:border-primary/30 transition-all duration-200"
                       >
@@ -4543,21 +4845,22 @@ export function ChatPage() {
                           {!activeCategory && (
                             <div className="w-10 h-10 rounded-xl bg-primary-fixed flex items-center justify-center shrink-0 group-hover:bg-primary-fixed-dim transition-colors">
                               <span className="material-symbols-outlined text-primary text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>
-                                {typeof item === 'string' ? (index === 0 ? 'search' : index === 1 ? 'smart_toy' : index === 2 ? 'support_agent' : 'bolt') : item.icon}
+                                {index === 0 ? 'search' : index === 1 ? 'smart_toy' : index === 2 ? 'support_agent' : 'bolt'}
                               </span>
                             </div>
                           )}
                           <div className={clsx('flex-1 min-w-0', !activeCategory && '')}>
                             <p className="text-sm font-semibold text-on-background mb-1 line-clamp-1">
-                              {typeof item === 'string' ? item : item.text}
+                              {item.question}
                             </p>
-                            <p className="text-xs text-on-surface-variant line-clamp-2">
-                              {typeof item === 'string' ? '' : item.desc}
+                            <p className="text-xs text-on-surface-variant line-clamp-2 flex items-center gap-1">
+                              <span className="material-symbols-outlined text-[12px]">quiz</span>
+                              {CATEGORY_LABELS[item.category as keyof typeof CATEGORY_LABELS]?.title || item.category}
                             </p>
                           </div>
                         </div>
                       </button>
-                    ))}
+                    )))}
                   </div>
                 </div>
                 )}
@@ -4570,9 +4873,26 @@ export function ChatPage() {
                 <div className="flex items-center gap-3">
                   <div className="w-2 h-2 rounded-full bg-blue-500"></div>
                   <h2 className="font-bold text-slate-900 uppercase tracking-tight">
-                    {activeCategory 
-                      ? (language === 'vi' ? CATEGORY_LABELS[activeCategory].title : language === 'en' ? CATEGORY_LABELS[activeCategory].titleEn : language === 'ar' ? CATEGORY_LABELS[activeCategory].titleAr : CATEGORY_LABELS[activeCategory].titleFr)
-                      : t('chat.supplementaryInfo')}
+                    {/* ⭐ Ưu tiên bot đang chat. Khi user bấm "Trò chuyện mới" thì
+                        selectedAgentId = null (Bot 7). Nhưng nếu câu hỏi thuộc
+                        chuyên môn riêng, server sẽ tự chuyển bot và báo event
+                        'agentSwitched' → selectedAgentId đổi sang bot chuyên môn.
+                        Header phải theo bot đó, nếu không sẽ ghi sai tên Bot 7
+                        cho câu trả lời của bot khác. */}
+                    {chatAgent && selectedAgentId
+                      ? (() => {
+                          const botInfo = MADA_BOTS.find(b => b.id === chatAgent.botId);
+                          if (botInfo) {
+                            if (language === 'vi') return botInfo.nameVi;
+                            if (language === 'en') return botInfo.name;
+                            if (language === 'ar') return botInfo.nameAr;
+                            if (language === 'fr') return botInfo.nameFr;
+                          }
+                          return chatAgent.name;
+                        })()
+                      : activeCategory
+                        ? (language === 'vi' ? CATEGORY_LABELS[activeCategory].title : language === 'en' ? CATEGORY_LABELS[activeCategory].titleEn : language === 'ar' ? CATEGORY_LABELS[activeCategory].titleAr : CATEGORY_LABELS[activeCategory].titleFr)
+                        : t('chat.supplementaryInfo')}
                   </h2>
                 </div>
               </div>
@@ -5066,9 +5386,25 @@ interface ProductCardItemProps {
   product: SuggestedProduct;
   language: string;
   onRequestConsultation: () => void;
+  /**
+   * ⭐ Chế độ xem:
+   *  - 'detail'  → card đầy đủ như hiện tại (dùng khi chỉ có 1 sản phẩm, hoặc
+   *    khách đã bấm chọn 1 sản phẩm).
+   *  - 'compact' → card NHỎ chỉ có ảnh + tên + giá, bấm vào để xem chi tiết.
+   */
+  variant?: 'detail' | 'compact';
+  isSelected?: boolean;
+  onSelect?: () => void;
 }
 
-function ProductCardItem({ product, language, onRequestConsultation }: ProductCardItemProps) {
+function ProductCardItem({
+  product,
+  language,
+  onRequestConsultation,
+  variant = 'detail',
+  isSelected = false,
+  onSelect,
+}: ProductCardItemProps) {
   const [imageError, setImageError] = useState(false);
   
   // ⭐ Lấy image URL đã xử lý (có thể bị reject → trả về empty)
@@ -5100,16 +5436,112 @@ function ProductCardItem({ product, language, onRequestConsultation }: ProductCa
     gradientClass = 'from-amber-500 to-orange-500';
   }
 
+  // ⭐⭐ CHẾ ĐỘ COMPACT: card nhỏ (ảnh + tên + giá), bấm để xem chi tiết.
+  // Dùng khi bot liệt kê NHIỀU sản phẩm — khách phải chọn 1 cái mới xem
+  // chi tiết, tránh hiện 12 card dày đặc làm rối mắt.
+  if (variant === 'compact') {
+    // ⭐ KHÔNG dùng <button> bao trọn: HTML không cho <a>/<button> lồng nhau,
+    // mà card nhỏ cần 2 nút thật (Xem chi tiết & Mua, Liên hệ tư vấn viên).
+    // → Dùng <div>, phần ảnh + tên là vùng bấm để mở card chi tiết lớn.
+    return (
+      <div
+        className={`group flex flex-col bg-white rounded-xl border overflow-hidden transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 ${
+          isSelected
+            ? 'border-[#006D77] ring-2 ring-[#006D77]/25 shadow-md'
+            : 'border-slate-200 hover:border-secondary/40 hover:shadow-secondary/10'
+        }`}
+      >
+        {/* Vùng bấm để mở chi tiết */}
+        <button
+          type="button"
+          onClick={onSelect}
+          aria-expanded={isSelected}
+          aria-label={`${productTitle} — xem chi tiết`}
+          className="block w-full text-left active:scale-[0.98] transition-transform"
+        >
+          <div className={`relative h-24 bg-gradient-to-br ${gradientClass} overflow-hidden`}>
+            {processedImageUrl && !imageError ? (
+              <img
+                src={processedImageUrl}
+                alt={productTitle}
+                className="w-full h-full object-contain p-1.5 bg-slate-100"
+                loading="lazy"
+                referrerPolicy="no-referrer"
+                onError={() => {
+                  setImageError(true);
+                }}
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-400 to-slate-600">
+                <Accessibility className="w-9 h-9 text-white/90" strokeWidth={1.5} />
+              </div>
+            )}
+            <div className="absolute top-1.5 left-1.5 px-1.5 py-0.5 bg-white/90 backdrop-blur-sm rounded-full">
+              <span className="text-[9px] font-semibold text-slate-700">{brandDisplay}</span>
+            </div>
+          </div>
+
+          <div className="p-2.5">
+            <p className="text-[12px] font-semibold text-slate-800 line-clamp-2 leading-tight">
+              {productTitle}
+            </p>
+            {product.price_range && (
+              <p className="text-[11px] font-medium text-[#006D77] mt-1 line-clamp-1">
+                {product.price_range}
+              </p>
+            )}
+          </div>
+        </button>
+
+        {/* ⭐ 2 nút thật — giống card chi tiết lớn */}
+        <div className="mt-auto flex flex-col gap-1.5 p-2.5 pt-0">
+          <a
+            href={productLink}
+            target={isExternalLink ? '_blank' : '_self'}
+            rel={isExternalLink ? 'noopener noreferrer' : ''}
+            className="flex items-center justify-center gap-1.5 px-2 py-2 bg-gradient-to-r from-[#006D77] to-[#0A9396] hover:from-[#005A63] hover:to-[#087E8B] text-white text-[10.5px] font-semibold rounded-lg shadow-sm hover:shadow-md transition-all duration-200 active:scale-[0.98]"
+          >
+            <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="9" cy="21" r="1" />
+              <circle cx="20" cy="21" r="1" />
+              <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+            </svg>
+            <span className="truncate">{language === 'vi' ? 'Xem chi tiết & Mua' : language === 'en' ? 'View & Buy' : language === 'ar' ? 'عرض والشراء' : 'Voir & acheter'}</span>
+          </a>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onRequestConsultation();
+            }}
+            className="flex items-center justify-center gap-1.5 px-2 py-2 bg-white border-2 border-[#83C5BE]/50 hover:border-[#83C5BE] text-[#006D77] text-[10.5px] font-semibold rounded-lg transition-all duration-200 hover:bg-[#EDF6F9] active:scale-[0.98]"
+          >
+            <div className="w-4 h-4 shrink-0 rounded-full bg-gradient-to-br from-[#83C5BE] to-[#006D77] flex items-center justify-center">
+              <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/>
+              </svg>
+            </div>
+            <span className="truncate">{language === 'vi' ? 'Liên hệ tư vấn viên' : language === 'en' ? 'Contact Advisor' : language === 'ar' ? 'تواصل مع مستشار' : 'Contacter'}</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="group block bg-white rounded-xl border border-slate-200 overflow-hidden hover:border-secondary/40 hover:shadow-lg hover:shadow-secondary/10 transition-all duration-200 hover:-translate-y-0.5">
-      {/* Hình ảnh sản phẩm - LỚN VÀ NỔI BẬT */}
+      {/* ⭐ Hình ảnh sản phẩm.
+          Nhiều ảnh AT có nền TRẮNG (VD Luna Series, kính lúp trắng) → nếu để
+          nền trong suốt, ảnh dính sát nền card trắng và trông như KHÔNG CÓ ẢNH.
+          Vì vậy dùng nền xám nhạt + object-contain để mọi ảnh đều tách bạch. */}
       <div className={`relative h-32 bg-gradient-to-br ${gradientClass} overflow-hidden`}>
         {/* ⭐ Fix: Check processedImageUrl thay vì product.image_url */}
         {processedImageUrl && !imageError ? (
           <img
             src={processedImageUrl}
             alt={productTitle}
-            className="w-full h-full object-cover object-center"
+            className="w-full h-full object-contain p-1.5 bg-slate-100"
             loading="lazy"
             referrerPolicy="no-referrer"
             onError={() => {
@@ -5185,70 +5617,110 @@ function ProductCardItem({ product, language, onRequestConsultation }: ProductCa
 
 // ============== PRODUCT CARDS GRID ==============
 
-// Số card hiển thị mặc định. Backend có thể trả 6–12 sản phẩm; trước đây
-// slice(0, 3) cắt cứng khiến phần còn lại không bao giờ hiện và không có cách
-// xem tiếp. Giờ hiện 3 card đầu + nút "xem thêm" để mở dần.
-const PRODUCT_COLLAPSED_COUNT = 3;
-
+// ⭐⭐ YÊU CẦU: bot liệt kê ra bao nhiêu sản phẩm thì UI PHẢI hiện đủ tất cả
+// card nhỏ (ảnh + tên + giá). Không cắt, không "xem thêm" — khách phải thấy
+// trọn danh sách ngay để tự chọn. Trước đây slice(0, 3) + nút "xem thêm" khiến
+// phần còn lại bị giấu đi, khách không biết còn bao nhiêu sản phẩm nữa.
 function ProductCardsGrid({ products, language, onRequestConsultation }: {
   products: SuggestedProduct[];
   language: string;
   onRequestConsultation: () => void;
 }) {
-  const [expanded, setExpanded] = useState(false);
+  /**
+   * ⭐⭐ ID sản phẩm khách đang XEM CHI TIẾT (null = chưa chọn).
+   *
+   * YÊU CẦU: bot liệt kê nhiều sản phẩm → hiện card nhỏ cho tất cả, khách
+   * BẤM 1 cái mới mở 1 card lớn chi tiết sản phẩm đó. Không chọn → không
+   * hiện card lớn nào.
+   */
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  // products có thể thay đổi theo message mới → reset về trạng thái thu gọn.
+  // products thay đổi theo message mới → bỏ chọn sản phẩm cũ.
   useEffect(() => {
-    setExpanded(false);
+    setSelectedId(null);
   }, [products]);
 
-  const visibleProducts = expanded
-    ? products
-    : products.slice(0, PRODUCT_COLLAPSED_COUNT);
-  const hiddenCount = products.length - visibleProducts.length;
+  // ⭐ CHỈ có 1 sản phẩm → hiện thẳng card đầy đủ, không cần khách bấm chọn
+  // (hỏi riêng 1 sản phẩm thì phải thấy ngay, không bắt khách làm thêm bước).
+  const isSingle = products.length === 1;
 
-  const showMoreLabels: Record<string, string> = {
-    vi: `Xem thêm ${hiddenCount} sản phẩm khác`,
-    en: `Show ${hiddenCount} more products`,
-    ar: `عرض ${hiddenCount} منتجات أخرى`,
-    fr: `Voir ${hiddenCount} autres produits`,
+  // Sản phẩm khách đang chọn xem chi tiết (nếu có).
+  const selectedProduct = selectedId
+    ? products.find((p) => (p.id || '') === selectedId) || null
+    : null;
+
+  const pickOneLabels: Record<string, string> = {
+    vi: 'Bấm vào sản phẩm bạn quan tâm để xem thông tin đầy đủ',
+    en: 'Tap the product you are interested in to see full details',
+    ar: 'اضغط على المنتج الذي يهمك لعرض التفاصيل الكاملة',
+    fr: 'Cliquez sur le produit qui vous intéresse pour voir les détails',
   };
-  const showLessLabels: Record<string, string> = {
-    vi: 'Thu gọn lại',
-    en: 'Show less',
-    ar: 'عرض أقل',
-    fr: 'Réduire',
+  const closeLabels: Record<string, string> = {
+    vi: 'Đóng',
+    en: 'Close',
+    ar: 'إغلاق',
+    fr: 'Fermer',
   };
 
+  // ⭐ Khi khách đã chọn 1 sản phẩm → hiện card chi tiết lớn ở TRÊN, rồi mới
+  // tới lưới card nhỏ để so sánh/chọn sản phẩm khác.
   return (
     <>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        {visibleProducts.map((product, index) => (
+      {selectedProduct && (
+        <div className="mb-4">
           <ProductCardItem
-            key={product.id || index}
-            product={product}
+            product={selectedProduct}
             language={language}
             onRequestConsultation={onRequestConsultation}
+            variant="detail"
           />
-        ))}
-      </div>
-
-      {products.length > PRODUCT_COLLAPSED_COUNT && (
-        <div className="mt-3 flex justify-center">
-          <button
-            type="button"
-            onClick={() => setExpanded((v) => !v)}
-            aria-expanded={expanded}
-            className="group inline-flex items-center gap-2 rounded-full border border-[#83C5BE]/60 bg-white px-4 py-2 text-[12.5px] font-semibold text-[#006D77] shadow-sm transition-all duration-200 hover:border-[#006D77] hover:bg-[#EDF6F9] active:scale-[0.98]"
-          >
-            <span>{expanded ? (showLessLabels[language] || showLessLabels.vi) : (showMoreLabels[language] || showMoreLabels.vi)}</span>
-            <ChevronDown
-              className={`h-4 w-4 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
-              strokeWidth={2}
-              aria-hidden="true"
-            />
-          </button>
+          <div className="mt-2 flex justify-center">
+            <button
+              type="button"
+              onClick={() => setSelectedId(null)}
+              className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3.5 py-1.5 text-[12px] font-semibold text-slate-600 shadow-sm transition-all duration-200 hover:border-slate-300 hover:bg-slate-50 active:scale-[0.98]"
+            >
+              <span>{closeLabels[language] || closeLabels.vi}</span>
+            </button>
+          </div>
         </div>
+      )}
+
+      {/* Chỉ 1 sản phẩm → hiện thẳng card đầy đủ, không cần chọn. */}
+      {isSingle ? (
+        <div className="grid grid-cols-1 gap-3">
+          <ProductCardItem
+            product={products[0]}
+            language={language}
+            onRequestConsultation={onRequestConsultation}
+            variant="detail"
+          />
+        </div>
+      ) : (
+        <>
+          {!selectedProduct && (
+            <p className="mb-2.5 text-center text-[12px] font-medium text-slate-500">
+              {pickOneLabels[language] || pickOneLabels.vi}
+            </p>
+          )}
+          {/* ⭐ Hiện TOÀN BỘ danh sách — không slice, không nút "xem thêm". */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 min-w-0">
+            {products.map((product, index) => (
+              <ProductCardItem
+                key={product.id || index}
+                product={product}
+                language={language}
+                onRequestConsultation={onRequestConsultation}
+                variant="compact"
+                isSelected={selectedId === (product.id || '')}
+                onSelect={() => {
+                  const id = product.id || `idx-${index}`;
+                  setSelectedId((prev) => (prev === id ? null : id));
+                }}
+              />
+            ))}
+          </div>
+        </>
       )}
     </>
   );
@@ -5449,7 +5921,7 @@ function MessageBubble({
         <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 rounded-full border-2 border-white animate-pulse"></div>
       </div>
 
-      <div className="flex-1 max-w-[85%]">
+      <div className="flex-1 min-w-0 max-w-[85%]">
         {/* ⭐ AI Message Content - Enhanced styling */}
         <div className="relative">
           {/* Message bubble background with gradient border effect */}
@@ -5558,17 +6030,48 @@ function MessageBubble({
         {/* ⭐ Suggested Products - Hiển thị khi server gửi sản phẩm */}
         {/* ⭐ LUÔN hiển thị khi có sản phẩm - không chờ đủ context */}
         {message.suggestedProducts && message.suggestedProducts.length > 0 && (
-          <div className="mt-4" dir="ltr" role="region" aria-label="Sản phẩm được giới thiệu">
+          <div
+            className="mt-4 w-full min-w-0 max-w-full overflow-hidden"
+            dir="ltr"
+            role="region"
+            aria-label="Sản phẩm được giới thiệu"
+          >
 
-            {/* ⭐ Text giới thiệu TỰ NHIÊN - Như lời chatbot nói */}
+            {/* ⭐ Text giới thiệu — đổi câu theo ngữ cảnh.
+                • User nêu tên 1 sản phẩm → "Tôi đang có sản phẩm này…"
+                • Hỏi chung / mô tả triệu chứng → gợi ý danh sách liên quan */}
             <p className="text-[13px] text-on-surface-variant leading-relaxed mb-3">
-              {language === 'vi'
-                ? `Với các biểu hiện trên của bạn thì tôi khuyên bạn nên tham khảo các sản phẩm dưới đây nhé:`
-                : language === 'en'
-                ? `Based on your description, I recommend checking out these products:`
-                : language === 'ar'
-                ? `بناءً على وصفك، أنصحك بالاطلاع على هذه المنتجات:`
-                : `Selon votre description, je vous recommande de consulter ces produits:`}
+              {(() => {
+                const isSpecific = message.suggestedProducts?.some((p) => p.isSpecificProduct);
+                const count = message.suggestedProducts?.length || 0;
+                // ⭐ Nhiều sản phẩm → nói rõ "bấm vào sản phẩm để xem chi tiết",
+                // đúng với luồng mới (khách bấm card mới mở phần chi tiết).
+                if (!isSpecific && count > 1) {
+                  return language === 'vi'
+                    ? `Dưới đây là ${count} sản phẩm phù hợp với tình trạng của bạn. Bấm vào sản phẩm bạn quan tâm để xem thông tin đầy đủ:`
+                    : language === 'en'
+                      ? `Below are ${count} products that suit your condition. Tap the one you are interested in to see full details:`
+                      : language === 'ar'
+                        ? `فيما يلي ${count} منتجات تناسب حالتك. اضغط على المنتج الذي يهمك لعرض التفاصيل الكاملة:`
+                        : `Voici ${count} produits adaptés à votre situation. Cliquez sur celui qui vous intéresse pour voir les détails complets :`;
+                }
+                if (isSpecific) {
+                  return language === 'vi'
+                    ? 'Tôi đang có một số sản phẩm liên quan đến thông tin bạn vừa hỏi:'
+                    : language === 'en'
+                      ? 'I have a few products related to what you just asked about:'
+                      : language === 'ar'
+                        ? 'لدي بعض المنتجات المتعلقة بما سألت عنه للتو:'
+                        : "J'ai quelques produits liés à votre demande :";
+                }
+                return language === 'vi'
+                  ? `Với các biểu hiện trên của bạn thì tôi khuyên bạn nên tham khảo các sản phẩm dưới đây nhé:`
+                  : language === 'en'
+                    ? `Based on your description, I recommend checking out these products:`
+                    : language === 'ar'
+                      ? `بناءً على وصفك، أنصحك بالاطلاع على هذه المنتجات:`
+                      : `Selon votre description, je vous recommande de consulter ces produits:`;
+              })()}
             </p>
 
             {/* ⭐ Product Cards Grid - Sử dụng component để tránh hooks violation */}

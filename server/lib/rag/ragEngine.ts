@@ -3,6 +3,154 @@ import { GoogleGenerativeAI, type FunctionDeclaration } from '@google/generative
 import { vectorStore } from './vectorStore';
 import { rerankService, type RerankableItem } from './rerankService';
 import db from '../db';
+import { sanitizeContextForPrompt, sanitizeAssistantAnswer, createStreamingSanitizer } from '../responseSanitizer';
+import { appendProductLinks, stripProductMentions, repairTruncatedSentences } from '../productLinkInjector';
+import { CONSULT_4_QUESTIONS, CONSULT_NOW_RULES, SINGLE_PRODUCT_RULES } from '../prompts/systemPrompts';
+import { productCategoriesForBot, resolveProductOwner } from '../categoryMapping';
+import { productBelongsToBot, isExclusiveToBot } from '../productTaxonomy';
+
+/**
+ * ⭐⭐ TUYỆT ĐỐI KHÔNG LẶP HEADER ĐỊNH DANH.
+ *
+ * Header "📋 **6 CHUYÊN GIA CHUYÊN MÔN — TỔNG HỢP KIẾN THỨC**" hoặc
+ * "📋 **CHUYÊN GIA THÍNH GIÁC MADA — TƯ VẤN CHUYÊN SÂU**" chỉ nên hiện ĐÚNG
+ * 1 LẦN ở lượt đầu tiên. Nếu lặp ở mọi lượt, người dùng thấy nó "đọc nhức
+ * đầu" và mất thiện cảm.
+ *
+ * Hàm này kiểm tra lịch sử hội thoại: nếu header đã từng xuất hiện ở một tin
+ * nhắn nào của bot, trả về true để bỏ qua header ở lượt hiện tại.
+ */
+export function hasShownIdentityHeader(
+  conversationHistory: Array<{ role: string; content: string }> = []
+): boolean {
+  // Dòng bắt đầu bằng 📋 ** và chứa từ khóa định danh của các bot.
+  // ⚠️ Không bắt buộc kết thúc bằng \n: header có thể bị dính liền câu chào
+  // ("📋 **…** Chào bạn!") — vẫn phải tính là đã hiện để chống lặp.
+  const headerLine = /^\s*📋\s*\*\*[^\n]*(CHUYÊN GIA|خبراء|EXPERTS)/i;
+  return (conversationHistory || []).some(
+    (m) => m?.role === 'assistant' && headerLine.test(m.content || '')
+  );
+}
+
+/**
+ * Gỡ dòng header định danh ở đầu câu trả lời (nếu có).
+ *
+ * Chỉ xóa dòng header ở vị trí ĐẦU câu trả lời — không đụng vào nội dung thật
+ * ở giữa bài, để không mất thông tin khi người dùng nhắc lại tên bot.
+ *
+ * ⚠️ VÌ SAO DÙNG NON-GREEDY `(?:[^*\n]|\*(?!\*))+`:
+ * Regex cũ dùng `[^\n]*\*\*` (tham lam) → khớp tới dấu `**` CUỐI CÙNG trên
+ * dòng, nuốt luôn câu chào phía sau nếu câu đó có bold:
+ *   "📋 **6 CHUYÊN GIA** Chào bạn, mình là **MADA** nhé!" → chỉ còn "nhé!"
+ * Bản non-greedy chỉ ăn tới dấu `**` ĐẦU TIÊN (đóng header) → câu chào giữ
+ * nguyên. Đồng thời chấp nhận header dính liền câu chào trên cùng dòng.
+ */
+export function stripIdentityHeader(answer: string): string {
+  if (!answer) return answer;
+  return answer
+    .replace(
+      /^\s*📋[ \t]*\*\*((?:[^*\n]|\*(?!\*))+?)\*\*[ \t]*(?:\n+|(?=\S))/i,
+      ''
+    )
+    .replace(/^\s*\n+/, '')
+    .trimStart();
+}
+
+/**
+ * ⭐⭐⭐ Gỡ lời CHÀO ở giữa cuộc trò chuyện.
+ *
+ * ⚠️ VÌ SAO CẦN (lớp phòng thủ SAU prompt):
+ * Mỗi bot có lời mở đầu sẵn trong identity ("Chào bạn! Mình là MADA…"). Dù
+ * đã có chỉ thị cấm trong prompt, model VẪN hay chào lại ở lượt thứ 5, thứ
+ * 10. Hàm này xoá hẳn để người dùng không thấy bot "đọc nhức đầu".
+ *
+ * ⚠️ CHỈ gọi khi ĐÃ có lượt trước — lượt đầu tiên thì lời chào là đúng.
+ *
+ * @param answer Câu trả lời cần làm sạch.
+ * @returns Câu trả lời đã bỏ lời chào + giới thiệu lại danh tính ở đầu.
+ */
+export function stripMidConversationGreeting(answer: string): string {
+  if (!answer) return answer;
+  let out = answer.trimStart();
+
+  // Gỡ header định danh trước (nếu có) để lời chào nằm ở đầu tuyệt đối.
+  out = stripIdentityHeader(out);
+
+  // Tiền xử lý: gỡ markdown bao quanh lời chào. "**Chào bạn**," phải bỏ CẢ
+  // cặp "**" đóng lại, nếu không sẽ còn sót "Chào bạn**" rác trong câu.
+  out = out.replace(
+    /^\s*(?:[-–—•>]\s*|\d+[.)]\s*)?\*{0,2}\s*(?:chào bạn|xin chào|chào|hello|hi|rất vui được hỗ trợ bạn|rất hân hạnh)\s*[,.!…]?\s*\*{0,2}\s*/i,
+    ''
+  );
+  out = out.replace(/^\s*[,;:]+\s*/, '');
+  // Markdown/bullet rơi vụn ở đầu.
+  out = out.replace(/^\s*(?:[-–—•>#]+\s*|\d+[.)]\s*|\*{1,2})\s*/i, '');
+
+  // Lời chào + tự giới thiệu. Áp dụng TỐI ĐA 2 lần: lời chào và khối giới
+  // thiệu thường viết liền nhau ("Chào bạn! Mình là… Xin chào bạn!"), nhưng
+  // không giới hạn thì sẽ cắn mất nội dung thật phía sau.
+  const GREETINGS: RegExp[] = [
+    /^\s*(?:chào bạn|xin chào|chào|hello|hi|good (?:morning|afternoon|evening))[!,.\s]*(?:mình là|chúng tôi là|chúng tôi có tên là|tôi là|this is|my name is|i am|i'm)[^\n.!?]{0,120}[.!?]?(?:\s*(?:xin\s+chào|chào)\s*b[aạ]n[.!?]?)?/i,
+    /^\s*(?:rất vui được hỗ trợ bạn[^.!?\n]{0,80}[.!?]?|rất hân hạnh[^.!?\n]{0,80}[.!?]|rất vui khi được[^.!?\n]{0,80}[.!?]?|pleased to (?:help|assist)[^.!?\n]{0,80}[.!?]?|happy to help[^.!?\n]{0,80}[.!?]?)/i,
+    // ⭐ "Chào bạn," / "Xin chào," CHỈ mà không kèm tự giới thiệu — rất hay gặp:
+    // bot mở đầu mọi câu bằng "Chào bạn, mình hiểu bạn 45 tuổi…".
+    // ⚠️ Cần ít nhất 1 ký tự đữ sau "chào" để KHÔNG khớp câu lời chào đứng
+    // riêng ("Xin chào các bạn…") — loại đó vẫn phải giữ nguyên.
+    /^\s*(?:chào bạn|hello|hi)[!,.]?\s+(?!$)/i,
+  ];
+
+  for (const re of GREETINGS) {
+    out = out.replace(re, '').replace(/^\s*[,;:]+\s*/, '');
+  }
+  // Vòng lặp nhẹ cho trường hợp lời chào + giới thiệu viết liền nhiều lần.
+  for (let i = 0; i < 2; i++) {
+    const before = out;
+    for (const re of GREETINGS) out = out.replace(re, '');
+    if (out === before) break;
+  }
+
+  out = out.replace(/^\s*[*_~#>\-•\s]+/, '').trimStart();
+
+  // ⚠️ Lời chào đứng RIÊNG một mình ("Chào bạn." / "Xin chào!") — gỡ nốt.
+  // Nếu gỡ mà rỗng thì trả về rỗng (tin nhắn rỗng còn hơn hiện lời chào lặp).
+  if (/^\s*\**\s*(?:chào bạn|xin chào|chào|hello|hi)\s*\**[.!?…]?\s*$/i.test(out)) {
+    return '';
+  }
+
+  return out;
+}
+
+/**
+ * ⭐ Đánh dấu câu trả lời bị cắt cụt do chạm trần token (finishReason=MAX_TOKENS).
+ *
+ * ⚠️ VÌ SAO CẦN: khi Gemini dừng giữa chừng, câu cuối thường bị cắt ở giữa từ
+ * ("...tiếp tục tận hưởng"). Người dùng không biết là bot hết dữ liệu hay mất
+ * kết nối. Gắn "…" + ghi chú ngắn giúp họ hiểu câu đang dang dở và hỏi tiếp.
+ *
+ * @param answer Câu trả lời đầy đủ (chưa chỉnh sửa).
+ * @param lang   Ngôn ngữ để chọn ghi chú phù hợp.
+ */
+export function markTruncated(answer: string, lang: string = 'vi'): string {
+  const out = (answer || '').replace(/\s+$/, '');
+  if (!out) return out;
+
+  // Đã có dấu kết hợp lệ → coi như trọn vẹn, không đụng vào.
+  if (/[?!….""')\]]\s*$/.test(out)) return out;
+
+  const note =
+    lang === 'en'
+      ? '\n\n_(This response was cut short due to length. Feel free to ask me to continue.)_'
+      : '\n\n_(Câu trả lời bị ngắn do độ dài. Bạn có thể nhờ mình viết tiếp phần còn lại.)_';
+
+  // Cắt đúng ranh giới từ gần nhất để không để lại mảnh chữ lơ lửng.
+  const words = out.split(' ');
+  if (words.length > 12) {
+    const trimmed = words.slice(0, words.length - 2).join(' ');
+    return `${trimmed}…${note}`;
+  }
+
+  return `${out}…${note}`;
+}
 
 // ============ PROXY-AWARE FETCH ============
 // Use proxy if configured (respects HTTP_PROXY/HTTPS_PROXY env vars)
@@ -47,12 +195,20 @@ async function fetchWithRetry(
 }
 
 // Direct Gemini API call that bypasses proxy, with automatic 429 retry
+//
+// ⚠️ maxOutputTokens PHẢI lớn: Gemini 2.5 dùng "thinking mode" — token suy nghĩ
+// (`thoughtsTokenCount`) tính VÀO cùng maxOutputTokens. Đo thực tế: với
+// maxOutputTokens=2048, model dùng 1963 token để suy nghĩ → chỉ còn 85 token
+// cho câu trả lời → sinh ra 312 ký tự rồi CỤT giữa chừng, finishReason =
+// MAX_TOKENS. Nên mốc tối thiểu là 8192, dùng 16384 cho chắc.
+const GEMINI_MIN_OUTPUT_TOKENS = 16384;
+
 async function callGeminiDirect(
   apiKey: string,
   modelName: string,
   prompt: string,
   tools?: any,
-  opts?: { systemInstruction?: string; contents?: any[] }
+  opts?: { systemInstruction?: string; contents?: any[]; maxOutputTokens?: number }
 ): Promise<any> {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
 
@@ -62,10 +218,18 @@ async function callGeminiDirect(
       : [{ role: 'user', parts: [{ text: prompt }] }],
     generationConfig: {
       temperature: 0.3,
-      maxOutputTokens: 2048,
+      // ⭐ maxOutputTokens bên dưới là trần của phần trả lời; phần suy nghĩ có
+      // trần riêng (thinkingConfig) nên không tranh nhau ở đây.
+      maxOutputTokens: Math.max(opts?.maxOutputTokens ?? GEMINI_MIN_OUTPUT_TOKENS, GEMINI_MIN_OUTPUT_TOKENS),
       topP: 0.8,
       topK: 20,
     },
+  };
+
+  // ⚠️ Tách "suy nghĩ" ra khỏi ngân sách trả lời. Không có dòng này, thinking
+  // mode ăn hết maxOutputTokens và câu trả lời bị cắt cụt.
+  body.generationConfig.thinkingConfig = {
+    thinkingBudget: opts?.thinkingBudget ?? 2048,
   };
 
   if (opts?.systemInstruction) {
@@ -305,6 +469,23 @@ interface RAGConfig {
   agentId?: string;
   /** ⭐ MỚI: Nếu true → ưu tiên KB theo filter, nếu thiếu thì fallback toàn bộ KB */
   priority?: boolean;
+  /**
+   * ⭐ MỚI: Danh mục tên sản phẩm THẬT của MADA (đã format sẵn).
+   * Chèn vào prompt để model KHÔNG bịa tên sản phẩm — mọi tên được nhắc
+   * đều tồn tại trong DB → luôn gắn được link sản phẩm.
+   */
+  productCatalog?: string;
+  /**
+   * ⭐ Chưa đủ 4 câu hỏi tiêu chuẩn → cấm bot nhắc tên sản phẩm.
+   * Bot phải tập trung trả lời và để người dùng bổ sung thông tin.
+   */
+  noProductRecommendation?: boolean;
+  /**
+   * ⭐ HỎI RIÊNG 1 SẢN PHẨM (đã khớp tên trong kb_products).
+   * Khi có giá trị này: bot chỉ được tư vấn đúng sản phẩm đó, không ra thêm
+   * sản phẩm khác — người dùng sẽ xem thẻ có ẢNH của chính sản phẩm hỏi.
+   */
+  singleProductFocus?: string | null;
 }
 
 /**
@@ -418,17 +599,21 @@ class RAGEngine {
       }
 
       // Build context from retrieved documents
+      // ⭐ SANITIZE: loại bỏ metadata nội bộ (Mã SP, Stock, …) + marker prompt
+      //    trước khi đưa vào prompt để model không echo nguyên văn ra ngoài.
       let context = '';
       if (finalDocs.length > 0) {
-        context = finalDocs
-          .map((doc, index) => `[Document ${index + 1}] (Nguồn: ${doc.metadata?.title || doc.metadata?.source || 'Unknown'})\n${doc.content}`)
-          .join('\n\n');
+        context = sanitizeContextForPrompt(
+          finalDocs
+            .map((doc, index) => `[Document ${index + 1}] (Nguồn: ${doc.metadata?.title || doc.metadata?.source || 'Unknown'})\n${doc.content}`)
+            .join('\n\n')
+        );
       }
 
       // Build prompt
       const hasContext = context.length > 0;
-      const prompt = this.buildPrompt(userQuery, context, conversationHistory, hasContext, systemInstruction, config.language);
-      const req = this.buildRequest(userQuery, context, conversationHistory, hasContext, systemInstruction, config.language);
+      const prompt = this.buildPrompt(userQuery, context, conversationHistory, hasContext, systemInstruction, config.language, config.productCatalog, config.noProductRecommendation, config.singleProductFocus);
+      const req = this.buildRequest(userQuery, context, conversationHistory, hasContext, systemInstruction, config.language, config.productCatalog, config.noProductRecommendation, config.singleProductFocus);
 
       // Generate response
       if (!this._isConfigured || !this.genAI) {
@@ -439,9 +624,12 @@ class RAGEngine {
         model: 'gemini-2.5-flash', // ✅ Stable & Fast
         generationConfig: {
           temperature: 0.3, // Low temp = focused, faster
-          maxOutputTokens: config.maxOutputTokens || 2048, // ⚡ Reduced for faster response
+          maxOutputTokens: config.maxOutputTokens || 8192, // ⚠️ Không dùng mốc thấp (2048 cũ)
           topP: 0.8,
           topK: 20,
+          // ⚠️ Tách token suy nghĩ khỏi ngân sách trả lời — Gemini 2.5 mặc định
+          // dùng chung maxOutputTokens nên câu trả lời bị cắt cụt giữa chừng.
+          thinkingConfig: { thinkingBudget: 2048 },
         },
         tools: [{
           functionDeclarations: [RAG_RESPONSE_SCHEMA]
@@ -460,7 +648,17 @@ class RAGEngine {
         const geminiResult = await callGeminiDirect(apiKey, 'gemini-2.5-flash', prompt, undefined, {
           systemInstruction: req.systemText,
           contents: req.contents,
+          maxOutputTokens: config.maxOutputTokens,
         });
+
+        // ⚠️ Phát hiện bị cắt vì hết token (non-stream).
+        const finishReason = geminiResult?.candidates?.[0]?.finishReason;
+        if (finishReason === 'MAX_TOKENS') {
+          console.warn(
+            '[RAG query] ⚠️ Câu trả lời BỊ CẮT (finishReason=MAX_TOKENS) — ' +
+            'tăng maxOutputTokens'
+          );
+        }
         
         // Parse the response
         const candidates = geminiResult?.candidates || [];
@@ -487,6 +685,12 @@ class RAGEngine {
           answer = postProcessMarkdown(rawAnswer);
           confidence = this.calculateConfidence(finalDocs, hasContext);
         }
+
+        // ⚠️ Nếu bị cắt vì hết token → gắn dấu "…" để người dùng biết câu đang
+        // dang dở, thay vì tưởng bot trả lời thiếu/thiếu ý.
+        if (answer && finishReason === 'MAX_TOKENS') {
+          answer = markTruncated(answer, config.language || 'vi');
+        }
       } catch (schemaError: any) {
         console.warn('[RAG] Schema parsing failed, using text fallback:', schemaError.message?.slice(0, 80));
         try {
@@ -504,6 +708,28 @@ class RAGEngine {
         } catch (textError) {
           throw textError;
         }
+      }
+
+      // ⭐ SANITIZE: dọn câu trả lời cuối cùng trước khi trả về client
+      answer = sanitizeAssistantAnswer(answer);
+      // ⭐ Header định danh chỉ hiện 1 LẦN ở lượt đầu. Nếu đã hiện ở lượt trước
+      // mà LLM lại viết lại → gỡ bỏ để không lặp gây khó chịu.
+      if (hasShownIdentityHeader(conversationHistory)) {
+        answer = stripIdentityHeader(answer);
+      }
+      // ⭐⭐⭐ Gỡ LỜI CHÀO ở giữa cuộc trò chuyện (thứ tự: sau header).
+      // Đã có lượt trước → không được chào lại "Chào bạn! Mình là MADA…".
+      if ((conversationHistory || []).some((m) => m?.role === 'user')) {
+        answer = stripMidConversationGreeting(answer);
+      }
+      // Chưa đủ 4 câu hỏi → gỡ tên sản phẩm (prompt một mình không đủ tin cậy).
+      if (config.noProductRecommendation) {
+        // ⭐ Thứ tự quan trọng: cắt sản phẩm TRƯỚC, rồi mới sửa câu bị cụt.
+        // Ngược lại sẽ sửa câu rồi lại cắt → lại còn câu đứt ("Bạn đã").
+        answer = repairTruncatedSentences(stripProductMentions(answer));
+      } else {
+        // Đã đủ → chèn link MADA dưới tên sản phẩm (chỉ tên có thật trong DB).
+        answer = appendProductLinks(answer);
       }
 
       return {
@@ -630,44 +856,57 @@ class RAGEngine {
       // Fetch top products từ kb_products theo botId / madaCategory
       let productContext = '';
       try {
-        // Map madaCategory (e.g. "mental-cognitive") → DB category enum (e.g. "cognition")
-        const MADA_CATEGORY_TO_DB: Record<string, string> = {
-          'mobility': 'mobility',
-          'vision': 'vision',
-          'hearing': 'hearing',
-          'cognition': 'cognition',
-          'mental-cognitive': 'cognition',
-          'communication': 'communication',
-          'daily-living': 'daily_living',
-          'education': 'education',
-        };
-        const dbCategory = (madaCategory && MADA_CATEGORY_TO_DB[madaCategory]) || null;
+        // Bot này nhận category nào trong kb_products.
+        // ⚠️ KHÔNG map cứng 1 category: `mobility` trộn xe lăn (Bot 6) + nẹp/chuột
+        // (Bot 5). Dùng `productCategoriesForBot()` để lấy đủ category, rồi lọc
+        // theo `resolveProductOwner()` để mỗi bot chỉ nhận sản phẩm đúng chuyên môn.
+        const wantedCats = productCategoriesForBot(config.botId || agentId, madaCategory);
 
         let products: any[] = [];
-        if (dbCategory) {
-          products = db.prepare(
-            `SELECT title, title_en, description, category, brand, price_range, product_url
-             FROM kb_products
-             WHERE (category = ? OR category LIKE ?) AND status = 'published'
-             ORDER BY featured DESC, sort_order DESC, created_at DESC
-             LIMIT 5`
-          ).all(dbCategory, `%${dbCategory}%`) as any[];
-          
+        if (wantedCats.length > 0) {
+          const placeholders = wantedCats.map(() => '?').join(',');
+          const selectRows = (limit: number) =>
+            db.prepare(
+              `SELECT title, title_en, description, category, brand, price_range,
+                      product_url, source_url, image_url
+               FROM kb_products
+               WHERE category IN (${placeholders}) AND status = 'published'
+               ORDER BY featured DESC, sort_order DESC, created_at DESC
+               LIMIT ?`
+            ).all(...wantedCats, limit) as any[];
+
+          const owner = config.botId || agentId;
+          // ⭐ Lọc theo taxonomy MADA (nguồn chuẩn, đa nhãn). Lọc bằng
+          // `resolveProductOwner()` chỉ suy đoán từ tên sản phẩm và bỏ sót các
+          // sản phẩm MADA khai thuộc nhiều nhóm (proloquo2go, esight-4…).
+          const keep = (p: any) =>
+            productBelongsToBot(p.product_url || p.source_url, owner) ||
+            resolveProductOwner(p.category, p.title)?.botId === owner;
+
+          const owned = selectRows(200).filter(keep);
+          // ⭐ Ưu tiên sản phẩm ĐỘC QUYỀN. Bot nào có sản phẩm riêng thì không
+          // gợi ý sản phẩm đa nhãn — nếu không bot-mobility sẽ dẫn đầu bằng
+          // eSight 4 / Tobii PCEye 5 (thị giác) và Quha Dwell (cơ xương khớp).
+          const exclusive = owned.filter((p) =>
+            isExclusiveToBot(p.product_url || p.source_url, owner)
+          );
+          products = exclusive.length > 0 ? exclusive : owned;
+
           // ⭐ ANTI-REPEAT: Filter out already-recommended products
           const recommendedSet = getRecommendedProducts(conversationId || '');
-          products = products.filter(p => !recommendedSet.has(p.title.toLowerCase()));
-          
+          products = products.filter(p => !recommendedSet.has((p.title || '').toLowerCase()));
+
           // If all products were already recommended, fetch more (expand LIMIT and filter again)
           if (products.length === 0 && recommendedSet.size > 0) {
-            const expandedProducts = db.prepare(
-              `SELECT title, title_en, description, category, brand, price_range, product_url
-               FROM kb_products
-               WHERE (category = ? OR category LIKE ?) AND status = 'published'
-               ORDER BY featured DESC, sort_order DESC, created_at DESC
-               LIMIT 10`
-            ).all(dbCategory, `%${dbCategory}%`) as any[];
-            products = expandedProducts.filter(p => !recommendedSet.has(p.title.toLowerCase()));
+            const all = selectRows(400).filter(keep);
+            const excl = all.filter((p) => isExclusiveToBot(p.product_url || p.source_url, owner));
+            const pool = excl.length > 0 ? excl : all;
+            products = pool.filter(
+              (p) => !recommendedSet.has((p.title || '').toLowerCase())
+            );
           }
+
+          products = products.slice(0, 5);
         }
         // ⭐ FIX: KHÔNG fallback sang tất cả sản phẩm nếu category không match
         // Nếu không có sản phẩm đúng category → bỏ qua product fallback, trả lời "không tìm thấy"
@@ -692,11 +931,19 @@ class RAGEngine {
           : `Tôi chưa có thông tin chi tiết về chủ đề này trong cơ sở kiến thức, nhưng dưới đây là một số sản phẩm từ cơ sở dữ liệu có thể phù hợp:`;
 
         const aiContext = `[${labelHeader}]\n${productContext}`;
-        const fbReq = this.buildRequest(userQuery, aiContext, conversationHistory, true, config.systemInstruction, config.language);
+        const fbReq = this.buildRequest(userQuery, aiContext, conversationHistory, true, config.systemInstruction, config.language, config.productCatalog, config.noProductRecommendation, config.singleProductFocus);
         const model = this.genAI.getGenerativeModel({
           model: 'gemini-2.5-flash',
           systemInstruction: fbReq.systemText,
-          generationConfig: { temperature: 0.3, maxOutputTokens: config.maxOutputTokens || 8192, topP: 0.8, topK: 20 },
+          generationConfig: {
+            temperature: 0.3,
+            maxOutputTokens: config.maxOutputTokens || 8192,
+            topP: 0.8,
+            topK: 20,
+            // ⚠️ Tách token suy nghĩ khỏi ngân sách trả lời (xem giải thích ở
+            // nhánh query() chính) — không có thì câu bị cắt cụt.
+            thinkingConfig: { thinkingBudget: 2048 },
+          },
         });
 
         let fullAnswer = '';
@@ -721,6 +968,19 @@ class RAGEngine {
             const raw = `\n\n${productContext}`;
             fullAnswer += raw;
             yield { text: () => raw };
+          }
+
+          // ⭐⭐ Gắn link MADA cho từng sản phẩm được giới thiệu.
+          // Nhánh fallback này stream trực tiếp nên phải gửi event "replace" để
+          // client thay toàn bộ nội dung — nếu chỉ nối thêm phần chênh lệch thì
+          // link (được chèn ngay dưới tên sản phẩm, tức ở GIỮA nội dung) sẽ bị
+          // mất và người dùng không thấy link nào.
+          const linked = config.noProductRecommendation
+            ? repairTruncatedSentences(stripProductMentions(fullAnswer))
+            : appendProductLinks(fullAnswer);
+          if (linked !== fullAnswer) {
+            fullAnswer = linked;
+            yield { text: () => '', __replaceFull: linked };
           }
         })();
 
@@ -781,16 +1041,20 @@ class RAGEngine {
     }
 
     // Build context
+    // ⭐ SANITIZE: loại bỏ metadata nội bộ (Mã SP, Stock, …) + marker prompt
+    //    trước khi đưa vào prompt để model không echo nguyên văn ra ngoài.
     let context = '';
     if (relevantDocs.length > 0) {
-      context = relevantDocs
-        .map((doc, index) => `[Document ${index + 1}] (Nguồn: ${doc.metadata?.title || doc.metadata?.source || 'Unknown'})\n${doc.content}`)
-        .join('\n\n');
+      context = sanitizeContextForPrompt(
+        relevantDocs
+          .map((doc, index) => `[Document ${index + 1}] (Nguồn: ${doc.metadata?.title || doc.metadata?.source || 'Unknown'})\n${doc.content}`)
+          .join('\n\n')
+      );
     }
 
     // Build prompt
     const hasContext = context.length > 0;
-    const streamReq = this.buildRequest(userQuery, context, conversationHistory, hasContext, config.systemInstruction, config.language);
+    const streamReq = this.buildRequest(userQuery, context, conversationHistory, hasContext, config.systemInstruction, config.language, config.productCatalog, config.noProductRecommendation, config.singleProductFocus);
 
     // Format sources
     const sources = relevantDocs.map((doc) => ({
@@ -816,6 +1080,9 @@ class RAGEngine {
         maxOutputTokens: config.maxOutputTokens || 8192,
         topP: 0.8,
         topK: 20,
+        // ⚠️ Tách token suy nghĩ khỏi ngân sách trả lời — thiếu dòng này thì
+        // thinking mode ăn hết maxOutputTokens và câu bị cắt cụt.
+        thinkingConfig: { thinkingBudget: 2048 },
       },
     });
 
@@ -845,6 +1112,15 @@ class RAGEngine {
 
     // Collect full answer for history
     let fullAnswer = '';
+    // ⭐ Cờ báo câu trả lời bị Gemini cắt vì chạm trần token.
+    let truncatedByTokenLimit = false;
+    // ⭐ SANITIZE (streaming): lọc nội dung nội bộ theo luồng, giữ trải nghiệm hiện dần
+    // ⭐ Nếu header định danh (📋 ...) đã xuất hiện trong các lượt TRƯỚC, không ghim
+    // lại ở lượt này — chỉ hiện đúng 1 lần ở lượt đầu tiên.
+    const headerAlreadyShown = hasShownIdentityHeader(conversationHistory);
+    const sanitizer = createStreamingSanitizer({ headerAlreadyShown });
+    // ⭐ Đã có lượt trước → cấm chào lại (prompt + gỡ bằng code).
+    const isFollowUpTurn = (conversationHistory || []).some((m) => m?.role === 'user');
 
     const stream = (async function* () {
       try {
@@ -852,8 +1128,90 @@ class RAGEngine {
 
         for await (const chunk of result.stream) {
           const text = chunk.text();
+          if (!text) continue;
+          const safeText = sanitizer.push(text);
           fullAnswer += text;
-          yield { text: () => text };
+          if (safeText) {
+            yield { text: () => safeText };
+          }
+
+          // ⚠️ PHẦN QUAN TRỌNG: phát hiện bị cắt cụt VÀ báo lại cho người dùng.
+          //
+          // VÌ SAO CẦN: trước đây finishReason bị bỏ qua hoàn toàn → khi model
+          // chạm trần token, câu trả lời dừng giữa chừng ("...tận hưởng") mà
+          // không có dấu hiệu gì cho người dùng lẫn developer.
+          const fr = (chunk as any)?.candidates?.[0]?.finishReason;
+          if (fr === 'MAX_TOKENS') {
+            truncatedByTokenLimit = true;
+            console.warn(
+              `[RAG Stream] ⚠️ Câu trả lời BỊ CẮT (finishReason=MAX_TOKENS) ` +
+              `sau ${fullAnswer.length} ký tự — tăng maxOutputTokens/thinkingBudget`
+            );
+          }
+        }
+
+        // Đẩy nốt phần buffer còn lại
+        const tail = sanitizer.flush();
+        if (tail) {
+          yield { text: () => tail };
+        }
+
+        // ⚠️ Nếu bị cắt vì hết token → gắn dấu "…" cho người dùng biết câu
+        // chưa trọn vẹn, thay vì im lặng dừng giữa chừng (như "…tận hưởng").
+        if (truncatedByTokenLimit) {
+          const withEllipsis = markTruncated(fullAnswer, config.language || 'vi');
+          if (withEllipsis !== fullAnswer) {
+            yield { text: () => '', __replaceFull: withEllipsis };
+            fullAnswer = withEllipsis;
+          }
+        }
+
+        // ⭐ Header định danh chỉ hiện 1 lần ở lượt đầu. Nếu đã hiện ở lượt
+        // trước mà LLM lại viết lại → gỡ bỏ rồi gửi bản đã sửa (replace).
+        if (headerAlreadyShown) {
+          const noHeader = stripIdentityHeader(fullAnswer);
+          if (noHeader !== fullAnswer) {
+            yield { text: () => '', __replaceFull: noHeader };
+            fullAnswer = noHeader;
+          }
+        }
+
+        // ⭐⭐⭐ Gỡ LỜI CHÀO ở giữa cuộc trò chuyện. Stream đã gửi hết chunk ra
+        // client nên phải gửi bản THAY THẾ (replace) để khách không thấy bot chào
+        // lại ở giữa cuộc trò chuyện.
+        if (isFollowUpTurn) {
+          const noGreeting = stripMidConversationGreeting(fullAnswer);
+          if (noGreeting !== fullAnswer) {
+            yield { text: () => '', __replaceFull: noGreeting };
+            fullAnswer = noGreeting;
+          }
+        }
+
+        // ⭐ Chưa đủ 4 câu hỏi → gỡ phần nhắc tên sản phẩm mà bot tự ý thêm vào.
+        // Gửi phần còn lại sau khi đã lọc, không gửi lại phần đã stream.
+        if (config.noProductRecommendation) {
+          const cleaned = repairTruncatedSentences(stripProductMentions(fullAnswer));
+          if (cleaned !== fullAnswer) {
+            // Thay thế nội dung đã gửi bằng bản đã lọc qua event "replace".
+            yield { text: () => '', __replaceFull: cleaned };
+          }
+        } else {
+          // Đã đủ 4 câu → chèn link MADA dưới tên sản phẩm.
+          const withLinks = appendProductLinks(fullAnswer);
+          if (withLinks !== fullAnswer) {
+            // ⭐⭐ BẮT BUỘC dùng event "replace", KHÔNG gửi phần chênh lệch.
+            //
+            // LÝ DO: appendProductLinks chèn link NGAY DƯỚI tên sản phẩm — tức
+            // là chèn ở GIỪA nội dung, không phải nối thêm ở cuối. Nếu gửi
+            // `withLinks.slice(fullAnswer.length)` (cách cũ) thì phần tính từ
+            // độ dài bản gốc sẽ KHÔNG phải là link mà là đoạn văn bị lệch vị trí,
+            // còn link thì bị mất sạch. Người dùng sẽ thấy câu bị cắt dở.
+            //
+            // → Gửi lại TOÀN BỘ bản đã chèn link qua __replaceFull để client thay
+            // thế nội dung đã stream, nhờ vậy link luôn xuất hiện đúng chỗ.
+            yield { text: () => '', __replaceFull: withLinks };
+            fullAnswer = withLinks;
+          }
         }
       } catch (error) {
         // ⭐ FIX: throw lỗi để caller xử lý (không nuốt lỗi như trước)
@@ -878,7 +1236,10 @@ class RAGEngine {
     conversationHistory: Array<{ role: string; content: string }>,
     hasContext: boolean,
     systemInstruction?: string,
-    language: 'vi' | 'en' | 'ar' | 'fr' = 'vi'
+    language: 'vi' | 'en' | 'ar' | 'fr' = 'vi',
+    productCatalog?: string,
+    noProductRecommendation?: boolean,
+    singleProductFocus?: string | null
   ): string {
     const langCode: 'vi' | 'en' | 'ar' | 'fr' = (['vi', 'en', 'ar', 'fr'].includes(language) ? language : 'vi');
     const tail = RAG_TAIL_PROMPTS[langCode];
@@ -902,12 +1263,17 @@ class RAGEngine {
 
     const basePrompt = systemInstruction || SYSTEM_PROMPT;
 
+    // ⭐ Đã đủ thông tin + có catalog → bắt buộc tư vấn (xem buildRequest).
+    const consultNow = (!noProductRecommendation && productCatalog)
+      ? `\n\n${CONSULT_NOW_RULES[langCode] || CONSULT_NOW_RULES.vi}`
+      : '';
+
     return `${basePrompt}
 
 ${tail.guidanceTitle}:
 ${tail.guidanceRules.map(r => `- ${r}`).join('\n')}
 
-${hasContext ? `${tail.contextHeader}:
+${productCatalog ? `${productCatalog}\n` : ''}${hasContext ? `${tail.contextHeader}:
 ${context}
 
 ---` : ''}
@@ -917,7 +1283,7 @@ ${historyStr}
 ---` : ''}
 ${tail.questionHeader}: ${userQuery}
 
-${tail.answerPrompt}`;
+${tail.answerPrompt}${consultNow}`;
   }
 
   /**
@@ -930,7 +1296,10 @@ ${tail.answerPrompt}`;
     conversationHistory: Array<{ role: string; content: string }>,
     hasContext: boolean,
     systemInstruction?: string,
-    language: 'vi' | 'en' | 'ar' | 'fr' = 'vi'
+    language: 'vi' | 'en' | 'ar' | 'fr' = 'vi',
+    productCatalog?: string,
+    noProductRecommendation?: boolean,
+    singleProductFocus?: string | null
   ): { systemText: string; contents: Array<{ role: 'user' | 'model'; parts: Array<{ text: string }> }> } {
     const langCode: 'vi' | 'en' | 'ar' | 'fr' = (['vi', 'en', 'ar', 'fr'].includes(language) ? language : 'vi');
     const tail = RAG_TAIL_PROMPTS[langCode];
@@ -959,14 +1328,113 @@ ${tail.answerPrompt}`;
       `${tail.questionHeader}: ${userQuery}`,
     ].filter(Boolean).join('\n');
 
+    // Chưa đủ 4 câu hỏi → nhắc lại yêu cầu NGAY TRƯỚC câu hỏi của user.
+    // ⚠️ Vị trí này quan trọng: đặt ngay cạnh câu hỏi, model chú ý hơn nhiều
+    // so với chỉ thị chung đặt trong system prompt (system prompt riêng của từng
+    // bot có sẵn danh sách sản phẩm và khiến model hay tự liệt kê).
+    const inlineReminder = noProductRecommendation
+      ? `\n\n[QUY TẮC BẮT BUỘC — CHƯA ĐỦ THÔNG TIN, TUYỆT ĐỐI TUÂN THỦ]\n`
+        + `- KHÔNG được nhắc tên bất kỳ sản phẩm, thiết bị, phần mềm hay thương hiệu cụ thể nào.\n`
+        + `- KHÔNG được liệt kê hay mô tả sản phẩm (kể cả mô tả chức năng của sản phẩm).\n`
+        + `- Hãy trả lời câu hỏi của người dùng một cách hữu ích, chung về triệu chứng / nguyên nhân / cách chăm sóc ban đầu.\n`
+        + `- Kết thúc bằng đúng MỘT câu hỏi trong bộ 4 câu tiêu chuẩn, bỏ qua câu họ đã trả lời.`
+      : '';
+
+    // Chèn bộ 4 câu tiêu chuẩn vào system prompt (bổ sung cho inline reminder).
+    const noProductRule = noProductRecommendation
+      ? `\n\n${CONSULT_4_QUESTIONS[langCode] || CONSULT_4_QUESTIONS.vi}`
+      : '';
+
+    // ⭐⭐⭐ CHỐNG "ĐỌC NHỨC ĐẦU" — chỉ chào MỘT LẦN ở đầu cuộc trò chuyện.
+    //
+    // ⚠️ VÌ SAO CẦN: system instruction của từng bot mở đầu sẵn bằng lời
+    // chào ("Chào bạn! Mình là MADA…"). Ở lượt thứ 5, thứ 10, model vẫn bám theo
+    // và chào lại từ đầu → người dùng thấy bot "không nhớ mình đang nói chuyện",
+    // đọc rất không thông minh. Đã có `stripIdentityHeader` gỡ HEADER (📋),
+    // nhưng CÂU CHÀO ("Chào bạn!") thì không bị gỡ.
+    const isFollowUpTurn = cleaned.some((m) => m?.role === 'user');
+    const noReGreetRule = isFollowUpTurn
+      ? (langCode === 'en'
+        ? `\n\n[WELCOME — ONCE ONLY] This is NOT the first message of our conversation. We are ALREADY talking.`
+          + `\n- NEVER greet again. NEVER say "Chào bạn", "Xin chào", "Hello", "Welcome", "Rất vui được hỗ trợ bạn".`
+          + `\n- NEVER re-introduce yourself or repeat your name/role.`
+          + `\n- NEVER say "Bạn cần tôi giúp gì hôm nay?" — that was question #1, already answered.`
+        : `\n\n[XIN CHÀO — CHỈ MỘT LẦN] Đây KHÔNG phải tin nhắn đầu tiên của cuộc trò chuyện — chúng ta ĐANG nói chuyện rồi.`
+          + `\n- TUYỆT ĐỐI KHÔNG chào lại. KHÔNG được nói "Chào bạn", "Xin chào", "Rất vui được hỗ trợ bạn".`
+          + `\n- KHÔNG giới thiệu lại tên/vai trò của bạn.`
+          + `\n- KHÔNG được hỏi "Bạn cần tôi giúp gì hôm nay?" — đó là câu 1, khách đã trả lời rồi.`
+          + `\n- Trả lời THẲNG vào câu hỏi vừa hỏi, dựa trên những gì đã bàn bạc trước đó.`)
+      : '';
+
+    // ⭐ ĐÃ ĐỦ thông tin và ĐÃ có catalog → BẮT BUỘC phải tư vấn thật.
+    // ⚠️ Thiếu chỉ thị này, model chỉ thấy danh sách tên sản phẩm rồi trả lời
+    // kiểu "Để mình hỗ trợ bạn tốt nhất, cho mình hỏi thêm…" → không nêu sản
+    // phẩm nào. Cần nhắc RÕ 3 phần: chuyên môn → sản phẩm thật → cách dùng.
+    //
+    // ⚠️ Khi hỏi RIÊNG 1 sản phẩm thì KHÔNG dùng rule này — nó bảo "liệt kê
+    // 2-4 sản phẩm" sẽ khiến bot ra thêm hàng, trái yêu cầu của người dùng.
+    const singleSystemRule = singleProductFocus
+      ? `\n\n${SINGLE_PRODUCT_RULES[langCode].replace(/\{PRODUCT_NAME\}/g, singleProductFocus)}`
+      : '';
+    const consultNowRule = (!noProductRecommendation && productCatalog && !singleProductFocus)
+      ? `\n\n${CONSULT_NOW_RULES[langCode] || CONSULT_NOW_RULES.vi}`
+      : '';
+
+    // ⚠️ QUAN TRỌNG: chỉ thị trong system prompt KHÔNG ĐỦ — Gemini vẫn bám theo
+    // lời mở đầu "Chào bạn! ... Bạn cần mình hỗ trợ gì hôm nay?" có sẵn trong
+    // identity của bot. Phải nhắc LẠI NGAY CẠNH câu hỏi (mới có hiệu lực).
+    // ⭐ ĐƯỢC ƯU TIÊN CAO HƠN consultNowInline: khi hỏi riêng 1 sản phẩm,
+    // KHÔNG được phép "ra thêm" danh sách sản phẩm khác.
+    const singleProductInline = singleProductFocus
+      ? SINGLE_PRODUCT_RULES[langCode].replace(/\{PRODUCT_NAME\}/g, singleProductFocus)
+      : '';
+
+    const consultNowInline = singleProductInline || (consultNowRule
+      ? (langCode === 'en'
+        ? `\n\n[MANDATORY — ENOUGH INFORMATION, CONSULT NOW]\n`
+          + `- DO NOT ask any follow-up question. DO NOT say "to support you best" or "tell me more".\n`
+          + `- Start by stating what you support best for their condition (2-3 sentences).\n`
+          + `- Then list 2-4 REAL products taken ONLY from the catalog above, each with its URL on the line right under the bold name, plus one line "why it fits".\n`
+          + `- End with a concrete tip on how to start using them.`
+        : `\n\n[BẮT BUỘC — ĐÃ ĐỦ THÔNG TIN, TƯ VẤN NGAY]\n`
+          + `- TUYỆT ĐỐI KHÔNG hỏi thêm. KHÔNG nói "để mình hỗ trợ bạn tốt nhất", "cho mình biết thêm".\n`
+          + `- MỞ ĐẦU bằng 2-3 câu nói rõ bạn hỗ trợ tốt nhất về lĩnh vực nào và với tình trạng của họ thì giải pháp nào phù hợp.\n`
+          + `- SAU ĐÓ liệt kê 2-4 sản phẩm THẬT lấy từ danh mục sản phẩm MADA ở trên, mỗi sản phẩm viết tên in đậm, link ở DÒNG RIÊNG ngay dưới tên (chép y hệt), kèm 1 dòng "phù hợp vì…".\n`
+          + `- KẾT thúc bằng 1-2 câu gợi ý cụ thể về cách bắt đầu sử dụng.`)
+      : '');
+
     const lastTurn = turns[turns.length - 1];
+    // ⭐⭐⭐ "TRẢ LỜI THẲNG" — chỉ dẫn quan trọng nhất cho mọi lượt sau.
+    //
+    // ⚠️ VÌ SAO CẦN: Ở lượt tiếp theo, model hay trả lời hờ hững kiểu
+    // "Cảm ơn bạn, để tôi hiểu rõ hơn về nhu cầu của bạn…", "Bạn vui lòng mô
+    // tả thêm…" — tức là lại hỏi lại điều khách VỪA trả lời. Người dùng thấy
+    // bot không nghe, rất mất thiện cảm.
+    //
+    // → Bắt buộc dựa trên lịch sử đã bàn bạc, trả lời ĐÚNG Ý hỏi, và chỉ hỏi
+    //   thêm khi thực sự thiếu thông tin — không hỏi lại điều đã nói rồi.
+    const directAnswerInline = isFollowUpTurn
+      ? (langCode === 'en'
+        ? `\n\n[ANSWER DIRECTLY — CONVERSATION IN PROGRESS]\n`
+          + `- READ the conversation history. Do NOT ask the user to repeat anything they already told you.\n`
+          + `- Answer the CURRENT question with specifics. Generic filler like "tell me more" is FORBIDDEN.\n`
+          + `- Give real, concrete information — not meta-talk about needing more details.\n`
+          + `- If you must ask something, make it ONE sharp, new question about information NOT yet given.`
+        : `\n\n[TRẢ LỜI THẲNG — CUỘC TRÒ CHUYỆN ĐANG DIỄN RA]\n`
+          + `- ĐỌC kỹ lịch sử hội thoại. TUYỆT ĐỐI KHÔNG hỏi lại điều khách đã nói.\n`
+          + `- Trả lời TRỰC TIẾP câu hỏi vừa hỏi, có thông tin cụ thể.\n`
+          + `- Cấm tuyệt đối câu hờ hững kiểu "để tôi hiểu rõ hơn", "cho tôi biết thêm", "bạn vui lòng mô tả thêm".\n`
+          + `- Hãy đưa ra thông tin thật, cụ thể, hữu ích — đừng nói vòng vo về việc cần thêm thông tin.\n`
+          + `- Nếu cần hỏi, chỉ hỏi MỘT câu mới, và chỉ hỏi điều chưa được nói.`)
+      : '';
+
     if (lastTurn && lastTurn.role === 'user') {
-      lastTurn.parts[0].text += `\n\n${currentTurn}`;
+      lastTurn.parts[0].text += `\n\n${currentTurn}${inlineReminder}${consultNowInline}${directAnswerInline}`;
     } else {
-      turns.push({ role: 'user', parts: [{ text: currentTurn }] });
+      turns.push({ role: 'user', parts: [{ text: `${currentTurn}${inlineReminder}${consultNowInline}${directAnswerInline}` }] });
     }
 
-    const systemText = `${systemInstruction || SYSTEM_PROMPT}\n\n${tail.guidanceTitle}:\n${tail.guidanceRules.map((r) => `- ${r}`).join('\n')}`;
+    const systemText = `${systemInstruction || SYSTEM_PROMPT}\n\n${tail.guidanceTitle}:\n${tail.guidanceRules.map((r) => `- ${r}`).join('\n')}${productCatalog ? `\n\n${productCatalog}` : ''}${noReGreetRule}${noProductRule}${consultNowRule}${singleSystemRule}`;
     return { systemText, contents: turns };
   }
 
@@ -1092,31 +1560,26 @@ ${tail.answerPrompt}`;
     // NHƯNG: Nếu có agentId (custom agent), KHÔNG fallback - dùng kết quả hiện có
     if (priority && searchFilter && primary.length < topK && !hasAgentId) {
       const need = topK - primary.length;
-      console.log(`🔁 [RAG] Priority fallback: cần thêm ${need} docs từ toàn bộ KB`);
-      try {
-        const fallback = await vectorStore.hybridSearch(userQuery, need, undefined, 0.7, 0.3);
-        // Merge, tránh trùng
-        const primaryIds = new Set(primary.map((d: any) => d.id || d.metadata?.source));
-        const merged = [...primary];
-        for (const doc of fallback) {
-          const id = doc.id || doc.metadata?.source;
-          if (!primaryIds.has(id)) {
-            merged.push(doc);
-            primaryIds.add(id);
-          }
-          if (merged.length >= topK) break;
-        }
-        if (merged.length === 0) {
-          // Vector store rỗng hoặc không khớp → dùng tìm kiếm từ khóa trên SQLite
-          return await this.sqliteFallback(userQuery, topK);
-        }
-        return merged;
-      } catch (err) {
-        console.warn('⚠️ [RAG] Fallback hybrid search failed, trying vector:', err);
+      // ⚠️ KHÔNG được gọi `hybridSearch(..., undefined, ...)` ở đây.
+      // Filter `undefined` = lấy docs TỪ MỌI BOT → bot-cognitive gợi ý Proloquo2Go
+      // (bot-speech), bot-mobility gợi ý eSight 4 / Tobii PCEye 5 (bot-vision).
+      // Người dùng chọn đúng bot mà vẫn nhận sản phẩm sai chuyên môn.
+      //
+      // Cách sửa: fallback vẫn giữ ranh giới bot, chỉ nới từ AND (botId+madaCategory)
+      // xuống từng filter riêng lẻ để vẫn nằm trong chuyên môn của bot đó.
+      console.log(`🔁 [RAG] Priority fallback: cần thêm ${need} docs (giữ filter bot ${botId || 'n/a'})`);
+      const primaryIds = new Set(primary.map((d: any) => d.id || d.metadata?.source));
+      const merged = [...primary];
+
+      const relaxedFilters: Array<Record<string, string> | undefined> = [
+        ...(botId ? [{ botId }] : []),
+        ...(madaCategory ? [{ madaCategory }] : []),
+      ];
+
+      for (const rf of relaxedFilters) {
+        if (merged.length >= topK) break;
         try {
-          const fallback = await vectorStore.search(userQuery, { topK: need, filter: undefined });
-          const primaryIds = new Set(primary.map((d: any) => d.id || d.metadata?.source));
-          const merged = [...primary];
+          const fallback = await vectorStore.hybridSearch(userQuery, need * 2, rf, 0.7, 0.3);
           for (const doc of fallback) {
             const id = doc.id || doc.metadata?.source;
             if (!primaryIds.has(id)) {
@@ -1125,15 +1588,14 @@ ${tail.answerPrompt}`;
             }
             if (merged.length >= topK) break;
           }
-          if (merged.length === 0) {
-            return await this.sqliteFallback(userQuery, topK);
-          }
-          return merged;
-        } catch (err2) {
-          console.warn('⚠️ [RAG] Fallback search also failed:', err2);
-          return await this.sqliteFallback(userQuery, topK);
+        } catch (err) {
+          console.warn('⚠️ [RAG] Relaxed-filter fallback failed:', err);
         }
       }
+
+      if (merged.length > 0) return merged;
+      // Không còn gì trong phạm vi bot này → SQLite keyword search (cũng giữ filter bot)
+      return await this.sqliteFallback(userQuery, topK, { botId, madaCategory, agentId });
     } else if (hasAgentId && primary.length === 0) {
       // ⭐ Custom agent KHÔNG có dữ liệu - log cảnh báo và trả về rỗng
       // KHÔNG fallback sang MADA để tránh trả lời sai
@@ -1307,33 +1769,41 @@ ${tail.answerPrompt}`;
     }
   }
 
-  /** Map filter category sang nhiều alias có thể có trong DB */
+  /**
+   * Map filter category sang nhiều alias có thể có trong DB.
+   *
+   * ⚠️ Phải khớp với `lib/categoryMapping.ts` (DB_CATEGORY_TO_MADA):
+   *   - Bot 5 "Neuromusculoskeletal Movement" → category DB `mobility`
+   *   - Bot 6 "Mobility & Transportation"     → category DB `daily_living`
+   * Trước đây alias của 'mobility-and-transportation' trỏ sang `mobility`
+   * (thuộc Bot 5) và thiếu `daily_living` → SQLite fallback của bot
+   * Mobility & Transportation không tìm được sản phẩm của chính nó.
+   */
   private expandCategoryAliases(cat: string): string[] {
     const map: Record<string, string[]> = {
-      // Hearing
-      'sensory-hearing': ['sensory-hearing', 'hearing', 'sensory-hearing'],
+      // Hearing — Bot 1
+      'sensory-hearing': ['hearing', 'sensory-hearing'],
       'hearing': ['hearing', 'sensory-hearing'],
-      // Vision
-      'sensory-vision': ['sensory-vision', 'vision', 'sensory-vision'],
+      // Vision — Bot 2
+      'sensory-vision': ['vision', 'sensory-vision'],
       'vision': ['vision', 'sensory-vision'],
-      // Speech/Communication
-      'voice-and-speech': ['voice-and-speech', 'voice', 'speech', 'communication', 'aac'],
-      'voice-speech': ['voice-and-speech', 'voice', 'speech', 'communication', 'aac'],
+      // Speech/Communication — Bot 3
+      'voice-and-speech': ['voice-and-speech', 'communication', 'voice', 'speech', 'aac'],
+      'voice-speech': ['voice-and-speech', 'communication', 'voice', 'speech', 'aac'],
       'communication': ['communication', 'voice-and-speech'],
-      // Cognitive
-      'mental-cognitive': ['mental-cognitive', 'cognition', 'cognitive', 'mental'],
-      'cognitive': ['cognitive', 'mental-cognitive'],
-      // Neuro/Movement
-      'neuromusculoskeletal-movement': ['neuromusculoskeletal-movement', 'neuro', 'movement', 'musculoskeletal'],
-      'movement': ['movement', 'neuromusculoskeletal-movement'],
-      // Mobility/Transport
-      'mobility-and-transportation': ['mobility-and-transportation', 'mobility', 'transport', 'physical'],
-      'mobility': ['mobility', 'mobility-and-transportation'],
-      // Regulatory
-      'regulatory-standards': ['regulatory-standards', 'regulatory', 'standards'],
+      // Cognitive — Bot 4
+      'mental-cognitive': ['cognition', 'mental-cognitive', 'cognitive', 'mental'],
+      'cognitive': ['cognition', 'mental-cognitive', 'cognitive', 'mental'],
+      // Neuromusculoskeletal Movement — Bot 5 (DB category: `mobility`)
+      'neuromusculoskeletal-movement': ['mobility', 'neuromusculoskeletal-movement', 'neuro', 'movement', 'musculoskeletal'],
+      'movement': ['mobility', 'neuromusculoskeletal-movement', 'neuro', 'movement'],
+      // Mobility & Transportation — Bot 6 (DB category: `daily_living`)
+      'mobility-and-transportation': ['daily_living', 'mobility-and-transportation', 'transport', 'physical'],
+      'daily_living': ['daily_living', 'mobility-and-transportation', 'transport', 'physical'],
+      // Regulatory & Standards — Bot 7
+      'regulatory-standards': ['education', 'regulatory-standards', 'regulatory', 'standards', 'web_accessibility'],
+      'education': ['education', 'regulatory-standards', 'web_accessibility'],
       // Fallback
-      'daily_living': ['general', 'daily_living'],
-      'education': ['education', 'general'],
       'general': ['general'],
     };
     return map[cat] || [cat];

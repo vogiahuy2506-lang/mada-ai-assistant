@@ -4941,17 +4941,46 @@ if (fs.existsSync(clientDistPath)) {
   console.log(`📁 Static files root: ${clientDistPath}`);
   console.log(`📁 Assets path: ${assetsPath}`);
   console.log(`📁 Assets exist: ${fs.existsSync(assetsPath)}`);
-  
+
   // Explicitly serve /assets from clientDistPath/assets to ensure files are served correctly
   // This fixes the issue where SPA fallback catches /assets/* requests
-  app.use('/assets', express.static(assetsPath));
-  
+  //
+  // Cache policy:
+  // - /assets/* : tên file có content-hash (index-XXXX.js) → cache immutable, không bao giờ stale
+  // - index.html: KHÔNG cache → browser luôn lấy HTML mới, tránh 404 chunk sau khi deploy
+  app.use(
+    '/assets',
+    express.static(assetsPath, {
+      setHeaders(res, filePath) {
+        const name = path.basename(filePath);
+        // Chỉ cache bất biến cho file có hash trong tên (vd: index-D8AwaPXn.js)
+        if (/-[A-Za-z0-9_-]{8,}\.(js|css|woff2?|png|jpg|jpeg|svg|webp|gif|ico)$/.test(name)) {
+          res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+        } else {
+          res.setHeader('Cache-Control', 'public, max-age=0, must-revalidate');
+        }
+      },
+    }),
+  );
+
   // Also serve other static files from client root (manifest.json, favicon, etc.)
-  app.use(express.static(clientDistPath));
-  
+  app.use(
+    express.static(clientDistPath, {
+      setHeaders(res, filePath) {
+        // index.html phải luôn fresh để trỏ đúng chunk hash hiện tại
+        if (path.basename(filePath) === 'index.html') {
+          res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+          res.setHeader('Pragma', 'no-cache');
+          res.setHeader('Expires', '0');
+        }
+      },
+    }),
+  );
+
   // SPA fallback - serve index.html for all non-API routes
   // Note: This regex should NOT match /assets/* since we handle it explicitly above
   app.get(/^(?!\/api\/|\/uploads\/|\/assets\/).*/, (_req, res) => {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.sendFile(path.join(clientDistPath, 'index.html'), (err) => {
       if (err) res.status(404).json({ success: false, error: 'Not found' });
     });

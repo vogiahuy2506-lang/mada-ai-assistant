@@ -259,6 +259,28 @@ jobs:
               echo "⚠️ insert-aac-products.ts not found, skipping"
             fi
 
+            echo "=== Step 12c: Build vector store (RAG) ==="
+            # ⚠️ BẮT BUỘC: data/chroma/ KHÔNG được commit lên git (chứa vector
+            # nhúng, thay đổi mỗi lần re-embed) → VPS luôn khởi đầu với
+            # vector store rỗng. Nếu không index lại ở đây, RAG không có
+            # context nào và bot trả lời sai lệch/đúng kiểu "chưa có thông
+            # tin trong cơ sở dữ liệu".
+            cd $APP_DIR
+            sudo mkdir -p data/chroma
+            if [ -f "scripts/reindex-products.ts" ]; then
+              sudo -E npx tsx scripts/reindex-products.ts --all || {
+                echo "⚠️ Reindex thất bại — bot sẽ không có context RAG"
+              }
+              # Verify vector store thực sự có dữ liệu
+              DOC_COUNT=$(node -e "try{const d=require('$APP_DIR/data/chroma/documents.json');console.log(Array.isArray(d)?d.length:0)}catch(e){console.log(0)}")
+              echo "✅ Vector store: $DOC_COUNT docs"
+              if [ "$DOC_COUNT" = "0" ]; then
+                echo "❌ CẢNH BÁO: vector store rỗng — RAG sẽ không hoạt động"
+              fi
+            else
+              echo "❌ scripts/reindex-products.ts không tồn tại — BỎ QUA BƯỚC NÀY, RAG SẼ KHÔNG CÓ CONTEXT"
+            fi
+
             echo "=== Step 13: Install/Update PM2 ==="
             export NPM_CONFIG_PREFIX="$HOME/.npm-global"
             export PATH="$HOME/.npm-global/bin:$PATH"

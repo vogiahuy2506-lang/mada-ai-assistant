@@ -30,6 +30,7 @@ import {
   MADA_CATEGORY_TO_DB as MADA_CATEGORY_TO_DB_MAP,
 } from '../lib/categoryMapping';
 import { routeToSpecialistBot } from '../lib/specialistRouter';
+import { shouldFetchProducts } from '../lib/productGating';
 import { logActivity } from '../index';
 
 const router = express.Router();
@@ -2025,10 +2026,20 @@ router.post('/', async (req, res) => {
     const isExplicitRequest = isExplicitProductRequest(message); // ⭐ CRITICAL FIX
     // ⭐ Chỉ gợi ý sản phẩm khi ĐÃ ĐỦ 4 CÂU HỎI, hoặc user hỏi thẳng về
     // tên sản phẩm cụ thể. Nếu không, bot sẽ tư vấn sản phẩm ngay ở câu 1.
-    const allowProducts = consultedDone || explicitProductQuery;
+    // ⭐⭐ Dùng CHUNG điều kiện với nhánh streaming (server/lib/productGating.ts).
+    // Trước đây 2 nhánh lệch nhau → streaming không hiện card khi khách duyệt
+    // bằng "có" sau khi đã trả lời đủ 4 câu hỏi tiêu chuẩn.
+    const shouldFetch = shouldFetchProducts({
+      keywordMatch: shouldShowProducts(message),
+      isReadyForProductSuggestion,
+      isExplicitRequest,
+      consultedQuestionsCompleted: consultedDone,
+      isExplicitProductQuery: explicitProductQuery,
+      conversationTurns,
+    });
     // ⭐⭐ Đủ 4 câu hỏi → KHÔNG được chặn bởi shouldShowProducts (xem giải thích
     // ở nhánh streaming: 3 câu cuối khách trả lời ngắn, không có từ khoá SP).
-    if (allowProducts && (shouldShowProducts(message) || allowProducts) && (conversationTurns >= 3 || isReadyForProductSuggestion || isExplicitRequest)) {
+    if (shouldFetch) {
       // ⭐ Đợi user cung cấp đủ context trước khi gợi ý sản phẩm
       try {
         // ⭐ Truyền shownProductIds và isAskingForOtherProducts để không lặp lại sản phẩm
@@ -2687,11 +2698,21 @@ router.post('/stream', async (req: any, res: any) => {
       //
       // Đã đủ 4 câu hỏi (isReadyForProductSuggestion) là đủ điều kiện tư vấn:
       // mỗi bot chuyên môn đã hỏi đủ bối cảnh thì PHẢI ra sản phẩm.
-      const shouldFetchProducts =
-        (shouldShow || isReadyForProductSuggestion) &&
-        (conversationTurns >= 3 || isReadyForProductSuggestion || isExplicitRequest);
+      //
+      // ⭐⭐ Dùng CHUNG điều kiện với nhánh non-streaming
+      // (server/lib/productGating.ts) — trước đây 2 nhánh lệch nhau:
+      // streaming KHÔNG dùng `consultQuestionsCompleted` → khách trả lời đủ
+      // 4 câu rồi duyệt bằng "có" → KHÔNG có card sản phẩm.
+      const shouldFetch = shouldFetchProducts({
+        keywordMatch: shouldShow,
+        isReadyForProductSuggestion,
+        isExplicitRequest,
+        consultedQuestionsCompleted: consultedQuestionsCompleted,
+        isExplicitProductQuery: isExplicitProductQuery,
+        conversationTurns,
+      });
 
-      if (shouldFetchProducts) {
+      if (shouldFetch) {
         // ⭐ Chỉ gợi ý sản phẩm KHI đã đủ context HOẶC user explicit yêu cầu
         try {
           let allProducts = [...scrapedProducts]; // Start with scraped products
@@ -2862,9 +2883,16 @@ router.post('/stream', async (req: any, res: any) => {
         // ⭐ Detect nếu user hỏi về "sản phẩm khác"
         const messageLower = (message || '').toLowerCase();
         const isAskingForOtherProductsFallback = /((còn|co|khác|other|another|more|another)|(sản phẩm|sp|thiết bị|product|device)(khác|else|more|additional)|(có|gì|có gì)(khác|else|nữa|more)|(list|show|hiển thị|gợi ý)(thêm|more|additional)|more products|more devices|more options|additional products)/i.test(messageLower);
-        const allowProductsStream = canRecommendProducts;
       // ⭐⭐ Cùng lý do trên: đủ 4 câu thì KHÔNG được chặn bởi shouldShowProducts.
-      if (allowProductsStream && (shouldShowProducts(message) || canRecommendProducts) && (conversationTurns >= 3 || isReadyForProductSuggestion || isExplicitRequest)) {
+      // Dùng CHUNG điều kiện với nhánh streaming chính + non-streaming.
+      if (shouldFetchProducts({
+        keywordMatch: shouldShowProducts(message),
+        isReadyForProductSuggestion,
+        isExplicitRequest,
+        consultedQuestionsCompleted: consultedQuestionsCompleted,
+        isExplicitProductQuery: isExplicitProductQuery,
+        conversationTurns,
+      })) {
           try {
             // ⭐ Truyền shownProductIds và isAskingForOtherProducts để không lặp lại sản phẩm
             const suggestedProducts = await getSuggestedProducts([], message, effectiveLanguage, activeAgentId, shownProductIds, isAskingForOtherProductsFallback);

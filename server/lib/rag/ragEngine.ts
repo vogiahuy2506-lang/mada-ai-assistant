@@ -5,6 +5,7 @@ import { rerankService, type RerankableItem } from './rerankService';
 import db from '../db';
 import { sanitizeContextForPrompt, sanitizeAssistantAnswer, createStreamingSanitizer } from '../responseSanitizer';
 import { appendProductLinks, stripProductMentions, repairTruncatedSentences } from '../productLinkInjector';
+import { removeFabricatedContent } from '../fabricationGuard';
 import { CONSULT_4_QUESTIONS, CONSULT_NOW_RULES, SINGLE_PRODUCT_RULES } from '../prompts/systemPrompts';
 import { productCategoriesForBot, resolveProductOwner } from '../categoryMapping';
 import { productBelongsToBot, isExclusiveToBot } from '../productTaxonomy';
@@ -712,6 +713,12 @@ class RAGEngine {
 
       // ⭐ SANITIZE: dọn câu trả lời cuối cùng trước khi trả về client
       answer = sanitizeAssistantAnswer(answer);
+      // ⭐⭐ CHỐNG BỊA: gỡ tên/giá/URL/nhà bán lẻ không có thật trong DB MADA.
+      // Đặt TRƯỚC appendProductLinks để link chèn vào chỉ dùng tên thật.
+      // (Log thật đã ghi nhận bot bịa "WHILL Model F", "Hãng: Phonak, Widex",
+      //  "3-5 triệu", "mua qua Shopee" — chỉ dựa vào prompt là không đủ.)
+      answer = removeFabricatedContent(answer);
+
       // ⭐ Header định danh chỉ hiện 1 LẦN ở lượt đầu. Nếu đã hiện ở lượt trước
       // mà LLM lại viết lại → gỡ bỏ để không lặp gây khó chịu.
       if (hasShownIdentityHeader(conversationHistory)) {
@@ -975,9 +982,11 @@ class RAGEngine {
           // client thay toàn bộ nội dung — nếu chỉ nối thêm phần chênh lệch thì
           // link (được chèn ngay dưới tên sản phẩm, tức ở GIỮA nội dung) sẽ bị
           // mất và người dùng không thấy link nào.
-          const linked = config.noProductRecommendation
-            ? repairTruncatedSentences(stripProductMentions(fullAnswer))
-            : appendProductLinks(fullAnswer);
+// ⭐⭐ CHỐNG BỊA (fallback branch): gỡ tên/giá/URL bịa trước khi gắn link.
+        fullAnswer = removeFabricatedContent(fullAnswer);
+        const linked = config.noProductRecommendation
+          ? repairTruncatedSentences(stripProductMentions(fullAnswer))
+          : appendProductLinks(fullAnswer);
           if (linked !== fullAnswer) {
             fullAnswer = linked;
             yield { text: () => '', __replaceFull: linked };
@@ -1185,6 +1194,15 @@ class RAGEngine {
             yield { text: () => '', __replaceFull: noGreeting };
             fullAnswer = noGreeting;
           }
+        }
+
+        // ⭐⭐ CHỐNG BỊA: gỡ tên/giá/URL/nhà bán lẻ không có thật trong DB MADA.
+        // Đặt TRƯỚC bước gắn link / gỡ tên sản phẩm để mọi tên còn lại đều thật.
+        const noFake = removeFabricatedContent(fullAnswer);
+        if (noFake !== fullAnswer) {
+          console.warn('[RAG Stream] ⚠️ Đã gỡ nội dung bịa khỏi câu trả lời');
+          yield { text: () => '', __replaceFull: noFake };
+          fullAnswer = noFake;
         }
 
         // ⭐ Chưa đủ 4 câu hỏi → gỡ phần nhắc tên sản phẩm mà bot tự ý thêm vào.

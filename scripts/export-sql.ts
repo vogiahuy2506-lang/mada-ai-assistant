@@ -34,7 +34,17 @@ function exportTable(db: Database.Database, table: string, outputFile: string) {
       const v = row[c];
       if (v === null || v === undefined) return 'NULL';
       if (typeof v === 'number') return v;
-      return JSON.stringify(String(v));
+      if (typeof v === 'boolean') return v ? '1' : '0';
+      // ⚠️ PHẢI escape theo quy tắc của SQL, KHÔNG dùng JSON.stringify.
+      //
+      // `JSON.stringify('[\"WCAG 2.2\"]')` → `"[\"WCAG 2.2\"]"`. SQLite KHÔNG
+      // hiểu `\"` là escape trong string literal → coi `\` là ký tự thường rồi
+      // kết thúc chuỗi ở dấu `"` kế tiếp → báo `Parse error near "WCAG"`.
+      // Kết quả: toàn bộ file knowledge-items-sync.sql fail import → VPS có 0
+      // knowledge item, RAG không có context, bot không tư vấn được.
+      //
+      // Quy tắc SQL: nhân đôi dấu `'` thành `''`.
+      return `'${String(v).replace(/'/g, "''")}'`;
     });
     sql += `INSERT OR REPLACE INTO ${table} (${cols.join(',')}) VALUES (${vals.join(',')});\n`;
   }

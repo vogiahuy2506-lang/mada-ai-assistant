@@ -2277,6 +2277,10 @@ app.get('/api/health', (_req, res) => {
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
+    // ⭐ Build marker: để verify production thực sự chạy đúng commit vừa deploy.
+    // Trước đây deploy báo "success" nhưng nginx vẫn trỏ app legacy ở port khác
+    // → không có cách nào biết production đang chạy code nào.
+    build: process.env.BUILD_SHA || 'dev',
     ragEnabled: ragInitialized,
     geminiConfigured: !!process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'your_gemini_api_key_here',
     authEnabled: true,

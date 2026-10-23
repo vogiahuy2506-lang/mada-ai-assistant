@@ -66,12 +66,21 @@ jobs:
 
             echo "=== Step 3: Stop all services ==="
             # Stop PM2
+            # ⚠️ Xoá CẢ "mada-app" (tên mới) VÀ "mada-ai" (tên app legacy cũ).
+            # App legacy từng chạy ở port 3001 với data/code cũ; nếu không dừng,
+            # nginx sẽ tiếp tục phục vụ nó sau khi deploy "thành công".
             for p in "$HOME/.npm-global/bin/pm2" "/usr/local/bin/pm2" "/usr/bin/pm2"; do
               if [ -f "$p" ]; then
                 $p stop mada-app 2>/dev/null || true
                 $p delete mada-app 2>/dev/null || true
+                $p stop mada-ai 2>/dev/null || true
+                $p delete mada-ai 2>/dev/null || true
               fi
             done
+
+            # Dừng mọi thứ đang giữ port 3001 (app cũ có thể chạy bằng systemd
+            # hoặc process trực tiếp, không qua pm2).
+            sudo fuser -k 3001/tcp 2>/dev/null || true
             
             # Stop Docker containers
             cd $APP_DIR 2>/dev/null || true
@@ -120,7 +129,11 @@ jobs:
             fi
 
             echo "=== Step 8b: Setup fresh mada.db ==="
-            # Delete old database to ensure fresh start
+            # ⚠️ PORT phải KHỚP với nginx proxy_pass (nginx/nginx.conf → 3001).
+            # Trước đây deploy chạy PM2 ở PORT=3000 còn nginx trỏ 3001 → app mới
+            # chạy nhưng KHÔNG ai trỏ tới, nginx vẫn phục vụ app legacy cũ ở 3001
+            # (dữ liệu cũ, code cũ) mà deploy vẫn báo success.
+            # → nginx + PM2 + .env đều dùng 3001.
             echo "Removing old database..."
             sudo rm -f $APP_DIR/data/mada.db $APP_DIR/data/mada.db-shm $APP_DIR/data/mada.db-wal 2>/dev/null || true
             sudo mkdir -p $APP_DIR/data
@@ -219,7 +232,9 @@ jobs:
               echo "SUPER_ADMIN_EMAIL=${{ secrets.SUPER_ADMIN_EMAIL }}"
               echo "SUPER_ADMIN_PASSWORD=${{ secrets.SUPER_ADMIN_PASSWORD }}"
               echo "NODE_ENV=production"
-              echo "PORT=3000"
+              echo "PORT=3001"
+              # Build marker để /api/health báo đúng commit đang chạy trên VPS.
+              echo "BUILD_SHA=${{ github.sha }}"
               # ===== Mail / SMTP (consultation notifications) =====
               echo "MAIL_HOST=${{ secrets.MAIL_HOST }}"
               echo "MAIL_PORT=${{ secrets.MAIL_PORT }}"
@@ -235,7 +250,7 @@ jobs:
             # Merge backup env vars (keep custom settings - but JWT_SECRET already handled above)
             if [ "$HAS_EXISTING_ENV" = "true" ]; then
               echo "Merging backup env vars..."
-              grep -v -E '^(GEMINI_API_KEY|JWT_SECRET|ADMIN_EMAIL|ADMIN_PASSWORD|SUPER_ADMIN_EMAIL|SUPER_ADMIN_PASSWORD|NODE_ENV|PORT|MAIL_HOST|MAIL_PORT|MAIL_SECURE|MAIL_TLS|MAIL_USERNAME|MAIL_PASSWORD|MAIL_FROM|CONSULTATION_EMAIL|ADMIN_URL)=' /tmp/mada-env-backup.env | sudo tee -a $APP_DIR/.env > /dev/null
+              grep -v -E '^(GEMINI_API_KEY|JWT_SECRET|ADMIN_EMAIL|ADMIN_PASSWORD|SUPER_ADMIN_EMAIL|SUPER_ADMIN_PASSWORD|NODE_ENV|PORT|BUILD_SHA|MAIL_HOST|MAIL_PORT|MAIL_SECURE|MAIL_TLS|MAIL_USERNAME|MAIL_PASSWORD|MAIL_FROM|CONSULTATION_EMAIL|ADMIN_URL)=' /tmp/mada-env-backup.env | sudo tee -a $APP_DIR/.env > /dev/null
             fi
 
             echo "=== Step 10: Set permissions ==="
@@ -295,14 +310,20 @@ jobs:
             # Use absolute PM2 path (sudo requires full path)
             PM2_BIN="$HOME/.npm-global/bin/pm2"
             
-            # Kill any existing processes on port 3000
-            sudo fuser -k 3000/tcp 2>/dev/null || true
-            
-            # Delete any existing app first
-            $PM2_BIN delete mada-app 2>/dev/null || true
-            
+            # Kill any existing processes on port 3001 (port nginx proxy tới).
+            # ⚠️ Phải khai báo mọi tên pm2 cũ: app legacy từng chạy tên "mada-ai",
+            # deploy mới dùng "mada-app". Nếu chỉ xoá "mada-app" thì app legacy
+            # vẫn giữ port 3001 và nginx tiếp tục phục vụ code/data cũ.
+            sudo fuser -k 3001/tcp 2>/dev/null || true
+            for p in "$HOME/.npm-global/bin/pm2" "/usr/local/bin/pm2" "/usr/bin/pm2"; do
+              if [ -f "$p" ]; then
+                $p delete mada-app 2>/dev/null || true
+                $p delete mada-ai 2>/dev/null || true
+              fi
+            done
+
             # Start with pm2-startup to ensure PM2 survives reboots
-            PORT=3000 $PM2_BIN start dist/server.mjs --name mada-app
+            PORT=3001 $PM2_BIN start dist/server.mjs --name mada-app
             
             # Wait for process to start
             sleep 3
@@ -329,7 +350,7 @@ jobs:
               COUNTER=$((COUNTER + 1))
               # Try different endpoints
               for ENDPOINT in "/api/health" "/api/performance/health" "/"; do
-                HEALTH_CODE=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:3000${ENDPOINT}" --connect-timeout 3 --max-time 5 2>/dev/null || echo "000")
+                HEALTH_CODE=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:3001${ENDPOINT}" --connect-timeout 3 --max-time 5 2>/dev/null || echo "000")
                 if [ "$HEALTH_CODE" = "200" ]; then
                   echo "✅ App is healthy! (took ${COUNTER}x5s, endpoint: ${ENDPOINT})"
                   HEALTHY=true
@@ -393,7 +414,31 @@ jobs:
             echo "=== Step 18: Final verification ==="
             echo "HTTP check: $(curl -s -o /dev/null -w '%{http_code}' http://mada.digiso.vn --max-time 10 || echo 'FAILED')"
             echo "HTTPS check: $(curl -s -o /dev/null -w '%{http_code}' https://mada.digiso.vn --max-time 10 -k || echo 'FAILED')"
-            
+
+            # ⭐⭐ VERIFY THẬT: đảm bảo nginx đang phục vụ đúng build vừa deploy,
+            # không phải app legacy còn sót ở port khác.
+            # Trước đây deploy báo success nhưng production vẫn trả code/data cũ.
+            echo "--- Verifying build marker via HTTPS ---"
+            LIVE_BUILD=$(curl -s https://mada.digiso.vn/api/health --max-time 15 2>/dev/null | grep -o '"build"[[:space:]]*:[[:space:]]*"[^"]*"' | cut -d'"' -f4)
+            echo "Live build: ${LIVE_BUILD:-<none>}"
+            if [ "$LIVE_BUILD" != "${{ github.sha }}" ]; then
+              echo "❌ Production KHÔNG chạy build vừa deploy!"
+              echo "   Expected: ${{ github.sha }}"
+              echo "   Got     : ${LIVE_BUILD:-<none — app cũ không có build marker>}"
+              echo "   → nginx có thể vẫn trỏ app cũ ở port khác."
+              exit 1
+            fi
+
+            # Verify số sản phẩm trên production khớp DB vừa import
+            # (API chỉ trả status='published' → so sánh cùng điều kiện)
+            LIVE_COUNT=$(curl -s "https://mada.digiso.vn/api/public/products?limit=1" --max-time 15 2>/dev/null | grep -o '"total"[[:space:]]*:[[:space:]]*[0-9]*' | grep -o '[0-9]*$')
+            DB_COUNT=$(sudo sqlite3 $APP_DIR/data/mada.db "SELECT COUNT(*) FROM kb_products WHERE status='published';" 2>/dev/null)
+            echo "Products in DB (published): ${DB_COUNT:-?} | visible via API: ${LIVE_COUNT:-?}"
+            if [ -n "$DB_COUNT" ] && [ -n "$LIVE_COUNT" ] && [ "$DB_COUNT" != "$LIVE_COUNT" ]; then
+              echo "❌ Số sản phẩm qua API ($LIVE_COUNT) ≠ DB ($DB_COUNT) — API đang đọc DB khác!"
+              exit 1
+            fi
+
             echo "✅ Deploy completed successfully at $(date)"
             echo "📝 Commit: ${{ github.sha }}"
 

@@ -11,7 +11,19 @@ fs.mkdirSync(DATA_DIR, { recursive: true });
 const DB_PATH = path.join(DATA_DIR, 'mada.db');
 
 const db = new Database(DB_PATH);
-db.pragma('journal_mode = WAL');
+// WAL cần ghi header DB → nếu file thuộc root (deploy tạo bằng sudo sqlite3)
+// và script chạy bằng user khác thì sẽ ném SQLITE_READONLY. Fallback sang
+// DELETE mode để script vẫn chạy được (chỉ mất hiệu năng, không mất dữ liệu).
+try {
+  db.pragma('journal_mode = WAL');
+} catch (err: any) {
+  try {
+    db.pragma('journal_mode = DELETE');
+    console.warn('⚠️  Không chuyển được sang WAL (readonly?), dùng DELETE journal mode.');
+  } catch (err2: any) {
+    console.error('❌ Không set được journal_mode:', err2?.message || err2);
+  }
+}
 db.pragma('foreign_keys = ON');
 
 console.log('📦 Connected to SQLite at', DB_PATH);

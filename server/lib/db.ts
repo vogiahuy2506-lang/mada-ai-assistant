@@ -19,14 +19,106 @@ if (!fs.existsSync(DATA_DIR)) {
 const DB_PATH = path.join(DATA_DIR, 'mada.db');
 
 const db: BetterSQLiteDatabase = new Database(DB_PATH);
-db.pragma('journal_mode = WAL');
-db.pragma('foreign_keys = ON');
 
-console.log('📦 SQLite database initialized at', DB_PATH);
+// ⭐ FIX (deploy VPS): mada.db được tạo bằng `sudo sqlite3` → file thuộc user
+// root, mode 644. App chạy dưới PM2 bằng user KHÔNG phải root → không có
+// quyền ghi. `pragma('journal_mode = WAL')` cần ghi header DB nên ném
+// SQLITE_READONLY → throw ở module scope → server bundle KHÔNG BAO GIỜ khởi
+// động → port không bao giờ listen → nginx trả 502 (deploy vẫn báo success
+// vì PM2 vẫn còn PID).
+//
+// → Chuyển journal_mode sang DELETE (không cần file -wal/-shm phụ) và bọc
+// trong try/catch để app vẫn boot được, chỉ mất khả năng ghi nếu DB readonly.
+let journalMode = 'unknown';
+try {
+  db.pragma('journal_mode = WAL');
+  journalMode = 'wal';
+} catch (err: any) {
+  // DB readonly (thường do deploy tạo file bằng sudo) → thử DELETE mode.
+  // DELETE không cần file phụ nên vẫn đọc được; nếu cũng lỗi thì app vẫn
+  // phải boot để /api/health báo lỗi rõ ràng thay vì crash im lặng.
+  try {
+    db.pragma('journal_mode = DELETE');
+    journalMode = 'delete';
+    console.warn(
+      '⚠️  SQLite không chuyển sang WAL (readonly?). Dùng DELETE journal mode. ' +
+        'Kiểm tra quyền: sudo chown -R $(whoami) ' + DATA_DIR
+    );
+  } catch (err2: any) {
+    console.error(
+      '❌ SQLite journal_mode thất bại:',
+      err2?.message || err2,
+      '→ DB có thể readonly. Sửa: sudo chown -R $(whoami) ' + DATA_DIR
+    );
+  }
+}
+
+try {
+  db.pragma('foreign_keys = ON');
+} catch {
+  // Không critical — chỉ ảnh hưởng ràng buộc FK.
+}
+
+// ⭐ Kiểm tra khả năng ghi thật sự (không chỉ đọc được). Nếu DB readonly thì
+// app vẫn boot được nhưng mọi thao tác ghi (chat history, seed, admin CRUD)
+// sẽ hỏng. Biết trạng thái này sớm giúp deploy fail sớm + dễ chẩn đoán.
+let dbWritable = true;
+try {
+  db.prepare('SELECT COUNT(*) AS c FROM (SELECT 1 LIMIT 1)').get();
+  // Ghi thử vào bảng thật trong transaction rồi rollback — không để lại rác.
+  db.transaction(() => {
+    db.prepare('CREATE TABLE IF NOT EXISTS __writetest (id INTEGER PRIMARY KEY, ts TEXT)').run();
+    db.prepare('INSERT INTO __writetest (ts) VALUES (?)').run(new Date().toISOString());
+    db.prepare('DROP TABLE __writetest').run();
+  })();
+} catch (err: any) {
+  dbWritable = false;
+  console.error(
+    '❌ Database READONLY — app không ghi được (chat history/seed/admin sẽ hỏng).',
+    err?.message || err,
+    '→ Sửa: sudo chown -R $(whoami) ' + DATA_DIR + ' && sudo chmod -R u+rwX ' + DATA_DIR
+  );
+}
+
+console.log('📦 SQLite database initialized at', DB_PATH, `(journal_mode=${journalMode}, writable=${dbWritable})`);
+
+export const DB_STATUS = { writable: dbWritable, journalMode, path: DB_PATH };
+
+// ⭐ Helper chạy câu lệnh khởi tạo mà không làm sập app khi DB readonly.
+// Vì db.ts được import ở module scope của server/index.ts, MỘT lỗi ghi ở
+// đây sẽ throw ra khỏi module → server bundle không bao giờ boot → port không
+// bao giờ listen → nginx 502. Với DB readonly, app vẫn nên boot được (chỉ mất
+// khả năng ghi) để /api/health báo lỗi rõ ràng và deploy fail sớm.
+function safeExec(sql: string): void {
+  try {
+    db.exec(sql);
+  } catch (err: any) {
+    if (err?.code === 'SQLITE_READONLY' || /readonly/i.test(err?.message || '')) {
+      console.warn(
+        '⚠️  Bỏ qua câu lệnh khởi tạo DB (readonly):',
+        (err?.message || '').split('\n')[0]
+      );
+    } else {
+      console.error('❌ Lỗi khởi tạo DB:', err?.message || err);
+    }
+  }
+}
+
+function safeInit(label: string, fn: () => void): void {
+  try {
+    fn();
+  } catch (err: any) {
+    if (err?.code === 'SQLITE_READONLY' || /readonly/i.test(err?.message || '')) {
+      console.warn(`⚠️  Bỏ qua ${label} (database readonly)`);
+    } else {
+      console.error(`❌ Lỗi khi chạy ${label}:`, err?.message || err);
+    }
+  }
+}
 
 // ============== SCHEMA ==============
 
-db.exec(`
+safeExec(`
   CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY,
     email TEXT UNIQUE NOT NULL,
@@ -88,7 +180,7 @@ try {
 
 // ============== KNOWLEDGE BASE SCHEMA (Tuần 1 — Task 3) ==============
 
-db.exec(`
+safeExec(`
   -- Bảng category: 7 nhóm chuyên khoa + phụ
   CREATE TABLE IF NOT EXISTS kb_categories (
     id TEXT PRIMARY KEY,
@@ -178,7 +270,7 @@ db.exec(`
 
 // ============== PRODUCTS SCHEMA ==============
 
-db.exec(`
+safeExec(`
   CREATE TABLE IF NOT EXISTS kb_products (
     id TEXT PRIMARY KEY,
     title TEXT NOT NULL,
@@ -218,7 +310,7 @@ db.exec(`
 
 // ============== CHAT CONTEXT SCHEMA ==============
 
-db.exec(`
+safeExec(`
   CREATE TABLE IF NOT EXISTS conversation_recommended_products (
     conversation_id TEXT NOT NULL,
     product_title TEXT NOT NULL,
@@ -268,7 +360,7 @@ try {
 }
 
 // ============== MESSAGE FEEDBACK SCHEMA ==============
-db.exec(`
+safeExec(`
   CREATE TABLE IF NOT EXISTS message_feedback (
     id TEXT PRIMARY KEY,
     message_id TEXT NOT NULL,
@@ -288,7 +380,7 @@ db.exec(`
 `);
 
 // ============== FEEDBACK QUESTIONS SCHEMA ==============
-db.exec(`
+safeExec(`
   CREATE TABLE IF NOT EXISTS feedback_questions (
     id TEXT PRIMARY KEY,
     question_key TEXT UNIQUE NOT NULL,
@@ -308,26 +400,28 @@ db.exec(`
 `);
 
 // ============== SEED DEFAULT FEEDBACK QUESTIONS ==============
-const existingQuestions = db.prepare('SELECT COUNT(*) as count FROM feedback_questions').get() as { count: number };
-if (existingQuestions.count === 0) {
-  const now = new Date().toISOString();
-  const defaultQuestions = [
-    { id: 'fq-1', question_key: 'inaccurate', text_vi: 'Nội dung chưa chính xác hoặc thiếu dẫn chứng', text_en: 'Content is inaccurate or lacks evidence', text_ar: 'المحتوى غير دقيق أو يفتقر إلى أدلة', text_fr: 'Le contenu est inexact ou manque de preuves', icon: 'alert-circle', sort_order: 1 },
-    { id: 'fq-2', question_key: 'not_focused', text_vi: 'Chưa giải quyết đúng trọng tâm vấn đề', text_en: 'Does not address the main issue', text_ar: 'لا يعالج المشكلة الرئيسية', text_fr: 'Ne traite pas le problème principal', icon: 'target', sort_order: 2 },
-    { id: 'fq-3', question_key: 'too_complex', text_vi: 'Trả lời quá dài dòng hoặc từ ngữ chuyên môn khó hiểu', text_en: 'Response is too verbose or uses complex jargon', text_ar: 'الرد طويل جداً أو يستخدم مصطلحات معقدة', text_fr: 'La réponse est trop longue ou utilise un jargon complexe', icon: 'message-square', sort_order: 3 },
-    { id: 'fq-4', question_key: 'other', text_vi: 'Khác (Vui lòng ghi rõ bên dưới)', text_en: 'Other (Please specify below)', text_ar: 'أخرى (يرجى التحديد أدناه)', text_fr: 'Autre (Veuillez préciser ci-dessous)', icon: 'plus-circle', sort_order: 4 },
-  ];
+safeInit("seedFeedbackQuestions", () => {
+  const existingQuestions = db.prepare('SELECT COUNT(*) as count FROM feedback_questions').get() as { count: number };
+  if (existingQuestions.count === 0) {
+    const now = new Date().toISOString();
+    const defaultQuestions = [
+      { id: 'fq-1', question_key: 'inaccurate', text_vi: 'Nội dung chưa chính xác hoặc thiếu dẫn chứng', text_en: 'Content is inaccurate or lacks evidence', text_ar: 'المحتوى غير دقيق أو يفتقر إلى أدلة', text_fr: 'Le contenu est inexact ou manque de preuves', icon: 'alert-circle', sort_order: 1 },
+      { id: 'fq-2', question_key: 'not_focused', text_vi: 'Chưa giải quyết đúng trọng tâm vấn đề', text_en: 'Does not address the main issue', text_ar: 'لا يعالج المشكلة الرئيسية', text_fr: 'Ne traite pas le problème principal', icon: 'target', sort_order: 2 },
+      { id: 'fq-3', question_key: 'too_complex', text_vi: 'Trả lời quá dài dòng hoặc từ ngữ chuyên môn khó hiểu', text_en: 'Response is too verbose or uses complex jargon', text_ar: 'الرد طويل جداً أو يستخدم مصطلحات معقدة', text_fr: 'La réponse est trop longue ou utilise un jargon complexe', icon: 'message-square', sort_order: 3 },
+      { id: 'fq-4', question_key: 'other', text_vi: 'Khác (Vui lòng ghi rõ bên dưới)', text_en: 'Other (Please specify below)', text_ar: 'أخرى (يرجى التحديد أدناه)', text_fr: 'Autre (Veuillez préciser ci-dessous)', icon: 'plus-circle', sort_order: 4 },
+    ];
 
-  const insertStmt = db.prepare(`
-    INSERT INTO feedback_questions (id, question_key, text_vi, text_en, text_ar, text_fr, icon, is_active, sort_order, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)
-  `);
+    const insertStmt = db.prepare(`
+      INSERT INTO feedback_questions (id, question_key, text_vi, text_en, text_ar, text_fr, icon, is_active, sort_order, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)
+    `);
 
-  for (const q of defaultQuestions) {
-    insertStmt.run(q.id, q.question_key, q.text_vi, q.text_en, q.text_ar, q.text_fr, q.icon, q.sort_order, now, now);
+    for (const q of defaultQuestions) {
+      insertStmt.run(q.id, q.question_key, q.text_vi, q.text_en, q.text_ar, q.text_fr, q.icon, q.sort_order, now, now);
+    }
+    console.log('✅ Seeded default feedback questions');
   }
-  console.log('✅ Seeded default feedback questions');
-}
+});
 
 // ============== KNOWLEDGE ITEMS TRANSLATION MIGRATION ==============
 try {
@@ -411,7 +505,7 @@ try {
 
 // ============== SCHEDULED SOURCES SCHEMA ==============
 
-db.exec(`
+safeExec(`
   -- Bảng scheduled_sources: các nguồn scrape định kỳ
   CREATE TABLE IF NOT EXISTS scheduled_sources (
     id TEXT PRIMARY KEY,
@@ -454,11 +548,11 @@ function seedCategories() {
   for (const c of cats) stmt.run(c.id, c.name_vi, c.name_en, c.name_ar, c.name_fr, c.icon, c.sort_order, c.description_vi, c.description_en, c.description_ar, c.description_fr, c.related_url, c.product_link, now, now);
   console.log(`🌱 Seeded ${cats.length} KB categories (4 languages: VI/EN/AR/FR)`);
 }
-seedCategories();
+safeInit("seedCategories", () => seedCategories());
 
 // ============== CONSULTATION SCHEMA ==============
 
-db.exec(`
+safeExec(`
   CREATE TABLE IF NOT EXISTS consultations (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
@@ -495,7 +589,7 @@ try {
 
 // ============== ADMIN AGENTS SCHEMA ==============
 
-db.exec(`
+safeExec(`
   CREATE TABLE IF NOT EXISTS admin_agents (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
@@ -524,10 +618,19 @@ db.exec(`
 // Migration: thêm cột mới nếu DB cũ chưa có (SQLite không hỗ trợ IF NOT EXISTS cho ADD COLUMN,
 // nên kiểm tra pragma table_info trước)
 function addColumnIfMissing(table: string, column: string, ddl: string) {
-  const cols = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
-  if (!cols.some(c => c.name === column)) {
-    db.exec(`ALTER TABLE ${table} ADD COLUMN ${ddl}`);
-    console.log(`🛠  Migrated: added column ${table}.${column}`);
+  try {
+    const cols = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+    if (!cols.some(c => c.name === column)) {
+      db.exec(`ALTER TABLE ${table} ADD COLUMN ${ddl}`);
+      console.log(`🛠  Migrated: added column ${table}.${column}`);
+    }
+  } catch (err: any) {
+    // DB readonly → bỏ qua migration, app vẫn boot được (chỉ mất khả năng ghi).
+    if (err?.code === 'SQLITE_READONLY' || /readonly/i.test(err?.message || '')) {
+      console.warn(`⚠️  Bỏ qua migration cột ${table}.${column} (database readonly)`);
+    } else {
+      console.error(`❌ Migration lỗi ${table}.${column}:`, err?.message || err);
+    }
   }
 }
 
@@ -558,7 +661,7 @@ addColumnIfMissing('admin_agents', 'model', "model TEXT NOT NULL DEFAULT 'gemini
 // Bảng linking giữa admin_agents và kb_products để admin gán sản phẩm riêng cho
 // từng bot (cộng thêm auto-link theo mada_category). Chat đọc qua
 // /api/public/products/by-agent/:agentId.
-db.exec(`
+safeExec(`
   CREATE TABLE IF NOT EXISTS admin_agent_products (
     id TEXT PRIMARY KEY,
     agent_id TEXT NOT NULL,
@@ -843,12 +946,12 @@ CÁCH TRẢ LỜI:
   }
   console.log(`🤖 Seeded ${agents.length} MADA agents into admin_agents table`);
 }
-seedAdminAgents();
+safeInit("seedAdminAgents", () => seedAdminAgents());
 
 // ============== SUGGESTED QUESTIONS SCHEMA ==============
 // Bảng lưu câu hỏi gợi ý cho từng agent, category, view mode và ngôn ngữ
 
-db.exec(`
+safeExec(`
   CREATE TABLE IF NOT EXISTS suggested_questions (
     id TEXT PRIMARY KEY,
     agent_id TEXT,
@@ -874,7 +977,7 @@ db.exec(`
 
 // ============== ADMIN PROMPTS SCHEMA ==============
 
-db.exec(`
+safeExec(`
   CREATE TABLE IF NOT EXISTS admin_prompts (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
@@ -897,7 +1000,7 @@ db.exec(`
 // Lưu cấu hình các gói dịch vụ (Free, Pro, Enterprise) để admin có thể chỉnh sửa
 // và áp dụng cho toàn bộ website
 
-db.exec(`
+safeExec(`
   CREATE TABLE IF NOT EXISTS pricing_plans (
     id TEXT PRIMARY KEY,
     plan_key TEXT NOT NULL UNIQUE CHECK (plan_key IN ('free', 'pro', 'enterprise')),
@@ -932,66 +1035,69 @@ db.exec(`
 `);
 
 // Seed default pricing plans if not exist
-const existingPlans = db.prepare('SELECT COUNT(*) as count FROM pricing_plans').get() as { count: number };
-if (existingPlans.count === 0) {
-  const now = new Date().toISOString();
-  const insertPlan = db.prepare(`
-    INSERT INTO pricing_plans (
-      id, plan_key, name_vi, name_en, name_ar, name_fr,
-      price_amount, price_currency, price_note_vi, price_note_en,
-      description_vi, description_en, description_ar, description_fr,
-      features_vi, features_en, features_ar, features_fr,
-      is_active, is_highlighted, sort_order, cta_text_vi, cta_text_en,
-      created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
+safeInit("seedPricingPlans", () => {
+  const existingPlans = db.prepare('SELECT COUNT(*) as count FROM pricing_plans').get() as { count: number };
+  if (existingPlans.count === 0) {
+    const now = new Date().toISOString();
+    const insertPlan = db.prepare(`
+      INSERT INTO pricing_plans (
+        id, plan_key, name_vi, name_en, name_ar, name_fr,
+        price_amount, price_currency, price_note_vi, price_note_en,
+        description_vi, description_en, description_ar, description_fr,
+        features_vi, features_en, features_ar, features_fr,
+        is_active, is_highlighted, sort_order, cta_text_vi, cta_text_en,
+        created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
 
-  // Free Plan
-  insertPlan.run(
-    'plan-free', 'free',
-    'Miễn phí', 'Free', 'مجاني', 'Gratuit',
-    0, 'VND', '/tháng', '/month',
-    'Dành cho cá nhân sử dụng cơ bản', 'For personal basic use', 'للاستخدام الشخصي الأساسي', 'Pour usage personnel de base',
-    JSON.stringify(['10 tin nhắn/phiên', '3 file tải lên/phiên', 'Trả lời tiêu chuẩn', 'Hỗ trợ 4 ngôn ngữ']),
-    JSON.stringify(['10 messages/session', '3 file uploads/session', 'Standard responses', 'Support 4 languages']),
-    JSON.stringify([]), JSON.stringify([]),
-    1, 0, 1,
-    'Tiếp tục miễn phí', 'Continue Free',
-    now, now
-  );
+    // Free Plan
+    insertPlan.run(
+      'plan-free', 'free',
+      'Miễn phí', 'Free', 'مجاني', 'Gratuit',
+      0, 'VND', '/tháng', '/month',
+      'Dành cho cá nhân sử dụng cơ bản', 'For personal basic use', 'للاستخدام الشخصي الأساسي', 'Pour usage personnel de base',
+      JSON.stringify(['10 tin nhắn/phiên', '3 file tải lên/phiên', 'Trả lời tiêu chuẩn', 'Hỗ trợ 4 ngôn ngữ']),
+      JSON.stringify(['10 messages/session', '3 file uploads/session', 'Standard responses', 'Support 4 languages']),
+      JSON.stringify([]), JSON.stringify([]),
+      1, 0, 1,
+      'Tiếp tục miễn phí', 'Continue Free',
+      now, now
+    );
 
-  // Pro Plan
-  insertPlan.run(
-    'plan-pro', 'pro',
-    'Pro', 'Pro', 'احترافي', 'Pro',
-    299000, 'VND', '/tháng', '/month',
-    'Dành cho người dùng chuyên nghiệp', 'For professional users', 'للمستخدمين المحترفين', 'Pour les utilisateurs professionnels',
-    JSON.stringify(['Tin nhắn không giới hạn', '20 file tải lên/phiên', 'Trả lời ưu tiên', 'Hỗ trợ 4 ngôn ngữ', 'Phân tích nâng cao', 'Không quảng cáo']),
-    JSON.stringify(['Unlimited messages', '20 file uploads/session', 'Priority responses', 'Support 4 languages', 'Advanced analytics', 'No ads']),
-    JSON.stringify([]), JSON.stringify([]),
-    1, 1, 2,
-    'Nâng cấp Pro', 'Upgrade to Pro',
-    now, now
-  );
+    // Pro Plan
+    insertPlan.run(
+      'plan-pro', 'pro',
+      'Pro', 'Pro', 'احترافي', 'Pro',
+      299000, 'VND', '/tháng', '/month',
+      'Dành cho người dùng chuyên nghiệp', 'For professional users', 'للمستخدمين المحترفين', 'Pour les utilisateurs professionnels',
+      JSON.stringify(['Tin nhắn không giới hạn', '20 file tải lên/phiên', 'Trả lời ưu tiên', 'Hỗ trợ 4 ngôn ngữ', 'Phân tích nâng cao', 'Không quảng cáo']),
+      JSON.stringify(['Unlimited messages', '20 file uploads/session', 'Priority responses', 'Support 4 languages', 'Advanced analytics', 'No ads']),
+      JSON.stringify([]), JSON.stringify([]),
+      1, 1, 2,
+      'Nâng cấp Pro', 'Upgrade to Pro',
+      now, now
+    );
 
-  // Enterprise Plan
-  insertPlan.run(
-    'plan-enterprise', 'enterprise',
-    'Doanh nghiệp', 'Enterprise', 'المؤسسي', 'Entreprise',
-    0, 'VND', 'Liên hệ báo giá', 'Contact for quote',
-    'Dành cho tổ chức và doanh nghiệp', 'For organizations and businesses', 'للمنظمات والشركات', 'Pour les organisations et entreprises',
-    JSON.stringify(['Tất cả tính năng Pro', 'File không giới hạn', 'Hỗ trợ 24/7', 'API truy cập', 'Tích hợp tùy chỉnh', 'SLA đảm bảo']),
-    JSON.stringify(['All Pro features', 'Unlimited files', '24/7 support', 'API access', 'Custom integrations', 'Guaranteed SLA']),
-    JSON.stringify([]), JSON.stringify([]),
-    1, 0, 3,
-    'Liên hệ bán hàng', 'Contact Sales',
-    now, now
-  );
-}
+    // Enterprise Plan
+    insertPlan.run(
+      'plan-enterprise', 'enterprise',
+      'Doanh nghiệp', 'Enterprise', 'المؤسسي', 'Entreprise',
+      0, 'VND', 'Liên hệ báo giá', 'Contact for quote',
+      'Dành cho tổ chức và doanh nghiệp', 'For organizations and businesses', 'للمنظمات والشركات', 'Pour les organisations et entreprises',
+      JSON.stringify(['Tất cả tính năng Pro', 'File không giới hạn', 'Hỗ trợ 24/7', 'API truy cập', 'Tích hợp tùy chỉnh', 'SLA đảm bảo']),
+      JSON.stringify(['All Pro features', 'Unlimited files', '24/7 support', 'API access', 'Custom integrations', 'Guaranteed SLA']),
+      JSON.stringify([]), JSON.stringify([]),
+      1, 0, 3,
+      'Liên hệ bán hàng', 'Contact Sales',
+      now, now
+    );
+  }
+
+});
 
 // ============== PROMPT VERSIONS SCHEMA (Version Control) ==============
 
-db.exec(`
+safeExec(`
   CREATE TABLE IF NOT EXISTS prompt_versions (
     id TEXT PRIMARY KEY,
     prompt_id TEXT NOT NULL,
@@ -1010,7 +1116,7 @@ db.exec(`
 
 // ============== PROMPT TEMPLATES SCHEMA ==============
 
-db.exec(`
+safeExec(`
   CREATE TABLE IF NOT EXISTS prompt_templates (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
@@ -1150,7 +1256,7 @@ function seedAdminPrompts() {
 
   console.log(`🌱 Seeded ${prompts.length} admin prompts`);
 }
-seedAdminPrompts();
+safeInit("seedAdminPrompts", () => seedAdminPrompts());
 
 // ============== SEED PROMPT TEMPLATES ==============
 
@@ -1680,11 +1786,11 @@ Nhiệm vụ: Kiểm tra, đánh giá và hướng dẫn cải thiện khả nă
 
   console.log(`🌱 Seeded ${templates.length} prompt templates`);
 }
-seedPromptTemplates();
+safeInit("seedPromptTemplates", () => seedPromptTemplates());
 
 // ============== ADMIN LOGS SCHEMA ==============
 
-db.exec(`
+safeExec(`
   CREATE TABLE IF NOT EXISTS admin_system_logs (
     id TEXT PRIMARY KEY,
     level TEXT NOT NULL CHECK (level IN ('critical', 'error', 'warn', 'info', 'success')),
@@ -1706,7 +1812,7 @@ db.exec(`
 // Track successful file uploads per user per month.
 // Used to enforce plan-based upload limits (e.g. Free = 10/month, Pro = unlimited).
 
-db.exec(`
+safeExec(`
   CREATE TABLE IF NOT EXISTS file_uploads (
     id TEXT PRIMARY KEY,
     user_id TEXT NOT NULL,
@@ -1723,7 +1829,7 @@ db.exec(`
 
 // ============== SYSTEM SETTINGS SCHEMA ==============
 
-db.exec(`
+safeExec(`
   CREATE TABLE IF NOT EXISTS system_settings (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL,
@@ -1772,11 +1878,11 @@ function migrateSystemSettings() {
 }
 
 // Run migration on startup
-migrateSystemSettings();
+safeInit("migrateSystemSettings", () => migrateSystemSettings());
 
 // ============== CHAT METRICS SCHEMA ==============
 
-db.exec(`
+safeExec(`
   CREATE TABLE IF NOT EXISTS chat_metrics (
     id TEXT PRIMARY KEY,
     total_chats INTEGER NOT NULL DEFAULT 0,
@@ -1798,7 +1904,7 @@ db.exec(`
 
 // ============== USER CHAT HISTORY & FAVORITES SCHEMA ==============
 
-db.exec(`
+safeExec(`
   -- Bảng conversations: Mỗi cuộc hội thoại (group nhiều messages)
   CREATE TABLE IF NOT EXISTS chat_conversations (
     id TEXT PRIMARY KEY,
@@ -1852,7 +1958,7 @@ db.exec(`
 // ============== ADMIN NOTIFICATIONS SCHEMA ==============
 // Thông báo cho admin về các sự kiện hệ thống
 
-db.exec(`
+safeExec(`
   CREATE TABLE IF NOT EXISTS admin_notifications (
     id TEXT PRIMARY KEY,
     type TEXT NOT NULL CHECK (type IN ('info', 'warning', 'error', 'success', 'system')),
@@ -1879,7 +1985,7 @@ db.exec(`
 // ============== SUPPORT TICKETS SCHEMA ==============
 // Hệ thống ticket hỗ trợ người dùng
 
-db.exec(`
+safeExec(`
   CREATE TABLE IF NOT EXISTS support_tickets (
     id TEXT PRIMARY KEY,
     ticket_number TEXT UNIQUE NOT NULL,
@@ -1944,7 +2050,7 @@ function runMigrations() {
   }
 }
 
-runMigrations();
+safeInit("runMigrations", () => runMigrations());
 
 // ============== SEED ADMIN ==============
 
@@ -2056,7 +2162,7 @@ function migrateUsersTable() {
   }
 }
 
-migrateUsersTable();
+safeInit("migrateUsersTable", () => migrateUsersTable());
 
 // ============== SEED SUPER ADMIN ==============
 
@@ -2087,17 +2193,25 @@ function seedSuperAdmin() {
   console.log(`🌱 Seeded SuperAdmin: ${superAdminEmail} / ${superAdminPassword}`);
 }
 
-seedAdmin();
-seedSuperAdmin();
-seedDemoUsers();
+safeInit("seedAdmin", () => seedAdmin());
+safeInit("seedSuperAdmin", () => seedSuperAdmin());
+safeInit("seedDemoUsers", () => seedDemoUsers());
 
 // ============== PERMISSIONS INITIALIZATION ==============
 // Import and initialize permissions schema
 // NOTE: Must be imported dynamically AFTER db is created to avoid circular dependency issues
-import('./permissions').then(({ initPermissionsSchema, seedDefaultPermissions }) => {
-  initPermissionsSchema();
-  seedDefaultPermissions();
-}).catch(console.error);
+import('./permissions')
+  .then(({ initPermissionsSchema, seedDefaultPermissions }) => {
+    safeInit('initPermissionsSchema', () => initPermissionsSchema());
+    safeInit('seedDefaultPermissions', () => seedDefaultPermissions());
+  })
+  .catch((err) => {
+    if (err?.code === 'SQLITE_READONLY' || /readonly/i.test(err?.message || '')) {
+      console.warn('⚠️  Bỏ qua khởi tạo permissions (database readonly)');
+    } else {
+      console.error('❌ Lỗi khởi tạo permissions:', err?.message || err);
+    }
+  });
 
 // ============== EXPORT DB ==============
 export default db;
@@ -2305,7 +2419,7 @@ export function updateSystemSettings(settings: Partial<SystemSettings>): SystemS
 
 // ============== SCRAPE JOBS SCHEMA ==============
 // Job queue for async URL scraping (AIImportCard preview + save)
-db.exec(`
+safeExec(`
   CREATE TABLE IF NOT EXISTS scrape_jobs (
     id TEXT PRIMARY KEY,
     url TEXT NOT NULL,

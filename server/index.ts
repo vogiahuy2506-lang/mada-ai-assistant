@@ -60,7 +60,7 @@ function toProxyImageUrl(madaUrl: string): string {
 // RAG imports
 // Auth imports - DB must be initialized FIRST
 import './lib/db'; // Initialize DB
-import db, { getFileUploadQuota, trackFileUpload } from './lib/db';
+import db, { getFileUploadQuota, trackFileUpload, DB_STATUS } from './lib/db';
 
 // RAG imports (depend on db being initialized)
 import { vectorStore } from './lib/rag/vectorStore';
@@ -2281,6 +2281,12 @@ app.get('/api/health', (_req, res) => {
     // Trước đây deploy báo "success" nhưng nginx vẫn trỏ app legacy ở port khác
     // → không có cách nào biết production đang chạy code nào.
     build: process.env.BUILD_SHA || 'dev',
+    // ⭐ Trạng thái DB để deploy phát hiện sớm "DB readonly" (app boot được
+    // nhưng mọi thao tác ghi sẽ hỏng).
+    db: {
+      writable: DB_STATUS.writable,
+      journalMode: DB_STATUS.journalMode,
+    },
     ragEnabled: ragInitialized,
     geminiConfigured: !!process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'your_gemini_api_key_here',
     authEnabled: true,

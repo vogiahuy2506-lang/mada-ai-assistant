@@ -149,9 +149,21 @@ jobs:
               exit 1
             fi
             
-            # Set proper permissions
-            sudo chmod 644 $APP_DIR/data/mada.db
-            echo "✅ Fresh mada.db created ($(sudo ls -lh $APP_DIR/data/mada.db | awk '{print $5}'))"
+            # ⭐⭐ FIX QUYỀN GHI DB (root cause khiến deploy fail):
+            # `sudo sqlite3` tạo mada.db thuộc user ROOT, mode 644.
+            # App chạy dưới PM2 bằng user KHÔNG phải root → không ghi được →
+            # `pragma('journal_mode = WAL')` ném SQLITE_READONLY → throw ở
+            # module scope → server KHÔNG BAO GIỜ khởi động → port 3002 không
+            # bao giờ listen → nginx trả 502 (deploy vẫn báo success vì PM2
+            # vẫn còn PID).
+            # → Chown toàn bộ thư mục data cho user chạy app + cấp quyền ghi.
+            APP_USER="$(id -un)"
+            echo "App user: $APP_USER"
+            sudo chown -R "$APP_USER" $APP_DIR/data 2>/dev/null || true
+            sudo chmod -R u+rwX $APP_DIR/data
+            # File DB cần ghi cho WAL (-wal/-shm) và cần tạo file mới.
+            sudo chmod 664 $APP_DIR/data/mada.db 2>/dev/null || sudo chmod 644 $APP_DIR/data/mada.db
+            echo "✅ Fresh mada.db created ($(sudo ls -lh $APP_DIR/data/mada.db | awk '{print $5}')), owner=$(sudo stat -c '%U:%G' $APP_DIR/data/mada.db 2>/dev/null || echo unknown)"
 
             echo "=== Step 8c: Import data from SQL files ==="
             # Verify SQL files exist and have content
@@ -269,7 +281,11 @@ jobs:
             echo "=== Step 12b: Run AAC products import script ==="
             cd $APP_DIR
             if [ -f "scripts/insert-aac-products.ts" ]; then
-              npx tsx scripts/insert-aac-products.ts
+              # Chạy bằng user app: script này GHI vào mada.db → nếu DB thuộc
+              # root thì sẽ fail với "attempt to write a readonly database".
+              sudo -u "$APP_USER" -E npx tsx scripts/insert-aac-products.ts || {
+                echo "⚠️ AAC products import thất bại"
+              }
               echo "✅ AAC products imported"
             else
               echo "⚠️ insert-aac-products.ts not found, skipping"
@@ -283,8 +299,13 @@ jobs:
             # tin trong cơ sở dữ liệu".
             cd $APP_DIR
             sudo mkdir -p data/chroma
+            # ⭐ Chạy reindex BẰNG USER APP (không phải root) để file
+            # data/chroma/documents.json sinh ra thuộc đúng user mà app chạy.
+            # Nếu chạy bằng root, file thuộc root → app không ghi được lúc
+            # runtime (vectorStore.saveMetadataToDisk() → EACCES).
+            # Reindex cần đọc DB nên DB phải readable bởi app user (đã chown ở Step 8b).
             if [ -f "scripts/reindex-products.ts" ]; then
-              sudo -E npx tsx scripts/reindex-products.ts --all || {
+              sudo -u "$APP_USER" -E npx tsx scripts/reindex-products.ts --all || {
                 echo "⚠️ Reindex thất bại — bot sẽ không có context RAG"
               }
               # Verify vector store thực sự có dữ liệu
@@ -296,6 +317,10 @@ jobs:
             else
               echo "❌ scripts/reindex-products.ts không tồn tại — BỎ QUA BƯỚC NÀY, RAG SẼ KHÔNG CÓ CONTEXT"
             fi
+
+            # Chốt quyền sở hữu cho toàn bộ data/ (DB + vector store + uploads)
+            sudo chown -R "$APP_USER" $APP_DIR/data 2>/dev/null || true
+            sudo chmod -R u+rwX $APP_DIR/data
 
             echo "=== Step 13: Install/Update PM2 ==="
             export NPM_CONFIG_PREFIX="$HOME/.npm-global"
@@ -363,18 +388,30 @@ jobs:
             done
 
             if [ "$HEALTHY" = "false" ]; then
-              echo "⚠️ Health check failed, but checking if app is running..."
-              # Check if app is at least running (not crashed)
-              APP_PID=$($PM2_BIN jlist 2>/dev/null | grep -o '"pid":[0-9]*' | head -1 | cut -d: -f2 || echo "")
-              if [ -n "$APP_PID" ] && [ "$APP_PID" != "null" ]; then
-                echo "✅ App is running (PID: $APP_PID), proceeding with deploy"
-                HEALTHY=true
+              echo "⚠️ Health check failed — dumping diagnostics..."
+              echo "=== PM2 logs (error) ==="
+              $PM2_BIN logs mada-app --nostream --lines 60 --err 2>/dev/null || sudo $PM2_BIN logs mada-app --nostream --lines 60 --err 2>/dev/null || true
+              echo "=== PM2 logs (out) ==="
+              $PM2_BIN logs mada-app --nostream --lines 60 --out 2>/dev/null || sudo $PM2_BIN logs mada-app --nostream --lines 60 --out 2>/dev/null || true
+              echo "=== PM2 status ==="
+              $PM2_BIN status 2>/dev/null || sudo $PM2_BIN status 2>/dev/null || true
+              echo "=== Port 3002 listener ==="
+              sudo fuser 3002/tcp 2>&1 || echo "   (nothing listening on 3002)"
+              echo "=== DB permissions ==="
+              sudo ls -la $APP_DIR/data/ 2>/dev/null | head -20 || true
+              echo "=== DB write test as app user ==="
+              sudo -u "$APP_USER" sqlite3 $APP_DIR/data/mada.db "CREATE TABLE IF NOT EXISTS __deploy_wtest(x); INSERT INTO __deploy_wtest VALUES(1); DROP TABLE __deploy_wtest;" 2>&1 && echo "   ✅ DB writable by $APP_USER" || echo "   ❌ DB NOT writable by $APP_USER"
+
+              # ⭐⭐ KHÔNG được coi là "đang chạy" chỉ vì PM2 còn PID.
+              # PM2 giữ PID cả khi app crash-loop liên tục (VD: DB readonly →
+              # module throw → app chết ngay khi boot → port không bao giờ listen).
+              # Trước đây chỗ này in "App is running, proceeding with deploy" rồi
+              # để nginx trả 502 → deploy báo success nhưng production chết.
+              if sudo fuser 3002/tcp > /dev/null 2>&1; then
+                echo "✅ Port 3002 is listening (app bound the port)"
               else
-                echo "=== PM2 logs ==="
-                $PM2_BIN logs mada-app --nostream --lines 50 2>/dev/null || sudo $PM2_BIN logs mada-app --nostream --lines 50 2>/dev/null || true
-                echo "=== PM2 status ==="
-                $PM2_BIN status 2>/dev/null || sudo $PM2_BIN status 2>/dev/null || true
-                echo "❌ App is not running"
+                echo "❌ App KHÔNG listen port 3002 — deploy sẽ fail (nginx trả 502)"
+                exit 1
               fi
             fi
 
@@ -422,6 +459,14 @@ jobs:
             echo "Port 3002 listeners (app mới): $(sudo fuser 3002/tcp 2>&1 | tr -s ' ' || echo none)"
             echo "Port 3001 listeners (app legacy): $(sudo fuser 3001/tcp 2>&1 | tr -s ' ' || echo none)"
             echo "Local app build (direct to PM2 port): $(curl -s http://127.0.0.1:3002/api/health --max-time 8 2>/dev/null | grep -o '"build"[[:space:]]*:[[:space:]]*"[^"]*"' | cut -d'"' -f4 || echo unreachable)"
+
+            # ⭐ Kiểm tra app có GHI ĐƯỢC DB không (DB readonly → chat history,
+            # seed admin, admin CRUD đều hỏng dù app vẫn trả 200).
+            echo "--- DB write check ---"
+            sudo -u "$APP_USER" sqlite3 $APP_DIR/data/mada.db "CREATE TABLE IF NOT EXISTS __deploy_wtest(x); INSERT INTO __deploy_wtest VALUES(1); DROP TABLE __deploy_wtest;" > /dev/null 2>&1 \
+              && echo "   ✅ DB writable by $APP_USER" \
+              || { echo "   ❌ DB NOT writable by $APP_USER (app sẽ lỗi khi ghi)"; exit 1; }
+            echo "   App reports: $(curl -s http://127.0.0.1:3002/api/health --max-time 8 2>/dev/null | grep -o '"writable"[[:space:]]*:[[:space:]]*[a-z]*' | head -1)"
 
             # ⭐⭐ VERIFY THẬT: đảm bảo nginx đang phục vụ đúng build vừa deploy,
             # không phải app legacy còn sót ở port khác.

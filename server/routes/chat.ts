@@ -399,24 +399,24 @@ async function findSimilarProducts(
   const category = (product.category || '').toLowerCase();
 
   try {
-    const rows = await new Promise<any[]>((resolve, reject) => {
-      if (category) {
-        db.prepare(`
+    // ⭐ better-sqlite3 dùng API đồng bộ: .all(...) trả về mảng rows trực tiếp.
+    // (Bản cũ dùng callback kiểu node-sqlite3 → bị ném lỗi
+    // "SQLite3 can only bind numbers, strings, bigints, buffers, and null"
+    // vì callback bị bind như một tham số SQL.)
+    const rows: any[] = category
+      ? (db.prepare(`
           SELECT * FROM kb_products
           WHERE status = 'published' AND image_url IS NOT NULL AND image_url <> ''
             AND LOWER(category) = ?
           ORDER BY featured DESC, sort_order ASC, created_at DESC
           LIMIT 12
-        `).all(category, (err: any, res: any) => (err ? reject(err) : resolve(res as any[])));
-      } else {
-        db.prepare(`
+        `).all(category) as any[])
+      : (db.prepare(`
           SELECT * FROM kb_products
           WHERE status = 'published' AND image_url IS NOT NULL AND image_url <> ''
           ORDER BY featured DESC, sort_order ASC, created_at DESC
           LIMIT 12
-        `).all((err: any, res: any) => (err ? reject(err) : resolve(res as any[])));
-      }
-    });
+        `).all() as any[]);
 
     const out: any[] = [];
     const seen = new Set<string>([...(shownProductIds || []), product.id]);

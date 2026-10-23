@@ -16,7 +16,9 @@ services:
     image: ${MADA_IMAGE:-ghcr.io/vogiahuy2506-lang/mada-ai-assistant:latest}
     container_name: mada-app
     ports:
-      - "3001:3000"
+      # Map ra 3002 cho khớp port nginx/nginx.conf dùng cho app trên HOST.
+      # (App legacy cũ đang giữ 3001 — không tranh chấp.)
+      - "3002:3000"
     expose:
       - "3000"
     environment:

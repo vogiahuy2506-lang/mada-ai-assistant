@@ -89,7 +89,7 @@ jobs:
               
               echo ""
               echo "=== Port Check ==="
-              lsof -i :3000 2>/dev/null || netstat -tlnp 2>/dev/null | grep 3000 || echo "Port 3000 not in use"
+              lsof -i :3002 2>/dev/null || netstat -tlnp 2>/dev/null | grep 3002 || echo "Port 3002 not in use"
               lsof -i :80 2>/dev/null || netstat -tlnp 2>/dev/null | grep ':80 ' || echo "Port 80 not in use"
               lsof -i :443 2>/dev/null || netstat -tlnp 2>/dev/null | grep ':443 ' || echo "Port 443 not in use"
               
@@ -103,7 +103,7 @@ jobs:
               
               echo ""
               echo "=== Health Checks ==="
-              echo "HTTP (port 3000): $(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/api/health 2>/dev/null || echo 'FAILED')"
+              echo "HTTP (port 3002): $(curl -s -o /dev/null -w '%{http_code}' http://localhost:3002/api/health 2>/dev/null || echo 'FAILED')"
               echo "HTTP (port 80): $(curl -s -o /dev/null -w '%{http_code}' http://localhost/api/health 2>/dev/null || echo 'FAILED')"
               echo "External HTTP: $(curl -s -o /dev/null -w '%{http_code}' http://mada.digiso.vn --max-time 5 2>/dev/null || echo 'FAILED')"
               echo "External HTTPS: $(curl -s -o /dev/null -w '%{http_code}' https://mada.digiso.vn --max-time 5 2>/dev/null || echo 'FAILED')"
@@ -130,7 +130,7 @@ jobs:
               
               if [ -f "dist/server.mjs" ]; then
                 echo "Starting app from existing build..."
-                $PM2_PATH start dist/server.mjs --name mada-app -- --port 3000
+                $PM2_PATH start dist/server.mjs --name mada-app -- --port 3002
                 $PM2_PATH save
               else
                 echo "No existing build! Use 'full-fix' to rebuild."
@@ -139,7 +139,7 @@ jobs:
               
               echo "=== Waiting for health check ==="
               for i in {1..24}; do
-                if curl -sf http://localhost:3000/api/health > /dev/null 2>&1; then
+                if curl -sf http://localhost:3002/api/health > /dev/null 2>&1; then
                   echo "✅ App is healthy! (${i}x5s)"
                   break
                 fi
@@ -208,7 +208,7 @@ jobs:
               fi
               
               # Start fresh
-              $PM2_PATH start dist/server.mjs --name mada-app -- --port 3000
+              $PM2_PATH start dist/server.mjs --name mada-app -- --port 3002
               $PM2_PATH save
               
               # Restart nginx
@@ -217,7 +217,7 @@ jobs:
               # Wait and verify
               echo "=== Verifying (max 120s) ==="
               for i in {1..24}; do
-                if curl -sf http://localhost:3000/api/health > /dev/null 2>&1; then
+                if curl -sf http://localhost:3002/api/health > /dev/null 2>&1; then
                   echo "✅ App is healthy! (${i}x5s)"
                   break
                 fi
@@ -299,7 +299,7 @@ jobs:
               
               # Start
               echo "Starting app..."
-              $PM2_PATH start dist/server.mjs --name mada-app -- --port 3000
+              $PM2_PATH start dist/server.mjs --name mada-app -- --port 3002
               $PM2_PATH save
               
               # Setup nginx
@@ -320,7 +320,7 @@ jobs:
               # Verify
               echo "=== Verification ==="
               for i in {1..24}; do
-                if curl -sf http://localhost:3000/api/health > /dev/null 2>&1; then
+                if curl -sf http://localhost:3002/api/health > /dev/null 2>&1; then
                   echo "✅ App is healthy!"
                   break
                 fi

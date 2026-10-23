@@ -78,8 +78,9 @@ jobs:
               fi
             done
 
-            # Dừng mọi thứ đang giữ port 3001 (app cũ có thể chạy bằng systemd
+            # Dừng mọi thứ đang giữ port 3001 (app legacy có thể chạy bằng systemd
             # hoặc process trực tiếp, không qua pm2).
+            # ⚠️ App MỚI chạy ở port 3002 (tránh tranh chấp với app legacy 3001).
             sudo fuser -k 3001/tcp 2>/dev/null || true
             
             # Stop Docker containers
@@ -129,11 +130,11 @@ jobs:
             fi
 
             echo "=== Step 8b: Setup fresh mada.db ==="
-            # ⚠️ PORT phải KHỚP với nginx proxy_pass (nginx/nginx.conf → 3001).
+            # ⚠️ PORT phải KHỚP với nginx proxy_pass (nginx/nginx.conf → 3002).
             # Trước đây deploy chạy PM2 ở PORT=3000 còn nginx trỏ 3001 → app mới
             # chạy nhưng KHÔNG ai trỏ tới, nginx vẫn phục vụ app legacy cũ ở 3001
             # (dữ liệu cũ, code cũ) mà deploy vẫn báo success.
-            # → nginx + PM2 + .env đều dùng 3001.
+            # → nginx + PM2 + .env đều dùng 3002 (port RIÊNG, app legacy giữ 3001).
             echo "Removing old database..."
             sudo rm -f $APP_DIR/data/mada.db $APP_DIR/data/mada.db-shm $APP_DIR/data/mada.db-wal 2>/dev/null || true
             sudo mkdir -p $APP_DIR/data
@@ -232,7 +233,7 @@ jobs:
               echo "SUPER_ADMIN_EMAIL=${{ secrets.SUPER_ADMIN_EMAIL }}"
               echo "SUPER_ADMIN_PASSWORD=${{ secrets.SUPER_ADMIN_PASSWORD }}"
               echo "NODE_ENV=production"
-              echo "PORT=3001"
+              echo "PORT=3002"
               # Build marker để /api/health báo đúng commit đang chạy trên VPS.
               echo "BUILD_SHA=${{ github.sha }}"
               # ===== Mail / SMTP (consultation notifications) =====
@@ -310,11 +311,11 @@ jobs:
             # Use absolute PM2 path (sudo requires full path)
             PM2_BIN="$HOME/.npm-global/bin/pm2"
             
-            # Kill any existing processes on port 3001 (port nginx proxy tới).
+            # Kill any existing processes on our app port (3002) + dọn app legacy.
             # ⚠️ Phải khai báo mọi tên pm2 cũ: app legacy từng chạy tên "mada-ai",
             # deploy mới dùng "mada-app". Nếu chỉ xoá "mada-app" thì app legacy
             # vẫn giữ port 3001 và nginx tiếp tục phục vụ code/data cũ.
-            sudo fuser -k 3001/tcp 2>/dev/null || true
+            sudo fuser -k 3002/tcp 2>/dev/null || true
             for p in "$HOME/.npm-global/bin/pm2" "/usr/local/bin/pm2" "/usr/bin/pm2"; do
               if [ -f "$p" ]; then
                 $p delete mada-app 2>/dev/null || true
@@ -323,7 +324,7 @@ jobs:
             done
 
             # Start with pm2-startup to ensure PM2 survives reboots
-            PORT=3001 $PM2_BIN start dist/server.mjs --name mada-app
+            PORT=3002 $PM2_BIN start dist/server.mjs --name mada-app
             
             # Wait for process to start
             sleep 3
@@ -350,7 +351,7 @@ jobs:
               COUNTER=$((COUNTER + 1))
               # Try different endpoints
               for ENDPOINT in "/api/health" "/api/performance/health" "/"; do
-                HEALTH_CODE=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:3001${ENDPOINT}" --connect-timeout 3 --max-time 5 2>/dev/null || echo "000")
+                HEALTH_CODE=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:3002${ENDPOINT}" --connect-timeout 3 --max-time 5 2>/dev/null || echo "000")
                 if [ "$HEALTH_CODE" = "200" ]; then
                   echo "✅ App is healthy! (took ${COUNTER}x5s, endpoint: ${ENDPOINT})"
                   HEALTHY=true
@@ -414,6 +415,13 @@ jobs:
             echo "=== Step 18: Final verification ==="
             echo "HTTP check: $(curl -s -o /dev/null -w '%{http_code}' http://mada.digiso.vn --max-time 10 || echo 'FAILED')"
             echo "HTTPS check: $(curl -s -o /dev/null -w '%{http_code}' https://mada.digiso.vn --max-time 10 -k || echo 'FAILED')"
+
+            echo "--- Diagnosing which app is serving ---"
+            echo "PM2 processes:"
+            $PM2_BIN jlist 2>/dev/null | grep -o '"name":"[^"]*"' | sort -u | head -10 || echo "   (pm2 unavailable)"
+            echo "Port 3002 listeners (app mới): $(sudo fuser 3002/tcp 2>&1 | tr -s ' ' || echo none)"
+            echo "Port 3001 listeners (app legacy): $(sudo fuser 3001/tcp 2>&1 | tr -s ' ' || echo none)"
+            echo "Local app build (direct to PM2 port): $(curl -s http://127.0.0.1:3002/api/health --max-time 8 2>/dev/null | grep -o '"build"[[:space:]]*:[[:space:]]*"[^"]*"' | cut -d'"' -f4 || echo unreachable)"
 
             # ⭐⭐ VERIFY THẬT: đảm bảo nginx đang phục vụ đúng build vừa deploy,
             # không phải app legacy còn sót ở port khác.

@@ -39,6 +39,147 @@ export function normalizeProductName(name: string): string {
     .trim();
 }
 
+/** Escape ký tự regex của một chuỗi. */
+export function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Tên sản phẩm NGẮN (< 8 ký tự) phải khớp ĐÚNG HOA THƯỜNG.
+ *
+ * ⚠️ VÌ SAO CẦN:
+ * "Clicker", "Pearl" vừa là tên sản phẩm vừa là TỪ TIẾNG ANH THƯỜNG.
+ * Nếu khớp không phân biệt hoa thường thì câu "dùng một clicker nhỏ gọn"
+ * bị hiểu là bot đang giới thiệu sản phẩm Clicker → bot khác gỡ nhầm →
+ * câu trả lời bị hỏng.
+ *
+ * → Chỉ coi là "nhắc sản phẩm" khi tên xuất hiện đúng cả chữ hoa chữ thường
+ *   trong câu trả lời gốc.
+ */
+export function isShortProductTitle(title: string): boolean {
+  return title.trim().length < 8;
+}
+
+/** Tên SP có xuất hiện đúng hoa/thường trong câu gốc không (cho tên ngắn). */
+export function hasExactCaseMention(answer: string, title: string): boolean {
+  const t = title.trim();
+  if (!t) return false;
+  const re = new RegExp(
+    `(?<![A-Za-z0-9])${escapeRegExp(t)}(?![A-Za-z0-9])`
+  );
+  return re.test(answer);
+}
+
+/**
+ * ⭐ Lấy TẤT CẢ các đoạn được IN ĐẬM trong câu trả lời.
+ *
+ * ⚠️ VÌ SAO CẦN (thay vì so khớp `**tên**` bằng regex trực tiếp):
+ * Bot có thể viết `**WCAG 2.2**`, `** WCAG 2.2 **`, `**Tên sản phẩm**`…
+ * Regex trực tiếp với tên CỐ ĐỊNH rất dễ trượt (thiếu khoảng trắng, khác
+ * dấu, viết tắt). Trích xuất TẤT CẢ đoạn in đậm rồi so khớp đã chuẩn hoá
+ * → chịu được mọi biến thể viết.
+ */
+export function extractBoldSpans(answer: string): string[] {
+  if (!answer) return [];
+  const out: string[] = [];
+  const re = /\*\*([^*\n]+)\*\*/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(answer)) !== null) {
+    const s = m[1].trim();
+    if (s) out.push(s);
+  }
+  return out;
+}
+
+/**
+ * ⭐ Mục catalog này có đang được TRÌNH BÀY NHƯ MỘT MỤC DANH MỤC không?
+ *
+ * ⚠️ VÌ SAO CẦN (đây là điểm mấu chốt để phân biệt 2 vai trò):
+ * Một tên có thể xuất hiện trong câu trả lời theo HAI cách hoàn toàn khác:
+ *
+ *   1. TRÍCH DẪN  → "Theo WCAG 2.2, tương phản tối thiểu là 4.5:1."
+ *      Đây là NỘI DUNG TƯ VẤN — phải GIỮ, mọi bot đều được phép.
+ *
+ *   2. GIỚI THIỆU MỤC DANH MỤC → "**WCAG 2.2 — Nguyên tắc và 4 mức tuân thủ**"
+ *      Đây là bot đang "bán"/giới thiệu như một mục trong danh mục → phải
+ *      lọc theo chuyên môn như sản phẩm.
+ *
+ * Tín hiệu nhận dạng (theo quy ước sẵn có của codebase):
+ *   - IN ĐẬM: prompt bắt buộc bot viết tên sản phẩm ở DẠNG IN ĐẬM, và
+ *     `fabricationGuard` cũng chỉ soi tên in đậm. Văn xuôi trích dẫn thì
+ *     không in đậm.
+ *   - TÊN ĐẦY ĐỦ (kèm mô tả) hoặc URL: chỉ có khi bot đọc danh mục.
+ *
+ * → Cần CẢ HAI tín hiệu (in đậm + tên đầy đủ/URL) để tránh xoá nhầm câu
+ *   trích dẫn hợp lệ.
+ */
+export function isPresentedAsCatalogItem(
+  answer: string,
+  entry: {
+    title?: string;
+    title_en?: string;
+    product_url?: string;
+    source_url?: string;
+    coreName?: string;
+  }
+): boolean {
+  if (!answer) return false;
+
+  const boldSpans = extractBoldSpans(answer);
+  if (boldSpans.length === 0) return false;
+
+  const title = normalizeForMatching(entry.title || '').trim();
+  const titleEn = normalizeForMatching(entry.title_en || '').trim();
+  const core = entry.coreName ? normalizeForMatching(entry.coreName).trim() : '';
+
+  const normBold = boldSpans.map((s) => normalizeForMatching(s).trim());
+
+  // ⭐ Tín hiệu 1: đoạn in đậm chứa TRỌN tên đầy đủ (kèm mô tả).
+  // → Bot đang trình bày một MỤC DANH MỤC.
+  for (const b of normBold) {
+    if (!b) continue;
+    if (title && title.length >= 12 && b.includes(title)) return true;
+    if (titleEn && titleEn.length >= 12 && b.includes(titleEn)) return true;
+  }
+
+  // ⭐ Tín hiệu 2: đoạn in đậm đúng TÊN LÕI + câu có kèm URL.
+  // → Bot tự viết link cho mục danh mục đó.
+  const url = entry.product_url || entry.source_url || '';
+  if (url && answer.includes(url) && core) {
+    for (const b of normBold) {
+      if (b === core) return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * ⭐ Ranh giới từ AN TOÀN — thay thế `\b`.
+ *
+ * ⚠️ VÌ SAO KHÔNG DÙNG `\b`:
+ * `\b` chỉ tồn tại khi ranh giới giữa ký tự word và non-word. Khi tên sản
+ * phẩm nằm ngay cạnh ký tự non-word thì `\b` KHÔNG có:
+ *   - `**Optelec ClearReader+**` → sau `+` là `*` → không có `\b` → regex
+ *     không khớp → tên sản phẩm KHÔNG được gắn link và KHÔNG được gỡ.
+ *   - `**A-200 Personal Sound Amplifier**` → sau tên là `*` → không có `\b`.
+ *   - `Clicker 8 (English and Arabic)` → sau `)` là `*` → không có `\b`.
+ *
+ * → Dùng lookaround kiểm tra ký tự LIỀN KỀ có phải chữ/số hay không. Cách
+ *   này đúng cả khi tên nằm trong markdown bold hay kết thúc bằng ký tự đặc
+ *   biệt, đồng thời vẫn chặn khớp nhầm vào giữa từ.
+ */
+export const PRODUCT_BOUNDARY_START = '(?<![A-Za-z0-9])';
+export const PRODUCT_BOUNDARY_END = '(?![A-Za-z0-9])';
+
+/** Regex khớp tên sản phẩm, có ranh giới từ an toàn (không dùng `\b`). */
+export function buildProductNameRegex(name: string, flags = ''): RegExp {
+  return new RegExp(
+    `${PRODUCT_BOUNDARY_START}${escapeRegExp(name)}${PRODUCT_BOUNDARY_END}`,
+    flags
+  );
+}
+
 // ============== CATALOG ==============
 
 export interface CatalogProduct {
@@ -59,6 +200,40 @@ interface CatalogEntry extends CatalogProduct {
   norm: string;
   /** Các key phụ để match một phần (VD "A-200") */
   altNorms: string[];
+  /**
+   * ⭐ TÀI LIỆU THAM CHIẾU (tiêu chuẩn/quy định) — KHÔNG phải sản phẩm bán.
+   *
+   * ⚠️ VÌ SAO CẦN PHÂN BIỆT:
+   * Catalog gồm 2 loại thực thể rất khác nhau:
+   *   1. SẢN PHẨM BÁN (JAWS, Housemate, WeWALK…) — chỉ bot chuyên môn tương
+   *      ứng được nhắc tới; nhắc sai = vi phạm chuyên môn.
+   *   2. TÀI LIỆU THAM CHIẾU (WCAG 2.2, ISO 9999, EN 301 549…) — tiêu chuẩn
+   *      dùng chung, KHÔNG bán, KHÔNG thuộc riêng bot nào. Mọi chuyên gia đều
+   *      phải được trích dẫn (VD bot-vision nói "tương phản tối thiểu 4.5:1
+   *      theo WCAG 2.2" — đó là câu trả lời ĐÚNG và HỮU ÍCH).
+   *
+   * → Nhóm 2 được phép TRÍCH DẪN bởi mọi bot, nhưng chỉ bot-regulatory mới
+   *   được biến thành "card" (link tới văn bản gốc). Nhóm 1 thì lọc chặt.
+   *
+   * Nguồn: `knowledge_items` với `source_type='web'` (7 mục tiêu chuẩn).
+   * `kb_products` = sản phẩm bán → `isReference = false`.
+   */
+  isReference: boolean;
+  /**
+   * ⭐ "Tên lõi" của tài liệu tham chiếu — phần tên TRƯỚC dấu "—".
+   *
+   * ⚠️ VÌ SAO CẦN:
+   * Tiêu chuẩn trong DB có tên đầy đủ kèm mô tả:
+   *   "WCAG 2.2 — Nguyên tắc và 4 mức tuân thủ (A, AA, AAA)"
+   *
+   * Bot trích dẫn trong văn xuôi chỉ viết "WCAG 2.2" (đủ dùng và tự nhiên).
+   * Nếu dùng tên đầy đủ làm khoá so khớp → không nhận ra mô tả trích dẫn.
+   * Nếu dùng "2 từ đầu" ("wcag 2") → khớp NHẦM "WCAG 2.1" thành WCAG 2.2.
+   *
+   * → Dùng phần trước "—" làm khoá so khớp chính xác: "wcag 2 2", "iso 9999
+   *   2022", "en 301 549"…
+   */
+  coreName?: string;
 }
 
 let _catalogCache: CatalogEntry[] | null = null;
@@ -78,7 +253,7 @@ export function buildProductCatalog(): CatalogEntry[] {
   const entries: CatalogEntry[] = [];
   const seen = new Set<string>();
 
-  const push = (p: CatalogProduct) => {
+  const push = (p: CatalogProduct, isReference = false) => {
     if (!p.title && !p.title_en) return;
     const url = p.product_url || p.source_url || '';
     if (!url || !url.startsWith('http')) return;
@@ -103,7 +278,39 @@ export function buildProductCatalog(): CatalogEntry[] {
       if (first2.length >= 5) altNorms.push(first2);
     }
 
-    entries.push({ ...p, norm, altNorms: [...new Set(altNorms)] });
+    // ⭐⭐ TÀI LIỆU THAM CHIẾU: dùng "tên lõi" (trước dấu "—") làm khoá so
+    // khớp, và KHÔNG sinh key phụ kiểu "2 từ đầu".
+    //
+    // VÌ SAO:
+    // Tên tiêu chuẩn trong DB có mô tả: "WCAG 2.2 — Nguyên tắc và 4 mức…".
+    // Bot trích dẫn trong văn xuôi viết "WCAG 2.2" → cần so khớp được.
+    // Nhưng nếu sinh key "wcag 2" (2 từ đầu) → "WCAG 2.1" trong câu cũng
+    // khớp → gắn NHẦM link WCAG 2.2 → nội dung sai về mặt kỹ thuật.
+    //
+    // → Với tài liệu tham chiếu: khoá so khớp DUY NHẤT là tên lõi.
+    let coreName: string | undefined;
+    if (isReference) {
+      const rawCore = (p.title || '').split('—')[0].trim();
+      const core = normalizeProductName(rawCore);
+      if (core && core.length >= 4) {
+        coreName = core;
+        // Thay toàn bộ key phụ bằng tên lõi (chính xác, không nhầm phiên bản).
+        altNorms.length = 0;
+        altNorms.push(core);
+        if (normEn) {
+          const enCore = normalizeProductName(p.title_en.split('—')[0].trim());
+          if (enCore && enCore.length >= 4) altNorms.push(enCore);
+        }
+      }
+    }
+
+    entries.push({
+      ...p,
+      norm,
+      altNorms: [...new Set(altNorms)],
+      isReference,
+      ...(coreName ? { coreName } : {}),
+    });
   };
 
   try {
@@ -152,21 +359,65 @@ export function buildProductCatalog(): CatalogEntry[] {
         /* ignore */
       }
 
-      push({
-        id: r.id,
-        title: r.title || '',
-        title_en: r.title_en || r.title || '',
-        brand: '',
-        category: r.category || 'general',
-        price_range: '',
-        description: (r.description || '').substring(0, 300),
-        image_url: img,
-        product_url: r.url || r.source || '',
-        source_url: r.url || r.source || '',
-      });
+      push(
+        {
+          id: r.id,
+          title: r.title || '',
+          title_en: r.title_en || r.title || '',
+          brand: '',
+          category: r.category || 'general',
+          price_range: '',
+          description: (r.description || '').substring(0, 300),
+          image_url: img,
+          product_url: r.url || r.source || '',
+          source_url: r.url || r.source || '',
+        },
+        // ⭐ Nhóm `knowledge_items` (source_type='web') = TÀI LIỆU THAM CHIẾU
+        // (tiêu chuẩn/quy định), KHÔNG phải sản phẩm bán → mọi bot đều được
+        // trích dẫn, không lọc theo chuyên môn.
+        true
+      );
     }
   } catch (err) {
     console.warn('[productLinker] Failed to load knowledge_items:', (err as Error).message);
+  }
+
+  // ⭐⭐ GIẢI QUYẾT TÊN LÕI TRÙNG NHAU.
+  //
+  // VÌ SAO CẦN:
+  // Có 2 mục cùng tên lõi "WCAG 2.2" (một mục về nguyên tắc, một mục về
+  // tiêu chí mới) → khi bot trích dẫn "WCAG 2.2" trong văn xuôi, KHÔNG THỂ
+  // biết bot đang nói về mục nào.
+  //
+  // → Chọn MỘT mục "đại diện" (canonical): URL không có fragment `#` và
+  //   ngắn nhất — đây là trang gốc của tiêu chuẩn (VD https://www.w3.org/TR/
+  //   WCAG22/ thay vì https://www.w3.org/TR/WCAG22/#new). Mục đại diện giữ
+  //   tên lõi → trích dẫn "WCAG 2.2" vẫn gắn đúng link gốc.
+  //   Các mục còn lại BỎ tên lõi → chỉ khớp được khi bot viết TRỌN tên.
+  const byCore = new Map<string, typeof entries>();
+  for (const e of entries) {
+    if (!e.coreName) continue;
+    const list = byCore.get(e.coreName) || [];
+    list.push(e);
+    byCore.set(e.coreName, list);
+  }
+  for (const [core, group] of byCore) {
+    if (group.length <= 1) continue;
+
+    // ⭐ Chọn mục đại diện: URL "sạch" (không fragment) + ngắn nhất.
+    const canonical = [...group].sort((a, b) => {
+      const aFrag = (a.product_url || a.source_url || '').includes('#') ? 1 : 0;
+      const bFrag = (b.product_url || b.source_url || '').includes('#') ? 1 : 0;
+      if (aFrag !== bFrag) return aFrag - bFrag;
+      return (a.product_url || a.source_url || '').length -
+        (b.product_url || b.source_url || '').length;
+    })[0];
+
+    for (const e of group) {
+      if (e === canonical) continue;
+      e.coreName = undefined;
+      e.altNorms = e.altNorms.filter((a) => a !== core);
+    }
   }
 
   _catalogCache = entries;
@@ -212,6 +463,21 @@ export function findMentionedProducts(
   const found: Array<{ entry: CatalogEntry; pos: number; len: number }> = [];
 
   for (const entry of entries) {
+    // ⭐⭐ TÊN NGẮN (< 8 ký tự) PHẢI KHỚP ĐÚNG HOA THƯỜNG.
+    //
+    // "Clicker" và "Pearl" vừa là tên sản phẩm vừa là TỪ TIẾNG ANH THƯỜNG.
+    // `haystack` đã lowercase toàn bộ nên "dùng một clicker nhỏ gọn" khớp
+    // "clicker" → bot khác gỡ nhầm → câu trả lời bị hỏng.
+    //
+    // → Chỉ coi là "nhắc sản phẩm" khi tên xuất hiện đúng cả hoa chữ thường
+    //   trong câu GỐC (chưa chuẩn hoá).
+    const isShort = isShortProductTitle(entry.title || '');
+    if (isShort) {
+      const exact = hasExactCaseMention(answer, entry.title || '') ||
+        (entry.title_en ? hasExactCaseMention(answer, entry.title_en) : false);
+      if (!exact) continue;
+    }
+
     // Ưu tiên tên đầy đủ; sau đó thử các key phụ
     const candidates = [entry.norm, ...entry.altNorms];
 
@@ -233,9 +499,30 @@ export function findMentionedProducts(
     }
   }
 
+  // ⭐⭐ GIẢI QUYẾT CHỒNG LẤN — ưu tiên tên DÀI.
+  //
+  // VÌ SAO CẦN:
+  // "Dwell Clicker 2" CHỨA "Clicker". Nếu khớp CẢ HAI, lớp gỡ tên ngoài chuyên
+  // môn sẽ xoá "Clicker" → biến "Dwell Clicker 2" thành "Dwell 2" (hỏng tên
+  // sản phẩm hợp lệ). Tương tự "Osmo" trong "Cosmo Switch".
+  //
+  // → Sắp xếp match theo ĐỘ DÀI giảm dần, rồi chỉ nhận match KHÔNG chồng
+  //   lấn với match đã nhận. Tên dài luôn thắng tên ngắn nằm bên trong nó.
+  const ordered = [...found].sort((a, b) => (b.len - a.len) || (a.pos - b.pos));
+  const accepted: Array<{ entry: CatalogEntry; pos: number; len: number }> = [];
+  const taken: Array<{ start: number; end: number }> = [];
+
+  for (const m of ordered) {
+    const start = m.pos;
+    const end = m.pos + m.len;
+    if (taken.some((s) => start < s.end && end > s.start)) continue;
+    taken.push({ start, end });
+    accepted.push(m);
+  }
+
   // Loại bỏ match trùng lặp (cùng sản phẩm match nhiều lần) — giữ match đầu tiên
   const seen = new Set<string>();
-  const unique = found.filter((f) => {
+  const unique = accepted.filter((f) => {
     if (seen.has(f.entry.id)) return false;
     seen.add(f.entry.id);
     return true;

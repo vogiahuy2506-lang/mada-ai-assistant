@@ -43,8 +43,23 @@
 
 import fs from 'fs';
 import path from 'path';
+import db from './db';
 
-/** kb_products.category → botId */
+/**
+ * kb_products.category / knowledge_items.category → botId
+ *
+ * ⭐ VÌ SAO CẦN DÒNG `regulatory-standards`:
+ * Nhóm tiêu chuẩn/quy định (EN 301 549, ISO 22163/MDR, ATSM Qatar…) nằm trong
+ * `knowledge_items` — KHÔNG phải sản phẩm MADA nên không có trong file
+ * taxonomy (`data/mada-product-categories.json` chỉ có 243 sản phẩm bán).
+ *
+ * Trước đây thiếu dòng này → `botsForProduct()` trả về [] cho cả 7 tiêu chuẩn
+ * → lớp lọc phạm vi coi chúng là "không thuộc bot nào" → fail-open cho phép
+ * MỌI bot nhắc tới → 42 leak (7 tiêu chuẩn × 6 bot).
+ *
+ * Còn `bot-regulatory` thì chỉ nhận được 1/7 tiêu chuẩn trong prompt vì
+ * `buildCatalogPromptBlock()` lọc theo `education` trước khi lọc theo bot.
+ */
 const CATEGORY_TO_BOT: Record<string, string> = {
   hearing: 'bot-hearing',
   vision: 'bot-vision',
@@ -55,6 +70,7 @@ const CATEGORY_TO_BOT: Record<string, string> = {
   education: 'bot-regulatory',
   web_accessibility: 'bot-regulatory',
   communication: 'bot-speech',
+  'regulatory-standards': 'bot-regulatory',
 };
 
 type Taxonomy = Record<string, string[]>;
@@ -103,6 +119,62 @@ function getLookup(): Map<string, string[]> {
     }
   }
   return lookup;
+}
+
+/**
+ * ⭐ INDEX DỰ PHÒNG — tra DB cho các URL KHÔNG có trong file taxonomy.
+ *
+ * ⚠️ VÌ SAO CẦN (đây là nguyên nhân gốc của lỗi "bot nhắc tên ngoài chuyên môn"):
+ *
+ * File `data/mada-product-categories.json` chỉ liệt kê 243 SẢN PHẨM MADA bán
+ * được. Nhưng catalog còn lấy thêm 7 mục từ `knowledge_items` (source_type
+ * 'web') — đó là TIÊU CHUẨN/QUY ĐỊNH, không phải sản phẩm:
+ *
+ *   WCAG 2.2, ISO 9999:2022, EN 301 549, ISO 22163/MDR, ATSM Qatar…
+ *
+ * Chúng không có trong file taxonomy → `botsForProduct()` trả về [] → lớp lọc
+ * coi như "không thuộc bot nào" → FAIL-OPEN cho phép MỌI bot nhắc tới →
+ * 42 leak (7 tiêu chuẩn × 6 bot chuyên môn).
+ *
+ * → Index này tra `category` trong DB rồi map qua `CATEGORY_TO_BOT` → mọi mục
+ *   trong catalog đều xác định được chủ sở hữu → lớp lọc có thể chuyển sang
+ *   FAIL-CLOSED an toàn mà KHÔNG mất sản phẩm thật.
+ *
+ * ⚠️ THỨ TỰ ƯU TIÊN: file taxonomy luôn được tra TRƯỚC (nó là nguồn đa nhãn
+ * của MADA). Index này chỉ là DỰ PHÒNG cho URL chưa có trong file.
+ */
+let dbLookup: Map<string, string[]> | null = null;
+
+function getDbLookup(): Map<string, string[]> {
+  if (dbLookup) return dbLookup;
+  dbLookup = new Map();
+  try {
+    // ⭐ Đúng tập nguồn của `buildProductCatalog()`: kb_products + knowledge_items
+    // (source_type='web'). → MọI mục trong catalog ĐỀU có thể tra được ở đây.
+    const rows = db
+      .prepare(
+        `SELECT product_url AS u1, source_url AS u2, category FROM kb_products
+         UNION ALL
+         SELECT url AS u1, source AS u2, category FROM knowledge_items
+          WHERE status = 'published' AND source_type = 'web'`
+      )
+      .all() as any[];
+
+    for (const r of rows) {
+      const cat = (r.category || '').toLowerCase();
+      if (!cat || !CATEGORY_TO_BOT[cat]) continue;
+      for (const u of [r.u1, r.u2]) {
+        const k = norm(u);
+        if (k && !dbLookup.has(k)) dbLookup.set(k, [cat]);
+      }
+    }
+  } catch (err) {
+    console.warn(
+      '[productTaxonomy] Không nạp được index dự phòng từ DB:',
+      (err as Error).message
+    );
+  }
+  return dbLookup;
 }
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -206,7 +278,14 @@ export function botsForProduct(url: string | null | undefined): string[] {
   const key = norm(url);
   if (!key) return [];
 
-  const cats = getLookup().get(key);
+  // ⭐ Nguồn 1 (chuẩn, đa nhãn): file taxonomy MADA.
+  let cats = getLookup().get(key);
+
+  // ⭐ Nguồn 2 (dự phòng): tra DB cho URL chưa có trong file taxonomy —
+  // chủ yếu là nhóm TIÊU CHUẨN/QUY ĐỊNH (WCAG, ISO 9999, EN 301 549…) nằm
+  // trong `knowledge_items`, không phải sản phẩm bán nên không có trong file.
+  // Trước đây nhóm này rơi vào "không thuộc bot nào" → fail-open → leak.
+  if (!cats) cats = getDbLookup().get(key);
   if (!cats) return [];
 
   const bots: string[] = [];

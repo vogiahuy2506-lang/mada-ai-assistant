@@ -12,22 +12,48 @@
  * danh sách khuyến nghị để tránh giới thiệu sản phẩm không tồn tại.
  */
 
-import { buildProductCatalog, findMentionedProducts, normalizeProductName } from './productLinker';
+import {
+  buildProductCatalog,
+  findMentionedProducts,
+  normalizeProductName,
+  escapeRegExp,
+  buildProductNameRegex,
+  isShortProductTitle,
+  hasExactCaseMention,
+  isPresentedAsCatalogItem,
+} from './productLinker';
 import { botsForProduct } from './productTaxonomy';
 
 /**
  * ⭐ Bot này có được nhắc sản phẩm này không?
  *
- * ⚠️ FAIL-OPEN: sản phẩm KHÔNG có trong taxonomy → coi như được phép (giữ).
- * Lý do: taxonomy chỉ phủ 349/349 sản phẩm `kb_products`, nhưng catalog còn
- * lấy từ `knowledge_items` (web-scraped) — có thể có URL chưa có trong file
- * taxonomy. Nếu fail-closed thì những sản phẩm hợp lệ đó sẽ bị xoá khỏi
- * câu trả lời → mất sản phẩm thật (regression nghiêm trọng hơn leak).
+ * ⚠️ FAIL-OPEN CHỈ KHI KHÔNG XÁC ĐỊNH ĐƯỢC (không phải "không có trong taxonomy"):
+ * Lý do: `botsForProduct()` đã tra 2 nguồn (file taxonomy MADA + index dự phòng
+ * từ DB) → mọi mục trong catalog đều xác định được chủ sở hữu (đã kiểm chứng
+ * 250/250 mục resolve được). Trước đây 7 TIÊU CHUẨN/QUY ĐỊNH (WCAG, ISO 9999,
+ * EN 301 549…) nằm trong `knowledge_items` chứ không có trong file taxonomy →
+ * `botsForProduct()` trả [] → bị coi là "thuộc mọi bot" → 42 leak
+ * (7 tiêu chuẩn × 6 bot chuyên môn).
+ *
+ * → Chỉ còn 1 trường hợp fail-open: URL không có trong CẢ 2 nguồn (VD DB lỗi
+ *   lúc deploy, hoặc mục mới thêm chưa kịp đồng bộ). Khi đó giữ tên lại an
+ *   toàn hơn là xoá sạch tên sản phẩm khỏi câu trả lời.
+ *
+ * @param answer Câu trả lời gốc — cần để phân biệt "trích dẫn trong văn xuôi"
+ *               với "giới thiệu một mục danh mục" (xem `isPresentedAsCatalogItem`).
  */
 function isInBotScope(
-  entry: { product_url?: string; source_url?: string; title?: string; title_en?: string },
+  entry: {
+    product_url?: string;
+    source_url?: string;
+    title?: string;
+    title_en?: string;
+    isReference?: boolean;
+    coreName?: string;
+  },
   botId: string | null | undefined,
-  allowTitles?: Set<string> | null
+  allowTitles?: Set<string> | null,
+  answer?: string
 ): boolean {
   if (!botId) return true;
   // Bot 7 (Thông tin bổ trợ) được xem TOÀN BỘ danh mục.
@@ -36,6 +62,23 @@ function isInBotScope(
   // taxonomy → mọi sản phẩm đều "ngoài chuyên môn" theo cách tính này → nếu
   // lọc, custom agent sẽ mất sạch tên sản phẩm khỏi câu trả lời.
   if (!botId.startsWith('bot-')) return true;
+
+  // ⭐⭐ TÀI LIỆU THAM CHIẾU (tiêu chuẩn/quy định) — MỌI bot đều được trích dẫn.
+  //
+  // VÌ SAO:
+  // Tiêu chuẩn (WCAG 2.2, ISO 9999, EN 301 549…) là văn bản dùng chung, KHÔNG
+  // thuộc riêng chuyên môn nào và KHÔNG phải sản phẩm bán. Chuyên gia thị giác
+  // trả lời "tương phản tối thiểu 4.5:1 theo WCAG 2.2" là câu trả lời ĐÚNG và
+  // HỮU ÍCH — nếu lọc như sản phẩm, câu sẽ bị cắt thành "Theo , tương phản…".
+  //
+  // → MỌI bot được TRÍCH DẪN trong văn xuôi (không in đậm).
+  // → Nhưng nếu bot trình bày tiêu chuẩn như MỘT MỤC DANH MỤC (in đậm tên
+  //   đầy đủ kèm mô tả + link) → đó là "giới thiệu thiết bị/mục" → phải lọc
+  //   theo chuyên môn, giống sản phẩm bán.
+  if (entry.isReference) {
+    if (!answer) return true;
+    return !isPresentedAsCatalogItem(answer, entry);
+  }
 
   // Sản phẩm được phép nhắc dù ngoài chuyên môn (user hỏi thẳng tên).
   if (allowTitles && allowTitles.size > 0) {
@@ -46,7 +89,8 @@ function isInBotScope(
 
   const url = entry.product_url || entry.source_url || '';
   const bots = botsForProduct(url);
-  if (bots.length === 0) return true; // fail-open
+  // Không xác định được chủ sở hữu → giữ (fail-open, an toàn khi DB lỗi).
+  if (bots.length === 0) return true;
   return bots.includes(botId);
 }
 
@@ -69,8 +113,25 @@ function findOutOfScopeProducts(
 
   const mentioned = findMentionedProducts(answer, catalog);
   for (const entry of mentioned) {
-    if (isInBotScope(entry, botId, allowTitles)) continue;
-    const name = entry.title || entry.title_en || '';
+    if (isInBotScope(entry, botId, allowTitles, answer)) continue;
+
+    // ⭐⭐ Chọn ĐÚNG tên cần gỡ — tên phảI CÓ THẬT trong câu.
+    //
+    // VÌ SAO CẦN:
+    // Tài liệu tham chiếu có tên đầy đủ kèm mô tả:
+    //   "ISO 9999:2022 — Phân loại công nghệ hỗ trợ (AT)"
+    // nhưng bot có thể chỉ viết tên lõi "ISO 9999:2022" (đúng format prompt
+    // bắt buộc: tên + link ở dòng riêng). Nếu lấy tên đầy đủ để gỡ →
+    // regex KHÔNG khớp câu → tên tiêu chuẩn ngoài chuyên môn LỌT vào câu
+    // trả lời (đúng triệu chứng leak).
+    //
+    // → Ưu tiên tên đầy đủ nếu câu có; không thì dùng tên lõi.
+    let name = entry.title || entry.title_en || '';
+    if (entry.isReference && name && !answer.includes(name)) {
+      const core = (entry.title || '').split('—')[0].trim();
+      if (core.length >= 4 && answer.includes(core)) name = core;
+    }
+
     if (!name || name.length < 4) continue;
     const url = entry.product_url || entry.source_url || '';
     if (!url) continue;
@@ -95,12 +156,29 @@ function findProductsMissingLink(
     const url = entry.product_url || entry.source_url;
     if (!url || !url.startsWith('http')) continue;
 
-    const name = entry.title || '';
-    if (!name) continue;
-
     // ⭐ Nếu link này đã xuất hiện BẤT KỲ chỗ nào trong câu trả lời → bot đã
     // tự viết link đúng rồi → không chèn thêm (tránh link bị lặp).
     if (answer.includes(url)) continue;
+
+    // ⭐⭐ TÀI LIỆU THAM CHIẾU: neo link vào TÊN LÕI, không phải tên đầy đủ.
+    //
+    // VÌ SAO:
+    // Tiêu chuẩn trong DB có tên đầy đủ kèm mô tả:
+    //   "WCAG 2.2 — Nguyên tắc và 4 mức tuân thủ (A, AA, AAA)"
+    // nhưng bot trích dẫn trong văn xuôi chỉ viết "WCAG 2.2" → neo vào tên
+    // đầy đủ sẽ KHÔNG tìm thấy dòng nào → mất link.
+    //
+    // → Nếu câu CÓ tên đầy đủ → neo vào tên đầy đủ (bot trình bày mục danh
+    //   mục). Nếu KHÔNG có → neo vào tên lõi (bot trích dẫn).
+    let name = entry.title || '';
+    if (entry.isReference) {
+      const core = (entry.title || '').split('—')[0].trim();
+      const full = entry.title || '';
+      if (core && core.length >= 4 && !answer.includes(full)) {
+        name = core;
+      }
+    }
+    if (!name) continue;
 
     // Nếu tên sản phẩm xuất hiện nhiều lần mà chưa có link ở đâu, chỉ chèn
     // 1 lần cho tên đầu tiên — tránh lặp link theo số lần nhắc tên.
@@ -173,27 +251,72 @@ export function stripProductMentions(answer: string): string {
   // (bullet/dấu phẩy/gạch nối) cho sạch, rồi dọn khoảng trắng thừa.
   //
   // ⚠️ TÊN NGẮN (< 8 ký tự) PHẢI KHỚP HOA THƯỜNG:
-  // "Pearl", "Clicker", "Pearl" vừa là tên sản phẩm vừa là từ tiếng Anh có
+  // "Pearl", "Clicker" vừa là tên sản phẩm vừa là từ tiếng Anh có
   // nghĩa ("viên ngọc", "cái bấm") — khớp không phân biệt hoa thường sẽ xóa
-  // nhầm rồi làm câu nghĩa đổi. Danh sách chỉ có 33 tên dưới 8 ký tự và đều
+  // nhầm rồi làm câu nghĩa đổi. Danh sách chỉ có 18 tên dưới 8 ký tự và đều
   // là thương hiệu viết hoa (JAWS, Osmo, Mabot, Pearl…), nên khớp HOA THƯỜNG
   // vừa bắt được sản phẩm vừa không dính từ thường.
-  for (const entry of catalog) {
-    const name = (entry.title || '').trim();
-    if (name.length < 4) continue;
-    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const isShort = name.length < 8;
-    // Tên ngắn: bỏ cờ 'i' (bắt buộc đúng hoa thường như DB).
+  // ⭐⭐ SẮP XẾP TÊN DÀI TRƯỚC — tránh gỡ tên ngắn nằm TRONG tên dài.
+  //
+  // VÌ SAO CẦN:
+  // "Dwell Clicker 2" CHỨA "Clicker", và "SmartNav 4 with Dwell clicker 2"
+  // chứa cả hai. Nếu gỡ theo thứ tự catalog, tên ngắn ("Clicker") có thể bị
+  // gỡ trước → tên dài bị MÉO thành "Dwell 2" hoặc để lửng "SmartNav 4 with".
+  //
+  // → Gỡ tên DÀI NHẤT trước. Khi tên dài đã bị gỡ, tên ngắn bên trong nó
+  //   cũng không còn trong câu → không gỡ nhầm nữa.
+  const stripTargets = [...catalog]
+    .map((entry) => ({ entry, name: (entry.title || '').trim() }))
+    // ⭐⭐ BỎ QUA TÀI LIỆU THAM CHIẾU (tiêu chuẩn/quy định).
+    //
+    // VÌ SAO:
+    // `stripProductMentions()` chạy khi user CHƯA đủ 4 câu hỏi → gỡ tên sản
+    // phẩm để bot không "tự giới thiệu thiết bị" sớm. Nhưng tiêu chuẩn KHÔNG
+    // phải sản phẩm: "Theo WCAG 2.2, tương phản tối thiểu 4.5:1" là NỘI DUNG
+    // TƯ VẤN, không phải "quảng cáo thiết bị" → gỡ đi làm mất thông tin
+    // pháp lý hữu ích (và làm câu vỡ: "Theo , tương phản là 4.5:1").
+    .filter((t) => !t.entry.isReference && t.name.length >= 4)
+    .sort((a, b) => b.name.length - a.name.length);
+
+  for (const { name } of stripTargets) {
+    const isShort = isShortProductTitle(name);
+    // Tên ngắn: chỉ gỡ khi tên xuất hiện ĐÚNG HOA THƯỜNG trong câu gốc.
+    if (isShort && !hasExactCaseMention(answer, name)) continue;
+
+    const escaped = escapeRegExp(name);
     // Tên dài: cho phép không phân biệt hoa thường (người dùng hay gõ sai).
+    // Tên ngắn: bắt buộc đúng hoa thường như trong DB.
     const flags = isShort ? 'gm' : 'gim';
-    const w = (p: string) => (isShort ? p : `${p}`);
-    const wordStart = isShort ? '' : '\\b';
-    const wordEnd = isShort ? '' : '\\b';
+
+    // ⭐⭐ RANH GIỚI TỪ AN TOÀN (không dùng `\b`).
+    //
+    // `\b` KHÔNG tồn tại khi tên SP nằm cạnh ký tự non-word. Với markdown
+    // bold `**Tên**`, ký tự liền kề tên là `*` (non-word) → không có `\b` →
+    // regex không khớp → tên sản phẩm KHÔNG bị gỡ → lọt vào câu trả lời khi
+    // chưa đủ 4 câu hỏi.
+    //
+    // → Dùng lookaround kiểm tra ký tự liền kề có phải chữ/số hay không:
+    //   đúng cả trong bold, vẫn chặn khớp nhầm giữa từ.
+    const B = '(?<![A-Za-z0-9])';
+    const E = '(?![A-Za-z0-9])';
+
+    // ⭐⭐ TÊN BỌC TRONG **BOLD** → gỡ luôn cả dấu in đậm.
+    // (Trước đây tên trong `**...**` không bị gỡ vì marker chỉ cho phép 1 dấu *.)
+    out = out.replace(
+      new RegExp(`\\*\\*\\s*${B}${escaped}${E}\\s*\\*\\*`, flags),
+      ''
+    );
+    // Tên trong **BOLD** nhưng có ký tự cuối đặc biệt → không dùng E (vì `*` sau
+    // tên đã là ranh giới hợp lệ, nhưng `+`/`)` bên trong tên cần khớp chính xác).
+    out = out.replace(
+      new RegExp(`\\*\\*\\s*${escaped}\\s*\\*\\*`, flags),
+      ''
+    );
 
     // Dòng CHỈ CÒN tên sản phẩm (sau khi link đã bị xóa) → xóa cả dòng.
     out = out.replace(
       new RegExp(
-        `^\\s*(?:[-–—•*]|\\d+[.)])?\\s*${w(wordStart)}${escaped}${w(wordEnd)}[,:;]?\\s*$`,
+        `^\\s*(?:[-–—•*]|\\d+[.)])?\\s*${B}${escaped}${E}[,:;]?\\s*$`,
         flags
       ),
       ''
@@ -201,7 +324,7 @@ export function stripProductMentions(answer: string): string {
     // Tên nằm GIỮA văn xuôi → gỡ ra cùng dấu nối đứng trước.
     out = out.replace(
       new RegExp(
-        `(?:^|\\s)[-–—•*]?\\s*${w(wordStart)}${escaped}${w(wordEnd)}[,:;]?`,
+        `(?:^|\\s)[-–—•*]?\\s*${B}${escaped}${E}[,:;]?`,
         flags
       ),
       ''
@@ -237,6 +360,92 @@ export function stripProductMentions(answer: string): string {
 }
 
 /**
+ * ⭐ Cache tên đã chuẩn hoá của catalog (tránh normalize lặp lại mỗi lượt).
+ */
+let _normalizedTitlesCache: {
+  at: number;
+  items: Array<{ title: string; norm: string; core: string; isShort: boolean }>;
+} | null = null;
+
+function getNormalizedTitles(): Array<{
+  title: string;
+  norm: string;
+  core: string;
+  isShort: boolean;
+}> {
+  const now = Date.now();
+  if (_normalizedTitlesCache && now - _normalizedTitlesCache.at < 60_000) {
+    return _normalizedTitlesCache.items;
+  }
+  const items = buildProductCatalog().map((entry) => {
+    const title = entry.title || '';
+    return {
+      title,
+      norm: normalizeProductName(title),
+      core: entry.isReference ? normalizeProductName(entry.coreName || '') : '',
+      isShort: isShortProductTitle(title),
+    };
+  });
+  _normalizedTitlesCache = { at: now, items };
+  return items;
+}
+
+/**
+ * ⭐ Dòng này có phải CHỈ là TÊN SẢN PHẨM / TÊN TIÊU CHUẨN không?
+ *
+ * ⚠️ VÌ SAO CẦN:
+ * `repairTruncatedSentences()` có nhánh "câu bị cắt cụt → thay bằng câu hỏi
+ * thêm thông tin". Nhưng rất nhiều khi dòng đó KHÔNG phải câu văn — mà là
+ * DÒNG TÊN SẢN PHẨM do bot viết theo format prompt bắt buộc:
+ *   "**Tên sản phẩm**" + link ở dòng riêng.
+ *
+ * Thay nó bằng câu hỏi chung → MẤT HOÀN TOÀN tên sản phẩm → frontend không
+ * khớp được tên nào → người dùng chỉ thấy câu hỏi chung chung, KHÔNG thấy
+ * card sản phẩm (đúng triệu chứng "bot chỉ hiện tên, không hiện card").
+ *
+ * → Nhận diện dòng tên sản phẩm/tiêu chuẩn và GIỮ NGUYÊN.
+ *
+ * @param line Dòng cần kiểm tra.
+ */
+function isCatalogNameOnlyLine(line: string): boolean {
+  if (!line) return false;
+
+  // Bỏ marker markdown + bullet để so khớp tên thuần.
+  let bare = line
+    .replace(/\*\*/g, '')
+    .replace(/^\s*(?:[-–—•*]|\d+[.)])\s+/, '')
+    .trim();
+  if (!bare) return false;
+
+  // Tách phần URL ở cuối dòng (nếu có) — dòng link không phải câu văn.
+  const urlMatch = bare.match(/\s*(?:🔗\s*)?https?:\/\/\S+\s*$/);
+  if (urlMatch) bare = bare.slice(0, urlMatch.index!).trim();
+  if (!bare) return true; // dòng chỉ có URL → dòng link → giữ nguyên
+
+  const norm = normalizeProductName(bare);
+  if (!norm) return true;
+
+  for (const item of getNormalizedTitles()) {
+    if (item.norm) {
+      // ⭐ Tên ngắn ("Pearl", "Clicker") chỉ khớp khi dòng ĐÚNG BẰNG tên —
+      // nếu dùng "includes" thì câu văn kiểu "viên ngọc quý" cũng bị tính
+      // nhầm là dòng tên sản phẩm → câu bị giữ nguyên dù đang cụt.
+      if (item.isShort) {
+        if (norm === item.norm) return true;
+      } else if (norm === item.norm || norm.includes(item.norm)) {
+        // Tên dài: dòng có thể là tên đầy đủ kèm mô tả.
+        return true;
+      }
+    }
+
+    // ⭐ Tài liệu tham chiếu: bot có thể chỉ viết TÊN LÕI ("ISO 9999:2022")
+    // chứ không viết tên đầy đủ kèm mô tả → so khớp bằng tên lõi.
+    if (item.core && norm === item.core) return true;
+  }
+  return false;
+}
+
+/**
  * ⭐ Dọn CÂU BỊ CẮT CỤT do việc xóa dòng sản phẩm.
  *
  * ⚠️ VÌ SAO CẦN: khi bot viết câu dài rồi nhắc tên sản phẩm ở DÒNG KẾ TIẾP
@@ -251,10 +460,37 @@ export function stripProductMentions(answer: string): string {
 export function repairTruncatedSentences(answer: string): string {
   if (!answer) return answer;
 
+  // ⭐⭐ DÒNG CUỐI LÀ URL → KHÔNG phải câu bị cụt.
+  //
+  // VÌ SAO CẦN:
+  // Link do hệ thống chèn (dòng "🔗 https://…") là DÒNG RIÊNG, không phải
+  // câu thoại. Nếu coi nó là "câu cuối bị cắt cụt" → hàm này:
+  //   1) nối URL vào câu trước (mất định dạng "link ở dòng riêng" mà prompt
+  //      bắt buộc), và
+  //   2) thêm dấu "…" vào cuối URL (URL hỏng).
+  //
+  // → Câu trả lời kết thúc bằng URL là câu HỢP LỆ → trả về nguyên vẹn.
+  if (/https?:\/\/\S*\s*$/.test(answer.trim())) return answer;
+
   const endsCleanly = /[?!.…"')\]]\s*$/.test(answer.trim());
   if (endsCleanly) return answer;
 
   const lines = answer.split('\n').map((l) => l.trim()).filter(Boolean);
+
+  // ⭐⭐ DÒNG CUỐI LÀ TÊN SẢN PHẨM / TÊN TIÊU CHUẨN → KHÔNG phải câu bị cụt.
+  //
+  // VÌ SAO CẦN:
+  // Format prompt bắt buộc bot viết:
+  //   "**Tên sản phẩm**"  (link ở dòng riêng)
+  // Dòng đó KHÔNG có dấu kết câu → bị coi là "câu bị cắt cụt" → thay bằng
+  // câu hỏi chung → MẤT HOÀN TOÀN tên sản phẩm → frontend không khớp được
+  // tên nào → người dùng chỉ thấy câu hỏi chung, KHÔNG thấy card (đúng
+  // triệu chứng "bot chỉ hiện tên, không hiện card").
+  //
+  // → Giữ nguyên dòng tên sản phẩm.
+  if (lines.length >= 1 && isCatalogNameOnlyLine(lines[lines.length - 1])) {
+    return answer;
+  }
 
   // Trường hợp 1: chỉ còn MỘT câu ngắn bị cắt.
   // ⚠️ KHÔNG trả về '' — bot im lặng còn tệ hơn trả lời sai. Thay bằng câu
@@ -284,9 +520,28 @@ export function repairTruncatedSentences(answer: string): string {
 function mentionsCatalogProduct(line: string, catalog: ReturnType<typeof buildProductCatalog>): boolean {
   const lower = line.toLowerCase();
   for (const entry of catalog) {
-    const name = (entry.title || '').toLowerCase().trim();
+    // ⭐ Tài liệu tham chiếu (tiêu chuẩn) KHÔNG phải sản phẩm → dòng chứa
+    // tiêu chuẩn không bị xoá (VD "- Theo WCAG 2.2, tương phản 4.5:1").
+    if (entry.isReference) continue;
+
+    const title = (entry.title || '').trim();
+    const name = title.toLowerCase();
     // Tên quá ngắn (VD "VN", "ST") dễ khớp nhầm → bỏ qua.
     if (name.length < 5) continue;
+
+    // ⭐⭐ TÊN NGẮN PHẢI KHỚP ĐÚNG HOA THƯỜNG.
+    //
+    // "Clicker" là tên sản phẩm NHƯNG cũng là từ tiếng Anh thường ("cái
+    // bấm"). Nếu so khớp không phân biệt hoa thường thì dòng
+    // "- dùng một clicker nhỏ gọn" bị xoá HẲN → mất cả nội dung, không
+    // phải chỉ mất tên sản phẩm.
+    //
+    // → Với tên ngắn, chỉ coi là "nhắc sản phẩm" khi xuất hiện đúng hoa thường.
+    if (isShortProductTitle(title)) {
+      if (hasExactCaseMention(line, title)) return true;
+      continue;
+    }
+
     if (lower.includes(name)) return true;
   }
   return false;
@@ -332,15 +587,17 @@ export function appendProductLinks(
   const outOfScope = findOutOfScopeProducts(answer, botId, catalog, allowTitles);
   let out = answer;
   for (const { name } of outOfScope) {
-    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const escaped = escapeRegExp(name);
+    const B = '(?<![A-Za-z0-9])';
+    const E = '(?![A-Za-z0-9])';
     // Tên nằm trong **bold** → gỡ cả dấu in đậm.
     out = out.replace(
-      new RegExp(`\\*\\*\\s*${escaped}\\s*\\*\\*`, 'gi'),
+      new RegExp(`\\*\\*\\s*${B}${escaped}${E}\\s*\\*\\*`, 'gi'),
       ''
     );
     // Tên nằm trong văn xuôi (không in đậm) → gỡ kèm dấu nối phía trước.
     out = out.replace(
-      new RegExp(`(?:^|\\s)[-–—•*]?\\s*${escaped}[,:;]?`, 'gim'),
+      new RegExp(`(?:^|\\s)[-–—•*]?\\s*${B}${escaped}${E}[,:;]?`, 'gim'),
       ''
     );
   }
@@ -382,12 +639,26 @@ export function appendProductLinks(
 
 for (const { name, url } of missing) {
     // Escape các ký tự regex của tên sản phẩm
-    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const escaped = escapeRegExp(name);
+
+    // ⭐⭐ RANH GIỚI TỪ AN TOÀN (không dùng `\b`).
+    //
+    // `\b` KHÔNG tồn tại khi tên SP nằm cạnh ký tự non-word. Ví dụ tên kết
+    // thúc bằng `+` hoặc `)` ("Optelec ClearReader+", "Clicker 8 (English and
+    // Arabic)") → sau tên là `*` của markdown bold → không có `\b` → regex
+    // không khớp → tên sản phẩm KHÔNG được gắn link.
+    //
+    // Hậu quả: bot nhắc đúng sản phẩm thuộc chuyên môn nhưng user chỉ thấy
+    // TÊN, không thấy CARD → đúng triệu chứng "chỉ hiện tên, không hiện card".
+    //
+    // → Dùng lookaround kiểm tra ký tự liền kề có phải chữ/số hay không.
+    const B = '(?<![A-Za-z0-9])';
+    const E = '(?![A-Za-z0-9])';
 
     // Tìm dòng chứa tên sản phẩm (hỗ trợ **Tên** hoặc Tên)
     // Nếu dòng đó đã có link → bỏ qua
     const lineRegex = new RegExp(
-      `^([^\\n]*\\b${escaped}\\b[^\\n]*)$`,
+      `^([^\\n]*${B}${escaped}${E}[^\\n]*)$`,
       'gmi'
     );
 

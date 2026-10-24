@@ -251,22 +251,43 @@ export function findMentionedProducts(
  * Bảo đảm mọi sản phẩm được bot nhắc tới đều xuất hiện trong danh sách sản phẩm
  * gửi kèm → frontend gắn link đúng vào dòng đang nhắc tên.
  *
+ * ⚠️ QUY TẮC CHUYÊN MÔN (quan trọng):
+ * Sản phẩm được THÊM vào danh sách phải thuộc chuyên môn của bot (trừ bot
+ * "Thông tin bổ trợ" — bot-regulatory — được xem toàn bộ danh mục).
+ *
+ * VÌ SAO CẦN:
+ * Trước đây hàm này thêm MỌI sản phẩm bot nhắc trong câu trả lời, bỏ qua
+ * phạm vi chuyên môn. Hệ quả: bot-mobility (Di chuyển & Giao thông) bị dính
+ * eSight 4 (thị giác), Tobii PCEye 5 / Quha Dwell (nhập liệu thay thế) → card
+ * hiện sai chuyên môn, đúng triệu chứng người dùng báo "bot hiện sản phẩm
+ * không đúng của riêng nó".
+ *
  * @param answer      Câu trả lời của bot
  * @param products    Danh sách sản phẩm hiện có (từ RAG / DB)
  * @param language    Ngôn ngữ hiển thị
  * @param maxProducts Số sản phẩm tối đa trả về
+ * @param botId       Bot đang trả lời. `null`/undefined = không lọc (fallback).
  */
 export function enrichProductsWithMentions(
   answer: string,
   products: any[],
   language: string = 'vi',
-  maxProducts = 12
+  maxProducts = 12,
+  botId?: string | null
 ): any[] {
   const catalog = buildProductCatalog();
   if (catalog.length === 0) return products;
 
   const mentioned = findMentionedProducts(answer, catalog);
   if (mentioned.length === 0) return products;
+
+  // ⭐ Lọc theo chuyên môn TRƯỚC khi thêm vào danh sách.
+  // - bot-regulatory (Thông tin bổ trợ) → xem TẤT CẢ.
+  // - bot khác → chỉ sản phẩm MADA công nhận thuộc chuyên môn bot.
+  const scopedMentions = botId && botId !== 'bot-regulatory'
+    ? mentioned.filter((e) => productBelongsToBot(e.product_url || e.source_url, botId))
+    : mentioned;
+  if (scopedMentions.length === 0) return products;
 
   // Map các sản phẩm đang có theo tên chuẩn hoá
   const existingNorms = new Set<string>();
@@ -282,7 +303,7 @@ export function enrichProductsWithMentions(
 
   const additions: any[] = [];
 
-  for (const entry of mentioned) {
+  for (const entry of scopedMentions) {
     const url = entry.product_url || entry.source_url;
     if (!url || !url.startsWith('http')) continue;
     if (existingUrls.has(url)) continue;
@@ -316,8 +337,36 @@ export function enrichProductsWithMentions(
 
   if (additions.length === 0) return products;
 
+  // ⭐⭐ XẾP HẠNG: sản phẩm RIÊNG của bot luôn đứng đầu.
+  //
+  // VÌ SAO CẦN:
+  // MADA khai sản phẩm thuộc NHIỀU danh mục, nên một sản phẩm có thể thuộc
+  // chuyên môn của bot mà KHÔNG phải sản phẩm RIÊNG của bot. Ví dụ
+  // `eSight 4` → taxonomy [vision, daily_living] → hợp lệ cho bot-mobility,
+  // nhưng bot-mobility được MADA phân vào `daily_living` là chủ sở hữu:
+  //
+  //   GEWA Control Prog, Primo+, Housemate, Power Link 4, WeWALK, Lazarillo.
+  //
+  // → Nếu bot nhắc "eSight 4" trong câu trả lời, hàm này thêm nó LÊN ĐẦU →
+  //   card đầu tiên của Bot 6 lại là sản phẩm của Bot 2 → khách thấy bot
+  //   không giới thiệu đúng sản phẩm của riêng nó.
+  //
+  // → Sắp xếp lại: sản phẩm RIÊNG của bot đứng đầu, phần còn lại giữ nguyên
+  //   thứ tự (sản phẩm được nhắc trước, để khớp thứ tự người đọc).
+  const combined = [...additions, ...(products || [])];
+  if (botId && botId !== 'bot-regulatory') {
+    const mine: any[] = [];
+    const others: any[] = [];
+    for (const p of combined) {
+      const url = p.product_url || p.source_url || '';
+      if (isExclusiveToBot(url, botId)) mine.push(p);
+      else others.push(p);
+    }
+    return [...mine, ...others].slice(0, maxProducts);
+  }
+
   // Sản phẩm được nhắc tới ưu tiên lên đầu → khớp thứ tự người dùng đọc
-  return [...additions, ...(products || [])].slice(0, maxProducts);
+  return combined.slice(0, maxProducts);
 }
 
 // ============== CATALOG CHO PROMPT ==============
@@ -382,26 +431,63 @@ export function buildCatalogPromptBlock(
     else return '';
   }
 
-  // ⭐ Lọc theo taxonomy MADA (nguồn chuẩn) thay vì suy đoán từ category.
+  // ⭐⭐ Lọc theo taxonomy MADA (nguồn chuẩn) thay vì suy đoán từ category.
   // MADA khai 1 sản phẩm thuộc NHIỀU nhóm (proloquo2go → cognition +
   // voice-and-speech), nên lọc theo `category` đơn thuần là thiếu.
   //
-  // Ưu tiên sản phẩm ĐỘC QUYỀN của bot trước; chỉ dùng sản phẩm đa nhãn khi
-  // bot không có sản phẩm riêng (bot-mobility thuộc trường hợp này — MADA
-  // không bán xe lăn nên danh mục này gần như toàn sản phẩm chung).
+  // ⚠️⚠️ VÌ SAO BƯỚC NÀY PHẢI CHẠY TRƯỚC BƯỚC LỌC THEO `category`:
+  //
+  // `kb_products.category` chỉ lưu MỘT category (do lúc scrape nhét vào), nên
+  // nó KHÔNG phản ánh danh mục MADA thật. Ví dụ sản phẩm RIÊNG của Bot 6:
+  //
+  //   GEWA Control Prog      → kb category = `mobility`      (MADA: Mobility)
+  //   Housemate              → kb category = `mobility`      (MADA: Mobility)
+  //   Power Link 4           → kb category = `mobility`      (MADA: Mobility)
+  //   Primo+ Environment C.  → kb category = `mobility`      (MADA: Mobility)
+  //   WeWALK Smart Cane      → kb category = `vision`        (MADA: Mobility)
+  //   Lazarillo              → kb category = `daily_living`  (MADA: Mobility)
+  //
+  // Lọc theo category TRƯỚC → 5/6 sản phẩm riêng của Bot 6 bị loại → catalog
+  // của bot-mobility chỉ còn ĐÚNG 1 tên (Lazarillo) → bot hầu như không có
+  // gì để giới thiệu. Đây chính là lý do bot "chỉ hiện tên, không hiện card".
+  //
+  // → ƯU TIÊN sản phẩm RIÊNG của bot (chủ sở hữu chính) TRƯỚC; nếu bot không
+  //   có sản phẩm riêng thì mới dùng nhóm đa nhãn MADA công nhận.
   if (botId) {
-    const owned = entries.filter((e) =>
-      productBelongsToBot(e.product_url || e.source_url, botId)
-    );
-    const exclusive = owned.filter((e) =>
+    // 1) Sản phẩm RIÊNG của bot — bỏ qua hoàn toàn lọc category.
+    const exclusive = catalog.filter((e) =>
       isExclusiveToBot(e.product_url || e.source_url, botId)
     );
-    if (exclusive.length > 0) entries = exclusive;
-    else if (owned.length > 0) entries = owned;
+    if (exclusive.length > 0) {
+      // 2) Sản phẩm ĐA NHIỀN MADA công nhận (VD bot-vision hỏi về eye-gaze
+      //    Tobii PCEye 5 — MADA xếp nó vào cả Vision lẫn Neuromusculoskeletal).
+      //    Giữ chúng nhưng đặ SAU sản phẩm riêng → bot vẫn dẫn đầu bằng
+      //    chuyên môn của mình, nhưng không bỏ sót sản phẩm hợp lệ.
+      const shared = catalog.filter(
+        (e) =>
+          !isExclusiveToBot(e.product_url || e.source_url, botId) &&
+          productBelongsToBot(e.product_url || e.source_url, botId)
+      );
+      entries = [...exclusive, ...shared];
+    } else {
+      // 2) Bot không có sản phẩm riêng → dùng sản phẩm đa nhãn MADA công nhận
+      //    (lọc theo category đã áp ở trên nếu có).
+      const owned = entries.filter((e) =>
+        productBelongsToBot(e.product_url || e.source_url, botId)
+      );
+      if (owned.length > 0) entries = owned;
+    }
   }
 
   // Ưu tiên sản phẩm có ảnh (đủ thông tin để gửi card) rồi tới tên ngắn gọn
   const sorted = [...entries].sort((a, b) => {
+    // ⭐ Sản phẩm RIÊNG của bot luôn đứng trước (đã ghép sẵn ở trên, nhưng
+    // sort theo ảnh có thể đảo thứ tự) → bot dẫn đầu bằng đúng chuyên môn.
+    if (botId) {
+      const aMine = isExclusiveToBot(a.product_url || a.source_url, botId) ? 1 : 0;
+      const bMine = isExclusiveToBot(b.product_url || b.source_url, botId) ? 1 : 0;
+      if (aMine !== bMine) return bMine - aMine;
+    }
     const aImg = a.image_url ? 1 : 0;
     const bImg = b.image_url ? 1 : 0;
     if (aImg !== bImg) return bImg - aImg;

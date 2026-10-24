@@ -63,38 +63,38 @@ export const MADA_BOTS: MadaBotInfo[] = [
     regulatoryCodes: ['IEC 60118-4', 'ISO 8253-1'],
     featuredDevices: [
       {
-        name: 'Phonak Lyric',
-        nameVi: 'Phonak Lyric',
+        name: 'A-200 Personal Sound Amplifier',
+        nameVi: 'A-200 Personal Sound Amplifier',
         type: 'Hearing Aid',
-        description: 'Thiết bị trợ thính ẩn sâu trong tai, đeo liên tục nhiều tháng'
+        description: 'Khuếch đại cá nhân dùng pin, nhỏ gọn cho người giảm thính lực nhẹ'
       },
       {
-        name: 'Bellman',
-        nameVi: 'Bellman & Symfon',
+        name: 'Clarity AlertMaster AL10',
+        nameVi: 'Clarity AlertMaster AL10',
         type: 'Alert System',
-        description: 'Thiết bị cảnh báo bằng ánh sáng và xúc giác cho người điếc'
+        description: 'Thiết bị cảnh báo bằng ánh sáng và rung cho người điếc, dùng trong nhà'
       },
       {
-        name: 'Roger FM System',
-        nameVi: 'Roger FM System',
+        name: 'StreamLine Mic',
+        nameVi: 'StreamLine Mic',
         type: 'Assistive Listening',
-        description: 'Hệ thống FM không dây cho lớp học/hội nghị, giảm ồn tới 61%'
+        description: 'Micro hướng dẫn cho học sinh, kết hợp với máy trợ thính và hệ thống FM lớp học'
       },
       {
-        name: 'Oticon More',
-        nameVi: 'Oticon More Hearing Aid',
+        name: 'Pocket Talker with Headphones or Neck Loop',
+        nameVi: 'Pocket Talker with Headphones or Neck Loop',
         type: 'Hearing Aid',
-        description: 'Máy trợ thính AI Deep Neural Network, chống ồn thông minh'
+        description: 'Máy trợ thính cá nhân dùng pin cho môi trường ồn, có chuột tai hoặc vòng cổ'
       }
     ],
     sampleScenario: {
-      vi: 'Hỗ trợ người dùng bị giảm thính lực nhẹ với thiết bị trợ thính Phonak Lyric ẩn sâu trong tai hoặc thiết bị cảnh báo bằng ánh sáng/xúc giác Bellman. Ở chế độ chuyên gia CNHT, hệ thống cung cấp hướng dẫn kiểm chứng tiêu chuẩn an toàn kỹ thuật IEC 60118 và ISO 8253-1.',
-      en: 'Support for users with mild hearing loss using Phonak Lyric hearing aids hidden deep in the ear or Bellman light/tactile alert devices. In AT Specialist mode, the system provides guidance on IEC 60118 and ISO 8253-1 technical safety standards verification.'
+      vi: 'Hỗ trợ người dùng bị giảm thính lực nhẹ với A-200 Personal Sound Amplifier hoặc thiết bị cảnh báo bằng ánh sáng/xúc giác Clarity AlertMaster AL10. Ở chế độ chuyên gia CNHT, hệ thống cung cấp hướng dẫn kiểm chứng tiêu chuẩn an toàn kỹ thuật IEC 60118 và ISO 8253-1.',
+      en: 'Support for users with mild hearing loss using A-200 Personal Sound Amplifier or Clarity AlertMaster AL10 light/tactile alert devices. In AT Specialist mode, the system provides guidance on IEC 60118 and ISO 8253-1 technical safety standards verification.'
     },
     expertModeFeatures: [
       'Hướng dẫn kiểm chứng IEC 60118-4 (đo đặc tính kỹ thuật máy trợ thính)',
-      'So sánh công nghệ BTE vs CIC vs IIC về gain frequency response',
-      'Cài đặt Roger FM system cho môi trường lớp học',
+      'So sánh kiểu đeo trong tai (IIC/CIC) với sau vành tai (BTE) về gain frequency response',
+      'Cài đặt StreamLine Mic cho môi trường lớp học',
       'Phân tích tiêu chuẩn ISO 8253-1 cho đo thính lực'
     ],
     systemPrompt: `Bạn là chuyên gia tư vấn về Công nghệ Hỗ trợ THÍNH GIÁC (Sensory – Hearing) tại Mada Center.
@@ -159,8 +159,8 @@ CÁCH TRẢ LỜI:
         description: 'Phần mềm đọc màn hình mã nguồn mở miễn phí cho người khiếm thị'
       },
       {
-        name: 'Ruby HD',
-        nameVi: 'Ruby HD',
+        name: 'Ruby Series',
+        nameVi: 'Ruby Series',
         type: 'Electronic Magnifier',
         description: 'Kính lúp điện tử cầm tay với màn hình HD'
       },
@@ -178,13 +178,13 @@ CÁCH TRẢ LỜI:
       }
     ],
     sampleScenario: {
-      vi: 'Gợi ý phần mềm đọc màn hình mã nguồn mở NVDA miễn phí cho người khiếm thị kết hợp kính lúp điện tử cầm tay Ruby HD. Chuyên gia CNHT sẽ được cung cấp chứng nhận khả năng tiếp cận WCAG 2.1 AA và tương thích phần mềm ISO 9241-171.',
-      en: 'Recommend free open-source NVDA screen reader for visually impaired users combined with Ruby HD handheld electronic magnifier. AT Specialists will be provided with WCAG 2.1 AA accessibility certification and ISO 9241-171 software compatibility.'
+      vi: 'Gợi ý phần mềm đọc màn hình mã nguồn mở NVDA miễn phí cho người khiếm thị kết hợp kính lúp điện tử cầm tay Ruby Series. Chuyên gia CNHT sẽ được cung cấp chứng nhận khả năng tiếp cận WCAG 2.1 AA và tương thích phần mềm ISO 9241-171.',
+      en: 'Recommend free open-source NVDA screen reader for visually impaired users combined with Ruby Series handheld electronic magnifier. AT Specialists will be provided with WCAG 2.1 AA accessibility certification and ISO 9241-171 software compatibility.'
     },
     expertModeFeatures: [
-      'So sánh JAWS vs NVDA vs VoiceOver về độ tương thích WCAG 2.1 Level AAA',
+      'So sánh JAWS vs NVDA vs Dragon Professional về độ tương thích WCAG 2.1 Level AAA',
       'Hướng dẫn cấu hình OrCam MyEye theo EN 1332-20',
-      'Phân tích độ phóng đại tối ưu cho CCTV Magnifier theo WHO guidelines',
+      'Phân tích độ phóng đại tối ưu cho Ruby Series / Topaz Series theo WHO guidelines',
       'Tiêu chuẩn ISO 9241-171 cho phần mềm hỗ trợ thị giác'
     ],
     systemPrompt: `Bạn là chuyên gia tư vấn về Công nghệ Hỗ trợ THỊ GIÁC (Sensory – Vision) tại Mada Center.
@@ -243,8 +243,8 @@ CÁCH TRẢ LỜI:
     regulatoryCodes: ['HL7 FHIR v4'],
     featuredDevices: [
       {
-        name: 'Tobii Dynavox',
-        nameVi: 'Tobii Dynavox',
+        name: 'Tobii Dynavox I-Series',
+        nameVi: 'Tobii Dynavox I-Series',
         type: 'SGD (Speech Generating Device)',
         description: 'Thiết bị giao tiếp điều khiển bằng ánh mắt cho người hạn chế vận động'
       },
@@ -256,22 +256,22 @@ CÁCH TRẢ LỜI:
       }
     ],
     sampleScenario: {
-      vi: 'Hỗ trợ trẻ bị khó khăn về vận động và giao tiếp ở lớp thông qua thiết bị máy tính bảng giao tiếp Tobii Dynavox (điều khiển bằng ánh mắt) hoặc ứng dụng Proloquo2Go. Ở chế độ chuyên gia CNHT, hệ thống đề xuất tích hợp dữ liệu cá nhân qua tiêu chuẩn HL7 FHIR v4 và phân loại hỗ trợ theo ISO 9999:2022.',
-      en: 'Support for children with physical and communication difficulties in class through Tobii Dynavox tablet communication device (eye-controlled) or Proloquo2Go app. In AT Specialist mode, the system proposes personal data integration via HL7 FHIR v4 standard and support classification per ISO 9999:2022.'
+      vi: 'Hỗ trợ trẻ bị khó khăn về vận động và giao tiếp ở lớp thông qua thiết bị máy tính bảng giao tiếp Tobii Dynavox I-Series (điều khiển bằng ánh mắt) hoặc ứng dụng Proloquo2Go. Ở chế độ chuyên gia CNHT, hệ thống đề xuất tích hợp dữ liệu cá nhân qua tiêu chuẩn HL7 FHIR v4 và phân loại hỗ trợ theo ISO 9999:2022.',
+      en: 'Support for children with physical and communication difficulties in class through Tobii Dynavox I-Series tablet communication device (eye-controlled) or Proloquo2Go app. In AT Specialist mode, the system proposes personal data integration via HL7 FHIR v4 standard and support classification per ISO 9999:2022.'
     },
     expertModeFeatures: [
       'Tích hợp dữ liệu cá nhân qua tiêu chuẩn HL7 FHIR v4',
       'Phân loại hỗ trợ theo ISO 9999:2022 (codes 05.15, 22.21)',
-      'So sánh AAC symbols systems: PCS vs SymbolStix vs Widgit',
+      'So sánh hệ thống biểu tượng: PCS vs SymbolStix vs Widgit',
       'Phân tích PRD (Pragmatic Rating Dimensions) cho AAC assessment'
     ],
     systemPrompt: `Bạn là chuyên gia tư vấn về Công nghệ Hỗ trợ GIỌNG NÓI & LỜI NÓI (Voice and Speech) tại Mada Center.
 
 PHẠM VI CHUYÊN MÔN:
 - Thiết bị AAC (Augmentative and Alternative Communication)
-- SGD (Speech-Generating Devices): Proloquo2Go, TouchChat, LAMP
-- Bảng giao tiếp hình ảnh (PECS - Picture Exchange Communication System)
-- Phần mềm AAC trên iPad/Tablet
+- SGD (Speech-Generating Devices): Proloquo2Go, Tobii Dynavox I-Series, Tobii Dynavox Indi, TD Pilot
+- Ứng dụng AAC trên iPad/Tablet: CoughDrop AAC, Tawasol Symbols
+- Bảng giao tiếp hình ảnh (Boardmaker, Talking Photo Album)
 - Bàn phím giao tiếp (communication keyboards)
 - Speech-to-text apps
 
@@ -319,21 +319,21 @@ CÁCH TRẢ LỜI:
     regulatoryCodes: ['WHO Dementia Guidelines', 'WHO ICF (International Classification of Functioning)'],
     featuredDevices: [
       {
-        name: 'Medelert',
-        nameVi: 'Medelert',
-        type: 'Medication Dispenser',
-        description: 'Hộp chia thuốc thông minh tự động khóa mở xoay tròn nhắc uống thuốc'
+        name: 'Hopspot',
+        nameVi: 'Hopspot',
+        type: 'Memory Aid',
+        description: 'Bộ ghi chú dán tường có nút bấm, giúp người cao tuổi nhớ việc cần làm'
       },
       {
-        name: 'Time Timer',
-        nameVi: 'Time Timer',
-        type: 'Visual Timer',
-        description: 'Đồng hồ trực quan hóa thời gian cho người khó nhận thức thời gian'
+        name: 'Scanmarker Reader',
+        nameVi: 'Scanmarker Reader',
+        type: 'Reading Support',
+        description: 'Máy quét dòng chữ và đọc thành giọng nói, hỗ trợ người khó đọc'
       }
     ],
     sampleScenario: {
-      vi: 'Gợi ý hộp chia thuốc thông minh tự động khóa mở xoay tròn Medelert giúp nhắc uống thuốc cho người cao tuổi hay quên và đồng hồ Time Timer trực quan hóa thời gian. Đưa ra danh mục công cụ hỗ trợ nhận thức được WHO công nhận cho người dùng cần hỗ trợ trí nhớ.',
-      en: 'Recommend Medelert automatic rotating lock/unlock smart pill dispenser to remind elderly people who forget to take medication, and Time Timer to visualize time. Provide WHO-recognized cognitive aid tools list for users who need memory support.'
+      vi: 'Gợi ý bộ ghi chú Hopspot giúp người cao tuổi hay quên nhớ việc cần làm và máy đọc Scanmarker Reader hỗ trợ đọc tài liệu khi thị lực giảm. Đưa ra danh mục công cụ hỗ trợ nhận thức được WHO công nhận cho người dùng cần hỗ trợ trí nhớ.',
+      en: 'Recommend Hopspot wall-mounted note reminder to help elderly users who forget tasks, and Scanmarker Reader to assist reading when vision declines. Provide WHO-recognized cognitive aid tools list for users who need memory support.'
     },
     expertModeFeatures: [
       'Danh mục công cụ hỗ trợ nhận thức được WHO công nhận',
@@ -344,11 +344,11 @@ CÁCH TRẢ LỜI:
     systemPrompt: `Bạn là chuyên gia tư vấn về Công nghệ Hỗ trợ NHẬN THỨC (Mental – Cognitive) tại Mada Center.
 
 PHẠM VI CHUYÊN MÔN:
-- Thiết bị nhắc nhở thuốc (medication reminders)
-- Công cụ hỗ trợ ghi nhớ (memory aids)
-- Phần mềm huấn luyện nhận thức (cognitive training apps)
+- Công cụ hỗ trợ ghi nhớ & nhắc nhở (memory aids): Hopspot, Skwitch
+- Công cụ hỗ trợ đọc và ghi chú: Scanmarker Reader, TextHelp Read and Write, Livescribe ECHO Smart Pen, ClaroRead
+- Phần mềm huấn luyện nhận thức (cognitive training apps): XMind, Co-Writer, ModMath
+- Công cụ học tập & sáng tạo cho trẻ em: Lego Learning System, Bee-Bot Programmable Floor Robot, Osmo
 - Sách/hình ảnh thích ứng (easy-read materials)
-- Bảng giao tiếp không điện tử
 - Phần mềm hỗ trợ tự kỷ (autism apps)
 
 TIÊU CHUẨN ÁP DỤNG:
@@ -397,40 +397,43 @@ CÁCH TRẢ LỜI:
     regulatoryCodes: ['ISO 10993-1 (Biological safety)', 'Medical Device Regulation', 'EU MDR 2017/745', 'FDA 21 CFR Part 890'],
     featuredDevices: [
       {
-        name: 'IntegraMouse Plus',
-        nameVi: 'IntegraMouse Plus',
-        type: 'Mouth-Operated Mouse',
-        description: 'Chuột miệng thông minh điều khiển hoàn toàn bằng lực hút/thổi hơi'
+        name: 'Smyle Mouse',
+        nameVi: 'Smyle Mouse',
+        type: 'Adaptive Mouse',
+        description: 'Chuột thích ứng cho người hạn chế chi trên, điều khiển bằng cằm hoặc chân'
       },
       {
-        name: 'Neofect',
-        nameVi: 'Neofect Smart Glove',
-        type: 'Rehabilitation Device',
-        description: 'Găng tay cảm biến thông minh cho phục hồi chức năng bàn tay'
+        name: 'Tecla-e',
+        nameVi: 'Tecla-e',
+        type: 'Adaptive Keyboard',
+        description: 'Bàn phím 8 nút có thể cấu hình cho người liệt nặng, điều khiển bằng mắt/chân'
       },
       {
-        name: 'Bioness L300 Go',
-        nameVi: 'Bioness L300 Go',
-        type: 'Functional Electrical Stimulation',
-        description: 'Hệ thống FES kích thích điện chức năng hỗ trợ dáng đi cho người cần phục hồi vận động chi dưới'
+        name: 'Kinova Jaco Assistive Robotic Arm',
+        nameVi: 'Kinova Jaco Assistive Robotic Arm',
+        type: 'Assistive Robot',
+        description: 'Cánh tay robot hỗ trợ người hạn chế vận động chi trên trong sinh hoạt hằng ngày'
       }
     ],
     sampleScenario: {
-      vi: 'Thiết bị chuột miệng thông minh IntegraMouse Plus (điều khiển hoàn toàn bằng lực hút/thổi hơi) cho người hạn chế chi trên và găng tay cảm biến thông minh Neofect cho phục hồi chức năng bàn tay. Cung cấp tham khảo nghiên cứu về tiêu chuẩn an toàn kỹ thuật và tương thích vật liệu ISO 10993-1.',
-      en: 'IntegraMouse Plus intelligent mouth mouse (fully controlled by suction/blowing force) for people with upper limb restrictions and Neofect smart sensor glove for hand function rehabilitation. Provide technical research references meeting safety standards and ISO 10993-1 material biocompatibility.'
+      vi: 'Chuột thích ứng Smyle Mouse cho người hạn chế chi trên và bàn phím Tecla-e điều khiển bằng mắt hoặc chân giúp họ thao tác máy tính. Cung cấp tham khảo nghiên cứu về tiêu chuẩn an toàn kỹ thuật và tương thích vật liệu ISO 10993-1.',
+      en: 'Smyle Mouse adaptive mouse for people with upper limb restrictions and Tecla-e configurable 8-button keyboard controlled by eye or foot help them operate a computer. Provide technical research references meeting safety standards and ISO 10993-1 material biocompatibility.'
     },
     expertModeFeatures: [
       'Tiêu chuẩn tương thích sinh học ISO 10993-1 cho vật liệu thiết bị',
       'Tham khảo nghiên cứu kỹ thuật đạt chuẩn an toàn ISO 13485',
-      'So sánh joystick control vs chin control vs mouth control',
+      'So sánh joystick control vs chin control vs eye-gaze control',
       'Phân tích tiêu chuẩn ISO 9999 cho thiết bị hỗ trợ vận động'
     ],
     systemPrompt: `Bạn là chuyên gia tư vấn về Công nghệ Hỗ trợ VẬN ĐỘNG THẦN KINH – CƠ XƯƠNG (Neuromusculoskeletal Movement) tại Mada Center.
 
 PHẠM VI CHUYÊN MÔN:
 - Dụng cụ hỗ trợ cử động chi (limb movement devices)
-- Thiết bị trợ giúp vận động tinh (fine motor aids)
-- Bàn phím / chuột thích ứng (adaptive keyboards)
+- Thiết bị trợ giúp vận động tinh (fine motor aids): Smyle Mouse, GlassOuse, Tecla-e
+- Bàn phím / chuột thích ứng (adaptive keyboards): Clevy Keyboard, BigKeys LX Keyboard, Accuratus Monster 2
+- Điều khiển bằng mắt & đầu: Tobii PCEye 5, Irisbond Duo Eye Tracker, Quha Dwell
+- Switch & giao diện truy cập: Quha Zono 2, 1-2-Switch, MOGO Super Evaluation Kit, Assessment Switch Kit
+- Robot hỗ trợ: Kinova Jaco Assistive Robotic Arm, Obi robotic feeding device
 - Thiết bị phục hồi chức năng (rehabilitation equipment)
 - Nẹp, orthosis, exoskeleton
 
@@ -480,48 +483,49 @@ CÁCH TRẢ LỜI:
     regulatoryCodes: ['CE Medical Class II', 'ISO 7176-19 (Crash testing)', 'EU MDR', 'FDA 510(k)'],
     featuredDevices: [
       {
-        name: 'Scewo Bro',
-        nameVi: 'Scewo Bro',
-        type: 'Self-Balancing Wheelchair',
-        description: 'Xe lăn tự cân bằng và leo cầu thang, kích thước siêu nhỏ gọn (dưới 65cm)'
-      },
-      {
         name: 'WeWALK Smart Cane',
         nameVi: 'WeWALK Smart Cane',
         type: 'Smart Mobility Cane',
         description: 'Gậy thông minh tích hợp cảm biến siêu âm, phát hiện vật cản và điều hướng GPS'
       },
       {
-        name: 'Rollator Walker',
-        nameVi: 'Khung tập đi Rollator',
-        type: 'Walking Frame',
-        description: 'Khung tập đi 4 bánh có ghế ngồi và phanh tay, phù hợp người cao tuổi'
+        name: 'Lazarillo',
+        nameVi: 'Lazarillo',
+        type: 'Autonomous Navigation',
+        description: 'Ứng dụng định vị tự hành giúp người khiếm thị định vị an toàn trong nhà và nơi công cộng'
       },
       {
-        name: 'Quickie Q700-UP M',
-        nameVi: 'Quickie Q700-UP M',
-        type: 'Power Wheelchair',
-        description: 'Xe lăn điện cao cấp với hệ thống đứng C-Leg, leo cầu thang an toàn'
+        name: 'GEWA Control Prog',
+        nameVi: 'GEWA Control Prog',
+        type: 'Environmental Control',
+        description: 'Bộ điều khiển môi trường để người khuyết tật tự vận hành đèn, quạt, cửa trong nhà'
+      },
+      {
+        name: 'Primo+ Environment Control',
+        nameVi: 'Primo+ Environment Control',
+        type: 'Environmental Control',
+        description: 'Bộ điều khiển môi trường tập trung cho nhà thông minh, hỗ trợ sống độc lập'
       }
     ],
     sampleScenario: {
-      vi: 'Xe lăn tự cân bằng và leo cầu thang Scewo Bro có kích thước cực kỳ nhỏ gọn (bề ngang dưới 65cm) phù hợp hoàn hảo với căn hộ nhỏ. Cung cấp các kiểm chứng về tiêu chuẩn xuất khẩu châu Âu CE Medical Class II và thử nghiệm đâm va an toàn ISO 7176-19.',
-      en: 'Scewo Bro self-balancing and stair-climbing wheelchair with extremely compact size (under 65cm width) perfect for small apartments. Provide verifications on European export standard CE Medical Class II and ISO 7176-19 crash safety testing.'
+      vi: 'Gậy thông minh WeWALK Smart Cane phát hiện vật cản và dẫn đường bằng GPS cho người khiếm thị, kết hợp bộ điều khiển môi trường GEWA Control Prog để tự vận hành thiết bị trong nhà. Cung cấp các kiểm chứng về tiêu chuẩn xuất khẩu châu Âu CE Medical Class II và thử nghiệm đâm va an toàn ISO 7176-19.',
+      en: 'WeWALK Smart Cane detects obstacles and provides GPS navigation for visually impaired users, combined with GEWA Control Prog environmental control to operate home devices independently. Provide verifications on European export standard CE Medical Class II and ISO 7176-19 crash safety testing.'
     },
     expertModeFeatures: [
       'Tiêu chuẩn CE Medical Class II cho thiết bị y tế châu Âu',
       'Thử nghiệm đâm va an toàn ISO 7176-19',
-      'So sánh xe lăn tự cân bằng vs xe lăn thường vs xe lăn leo cầu thang',
+      'So sánh gậy thông minh, ứng dụng định vị tự hành và bộ điều khiển môi trường',
       'Phân tích ISO 7176 cho test parameters của xe lăn điện'
     ],
     systemPrompt: `Bạn là chuyên gia tư vấn về Công nghệ Hỗ trợ DI CHUYỂN & GIAO THÔNG (Mobility and Transportation) tại Mada Center.
 
 PHẠM VI CHUYÊN MÔN:
+- Gậy thông minh (smart canes) hỗ trợ định hướng: WeWALK Smart Cane
+- Ứng dụng định vị tự hành (autonomous navigation): Lazarillo
+- Bộ điều khiển môi trường (environmental control - sống độc lập): GEWA Control Prog, Primo+ Environment Control, Housemate, Power Link 4
 - Xe lăn tay (manual wheelchairs)
 - Xe lăn điện (powered wheelchairs)
-- Xe lăn leo cầu thang (stair-climbing wheelchairs)
 - Khung tập đi (walkers)
-- Gậy thông minh (smart canes) hỗ trợ định hướng
 - Thiết bị giả chi (prosthetics)
 - Nạng (crutches)
 
@@ -609,37 +613,39 @@ Bạn nắm TẤT CẢ kiến thức từ 6 chuyên gia sau:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 👂 BOT 1 - THÍNH GIÁC (Sensory Hearing):
-- Máy trợ thính: BTE, CIC, IIC, Phonak Lyric, Oticon More
-- Thiết bị cảnh báo: Bellman (ánh sáng/xúc giác)
-- Hệ thống FM: Roger FM System
+- Máy trợ thính & khuếch đại: A-200 Personal Sound Amplifier, Oticon Amigo T31, HearIt All Amplifier
+- Thiết bị cảnh báo (ánh sáng/xúc giác): Clarity AlertMaster AL10, Krown RA-05 Amplified Ringer, SonicAlert Home Alerting Systems
+- Hệ thống FM & micro: StreamLine Mic, Amigo Classroom FM System, Chatpack Desktop Sound Field System (TA-1)
 - Tiêu chuẩn: ISO 22.06.06, IEC 60118, ISO 8253-1
 
 👁️ BOT 2 - THỊ GIÁC (Sensory Vision):
-- Phần mềm đọc màn hình: JAWS, NVDA, VoiceOver
-- Kính lúp điện tử: Ruby HD, CCTV Magnifier
-- Thiết bị Braille: OrCam MyEye
+- Phần mềm đọc màn hình: JAWS, NVDA, Dragon Professional
+- Kính lúp điện tử & phóng đại: Ruby Series, Topaz Series, Snow 12, ZoomText Magnifier / Reader
+- Thiết bị Braille & đọc: OrCam MyEye, Victor Reader Stratus4 M
 - Tiêu chuẩn: WCAG 2.2, ISO 9241-171, ISO 22.03.06
 
 💬 BOT 3 - GIỌNG NÓI & LỜI NÓI (Voice and Speech):
-- Thiết bị AAC: Tobii Dynavox, Proloquo2Go
-- Bảng giao tiếp hình ảnh (PECS)
+- Thiết bị AAC: Proloquo2Go, Tobii Dynavox I-Series, Tobii Dynavox Indi, TD Pilot
+- Ứng dụng & bảng giao tiếp: CoughDrop AAC, Tawasol Symbols, Boardmaker, Talking Photo Album
 - Tiêu chuẩn: ISO 05.15.06, HL7 FHIR v4
 
 🧠 BOT 4 - NHẬN THỨC (Mental Cognitive):
-- Hộp chia thuốc: Medelert
-- Đồng hồ trực quan: Time Timer
+- Công cụ hỗ trợ ghi nhớ & tập trung: Hopspot, Skwitch, Talking Photo Album
+- Đọc & ghi chú hỗ trợ: Scanmarker Reader, TextHelp Read and Write, Livescribe ECHO Smart Pen, ClaroRead
+- Học tập & sáng tạo: Lego Learning System, Bee-Bot Programmable Floor Robot, XMind, Co-Writer
 - Tiêu chuẩn: ISO 05.06.15, WHO GATE
 
 🦴 BOT 5 - VẬN ĐỘNG THẦN KINH (Neuromusculoskeletal):
-- Chuột miệng: IntegraMouse Plus
-- Găng tay phục hồi: Neofect Smart Glove
-- Thiết bị FES: Bioness L300 Go
+- Chuột & bàn phím thích ứng: Smyle Mouse, Tecla-e, GlassOuse, Clevy Keyboard, BigKeys LX Keyboard
+- Điều khiển bằng mắt & đầu: Tobii PCEye 5, Irisbond Duo Eye Tracker, Quha Dwell
+- Switch & bộ điều khiển: Quha Zono 2, 1-2-Switch, MOGO Super Evaluation Kit, Assessment Switch Kit
+- Robot hỗ trợ: Kinova Jaco Assistive Robotic Arm, Obi robotic feeding device
 - Tiêu chuẩn: ISO 04.24, ISO 10993-1, ISO 13485
 
 🦽 BOT 6 - DI CHUYỂN & GIAO THÔNG (Mobility):
-- Xe lăn: Scewo Bro (leo cầu thang), Quickie Q700-UP M
 - Gậy thông minh: WeWALK Smart Cane
-- Khung tập đi: Rollator Walker
+- Thiết bị định vị tự hành: Lazarillo
+- Bộ điều khiển môi trường (sống độc lập): GEWA Control Prog, Primo+ Environment Control, Housemate, Power Link 4
 - Tiêu chuẩn: ISO 12.21.06, ISO 7176-19, CE Medical Class II
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

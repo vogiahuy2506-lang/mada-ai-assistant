@@ -12,7 +12,72 @@
  * danh sách khuyến nghị để tránh giới thiệu sản phẩm không tồn tại.
  */
 
-import { buildProductCatalog, findMentionedProducts } from './productLinker';
+import { buildProductCatalog, findMentionedProducts, normalizeProductName } from './productLinker';
+import { botsForProduct } from './productTaxonomy';
+
+/**
+ * ⭐ Bot này có được nhắc sản phẩm này không?
+ *
+ * ⚠️ FAIL-OPEN: sản phẩm KHÔNG có trong taxonomy → coi như được phép (giữ).
+ * Lý do: taxonomy chỉ phủ 349/349 sản phẩm `kb_products`, nhưng catalog còn
+ * lấy từ `knowledge_items` (web-scraped) — có thể có URL chưa có trong file
+ * taxonomy. Nếu fail-closed thì những sản phẩm hợp lệ đó sẽ bị xoá khỏi
+ * câu trả lời → mất sản phẩm thật (regression nghiêm trọng hơn leak).
+ */
+function isInBotScope(
+  entry: { product_url?: string; source_url?: string; title?: string; title_en?: string },
+  botId: string | null | undefined,
+  allowTitles?: Set<string> | null
+): boolean {
+  if (!botId) return true;
+  // Bot 7 (Thông tin bổ trợ) được xem TOÀN BỘ danh mục.
+  if (botId === 'bot-regulatory') return true;
+  // ⚠️ CHỈ lọc cho bot MADA dựng sẵn (`bot-*`). Custom agent không có
+  // taxonomy → mọi sản phẩm đều "ngoài chuyên môn" theo cách tính này → nếu
+  // lọc, custom agent sẽ mất sạch tên sản phẩm khỏi câu trả lời.
+  if (!botId.startsWith('bot-')) return true;
+
+  // Sản phẩm được phép nhắc dù ngoài chuyên môn (user hỏi thẳng tên).
+  if (allowTitles && allowTitles.size > 0) {
+    const t = normalizeProductName(entry.title || '');
+    const te = normalizeProductName(entry.title_en || '');
+    if ((t && allowTitles.has(t)) || (te && allowTitles.has(te))) return true;
+  }
+
+  const url = entry.product_url || entry.source_url || '';
+  const bots = botsForProduct(url);
+  if (bots.length === 0) return true; // fail-open
+  return bots.includes(botId);
+}
+
+/**
+ * Tìm các sản phẩm ĐƯỢC NHẮC trong câu trả lời mà bot KHÔNG được phép nhắc.
+ *
+ * ⚠️ CHỈ xét sản phẩm THỰC SỰ xuất hiện trong câu trả lời (dùng
+ * `findMentionedProducts`) — không quét toàn bộ catalog. Nếu quét toàn bộ
+ * catalog thì mỗi lượt chat sẽ gỡ hàng chục tên không có trong câu → hỏng
+ * nội dung.
+ */
+function findOutOfScopeProducts(
+  answer: string,
+  botId: string | null | undefined,
+  catalog: ReturnType<typeof buildProductCatalog>,
+  allowTitles?: Set<string> | null
+): Array<{ name: string; url: string }> {
+  const out: Array<{ name: string; url: string }> = [];
+  if (!answer || !botId || botId === 'bot-regulatory') return out;
+
+  const mentioned = findMentionedProducts(answer, catalog);
+  for (const entry of mentioned) {
+    if (isInBotScope(entry, botId, allowTitles)) continue;
+    const name = entry.title || entry.title_en || '';
+    if (!name || name.length < 4) continue;
+    const url = entry.product_url || entry.source_url || '';
+    if (!url) continue;
+    out.push({ name, url });
+  }
+  return out;
+}
 
 /**
  * Tìm tên sản phẩm hợp lệ (có trong DB) chưa có link trong câu trả lời.
@@ -233,21 +298,74 @@ function mentionsCatalogProduct(line: string, catalog: ReturnType<typeof buildPr
  * Thay vì dựa vào model tự viết link (không đáng tin), ta tự chèn link chính
  * xác từ DB. Nhờ vậy link luôn đúng và không bao giờ bị bịa.
  *
- * @param answer Câu trả lời gốc.
+ * ⭐⭐ LỌC THEO CHUYÊN MÔN BOT:
+ * Chỉ gắn link cho sản phẩm bot ĐƯỢC PHÉP nhắc. Nếu không lọc, bot-mobility
+ * có thể gắn link sản phẩm của bot-speech (VD "CoughDrop AAC") vào câu trả
+ * lời → người dùng thấy bot giới thiệu thiết bị không đúng chuyên môn.
+ *
+ * @param answer      Câu trả lời gốc.
+ * @param botId       Bot đang trả lời (dùng để lọc chuyên môn).
+ * @param allowTitles Tên sản phẩm được phép nhắc dù ngoài chuyên môn
+ *                    (VD user hỏi thẳng "CoughDrop AAC là gì?").
  * @returns Câu trả lời đã chèn link dưới tên sản phẩm.
  */
-export function appendProductLinks(answer: string): string {
+export function appendProductLinks(
+  answer: string,
+  botId?: string | null,
+  allowTitles?: Set<string> | null
+): string {
   if (!answer) return answer;
 
   const catalog = buildProductCatalog();
   if (catalog.length === 0) return answer;
 
-const missing = findProductsMissingLink(answer, catalog);
+  // ⭐⭐⭐ LOẠI SẢN PHẨM NGOÀI CHUYÊN MÔN KHỎI CÂU TRẢ LỜI.
+  //
+  // VÌ SAO PHẢI LOẠI (không chỉ bỏ link):
+  // Bot có thể tự nhắc tên sản phẩm của bot khác trong văn xuôi (không in đậm,
+  // không kèm link). Chỉ bỏ link thì người dùng VẪN thấy tên sản phẩm sai
+  // chuyên môn → đúng triệu chứng "bot giới thiệu thiết bị không đúng của
+  // riêng nó". Phải gỡ cả TÊN khỏi câu trả lời.
+  //
+  // ⚠️ CHỈ gỡ tên sản phẩm ĐANG ĐƯỢC NHẮC trong câu (có mặt trong text),
+  //    không gỡ mọi tên trong catalog (sẽ làm hỏng cả câu trả lời).
+  const outOfScope = findOutOfScopeProducts(answer, botId, catalog, allowTitles);
+  let out = answer;
+  for (const { name } of outOfScope) {
+    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    // Tên nằm trong **bold** → gỡ cả dấu in đậm.
+    out = out.replace(
+      new RegExp(`\\*\\*\\s*${escaped}\\s*\\*\\*`, 'gi'),
+      ''
+    );
+    // Tên nằm trong văn xuôi (không in đậm) → gỡ kèm dấu nối phía trước.
+    out = out.replace(
+      new RegExp(`(?:^|\\s)[-–—•*]?\\s*${escaped}[,:;]?`, 'gim'),
+      ''
+    );
+  }
+  out = out
+    .split('\n')
+    .filter((line) => {
+      if (/^[\t ]*$/.test(line)) return true;
+      if (/^[\t ]*(?:[-–—•*][\t ]*){1,}[,.]?[\t ]*$/.test(line)) return false;
+      if (/^[\t ]*[,…;:]+[\t ]*$/.test(line)) return false;
+      return true;
+    })
+    .join('\n')
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/\s+([,.;:!?])/g, '$1')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+  // ⭐ Sau khi gỡ tên ngoài chuyên môn, câu có thể bị cắt cụt → sửa lại.
+  out = repairTruncatedSentences(out);
+
+  const missing = findProductsMissingLink(out, catalog);
 
 // ⭐ KHÔNG return sớm khi không thiếu link — vì câu trả lời vẫn có thể cần
   // BƯỚC CHUẨN HOÁ (thêm emoji 🔗 cho link bot tự viết). Nếu return ở đây thì
   // link trần sẽ không bao giờ được chuẩn hoá.
-  let out = answer;
 
 // ⭐⭐ CHUẨN HOÁ LINK SẴN CÓ: bot thường tự viết link MADA nhưng KHÔNG kèm
   // emoji "🔗" (thường là dòng ngay dưới tên sản phẩm). Người dùng cần link

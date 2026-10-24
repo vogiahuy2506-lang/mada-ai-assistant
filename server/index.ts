@@ -1028,6 +1028,74 @@ const server = app.listen(Number(PORT), HOST, () => {
   console.log(`🛡️  Guardrails: Active`);
   console.log(`🔐 Auth: SQLite + bcrypt + JWT (admin: ${process.env.ADMIN_EMAIL || 'admin@mada.vn'})`);
 });
+
+// ⭐⭐⭐ XỬ LÝ LỖI KHI KHÔNG BIND ĐƯỢC PORT (EADDRINUSE).
+//
+// VÌ SAO CẦN:
+// `net.Server` PHẢI có listener 'error'. Nếu không, lỗi listen (vd port đã
+// bị process khác chiếm) được ném ra như uncaughtException → handler
+// `process.exit(1)` giết sạch process → `tsx watch` tự restart → lại
+// EADDRINUSE → vòng lặp crash vô hạn, log bị spam và server KHÔNG BAO GIỜ
+// lên được.
+//
+// → Bắt lỗi tại đây, in thông tin CHẨN ĐOÁN (ai đang giữ port) rồi thoát
+//   có kiểm soát (exit code khác 0) để `tsx watch` không respawn liên tục.
+server.on('error', (err: NodeJS.ErrnoException) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error('');
+    console.error(`❌ KHÔNG KHỞI ĐỘNG ĐƯỢC: port ${PORT} đã bị process khác chiếm.`);
+    console.error('');
+    console.error('   → Tìm và dừng process đang giữ port:');
+    console.error(`      lsof -nP -iTCP:${PORT} -sTCP:LISTEN`);
+    console.error('');
+    console.error('   → Hoặc dừng tất cả server dev cũ đang treo:');
+    console.error('      pkill -f "tsx watch server/index.ts"');
+    console.error('      pkill -f "node .*server/index.ts"');
+    console.error('');
+    console.error(`   → Hoặc chạy server với port khác: PORT=3002 npm run server`);
+    console.error('');
+    process.exit(1);
+  }
+
+  if (err.code === 'EACCES') {
+    console.error(`❌ KHÔNG KHỞI ĐỘNG ĐƯỢC: không có quyền bind port ${PORT}.`);
+    console.error('   → Chọn port > 1024 hoặc chạy bằng user có quyền.');
+    process.exit(1);
+  }
+
+  console.error('❌ Lỗi khi khởi động HTTP server:', err);
+  process.exit(1);
+});
+
+// ⭐⭐⭐ GRACEFUL SHUTDOWN.
+//
+// VÌ SAO CẦN:
+// `tsx watch` restart server khi file đổi. Nếu process cũ không đóng socket
+// server, port vẫn bị giữ trong vài giây → process mới vừa lên lại đụng
+// EADDRINUSE → crash loop. Thêm nữa, mỗi lần đóng terminal mà không tắt
+// server cũ sẽ để lại một process mồ côi giữ port 3001 vĩnh viễn (đây
+// chính là nguyên nhân 9 process `tsx watch` cùng tranh port trong repo này).
+//
+// → Đóng server sạch (đóng socket, giải phóng port) trước khi thoát.
+let shuttingDown = false;
+function gracefulShutdown(signal: string) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`\n🛑 Nhận ${signal} — đang tắt server an toàn...`);
+  server.close(() => {
+    console.log('✅ Đã đóng HTTP server. Port đã được giải phóng.');
+    process.exit(0);
+  });
+  // Ép thoát nếu close() treo (vd keep-alive connection không đóng)
+  setTimeout(() => {
+    console.warn('⚠️  Đóng server quá thời gian — ép thoát.');
+    process.exit(0);
+  }, 5000).unref();
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
 void server; // intentionally kept for graceful shutdown support
 
 bootstrap().catch((err) => {

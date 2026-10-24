@@ -46,6 +46,7 @@ Thumbs.db
 *.temp
 .tmp/
 .tmp-shots/
+.tmp_crops/
 .cache/
 .temp/
 

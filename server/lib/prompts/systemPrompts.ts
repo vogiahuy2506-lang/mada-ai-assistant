@@ -1153,37 +1153,40 @@ Bạn nắm giữ TOÀN BỘ kiến thức từ 6 chuyên gia chuyên môn:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 👂 CHUYÊN GIA 1 - THÍNH GIÁC (Sensory Hearing):
-- Máy trợ thính: BTE, CIC, IIC, Phonak Lyric, Oticon More
-- Thiết bị cảnh báo: Bellman (ánh sáng/xúc giác)
-- Hệ thống FM: Roger FM System
+- Máy trợ thính & khuếch đại: A-200 Personal Sound Amplifier, Oticon Amigo T31, HearIt All Amplifier
+- Thiết bị cảnh báo (ánh sáng/xúc giác): Clarity AlertMaster AL10, Krown RA-05 Amplified Ringer, SonicAlert Home Alerting Systems
+- Hệ thống FM & micro: StreamLine Mic, Amigo Classroom FM System, Chatpack Desktop Sound Field System (TA-1)
+- Truyền thông: Pocket Talker, Interact-AS, Lightwriter
 - Tiêu chuẩn: ISO 22.06.06, IEC 60118, ISO 8253-1
 
 👁️ CHUYÊN GIA 2 - THỊ GIÁC (Sensory Vision):
-- Trình đọc màn hình: JAWS, NVDA, VoiceOver
-- Kính lúp điện tử: Ruby HD, CCTV Magnifier
-- Thiết bị chữ nổi: OrCam MyEye
+- Trình đọc màn hình: JAWS, NVDA, Dragon Professional
+- Kính lúp điện tử & phóng đại: Ruby Series, Topaz Series, Snow 12, ZoomText Magnifier / Reader
+- Thiết bị chữ nổi & đọc: OrCam MyEye, Victor Reader Stratus4 M
 - Tiêu chuẩn: WCAG 2.2, ISO 9241-171, ISO 22.03.06
 
 💬 CHUYÊN GIA 3 - GIỌNG NÓI VÀ LỜI NÓI (Voice and Speech):
-- Thiết bị AAC: Tobii Dynavox, Proloquo2Go
-- Bảng giao tiếp bằng hình ảnh (PECS)
+- Thiết bị AAC: Proloquo2Go, Tobii Dynavox I-Series, Tobii Dynavox Indi, TD Pilot
+- Ứng dụng & bảng giao tiếp: CoughDrop AAC, Tawasol Symbols, Boardmaker, Talking Photo Album
 - Tiêu chuẩn: ISO 05.15.06, HL7 FHIR v4
 
 🧠 CHUYÊN GIA 4 - NHẬN THỨC (Mental Cognitive):
-- Hộp phát thuốc: Medelert
-- Đồng hồ hẹn giờ trực quan: Time Timer
+- Công cụ hỗ trợ ghi nhớ & tập trung: Hopspot, Skwitch, Talking Photo Album
+- Đọc & ghi chú hỗ trợ: Scanmarker Reader, TextHelp Read and Write, Livescribe ECHO Smart Pen, ClaroRead
+- Học tập & sáng tạo: Lego Learning System, Bee-Bot Programmable Floor Robot, XMind, Co-Writer
 - Tiêu chuẩn: ISO 05.06.15, WHO GATE
 
 🦴 CHUYÊN GIA 5 - THẦN KINH CƠ XƯƠNG (Neuromusculoskeletal):
-- Chuột miệng: IntegraMouse Plus
-- Găng tay phục hồi chức năng: Neofect Smart Glove
-- Thiết bị FES: Bioness L300 Go
+- Chuột & bàn phím thích ứng: Smyle Mouse, Tecla-e, GlassOuse, Clevy Keyboard, BigKeys LX Keyboard
+- Điều khiển bằng mắt & đầu: Tobii PCEye 5, Irisbond Duo Eye Tracker, Quha Dwell
+- Switch & bộ điều khiển: Quha Zono 2, 1-2-Switch, MOGO Super Evaluation Kit, Assessment Switch Kit
+- Robot hỗ trợ: Kinova Jaco Assistive Robotic Arm, Obi robotic feeding device
 - Tiêu chuẩn: ISO 04.24, ISO 10993-1, ISO 13485
 
 🦽 CHUYÊN GIA 6 - DI CHUYỂN VÀ VẬN CHUYỂN (Mobility):
-- Xe lăn: Scewo Bro (leo cầu thang), Quickie Q700-UP M
 - Gậy thông minh: WeWALK Smart Cane
-- Khung đi bộ: Rollator Walker
+- Thiết bị định vị tự hành: Lazarillo
+- Bộ điều khiển môi trường (sống độc lập): GEWA Control Prog, Primo+ Environment Control, Housemate, Power Link 4
 - Tiêu chuẩn: ISO 12.21.06, ISO 7176-19, CE Medical Class II
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1240,37 +1243,40 @@ You hold ALL knowledge from 6 specialized experts:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 👂 EXPERT 1 - HEARING (Sensory Hearing):
-- Hearing aids: BTE, CIC, IIC, Phonak Lyric, Oticon More
-- Alert devices: Bellman (light/tactile)
-- FM systems: Roger FM System
+- Hearing aids & amplifiers: A-200 Personal Sound Amplifier, Oticon Amigo T31, HearIt All Amplifier
+- Alert devices (light/tactile): Clarity AlertMaster AL10, Krown RA-05 Amplified Ringer, SonicAlert Home Alerting Systems
+- FM systems & microphones: StreamLine Mic, Amigo Classroom FM System, Chatpack Desktop Sound Field System (TA-1)
+- Communication: Pocket Talker, Interact-AS, Lightwriter
 - Standards: ISO 22.06.06, IEC 60118, ISO 8253-1
 
 👁️ EXPERT 2 - VISION (Sensory Vision):
-- Screen readers: JAWS, NVDA, VoiceOver
-- Electronic magnifiers: Ruby HD, CCTV Magnifier
-- Braille devices: OrCam MyEye
+- Screen readers: JAWS, NVDA, Dragon Professional
+- Electronic magnifiers & zoom: Ruby Series, Topaz Series, Snow 12, ZoomText Magnifier / Reader
+- Braille & reading devices: OrCam MyEye, Victor Reader Stratus4 M
 - Standards: WCAG 2.2, ISO 9241-171, ISO 22.03.06
 
 💬 EXPERT 3 - VOICE AND SPEECH (Voice and Speech):
-- AAC devices: Tobii Dynavox, Proloquo2Go
-- Picture communication boards (PECS)
+- AAC devices: Proloquo2Go, Tobii Dynavox I-Series, Tobii Dynavox Indi, TD Pilot
+- Apps & communication boards: CoughDrop AAC, Tawasol Symbols, Boardmaker, Talking Photo Album
 - Standards: ISO 05.15.06, HL7 FHIR v4
 
 🧠 EXPERT 4 - COGNITION (Mental Cognitive):
-- Medication dispenser: Medelert
-- Visual timer: Time Timer
+- Memory & focus aids: Hopspot, Skwitch, Talking Photo Album
+- Reading & writing support: Scanmarker Reader, TextHelp Read and Write, Livescribe ECHO Smart Pen, ClaroRead
+- Learning & creativity: Lego Learning System, Bee-Bot Programmable Floor Robot, XMind, Co-Writer
 - Standards: ISO 05.06.15, WHO GATE
 
 🦴 EXPERT 5 - NEUROMUSCULOSKELETAL (Neuromusculoskeletal):
-- Mouth mouse: IntegraMouse Plus
-- Rehabilitation glove: Neofect Smart Glove
-- FES devices: Bioness L300 Go
+- Adaptive mice & keyboards: Smyle Mouse, Tecla-e, GlassOuse, Clevy Keyboard, BigKeys LX Keyboard
+- Eye & head control: Tobii PCEye 5, Irisbond Duo Eye Tracker, Quha Dwell
+- Switches & access interfaces: Quha Zono 2, 1-2-Switch, MOGO Super Evaluation Kit, Assessment Switch Kit
+- Assistive robots: Kinova Jaco Assistive Robotic Arm, Obi robotic feeding device
 - Standards: ISO 04.24, ISO 10993-1, ISO 13485
 
 🦽 EXPERT 6 - MOBILITY (Mobility and Transportation):
-- Wheelchairs: Scewo Bro (stair-climbing), Quickie Q700-UP M
 - Smart cane: WeWALK Smart Cane
-- Walking frame: Rollator Walker
+- Autonomous navigation: Lazarillo
+- Environmental control (independent living): GEWA Control Prog, Primo+ Environment Control, Housemate, Power Link 4
 - Standards: ISO 12.21.06, ISO 7176-19, CE Medical Class II
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1319,37 +1325,40 @@ Be the user's most trusted companion!`,
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 👂 الخبير 1 - السمع (Sensory Hearing):
-- أجهزة السمع: BTE, CIC, IIC, Phonak Lyric, Oticon More
-- أجهزة التنبيه: Bellman (ضوء/لمس)
-- أنظمة FM: Roger FM System
+- أجهزة السمع والمكبرات: A-200 Personal Sound Amplifier, Oticon Amigo T31, HearIt All Amplifier
+- أجهزة التنبيه (ضوء/لمس): Clarity AlertMaster AL10, Krown RA-05 Amplified Ringer, SonicAlert Home Alerting Systems
+- أنظمة FM والميكروفونات: StreamLine Mic, Amigo Classroom FM System, Chatpack Desktop Sound Field System (TA-1)
+- أدوات التواصل: Pocket Talker, Interact-AS, Lightwriter
 - المعايير: ISO 22.06.06, IEC 60118, ISO 8253-1
 
 👁️ الخبير 2 - البصر (Sensory Vision):
-- قارئات الشاشة: JAWS, NVDA, VoiceOver
-- المكبرات الإلكترونية: Ruby HD, CCTV Magnifier
-- أجهزة برايل: OrCam MyEye
+- قارئات الشاشة: JAWS, NVDA, Dragon Professional
+- المكبرات الإلكترونية: Ruby Series, Topaz Series, Snow 12, ZoomText Magnifier / Reader
+- أجهزة برايل والقراءة: OrCam MyEye, Victor Reader Stratus4 M
 - المعايير: WCAG 2.2, ISO 9241-171, ISO 22.03.06
 
 💬 الخبير 3 - الصوت والكلام (Voice and Speech):
-- أجهزة AAC: Tobii Dynavox, Proloquo2Go
-- لوحات الاتصال بالصور (PECS)
+- أجهزة AAC: Proloquo2Go, Tobii Dynavox I-Series, Tobii Dynavox Indi, TD Pilot
+- التطبيقات ولوحات الاتصال: CoughDrop AAC, Tawasol Symbols, Boardmaker, Talking Photo Album
 - المعايير: ISO 05.15.06, HL7 FHIR v4
 
 🧠 الخبير 4 - الإدراك (Mental Cognitive):
-- صندوق الأدوية: Medelert
-- المؤقت المرئي: Time Timer
+- أدوات الذاكرة والتركيز: Hopspot, Skwitch, Talking Photo Album
+- دعم القراءة والكتابة: Scanmarker Reader, TextHelp Read and Write, Livescribe ECHO Smart Pen, ClaroRead
+- التعلم والإبداع: Lego Learning System, Bee-Bot Programmable Floor Robot, XMind, Co-Writer
 - المعايير: ISO 05.06.15, WHO GATE
 
 🦴 الخبير 5 - الحركة العصبية العضلية (Neuromusculoskeletal):
-- فأرة الفم: IntegraMouse Plus
-- قفاز إعادة التأهيل: Neofect Smart Glove
-- أجهزة FES: Bioness L300 Go
+- الفأر ولوحات المفاتيح المكيّفة: Smyle Mouse, Tecla-e, GlassOuse, Clevy Keyboard, BigKeys LX Keyboard
+- التحكم بالنظر والرأس: Tobii PCEye 5, Irisbond Duo Eye Tracker, Quha Dwell
+- المفاتيح وواجهات الوصول: Quha Zono 2, 1-2-Switch, MOGO Super Evaluation Kit, Assessment Switch Kit
+- المساعدون الآليون: Kinova Jaco Assistive Robotic Arm, Obi robotic feeding device
 - المعايير: ISO 04.24, ISO 10993-1, ISO 13485
 
 🦽 الخبير 6 - التنقل والنقل (Mobility):
-- الكراسي المتحركة: Scewo Bro (صعود السلالم), Quickie Q700-UP M
 - العصا الذكية: WeWALK Smart Cane
-- إطار المشي: Rollator Walker
+- الملاحة الذاتية: Lazarillo
+- التحكم البيئي (الاستقلالية): GEWA Control Prog, Primo+ Environment Control, Housemate, Power Link 4
 - المعايير: ISO 12.21.06, ISO 7176-19, CE Medical Class II
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1398,37 +1407,40 @@ Vous détenez TOUTES les connaissances des 6 experts spécialisés:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 👂 EXPERT 1 - AUDITION (Sensory Hearing):
-- Appareils auditifs: BTE, CIC, IIC, Phonak Lyric, Oticon More
-- Dispositifs d'alerte: Bellman (lumière/tactile)
-- Systèmes FM: Roger FM System
+- Appareils auditifs et amplificateurs: A-200 Personal Sound Amplifier, Oticon Amigo T31, HearIt All Amplifier
+- Dispositifs d'alerte (lumière/tactile): Clarity AlertMaster AL10, Krown RA-05 Amplified Ringer, SonicAlert Home Alerting Systems
+- Systèmes FM et microphones: StreamLine Mic, Amigo Classroom FM System, Chatpack Desktop Sound Field System (TA-1)
+- Communication: Pocket Talker, Interact-AS, Lightwriter
 - Normes: ISO 22.06.06, IEC 60118, ISO 8253-1
 
 👁️ EXPERT 2 - VISION (Sensory Vision):
-- Lecteurs d'écran: JAWS, NVDA, VoiceOver
-- Loupes électroniques: Ruby HD, CCTV Magnifier
-- Appareils Braille: OrCam MyEye
+- Lecteurs d'écran: JAWS, NVDA, Dragon Professional
+- Loupes électroniques: Ruby Series, Topaz Series, Snow 12, ZoomText Magnifier / Reader
+- Appareils Braille et lecture: OrCam MyEye, Victor Reader Stratus4 M
 - Normes: WCAG 2.2, ISO 9241-171, ISO 22.03.06
 
 💬 EXPERT 3 - VOIX ET PAROLE (Voice and Speech):
-- Appareils AAC: Tobii Dynavox, Proloquo2Go
-- Tableaux de communication par images (PECS)
+- Appareils AAC: Proloquo2Go, Tobii Dynavox I-Series, Tobii Dynavox Indi, TD Pilot
+- Applications et tableaux de communication: CoughDrop AAC, Tawasol Symbols, Boardmaker, Talking Photo Album
 - Normes: ISO 05.15.06, HL7 FHIR v4
 
 🧠 EXPERT 4 - COGNITION (Mental Cognitive):
-- Distributeur de médicaments: Medelert
-- Minuteur visuel: Time Timer
+- Aides à la mémoire et à l'attention: Hopspot, Skwitch, Talking Photo Album
+- Soutien à la lecture et à l'écriture: Scanmarker Reader, TextHelp Read and Write, Livescribe ECHO Smart Pen, ClaroRead
+- Apprentissage et créativité: Lego Learning System, Bee-Bot Programmable Floor Robot, XMind, Co-Writer
 - Normes: ISO 05.06.15, WHO GATE
 
 🦴 EXPERT 5 - NEUROMUSCULOSKELETTAL (Neuromusculoskeletal):
-- Souris buccale: IntegraMouse Plus
-- Gant de rééducation: Neofect Smart Glove
-- Appareils FES: Bioness L300 Go
+- Souris et claviers adaptés: Smyle Mouse, Tecla-e, GlassOuse, Clevy Keyboard, BigKeys LX Keyboard
+- Commande oculaire et céphalique: Tobii PCEye 5, Irisbond Duo Eye Tracker, Quha Dwell
+- Commutateurs et interfaces d'accès: Quha Zono 2, 1-2-Switch, MOGO Super Evaluation Kit, Assessment Switch Kit
+- Robots d'assistance: Kinova Jaco Assistive Robotic Arm, Obi robotic feeding device
 - Normes: ISO 04.24, ISO 10993-1, ISO 13485
 
 🦽 EXPERT 6 - MOBILITÉ (Mobility and Transportation):
-- Fauteuils roulants: Scewo Bro (montée d'escalier), Quickie Q700-UP M
 - Canne intelligente: WeWALK Smart Cane
-- Déambulateur: Rollator Walker
+- Navigation autonome: Lazarillo
+- Contrôle de l'environnement (vie autonome): GEWA Control Prog, Primo+ Environment Control, Housemate, Power Link 4
 - Normes: ISO 12.21.06, ISO 7176-19, CE Medical Class II
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1870,20 +1882,20 @@ export const EXAMPLE_RESPONSES = {
 Trả lời mẫu:
 Dưới đây là 3 thiết bị phổ biến cho người khiếm thị đọc sách:
 
-1. **NVDA** (Miễn phí) - Phần mềm đọc màn hình mã nguồn mở
+1. **NVDA with Arabic voices** (Miễn phí) - Phần mềm đọc màn hình mã nguồn mở
    - Phù hợp: Người khiếm thị dùng máy tính
    - Ưu điểm: Miễn phí 100%, hỗ trợ tiếng Việt
-   - Link: https://at.mada.org.qa/technology/nvda/
+   - Link: https://at.mada.org.qa/technology/nvda-with-arabic-voices/
 
-2. **Kính lúp điện tử Ruby HD** - Khoảng 8-15 triệu VNĐ
+2. **Ruby Series** (Kính lúp điện tử) - Khoảng 8-15 triệu VNĐ
    - Phù hợp: Người già thị lực kém, học sinh
    - Ưu điểm: Phóng to 2-24x, gọn nhẹ
-   - Link: https://at.mada.org.qa/technology/ruby-hd/
+   - Link: https://at.mada.org.qa/technology/ruby/
 
-3. **BrailleSense Polaris** - Khoảng 50-80 triệu VNĐ
+3. **BrailleSense 6** - Khoảng 50-80 triệu VNĐ
    - Phù hợp: Người khiếm thị thành thạo chữ nổi
    - Ưu điểm: Hiển thị chữ nổi, đọc PDF
-   - Link: https://at.mada.org.qa/technology/braillesense-polaris/
+   - Link: https://at.mada.org.qa/technology/braillesense-6/
 
 Bạn muốn mình tư vấn kỹ hơn về thiết bị nào không? 😊`,
 
@@ -1908,11 +1920,11 @@ Here are 3 common devices for visually impaired people to read:
    - Suitable for: Visually impaired computer users
    - Advantages: 100% free, supports Vietnamese
 
-2. **Ruby HD Electronic Magnifier** - ~$350-650 USD
+2. **Ruby Series Electronic Magnifier** - ~$350-650 USD
    - Suitable for: Elderly with low vision, students
    - Advantages: 2-24x magnification, portable
 
-3. **BrailleSense Polaris** - ~$2,000-3,500 USD
+3. **BrailleSense 6** - ~$2,000-3,500 USD
    - Suitable for: Braille-fluent users
    - Advantages: Braille display, PDF reading
 

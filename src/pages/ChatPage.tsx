@@ -3023,6 +3023,9 @@ export function ChatPage() {
         let confidence = 0.5;
         let suggestedProducts: any[] = [];
         let responseLanguage = language; // Default to UI language, will be updated from server
+        // ⭐⭐ Cờ CHÍNH THỨC từ server: user hỏi thẳng về 1 sản phẩm cụ thể.
+        // `null` = chưa biết (server chưa trả lời) → dùng fallback local.
+        let serverExplicitProductQuery: boolean | null = null;
         // ⭐ Use FRESH computed values (not stale closure state)
         const freshIsReady = isReadyForProducts;
         const freshMissingCtx = newMissingContext;
@@ -3074,6 +3077,10 @@ export function ChatPage() {
                   if (data.detectedLanguage) {
                     responseLanguage = data.detectedLanguage;
                   }
+                  // ⭐⭐ Nhận cờ "hỏi thẳng 1 sản phẩm" từ server (nguồn sự thật).
+                  if (typeof data.isExplicitProductQuery === 'boolean') {
+                    serverExplicitProductQuery = data.isExplicitProductQuery;
+                  }
                 } else if (data.type === 'error') {
                   throw new Error(data.error);
                 }
@@ -3099,6 +3106,9 @@ export function ChatPage() {
                 confidence = data.confidence || confidence;
                 if (data.answer) fullContent = data.answer;
                 if (data.detectedLanguage) responseLanguage = data.detectedLanguage;
+                if (typeof data.isExplicitProductQuery === 'boolean') {
+                  serverExplicitProductQuery = data.isExplicitProductQuery;
+                }
               }
             } catch { /* bỏ qua phần dở dang */ }
           }
@@ -3116,7 +3126,24 @@ export function ChatPage() {
           // - User hỏi thẳng về sản phẩm cụ thể → trả luôn, không hỏi.
           // - Chưa đủ 4 câu → trả lời user + hỏi câu tiếp theo, KHÔNG tư vấn sản phẩm.
           // - Đủ 4 câu → mới tư vấn sản phẩm kèm link.
-          let allowProductAdvice = userHasApproved || userExplicitlyRequestsProducts;
+          //
+          // ⭐⭐ NGUỒN SỰ THẬT = CỜ TỪ SERVER.
+          //
+          // VÌ SAO CẦN:
+          // Trước đây client tự suy đoán "user có hỏi thẳng sản phẩm không" bằng
+          // danh sách tên HARDCODED (KNOWN_PRODUCT_NAMES). Danh sách đó thiếu
+          // tên sản phẩm mới (EduMic, VisionBuddy, TD Pilot, WeWALK…) →
+          // client = false → bỏ card, trong khi SERVER đã nhận diện đúng từ DB
+          // và đã gửi card về → người dùng chỉ thấy danh sách tên, KHÔNG card.
+          //
+          // → Ưu tiên cờ server; chỉ fallback về danh sách local khi server chưa
+          //   trả cờ (null) — ví dụ request lỗi hoặc server cũ.
+          const explicitProductDetected =
+            serverExplicitProductQuery === null
+              ? userExplicitlyRequestsProducts
+              : serverExplicitProductQuery;
+
+          let allowProductAdvice = userHasApproved || explicitProductDetected;
 
           const alreadyConsulted = hasCompletedConsultQuestions(pastUserMessages);
 
@@ -3318,9 +3345,18 @@ export function ChatPage() {
 
         // ⭐ Chỉ được hiện sản phẩm khi đã đủ 4 câu hỏi tiêu chuẩn, hoặc user
         // hỏi thẳng tên sản phẩm, hoặc đã đồng ý xem sản phẩm.
+        //
+        // ⭐⭐ Cờ "hỏi thẳng 1 sản phẩm" lấy TỪ SERVER (nguồn sự thật) —
+        // server tự nhận diện tên sản phẩm từ DB nên không bỏ sót tên mới.
+        // Chỉ fallback về danh sách local khi server không trả cờ.
+        const serverExplicit = data.data.isExplicitProductQuery;
+        const explicitDetected =
+          typeof serverExplicit === 'boolean'
+            ? serverExplicit
+            : mentionsSpecificProduct(userMessage);
         const allowNonStreamProducts =
           hasCompletedConsultQuestions(pastUserMessages) ||
-          mentionsSpecificProduct(userMessage) ||
+          explicitDetected ||
           userApprovedProducts;
         const nonStreamMissingCtx = newMissingContext;
         
@@ -3390,7 +3426,7 @@ export function ChatPage() {
           }
         }
 
-        if (userHasApproved || userExplicitlyRequestsProducts) {
+        if (userHasApproved || explicitDetected) {
           // User đã đồng ý HOẶC hỏi trực tiếp về sản phẩm → không thêm câu hỏi
         } else if (nsNextConsult && !nsBotAlreadyAsked) {
           // Chưa đủ 4 câu → thêm câu hỏi tiêu chuẩn ở cuối.

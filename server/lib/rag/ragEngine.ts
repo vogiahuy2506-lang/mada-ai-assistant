@@ -5,6 +5,7 @@ import { rerankService, type RerankableItem } from './rerankService';
 import db from '../db';
 import { sanitizeContextForPrompt, sanitizeAssistantAnswer, createStreamingSanitizer } from '../responseSanitizer';
 import { appendProductLinks, stripProductMentions, repairTruncatedSentences } from '../productLinkInjector';
+import { normalizeProductName } from '../productLinker';
 import { removeFabricatedContent } from '../fabricationGuard';
 import { CONSULT_4_QUESTIONS, CONSULT_NOW_RULES, SINGLE_PRODUCT_RULES } from '../prompts/systemPrompts';
 import { productCategoriesForBot, resolveProductOwner } from '../categoryMapping';
@@ -345,11 +346,11 @@ Dưới đây là 3 thiết bị phổ biến cho người khiếm thị đọc 
    - Phù hợp: Người khiếm thị dùng máy tính
    - Ưu điểm: Miễn phí 100%, cộng đồng hỗ trợ lớn
 
-2. **Ruby HD** - Kính lúp điện tử cầm tay
+2. **Ruby Series** - Kính lúp điện tử cầm tay
    - Phù hợp: Người già thị lực kém, học sinh
    - Ưu điểm: Phóng to 2-24x, gọn nhẹ, dễ mang theo
 
-3. **BrailleSense Polaris** - Máy đọc chữ nổi
+3. **BrailleSense 6** - Máy đọc chữ nổi
    - Phù hợp: Người khiếm thị thành thạo chữ Braille
    - Ưu điểm: Hiển thị chữ nổi, kết nối WiFi, đọc PDF
 
@@ -487,6 +488,36 @@ interface RAGConfig {
    * sản phẩm khác — người dùng sẽ xem thẻ có ẢNH của chính sản phẩm hỏi.
    */
   singleProductFocus?: string | null;
+}
+
+/**
+ * ⭐ Bot dùng để lọc CHUYÊN MÔN sản phẩm trong câu trả lời.
+ *
+ * `botId` là bot MADA (bot-hearing…). `agentId` có thể là bot MADA hoặc
+ * custom agent. Ưu tiên `botId`; nếu không có thì dùng `agentId` khi nó là
+ * bot dựng sẵn (`bot-*`) — custom agent không có taxonomy nên không lọc
+ * (fail-open) để không xoá nhầm sản phẩm.
+ */
+function resolveScopeBotId(config: RAGConfig): string | null {
+  if (config.botId) return config.botId;
+  const agentId = config.agentId;
+  if (agentId && agentId.startsWith('bot-')) return agentId;
+  return null;
+}
+
+/**
+ * ⭐ Tên sản phẩm được phép nhắc DÙ ngoài chuyên môn của bot.
+ *
+ * Khi user hỏi thẳng "CoughDrop AAC là gì?" với bot-mobility, sản phẩm đó
+ * thuộc bot-speech — nhưng user CHỦ ĐỘNG hỏi → bot phải trả lời đúng sản
+ * phẩm đó. Nếu lọc cứng, câu trả lời sẽ bị gỡ sạch tên sản phẩm mà user
+ * đang hỏi → vô nghĩa.
+ */
+function allowedFocusTitles(config: RAGConfig): Set<string> | null {
+  const focus = config.singleProductFocus;
+  if (!focus) return null;
+  const n = normalizeProductName(focus);
+  return n ? new Set([n]) : null;
 }
 
 /**
@@ -736,7 +767,14 @@ class RAGEngine {
         answer = repairTruncatedSentences(stripProductMentions(answer));
       } else {
         // Đã đủ → chèn link MADA dưới tên sản phẩm (chỉ tên có thật trong DB).
-        answer = appendProductLinks(answer);
+        //
+        // ⭐⭐ Lọc theo chuyên môn bot: không gắn link cho tên sản phẩm thuộc
+        // bot KHÁC (VD bot-mobility nhắc "CoughDrop AAC" của bot-speech).
+        answer = appendProductLinks(
+          answer,
+          resolveScopeBotId(config),
+          allowedFocusTitles(config),
+        );
       }
 
       return {
@@ -986,7 +1024,11 @@ class RAGEngine {
         fullAnswer = removeFabricatedContent(fullAnswer);
         const linked = config.noProductRecommendation
           ? repairTruncatedSentences(stripProductMentions(fullAnswer))
-          : appendProductLinks(fullAnswer);
+          : appendProductLinks(
+              fullAnswer,
+              resolveScopeBotId(config),
+              allowedFocusTitles(config),
+            );
           if (linked !== fullAnswer) {
             fullAnswer = linked;
             yield { text: () => '', __replaceFull: linked };
@@ -1215,7 +1257,14 @@ class RAGEngine {
           }
         } else {
           // Đã đủ 4 câu → chèn link MADA dưới tên sản phẩm.
-          const withLinks = appendProductLinks(fullAnswer);
+          //
+          // ⭐⭐ Lọc theo chuyên môn bot (không gắn link / không giữ tên sản
+          // phẩm thuộc bot KHÁC trong câu trả lời).
+          const withLinks = appendProductLinks(
+            fullAnswer,
+            resolveScopeBotId(config),
+            allowedFocusTitles(config),
+          );
           if (withLinks !== fullAnswer) {
             // ⭐⭐ BẮT BUỘC dùng event "replace", KHÔNG gửi phần chênh lệch.
             //

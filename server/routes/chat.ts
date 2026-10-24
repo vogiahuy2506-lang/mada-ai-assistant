@@ -28,9 +28,15 @@ import { buildCatalogPromptBlock, enrichProductsWithMentions } from '../lib/prod
 import {
   AGENT_TO_MADA as AGENT_TO_MADA_MAP,
   MADA_CATEGORY_TO_DB as MADA_CATEGORY_TO_DB_MAP,
+  productCategoriesForBot,
 } from '../lib/categoryMapping';
 import { routeToSpecialistBot } from '../lib/specialistRouter';
 import { shouldFetchProducts } from '../lib/productGating';
+import {
+  primaryOwnerForProduct,
+  productBelongsToBot,
+  ownedProductUrlsForBot,
+} from '../lib/productTaxonomy';
 import { logActivity } from '../index';
 
 const router = express.Router();
@@ -1300,6 +1306,31 @@ async function getSuggestedProducts(ragSources: any[], message: string, effectiv
   // ⭐ Bot Thông tin bổ trợ được xem TẤT CẢ sản phẩm, các bot khác bị giới hạn theo category
   const shouldFilterByCategory = !isRegulatoryBot && agentCategory !== null;
 
+  // ⭐⭐ DANH SÁCH CATEGORY CẦN QUÉT (nhiều hơn 1).
+  //
+  // VÌ SAO CẦN:
+  // `kb_products.category` chỉ lưu MỘT category (lúc scrape), nên sản phẩm
+  // RIÊNG của bot có thể nằm ở category KHÁC category chính của bot:
+  //
+  //   GEWA Control Prog       → category = `mobility`  (Bot 6 – Di chuyển)
+  //   Primo+ Environment C.   → category = `mobility`  (Bot 6 – Di chuyển)
+  //   Housemate               → category = `mobility`  (Bot 6 – Di chuyển)
+  //   Power Link 4            → category = `mobility`  (Bot 6 – Di chuyển)
+  //
+  // → Query `WHERE category = 'daily_living'` (category chính của Bot 6) LOI
+  //   mất 4 sản phẩm RIÊNG của Bot 6 → card chỉ hiện sản phẩm của bot khác.
+  //
+  // → Quét NHIỀU category (theo `productCategoriesForBot()`), rồi lọc chính
+  //   xác bằng taxonomy + bảng chủ sở hữu (đã có ở phía dưới).
+  const scanCategories: string[] = (() => {
+    if (isRegulatoryBot) return [];
+    const cats = productCategoriesForBot(agentBotId, originalMadaCategory);
+    const set = new Set<string>();
+    if (agentCategory) set.add(agentCategory);
+    for (const c of cats) if (c) set.add(c);
+    return [...set];
+  })();
+
 
 
   // Helper: Check if URL is valid for product
@@ -1620,6 +1651,26 @@ async function getSuggestedProducts(ragSources: any[], message: string, effectiv
         }
       }
 
+      // ⭐⭐⭐ CHỦ SỞ HỮU CHÍNH (BẢNG MADA) — chặn sản phẩm của bot KHÁC.
+      //
+      // VÌ SAO CẦN:
+      // MADA khai sản phẩm thuộc NHIỀU danh mục, nên lọc theo category thô
+      // vẫn để lọt sản phẩm thuộc chuyên môn bot khác (VD bot-mobility dẫn
+      // đầu bằng Tobii PCEye 5 — thiết bị nhập liệu thay thế của Bot 5).
+      //
+      // → Sản phẩm mà bot này KHÔNG phải chủ sở hữu chính VÀ không nằm trong
+      //   danh mục MADA của bot này → loại.
+      const owner = primaryOwnerForProduct(p.product_url || p.source_url);
+      if (owner && agentBotId && !isRegulatoryBot) {
+        p.isPrimaryOwner = owner === agentBotId;
+        if (
+          owner !== agentBotId &&
+          !productBelongsToBot(p.product_url || p.source_url, agentBotId)
+        ) {
+          return false;
+        }
+      }
+
       return true;
     });
     
@@ -1677,17 +1728,50 @@ async function getSuggestedProducts(ragSources: any[], message: string, effectiv
           LIMIT ${LIMIT}
         `;
 
-      } else if (shouldFilterByCategory && agentCategory) {
-        // Các bot THƯỜNG: Chỉ lấy sản phẩm thuộc category của mình từ kb_products
+      } else if (shouldFilterByCategory && scanCategories.length > 0) {
+        // Các bot THƯỜNG: quét TẤT CẢ category mà bot quét được (có thể > 1),
+        // rồi lọc chính xác bằng taxonomy + bảng chủ sở hữu ở filter bên dưới.
+        //
+        // ⚠️ KHÔNG dùng `WHERE category = ?` với 1 category duy nhất:
+        // sản phẩm RIÊNG của bot-mobility (GEWA Control Prog, Housemate,
+        // Power Link 4, Primo+) đều nằm ở category `mobility`, trong khi
+        // category chính của bot là `daily_living` → query cũ loi mất sạch.
+        const catPlaceholders = scanCategories.map(() => '?').join(',');
+
+        // ⭐⭐ ƯU TIÊN SẢN PHẨM RIÊNG CỦA BOT TRONG SQL.
+        //
+        // VÌ SAO CẦN:
+        // Category `mobility` chứa 109 sản phẩm (đa số của Bot 5). Nếu chỉ
+        // `ORDER BY featured DESC, created_at DESC LIMIT 12`, 4 sản phẩm RIÊNG
+        // của Bot 6 (GEWA Control Prog, Primo+, Housemate, Power Link 4) — vốn
+        // có `created_at` cũ hơn, `featured = 0` — bị cắt khỏi LIMIT → Bot 6
+        // chỉ còn 1 sản phẩm riêng dù DB có đủ 6.
+        //
+        // → `CASE WHEN product_url IN (...) THEN 0 ELSE 1 END` đưa sản phẩm
+        //   RIÊNG của bot lên đầu NGAY TRONG DB → luôn nằm trong LIMIT.
+        const ownedUrls = ownedProductUrlsForBot(agentBotId);
+        let ownedOrder = '';
+        let ownedParams: string[] = [];
+        if (ownedUrls.length > 0) {
+          const ownedPlaceholders = ownedUrls.map(() => '?').join(',');
+          ownedOrder = `CASE WHEN product_url IN (${ownedPlaceholders}) THEN 0 ELSE 1 END, `;
+          ownedParams = ownedUrls;
+        }
+
         dbQuery = `
           SELECT * FROM kb_products
-          WHERE category = ? AND status IN ('draft', 'published', 'archived')
+          WHERE category IN (${catPlaceholders})
+          AND status IN ('draft', 'published', 'archived')
           AND image_url IS NOT NULL AND image_url != ''
           ${excludeClause}
-          ORDER BY featured DESC, created_at DESC
+          ORDER BY ${ownedOrder}featured DESC, created_at DESC
           LIMIT ${LIMIT}
         `;
-        dbParams = [agentCategory, ...dbParams];
+        // ⭐ Thứ tự tham số `?` PHẢI theo thứ tự xuất hiện trong SQL:
+        //   1) `category IN (...)`          → scanCategories
+        //   2) `${excludeClause}` (WHERE)   → excludeIds × 2
+        //   3) `CASE WHEN product_url IN (...)` (ORDER BY) → ownedUrls
+        dbParams = [...scanCategories, ...dbParams, ...ownedParams];
 
       } else {
         // Không có category → lấy tất cả từ kb_products
@@ -1724,7 +1808,7 @@ async function getSuggestedProducts(ragSources: any[], message: string, effectiv
         const titleLower = (p.title || '').toLowerCase();
         const isGarbageTitle = /^(.)\1{3,}$/.test(titleLower) || /^(test|test123|abcd|qwerty)/i.test(titleLower);
 
-        // ⭐ Category matching - MỖI BOT chỉ thấy sản phẩm thuộc category của mình
+        // ⭐ Category matching - MỖI BOT chỉ thấy sản phẩm thuộc danh mục của mình
         // bot-regulatory (Thông tin bổ trợ) KHÔNG bị filter - được xem TẤT CẢ sản phẩm
         // ⭐ CRITICAL FIX: Dùng originalMadaCategory (chưa map) cho specific checks
         let categoryMatch = true;
@@ -1733,6 +1817,10 @@ async function getSuggestedProducts(ragSources: any[], message: string, effectiv
           const catLower = agentCategory.toLowerCase();
           categoryMatch =
             productCategory.includes(catLower) ||
+            // ⭐ Chấp nhận MỌI category bot được phép quét (vd bot-mobility quét
+            // cả `daily_living` + `mobility` → không bỏ sót sản phẩm RIÊNG của bot
+            // đang nằm ở category khác).
+            scanCategories.some((c) => c && productCategory.includes(c.toLowerCase())) ||
             (originalMadaCategory === 'sensory-hearing' && productCategory.includes('hearing')) ||
             (originalMadaCategory === 'sensory-vision' && productCategory.includes('vision')) ||
             (originalMadaCategory === 'voice-and-speech' && (
@@ -1756,8 +1844,28 @@ async function getSuggestedProducts(ragSources: any[], message: string, effectiv
 
         }
 
-
-
+        // ⭐⭐⭐ CHỦ SỞ HỮU CHÍNH (BẢNG MADA) — ưu tiên sản phẩm RIÊNG của bot.
+        //
+        // VÌ SAO CẦN:
+        // MADA khai sản phẩm thuộc NHIỀU danh mục, nên `kb_products.category`
+        // chỉ giữ 1 category → lọc theo category vẫn để lọt sản phẩm của bot
+        // khác. Ví dụ bot-mobility (category `daily_living`) dẫn đầu bằng
+        // Tobii PCEye 5 / Quha Dwell (thiết bị nhập liệu thay thế → Bot 5) và
+        // eSight 4 (thị giác → Bot 2) → tư vấn lệch hoàn toàn.
+        //
+        // → Sản phẩm mà bot này là CHỦ SỞ HỮU CHÍNH (`mada-product-owners.json`)
+        //   được ưu tiên; sản phẩm thuộc CHÍNH một bot khác thì bị loại (trừ
+        //   khi MADA cũng xếp nó vào danh mục của bot này → đa nhãn hợp lệ).
+        const owner = primaryOwnerForProduct(p.product_url || p.source_url);
+        if (owner && agentBotId) {
+          p.isPrimaryOwner = owner === agentBotId;
+          if (
+            owner !== agentBotId &&
+            !productBelongsToBot(p.product_url || p.source_url, agentBotId)
+          ) {
+            return false;
+          }
+        }
 
         return hasImage && isValidUrl && !isBot && !isGarbageTitle && categoryMatch;
       });
@@ -1785,6 +1893,24 @@ async function getSuggestedProducts(ragSources: any[], message: string, effectiv
   // sách cũng chỉ còn tối đa 1 sản phẩm → giao diện gọn, dễ đọc.
   if (askingSpecificProduct) {
     return [{ ...specificProduct, isSpecificProduct: true }];
+  }
+
+  // ⭐⭐ XẾP HẠNG: sản phẩm RIÊNG của bot (chủ sở hữu chính) đứng đầu.
+  //
+  // VÌ SAO CẦN:
+  // Bot 5 và Bot 6 đều quét category `mobility` + `daily_living`. Nếu không
+  // xếp hạng, thứ tự DB (`featured DESC, created_at DESC`) có thể đưa sản
+  // phẩm đa nhãn của bot khác lên đầu → bot-mobility dẫn đầu bằng
+  // eSight 4 (thị giác) thay vì gậy thông minh / bộ điều khiển môi trường.
+  if (agentBotId && !isRegulatoryBot) {
+    suggestedProducts.sort((a: any, b: any) => {
+      const ao = primaryOwnerForProduct(a.product_url || a.source_url);
+      const bo = primaryOwnerForProduct(b.product_url || b.source_url);
+      const aMine = ao === agentBotId ? 1 : 0;
+      const bMine = bo === agentBotId ? 1 : 0;
+      if (aMine !== bMine) return bMine - aMine;
+      return 0;
+    });
   }
 
   // ⭐ Regulatory bot: trả về nhiều hơn (12), các bot thường: 6
@@ -2077,7 +2203,8 @@ router.post('/', async (req, res) => {
           ragResponse.answer,
           allProducts,
           effectiveLanguage,
-          12
+          12,
+          botId
         );
 
     res.json({
@@ -2093,6 +2220,10 @@ router.post('/', async (req, res) => {
         detectedLanguage: effectiveLanguage,
         suggestedProducts: allProducts,
         autoScraped: scrapedProducts.length > 0,
+        // ⭐⭐ CỜ CHÍNH THỨC "user hỏi thẳng về 1 sản phẩm cụ thể" (xem giải
+        // thích ở nhánh /stream): client dùng cờ này làm nguồn sự thật thay
+        // vì tự suy đoán từ danh sách tên sản phẩm hardcode (thiếu tên mới).
+        isExplicitProductQuery: explicitProductQuery,
         // ⭐ Trả về danh sách ID sản phẩm đã hiển thị để frontend track và gửi lại cho lần sau
         shownProductIds: allProducts.map((p: any) => p.id).filter(Boolean),
       },
@@ -2741,7 +2872,8 @@ router.post('/stream', async (req: any, res: any) => {
                 fullStreamedAnswer,
                 allProducts,
                 effectiveLanguage,
-                12
+                12,
+                botId
               );
 
           if (allProducts.length > 0) {
@@ -2767,6 +2899,17 @@ router.post('/stream', async (req: any, res: any) => {
         confidence: streamResult.confidence || 0.5,
         detectedLanguage: effectiveLanguage,
         shownProductIds: sentProductIds,
+        // ⭐⭐ CỜ CHÍNH THỨC "user hỏi thẳng về 1 sản phẩm cụ thể".
+        //
+        // VÌ SAO PHẢI GỬI TỪ SERVER:
+        // Client có danh sách tên sản phẩm HARDCODED (KNOWN_PRODUCT_NAMES) —
+        // danh sách này THIẾU tên sản phẩm mới (vd "EduMic", "VisionBuddy",
+        // "TD Pilot", "WeWALK Smart Cane"). → client tưởng user hỏi chung,
+        // bỏ qua card, trong khi SERVER đã tự nhận diện đúng từ DB và đã gửi
+        // card về → người dùng chỉ thấy danh sách tên, KHÔNG thấy card.
+        //
+        // → Client dùng cờ này làm nguồn sự thật, thay vì tự suy đoán.
+        isExplicitProductQuery,
       });
       
       chatHistory.get(convId)!.push({ role: 'assistant', content: fullStreamedAnswer || streamResult.answer || '' });

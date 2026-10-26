@@ -1,0 +1,59 @@
+# ===========================================
+# TEMPORARY diagnostic: đọc cấu hình mail trên VPS (chỉ hash, không lộ mật khẩu)
+# Xoá sau khi chẩn đoán xong.
+# ===========================================
+name: Diagnostic - Mail Env
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Action to perform'
+        required: false
+        default: 'inspect'
+        type: choice
+        options:
+          - inspect
+
+jobs:
+  diagnose:
+    name: Inspect Mail Env on VPS
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Inspect
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          command_timeout: 5m
+          script: |
+            APP_DIR="/app/mada-ai-assistant"
+            echo "=== MAIL_ keys present in .env ==="
+            grep -oE '^MAIL_[A-Z_]+' "$APP_DIR/.env" 2>/dev/null | sort
+            echo ""
+            echo "=== MAIL_PASSWORD: length + sha256 (KHÔNG lộ giá trị) ==="
+            PW=$(grep -E '^MAIL_PASSWORD=' "$APP_DIR/.env" 2>/dev/null | head -1 | cut -d '=' -f2-)
+            echo "raw length      : ${#PW}"
+            echo "sha256(raw)     : $(printf '%s' "$PW" | shasum -a 256 | cut -d' ' -f1)"
+            # Replicate normalizeMailPassword from server/lib/mailer.ts
+            V=$(printf '%s' "$PW" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+            case "$V" in
+              \"*\") V=$(printf '%s' "$V" | cut -c2-$((${#V}-1))) ;;
+              \'*\') V=$(printf '%s' "$V" | cut -c2-$((${#V}-1))) ;;
+            esac
+            echo "normalized len  : ${#V}"
+            echo "sha256(norm)    : $(printf '%s' "$V" | shasum -a 256 | cut -d' ' -f1)"
+            echo ""
+            echo "=== other MAIL_ values (non-secret) ==="
+            grep -E '^(MAIL_HOST|MAIL_PORT|MAIL_SECURE|MAIL_TLS|MAIL_USERNAME|MAIL_FROM|MAIL_TLS_REJECT_UNAUTHORIZED)=' "$APP_DIR/.env" 2>/dev/null
+            echo ""
+            echo "=== app process env (MAIL_ only) ==="
+            PM2B="$HOME/.npm-global/bin/pm2"
+            PID=$(sudo fuser 3002/tcp 2>/dev/null | tr -s ' ' | cut -d' ' -f2 | head -1)
+            if [ -n "$PID" ]; then
+              sudo tr '\0' '\n' < /proc/$PID/environ 2>/dev/null | grep -E '^(MAIL_|NODE_ENV|PORT)=' | grep -v PASSWORD
+            else
+              echo "no PID on 3002"
+            fi

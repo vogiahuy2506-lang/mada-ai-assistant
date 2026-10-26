@@ -29,10 +29,13 @@ import { onSettingsChange } from '@/lib/settingsBroadcast';
 import { MADA_BOTS } from '@/lib/madaBots';
 import {
   getNextConsultQuestion,
+  getNextConsultQuestionFromHistory,
   hasCompletedConsultQuestions,
   getSafeNextConsultQuestion,
   detectAskedQuestions,
   stripAlreadyAskedQuestions,
+  analyzeConsultProgress,
+  stripConsultQuestions,
 } from '@/lib/consultQuestions';
 
 /** Bỏ dấu + hạ chữ + gộp khoảng trắng, để so khớp câu hỏi không vướng format. */
@@ -2691,6 +2694,26 @@ export function ChatPage() {
     // Câu nào bot đã hỏi rồi (nhận diện theo vân tay câu hỏi, chịu được
     // cả cách diễn đạt khác nhau của LLM).
     const alreadyAskedTypes = detectAskedQuestions(pastAssistantMessages);
+
+    // ⭐⭐⭐ TIẾN ĐỘ BỘ 4 CÂU HỎI — tính từ TOÀN BỘ hội thoại.
+    //
+    // ⚠️ BUG ĐÃ SỬA (user báo: "hỏi xong câu 4 rồi mà không ra sản phẩm"):
+    // Trước đây "đủ 4 câu" chỉ được tính bằng REGEX trên lời nói. Khách trả
+    // lời kiểu không khớp mẫu nào (VD "vẫn ổn", "khoảng năm nay rồi") → không
+    // khớp → mãi thiếu → mãi không ra sản phẩm.
+    //
+    // → `analyzeConsultProgress` kết hợp thêm TÍN HIỆU THỨ TỰ HỘI THOẠI:
+    //   bot hỏi câu X → khách nói tiếp → câu X coi như đã trả lời.
+    //
+    // Lưu ý: `allMessages` CHƯA chứa tin nhắn user hiện tại (addMessage gọi
+    // sau đây), nên ta tự thêm vào.
+    const consultHistory = [
+      ...allMessages.map((m: Message) => ({ role: m.role, content: m.content || '' })),
+      { role: 'user', content: userMessage },
+    ];
+    const consultProgress = analyzeConsultProgress(consultHistory);
+    // ⭐ Đủ 4 câu → được phép tư vấn sản phẩm (dùng tiến độ hội thoại).
+    const consultCompleted = consultProgress.completed;
     
     // ⭐ Sử dụng analyzeConversationHistory để phân tích toàn bộ lịch sử
     const historyContext = analyzeConversationHistory(allMessages);
@@ -2925,6 +2948,13 @@ export function ChatPage() {
         agentId: effectiveAgent?.id || null,
         agentPrompt: effectiveAgent?.systemPrompt || '',
         userMode,
+        // ⭐⭐ conversationId — BẮT BUỘC để server theo dõi lịch sử hội thoại.
+        //
+        // LÝ DO: server dùng lịch sử này để TỰ tính "đã đủ 4 câu hỏi" (nguồn
+        // sự thật) thay vì tin cờ của client. Không có conversationId → mỗi
+        // lượt là 1 hội thoại mới → server không biết bot đã hỏi gì → cấm
+        // catalog sản phẩm → bot không nhắc tên sản phẩm.
+        conversationId: currentConvId || undefined,
         // ⭐ Smart context: gửi lên server để server biết có nên gửi products ngay không
         // Nếu chưa đủ context → server sẽ hỏi thêm trước khi gợi ý sản phẩm
         missingContext: newMissingContext,
@@ -2943,7 +2973,11 @@ export function ChatPage() {
         isInQuestionGatheringMode,
         // ⭐ Server cần biết đã đủ 4 câu chưa để QUYẾT ĐỊNH có đưa catalog
         // sản phẩm cho bot không. Chưa đủ 4 câu → cấm bot nhắc sản phẩm.
-        consultQuestionsCompleted: hasCompletedConsultQuestions(pastUserMessages),
+        //
+        // ⭐ Dùng `consultCompleted` (tính từ TIẾN ĐỘ HỘI THOẠI) thay vì
+        // `hasCompletedConsultQuestions` (chỉ regex) — tránh tình trạng bot
+        // đã hỏi đủ 4 câu + khách đã trả lời nhưng vẫn bị chặn sản phẩm.
+        consultQuestionsCompleted: consultCompleted,
         isExplicitProductQuery: mentionsSpecificProduct(userMessage),
         userApprovedProducts: userHasApproved, // Dùng biến local thay vì state
         shownProductIds: allShownProductIds,
@@ -3145,7 +3179,14 @@ export function ChatPage() {
 
           let allowProductAdvice = userHasApproved || explicitProductDetected;
 
-          const alreadyConsulted = hasCompletedConsultQuestions(pastUserMessages);
+          // ⭐⭐⭐ ĐÃ ĐỦ 4 CÂU? Dùng TIẾN ĐỘ HỘI THOẠI (consultProgress),
+          // không dùng regex-only (hasCompletedConsultQuestions).
+          //
+          // LÝ DO (bug user báo "hỏi xong câu 4 mà không ra sản phẩm"):
+          // Khách trả lời kiểu không khớp mẫu regex ("vẫn ổn", "khoảng năm
+          // nay rồi") → regex-only báo CHƯA ĐỦ → không tư vấn. Tiến độ hội
+          // thoại nhận ra: bot đã hỏi câu 4 → khách đã nói → ĐỦ.
+          const alreadyConsulted = consultCompleted;
 
           // ⭐⭐⭐ LỚP CHỐNG LẶP (3 tầng):
           //  Tầng 1: bỏ qua câu bot đã hỏi (detectAskedQuestions — nhận diện theo
@@ -3153,17 +3194,19 @@ export function ChatPage() {
           //  Tầng 2: chặn theo so khớp chuỗi (isQuestionAlreadyAsked).
           //  Tầng 3: dọn sạch mọi câu tiêu chuẩn đã hỏi còn sót trong câu trả
           //          lời của LLM — kể cả LLM tự hỏi lại.
-          const nextConsult = getSafeNextConsultQuestion(
+          //
+          // ⭐ Dùng `getNextConsultQuestionFromHistory` — tự động bỏ qua câu đã
+          // hỏi VÀ câu đã trả lời (kể cả trả lời kiểu không khớp regex).
+          const nextConsult = getNextConsultQuestionFromHistory(
             responseLanguage,
-            pastUserMessages,
-            pastAssistantMessages
+            consultHistory
           );
 
           // ⭐ Dọn mọi câu hỏi ĐÃ HỎI (hoặc user ĐÃ TRẢ LỜI) còn sót trong text.
-          let cleanContent = stripAlreadyAskedQuestions(
+          let cleanContent = stripConsultQuestions(
             fullContent,
-            pastAssistantMessages,
-            pastUserMessages
+            consultProgress,
+            pastAssistantMessages
           );
 
           // ⭐ Bot có vừa hỏi câu này không? Phải dùng VÂN TAY câu hỏi, KHÔNG
@@ -3187,18 +3230,18 @@ export function ChatPage() {
           } else if (!allowProductAdvice && nextConsult && botAlreadyAsked) {
             // Bot đã tự hỏi đúng câu tiêu chuẩn → không thêm nữa.
             allowProductAdvice = false;
-          } else if (!allowProductAdvice && alreadyConsulted && triggersProductSuggestion) {
-            // Đủ 4 câu + user muốn xem sản phẩm → cho phép tư vấn.
-            allowProductAdvice = true;
-          } else if (!allowProductAdvice && alreadyConsulted && isReadyForProducts) {
-            // ⭐⭐⭐ FIX LỚN: ĐÃ HỎI ĐỦ 4 CÂU thì PHẢI ra sản phẩm, không cần khách
-            // phải nói "cho tôi xem sản phẩm".
+          } else if (!allowProductAdvice && alreadyConsulted) {
+            // ⭐⭐⭐ ĐÃ ĐỦ 4 CÂU → PHẢI ra sản phẩm, KHÔNG cần khách phải nói
+            // "cho tôi xem sản phẩm" và KHÔNG cần từ khoá sản phẩm.
             //
-            // LỖI TRƯỚC ĐÂY: lượt cuối khách chỉ trả lời ngắn ("45 tuổi",
-            // "2 năm rồi") → triggersProductSuggestion = false. Kết hợp với
-            // nextConsult = null (đã hỏi đủ) → KHÔNG nhánh nào set true →
-            // allowProductAdvice = false → không gắn sản phẩm vào message →
-            // UI không hiện card dù bot đã đủ thông tin tư vấn.
+            // ⚠️ BUG ĐÃ SỬA (user báo: "lúc hiện lúc không v"):
+            // Trước đây nhánh này yêu cầu thêm `triggersProductSuggestion`
+            // HOẶC `isReadyForProducts`. Cả 2 đều phụ thuộc regex riêng, dễ
+            // lệch với detector 4 câu → lượt cuối khách trả lời ngắn ("45
+            // tuổi", "2 năm rồi") → KHÔNG nhánh nào set true → không gắn
+            // sản phẩm → UI không hiện card dù bot đã đủ thông tin.
+            //
+            // → Đủ 4 câu là ĐIỀU KIỆN ĐỦ, không cần thêm gì.
             allowProductAdvice = true;
           }
           const finalContent = cleanContent;
@@ -3218,7 +3261,13 @@ export function ChatPage() {
           if (currentUser && currentConvId) {
             userHistoryApi.addMessage(currentConvId, {
               role: 'assistant',
-              content: fullContent,
+              // ⭐⭐ Lưu `finalContent` (ĐÃ kèm câu hỏi chuẩn) chứ không phải
+              // `fullContent` (bản thô).
+              //
+              // LÝ DO: sau khi reload trang, lịch sử được nạp lại từ DB. Nếu
+              // lưu bản thô thì câu hỏi chuẩn mà client gắn thêm sẽ biến mất
+              // → detector không biết bot đã hỏi câu X → bot HỎI LẠI câu đó.
+              content: finalContent,
               agentId: selectedAgentId || undefined,
               sources,
               confidence,
@@ -3354,8 +3403,9 @@ export function ChatPage() {
           typeof serverExplicit === 'boolean'
             ? serverExplicit
             : mentionsSpecificProduct(userMessage);
+        // ⭐ Dùng `consultCompleted` (tiến độ hội thoại) thay vì regex-only.
         const allowNonStreamProducts =
-          hasCompletedConsultQuestions(pastUserMessages) ||
+          consultCompleted ||
           explicitDetected ||
           userApprovedProducts;
         const nonStreamMissingCtx = newMissingContext;
@@ -3393,18 +3443,17 @@ export function ChatPage() {
         // - Chưa đủ 4 câu → thêm câu hỏi tiêu chuẩn (trừ khi bot đã hỏi rồi).
         // - Đã đủ 4 câu → cho phép tư vấn sản phẩm.
         // - User hỏi thẳng tên sản phẩm → không hỏi.
-        const nsNextConsult = getSafeNextConsultQuestion(
+        const nsNextConsult = getNextConsultQuestionFromHistory(
           responseLanguage,
-          pastUserMessages,
-          pastAssistantMessages
+          consultHistory
         );
 
         // ⭐ Dọn mọi câu tiêu chuẩn đã hỏi trước đây còn sót trong câu trả lời
         // của LLM (kể cả LLM tự hỏi lại) — trước khi lưu vào lịch sử.
-        const nsCleaned = stripAlreadyAskedQuestions(
+        const nsCleaned = stripConsultQuestions(
           data.data.answer || '',
-          pastAssistantMessages,
-          pastUserMessages
+          consultProgress,
+          pastAssistantMessages
         );
 
         // ⭐ Bot có vừa hỏi câu này không? Dùng VÂN TAY câu hỏi (chịu được LLM hỏi
@@ -3412,6 +3461,10 @@ export function ChatPage() {
         const nsBotAlreadyAsked = nsNextConsult
           ? detectAskedQuestions([...pastAssistantMessages, nsCleaned]).has(nsNextConsult.type)
           : false;
+
+        // ⭐ Nội dung cuối cùng của bot (đã dọn câu lặp + đã kèm câu hỏi
+        // chuẩn nếu chưa đủ 4 câu) — dùng cho cả hiển thị lẫn lưu DB.
+        let nsFinalContent = nsCleaned;
 
         // Cập nhật lại tin nhắn bot vừa thêm, đã loại bỏ câu lặp.
         if (nsCleaned !== (data.data.answer || '')) {
@@ -3430,6 +3483,7 @@ export function ChatPage() {
           // User đã đồng ý HOẶC hỏi trực tiếp về sản phẩm → không thêm câu hỏi
         } else if (nsNextConsult && !nsBotAlreadyAsked) {
           // Chưa đủ 4 câu → thêm câu hỏi tiêu chuẩn ở cuối.
+          nsFinalContent = `${nsFinalContent}\n\n*${nsNextConsult.question}*`;
           const updatedMessages = useChatStore.getState().messages;
           if (updatedMessages.length > 0) {
             const lastMsg = updatedMessages[updatedMessages.length - 1];
@@ -3448,7 +3502,10 @@ export function ChatPage() {
         if (currentUser && currentConvId) {
           userHistoryApi.addMessage(currentConvId, {
             role: 'assistant',
-            content: fullContent,
+            // ⭐⭐ Lưu `nsFinalContent` (ĐÃ kèm câu hỏi chuẩn) chứ không phải
+            // `fullContent` (bản thô) — nếu không, reload trang sẽ mất dấu vết
+            // câu hỏi → bot hỏi lại câu đã hỏi.
+            content: nsFinalContent,
             agentId: selectedAgentId || undefined,
             sources: data.data.sources || [],
             confidence: data.data.confidence,

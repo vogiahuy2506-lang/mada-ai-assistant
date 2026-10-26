@@ -568,12 +568,30 @@ export function enrichProductsWithMentions(
   const mentioned = findMentionedProducts(answer, catalog);
   if (mentioned.length === 0) return products;
 
+  // ⭐⭐ LOẠI TÀI LIỆU THAM CHIẾU (tiêu chuẩn/quy định) KHỎI DANH SÁCH CARD.
+  //
+  // VÌ SAO CẦN:
+  // Bot thường TRÍCH DẪN tiêu chuẩn trong câu trả lời văn xuôi:
+  //   "Theo WCAG 2.2, tương phản tối thiểu 4.5:1" → đó là NỘI DUNG TƯ VẤN
+  //   đúng và hữu ích, phải giữ.
+  //
+  // Nhưng hàm này BIẾN TÊN ĐƯỢC NHẮC thành "product card" → tiêu chuẩn bị
+  // biến thành card sản phẩm → khách mô tả triệu chứng thấy card
+  // "ISO 9999:2022", "WCAG 2.2", "ATSM Qatar" thay vì thiết bị giải quyết
+  // vấn đề (đúng triệu chứng trong ảnh).
+  //
+  // → Chỉ thêm mục SẢN PHẨM BÁN (`isReference = false`) vào danh sách card.
+  //   Tiêu chuẩn vẫn được link gắn vào tên trong câu trả lời (xử lý ở
+  //   `productLinkInjector.appendProductLinks`).
+  const productMentions = mentioned.filter((e) => !e.isReference);
+  if (productMentions.length === 0) return products;
+
   // ⭐ Lọc theo chuyên môn TRƯỚC khi thêm vào danh sách.
   // - bot-regulatory (Thông tin bổ trợ) → xem TẤT CẢ.
   // - bot khác → chỉ sản phẩm MADA công nhận thuộc chuyên môn bot.
   const scopedMentions = botId && botId !== 'bot-regulatory'
-    ? mentioned.filter((e) => productBelongsToBot(e.product_url || e.source_url, botId))
-    : mentioned;
+    ? productMentions.filter((e) => productBelongsToBot(e.product_url || e.source_url, botId))
+    : productMentions;
   if (scopedMentions.length === 0) return products;
 
   // Map các sản phẩm đang có theo tên chuẩn hoá

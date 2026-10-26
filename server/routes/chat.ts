@@ -26,6 +26,10 @@ import { translateContent } from '../lib/translationService';
 import { productExtractor, type ExtractedProduct } from '../lib/scraping/productExtractor';
 import { buildCatalogPromptBlock, enrichProductsWithMentions } from '../lib/productLinker';
 import {
+  analyzeConsultProgress,
+  type ConsultMessage,
+} from '../../src/lib/consultCore';
+import {
   AGENT_TO_MADA as AGENT_TO_MADA_MAP,
   MADA_CATEGORY_TO_DB as MADA_CATEGORY_TO_DB_MAP,
   productCategoriesForBot,
@@ -174,7 +178,29 @@ function toProxyImageUrl(madaUrl: string): string {
 function knowledgeItemToProduct(row: any, effectiveLanguage: string = 'vi'): any {
   const meta = row.metadata ? (typeof row.metadata === 'string' ? JSON.parse(row.metadata) : row.metadata) : {};
   const categoryLower = (row.category || '').toLowerCase();
-  
+
+  // ⭐⭐ ĐÁNH DẤU TÀI LIỆU THAM CHIẾU (tiêu chuẩn/quy định) — KHÔNG phải sản phẩm.
+  //
+  // VÌ SAO CẦN:
+  // `knowledge_items` có 2 nhóm thực thể rất khác nhau:
+  //   1. SẢN PHẨM BÁN (đã scrape từ MADA) — được hiện thành CARD.
+  //   2. TIÊU CHUẨN/QUY ĐỊNH (WCAG 2.2, ISO 9999:2022, EN 301 549, ATSM
+  //      Qatar…) — là VĂN BẢN THAM CHIẾU, KHÔNG bán, KHÔNG giải quyết được
+  //      vấn đề của người dùng.
+  //
+  // → Trước đây cả 2 nhóm đều đi qua `knowledgeItemToProduct()` → bot
+  //   regulatory trả về card "ISO 9999:2022", "WCAG 2.2", "ATSM Qatar" khi
+  //   khách mô tả triệu chứng → khách thấy 3 card TIÊU CHUẨN thay vì sản
+  //   phẩm giải quyết vấn đề (đúng triệu chứng trong ảnh).
+  //
+  // → Đánh dấu `isReference` để lớp lọc dưới đây LOẠI khỏi danh sách card.
+  //   Tiêu chuẩn vẫn được TRÍCH DẪN trong câu trả lời văn xuôi (link gắn vào
+  //   tên) — chỉ không biến thành "product card" thôi.
+  const isReference =
+    row.source_type === 'web' ||
+    categoryLower === 'regulatory-standards' ||
+    categoryLower === 'web_accessibility';
+
   let categoryColor = 'from-blue-500 to-cyan-500';
   if (categoryLower.includes('hearing') || categoryLower.includes('thính')) {
     categoryColor = 'from-cyan-500 to-blue-600';
@@ -230,6 +256,8 @@ function knowledgeItemToProduct(row: any, effectiveLanguage: string = 'vi'): any
     in_stock: true,
     galleryImages: [],
     categoryColor,
+    // ⭐ Tiêu chuẩn/quy định — KHÔNG phải sản phẩm bán (xem `isReference` ở trên).
+    isReference,
   };
 }
 
@@ -289,6 +317,8 @@ function kbProductToProduct(row: any, effectiveLanguage: string = 'vi'): any {
     in_stock: true,
     galleryImages: [],
     categoryColor,
+    // ⭐ `kb_products` = SẢN PHẨM BÁN → KHÔNG phải tài liệu tham chiếu.
+    isReference: false,
   };
 }
 
@@ -481,6 +511,22 @@ function findProductByMessage(message: string, _effectiveLanguage: string, agent
 
 
 
+    // ⭐⭐ ƯU TIÊN `kb_products` — SẢN PHẨM BÁN thật.
+    //
+    // VÌ SAO CẦN:
+    // `knowledge_items` (source_type='web') chứa CẢ tiêu chuẩn/quy định
+    // (WCAG 2.2, ISO 9999:2022, ATSM Qatar…) LẪN sản phẩm đã scrape. Nếu tra
+    // `knowledge_items` trước → câu "cho tôi xem sản phẩm" có thể khớp
+    // "ISO 9999:2022" → trả về card TIÊU CHUẨN thay vì thiết bị.
+    //
+    // → Tra `kb_products` TRƯỚC (sản phẩm bán). Chỉ khi không có mới tra
+    //   `knowledge_items`, và khi đó phải là tiêu chuẩn → `isReference = true`
+    //   → bị lọc khỏi danh sách card (xem `getSuggestedProducts`).
+    const kbMatch = findKbProductByMessage(cleaned, message, _effectiveLanguage, agentId);
+    if (kbMatch) {
+      return kbMatch;
+    }
+
     // Search knowledge_items for matching titles (products scraped from MADA portal)
     for (const phrase of phrases) {
       if (phrase.length < 3) continue;
@@ -516,23 +562,21 @@ function findProductByMessage(message: string, _effectiveLanguage: string, agent
         }
 
         if (item) {
+          // ⭐ Tài liệu tham chiếu (tiêu chuẩn/quy định) → KHÔNG phải card
+          //   sản phẩm. Chỉ dùng làm "sản phẩm cụ thể" khi user hỏi rõ về
+          //   TIÊU CHUẨN đó (VD "WCAG 2.2 là gì?") — còn lại bỏ qua để không
+          //   trả về card tiêu chuẩn khi khách muốn xem thiết bị.
+          const isRef =
+            (item.category || '').toLowerCase() === 'regulatory-standards' ||
+            (item.category || '').toLowerCase() === 'web_accessibility' ||
+            /—|-/.test(item.title || '');
+          if (isRef && !/tiêu chuẩn|standard|wcag|iso |iso\d|quy định|regulation|accessibility/i.test(message)) {
+            continue;
+          }
 
           return knowledgeItemToProduct(item, _effectiveLanguage);
         }
       }
-    }
-
-    // ⭐⭐ FALLBACK: tìm trong kb_products.
-    //
-    // VÌ SAO CẦN:
-    // knowledge_items gần như trống với sản phẩm MADA (chỉ 9 dòng, 0 dòng
-    // web/published) — danh mục thật nằm ở kb_products (349 sản phẩm, 100%
-    // có image_url). Nếu chỉ query knowledge_items thì câu hỏi riêng về 1 tên
-    // sản phẩm (VD "VisionBuddy là gì?") KHÔNG bao giờ ra được card → người
-    // dùng chỉ thấy danh sách chung hoặc không thấy gì.
-    const kbProduct = findKbProductByMessage(cleaned, message, _effectiveLanguage, agentId);
-    if (kbProduct) {
-      return kbProduct;
     }
 
     return null;
@@ -803,6 +847,9 @@ function inferProductCategory(message: string): string | null {
         'tai nghe trợ thính', 'phục hồi thính', 'khuếch đại âm thanh',
         'hearing aid', 'hearing', 'tinnitus', 'deaf', 'hard of hearing', 'amplifier',
         'neckloop', 'fm system', 'sound field',
+        // ⭐ DẠNG RÚT GỌN: "nghe kém", "không nghe rõ", "điếc tai"…
+        'nghe kém', 'không nghe rõ', 'không nghe thấy', 'nghe không rõ',
+        'điếc tai', 'hỏng tai', 'lận cả', 'ù tai',
       ],
     },
     {
@@ -813,6 +860,12 @@ function inferProductCategory(message: string): string | null {
         'chữ nhỏ', 'phóng to chữ', 'tăng độ tương phản', 'tương phản cao',
         'braille', 'magnifier', 'low vision', 'vision loss', 'blind', 'visually impaired',
         'sight', 'eye',
+        // ⭐ DẠNG RÚT GỌN (đảo trật tự từ ngữ trong tiếng Việt):
+        // "mờ mắt", "khó đọc", "không thấy rõ", "chữ mờ"… — rất phổ biến
+        // trong cách khách mô tả triệu chứng. Trước đây chỉ có "mắt mờ" →
+        // "tôi mờ mắt" KHÔNG khớp → suy luận sai category → card không liên quan.
+        'mờ mắt', 'mờ màu', 'khó đọc', 'khó nhìn', 'không thấy rõ', 'chữ mờ',
+        'sưa mắt', 'yếu mắt', 'mỏ mắt', 'không đọc được', 'khó đọc chữ',
       ],
     },
     {
@@ -823,6 +876,9 @@ function inferProductCategory(message: string): string | null {
         'bại liệt', 'liệt', 'đi lại khó', 'khó đi lại', 'vận động', 'phục hồi chức năng',
         'wheelchair', 'walker', 'crutch', 'cane', 'prosthetic', 'orthotic', 'mobility',
         'paralysis', 'walking difficulty',
+        // ⭐ DẠNG RÚT GỌN: "khó đi", "yếu chân", "không đi được"…
+        'khó đi', 'yếu chân', 'yếu tay', 'không đi được', 'chân tay yếu',
+        'đi lại khó', 'cần xe lăn',
       ],
     },
     {
@@ -1293,10 +1349,13 @@ async function getSuggestedProducts(ragSources: any[], message: string, effectiv
   // Không có bước này thì lấy sản phẩm từ MỌI category → ra sản phẩm không
   // liên quan (VD: hỏi "máy trợ thính" lại ra "Dragon Professional", "Smyle Mouse").
   let inferredCategory: string | null = null;
-  if (!agentCategory && !isRegulatoryBot) {
+  if (!agentCategory || isRegulatoryBot) {
     inferredCategory = inferProductCategory(message);
     if (inferredCategory) {
-      agentCategory = inferredCategory;
+      // ⭐ Regulatory bot: `agentCategory` gốc là `regulatory-standards` (danh
+      // mục của bot), KHÔNG phải danh mục sản phẩm → thay bằng category suy
+      // luận từ câu hỏi để card có liên quan với vấn đề khách đang gặp.
+      if (isRegulatoryBot) agentCategory = inferredCategory;
       console.log(
         `[getSuggestedProducts] Inferred category "${inferredCategory}" from user message`
       );
@@ -1304,7 +1363,17 @@ async function getSuggestedProducts(ragSources: any[], message: string, effectiv
   }
 
   // ⭐ Bot Thông tin bổ trợ được xem TẤT CẢ sản phẩm, các bot khác bị giới hạn theo category
-  const shouldFilterByCategory = !isRegulatoryBot && agentCategory !== null;
+  //
+  // ⚠️ NHƯNG regulatory bot VẪN cần lọc theo category KHI câu hỏi nói rõ vấn
+  //   đề (VD "tôi mờ mắt, khó đọc sách" → phải ra kính lúp/máy đọc sách, KHÔNG
+  //   phải "Proloquo2Go", "Xbox Adaptive Controller"…). Nếu không lọc → 12 card
+  //   ngẫu nhiên theo `ORDER BY category` → hoàn toàn không liên quan.
+  //
+  // → `shouldFilterByCategory` chỉ tắt cho regulatory bot khi KHÔNG suy luận
+  //   được category từ câu hỏi.
+  const shouldFilterByCategory =
+    agentCategory !== null &&
+    (!isRegulatoryBot || inferredCategory !== null);
 
   // ⭐⭐ DANH SÁCH CATEGORY CẦN QUÉT (nhiều hơn 1).
   //
@@ -1323,9 +1392,15 @@ async function getSuggestedProducts(ragSources: any[], message: string, effectiv
   // → Quét NHIỀU category (theo `productCategoriesForBot()`), rồi lọc chính
   //   xác bằng taxonomy + bảng chủ sở hữu (đã có ở phía dưới).
   const scanCategories: string[] = (() => {
-    if (isRegulatoryBot) return [];
-    const cats = productCategoriesForBot(agentBotId, originalMadaCategory);
     const set = new Set<string>();
+    // ⭐ Regulatory bot: khi câu hỏi đã suy luận được category (VD "tôi mờ
+    //   mắt, khó đọc sách" → `vision`) → quét ĐÚNG category đó để card có
+    //   liên quan. Nếu không suy luận được → `[]` → lấy tất cả (xem bên dưới).
+    if (isRegulatoryBot) {
+      if (inferredCategory) set.add(inferredCategory);
+      return [...set];
+    }
+    const cats = productCategoriesForBot(agentBotId, originalMadaCategory);
     if (agentCategory) set.add(agentCategory);
     for (const c of cats) if (c) set.add(c);
     return [...set];
@@ -1380,10 +1455,34 @@ async function getSuggestedProducts(ragSources: any[], message: string, effectiv
     try {
       // Normalize URL (remove trailing slash)
       const normalizedUrl = productUrl.replace(/\/$/, '');
-      
+
+      // ⭐⭐ ƯU TIÊN `kb_products` — đây là SẢN PHẨM BÁN thật.
+      //
+      // VÌ SAO CẦN:
+      // `knowledge_items` (source_type='web') chứa HAI nhóm thực thể:
+      //   - SẢN PHẨM đã scrape từ MADA
+      //   - TIÊU CHUẨN/QUY ĐỊNH (WCAG 2.2, ISO 9999:2022, ATSM Qatar…)
+      // Trước đây hàm này CHỈ tra `knowledge_items` → khi RAG trả về URL
+      // tiêu chuẩn, nó biến tiêu chuẩn thành "product card" → khách thấy
+      // card "ISO 9999:2022" thay vì thiết bị giải quyết vấn đề.
+      //
+      // → Tra `kb_products` TRƯỚC (sản phẩm bán, `isReference = false`).
+      //   Chỉ khi không có trong `kb_products` mới tra `knowledge_items`
+      //   (khi đó kết quả là tiêu chuẩn → `isReference = true` → bị lọc khỏi
+      //   danh sách card ở phía dưới).
+      const kbRow = db.prepare(`
+        SELECT * FROM kb_products
+        WHERE status IN ('published', 'draft', 'archived')
+          AND (product_url = ? OR product_url = ? OR source_url = ? OR source_url = ?)
+        LIMIT 1
+      `).get(normalizedUrl, productUrl, normalizedUrl, productUrl) as any;
+      if (kbRow) {
+        return kbProductToProduct(kbRow, effectiveLanguage);
+      }
+
       // Try to find in knowledge_items by url (exact and normalized)
       const item = db.prepare(`
-        SELECT * FROM knowledge_items 
+        SELECT * FROM knowledge_items
         WHERE status = 'published' AND source_type = 'web'
           AND (url = ? OR url = ? OR source = ? OR source = ?)
         LIMIT 1
@@ -1393,7 +1492,7 @@ async function getSuggestedProducts(ragSources: any[], message: string, effectiv
         return knowledgeItemToProduct(item, effectiveLanguage);
       }
 
-    } catch (e) { 
+    } catch (e) {
       console.warn('[getProductFromDb] DB error:', (e as Error).message);
     }
     return null;
@@ -1403,9 +1502,32 @@ async function getSuggestedProducts(ragSources: any[], message: string, effectiv
   const getProductByTitle = (title: string): any => {
     if (!title) return null;
     try {
+      // ⭐⭐ ƯU TIÊN `kb_products` — SẢN PHẨM BÁN thật (xem `getProductFromDb`).
+      // Tra `knowledge_items` sau vì nhóm đó chứa cả tiêu chuẩn/quy định.
+      const kbRow = db.prepare(`
+        SELECT * FROM kb_products
+        WHERE status IN ('published', 'draft', 'archived')
+          AND (title = ? COLLATE NOCASE OR title_en = ? COLLATE NOCASE)
+        LIMIT 1
+      `).get(title, title) as any;
+      if (kbRow) {
+        return kbProductToProduct(kbRow, effectiveLanguage);
+      }
+
+      const kbPartial = db.prepare(`
+        SELECT * FROM kb_products
+        WHERE status IN ('published', 'draft', 'archived')
+          AND (title LIKE ? COLLATE NOCASE OR title_en LIKE ? COLLATE NOCASE)
+        ORDER BY featured DESC, sort_order ASC, created_at DESC
+        LIMIT 1
+      `).get(`%${title}%`, `%${title}%`) as any;
+      if (kbPartial) {
+        return kbProductToProduct(kbPartial, effectiveLanguage);
+      }
+
       // Try exact match first
       let item = db.prepare(`
-        SELECT * FROM knowledge_items 
+        SELECT * FROM knowledge_items
         WHERE status = 'published' AND source_type = 'web'
           AND (title = ? OR title_en = ?)
         LIMIT 1
@@ -1459,16 +1581,16 @@ async function getSuggestedProducts(ragSources: any[], message: string, effectiv
         // NOTE: We only remove trailing slash for matching, NOT all slashes
         const placeholders = sourceUrls.map(() => '?').join(',');
         const rows = db.prepare(`
-          SELECT id, title, content, source, url, category, language, metadata
+          SELECT id, title, content, source, url, category, language, metadata, source_type
           FROM knowledge_items
           WHERE url IN (${placeholders}) OR source IN (${placeholders})
         `).all(...sourceUrls, ...sourceUrls) as any[];
-        
+
         // Also try with trailing slash removed for both
         const normalizedSourceUrls = sourceUrls.map(url => url.replace(/\/$/, ''));
         const normalizedPlaceholders = normalizedSourceUrls.map(() => '?').join(',');
         const normalizedRows = db.prepare(`
-          SELECT id, title, content, source, url, category, language, metadata
+          SELECT id, title, content, source, url, category, language, metadata, source_type
           FROM knowledge_items
           WHERE url IN (${normalizedPlaceholders}) OR source IN (${normalizedPlaceholders})
         `).all(...normalizedSourceUrls, ...normalizedSourceUrls) as any[];
@@ -1581,6 +1703,15 @@ async function getSuggestedProducts(ragSources: any[], message: string, effectiv
         rating: merged.rating || 0,
         review_count: merged.review_count || 0,
         availability: merged.availability || '',
+        // ⭐ Tài liệu tham chiếu (tiêu chuẩn/quy định) KHÔNG phải product card.
+        //   - `kbProduct` từ `kb_products` → sản phẩm bán → isReference = false.
+        //   - `kbProduct` từ `knowledge_items` (web) → tiêu chuẩn → isReference = true.
+        //   - Không có `kbProduct` → dùng category của `dbItem` để suy ra.
+        isReference: kbProduct
+          ? kbProduct.isReference === true
+          : dbItem.source_type === 'web' ||
+            (dbItem.category || '').toLowerCase() === 'regulatory-standards' ||
+            (dbItem.category || '').toLowerCase() === 'web_accessibility',
       };
     });
 
@@ -1588,7 +1719,19 @@ async function getSuggestedProducts(ragSources: any[], message: string, effectiv
     suggestedProducts = suggestedProducts.filter((p: any) => {
       // ⭐ EXCLUDE already-shown products
       if (shownProductIds.includes(p.id)) return false;
-      
+
+      // ⭐⭐ LOẠI TÀI LIỆU THAM CHIẾU (tiêu chuẩn/quy định) KHỎI DANH SÁCH CARD.
+      //
+      // VÌ SAO CẦN:
+      // Khách mô tả triệu chứng ("tôi mờ mắt, khó đọc sách") → bot regulatory
+      // trả về card "ISO 9999:2022", "WCAG 2.2", "ATSM Qatar" — đều là VĂN
+      // BẢN THAM CHIẾU, không phải thiết bị. Khách thấy 3 card tiêu chuẩn thay
+      // vì sản phẩm giải quyết vấn đề → vô dụng.
+      //
+      // → Tiêu chuẩn vẫn được TRÍCH DẪN trong câu trả lời văn xuôi (link gắn
+      //   vào tên) — chỉ không biến thành "product card" thôi.
+      if (p.isReference) return false;
+
       const botCheck = isBotEntry(p.title);
       const urlCheck = isValidProductUrl(p.product_url);
       // Filter out garbage titles (repeated chars like "kkkk", "aaaa", etc.)
@@ -1717,8 +1860,9 @@ async function getSuggestedProducts(ragSources: any[], message: string, effectiv
       // ⭐ LIMIT: Always 12, let excludeClause handle deduplication (OFFSET was broken with category filter)
       const LIMIT = 12;
 
-      if (isRegulatoryBot) {
-        // ⭐ Regulatory bot: LẤY TẤT CẢ sản phẩm từ TẤT CẢ categories
+      if (isRegulatoryBot && !shouldFilterByCategory) {
+        // ⭐ Regulatory bot (KHÔNG suy luận được category từ câu hỏi):
+        // LẤY TẤT CẢ sản phẩm từ TẤT CẢ categories.
         dbQuery = `
           SELECT * FROM kb_products
           WHERE status IN ('draft', 'published', 'archived')
@@ -1797,6 +1941,11 @@ async function getSuggestedProducts(ragSources: any[], message: string, effectiv
         // ⭐ EXCLUDE already-shown products
         if (shownProductIds.includes(p.id)) return false;
 
+        // ⭐⭐ LOẠI TÀI LIỆU THAM CHIẾU (tiêu chuẩn/quy định) KHỎI CARD.
+        //   `kb_products` là sản phẩm bán → isReference = false, nhưng để chắc
+        //   chắn (data import tay cũng có thể chứa tiêu chuẩn) vẫn kiểm tra.
+        if (p.isReference) return false;
+
         // Phải có image_url hợp lệ (http OR proxy URL /api/mada-image)
         const hasImage = !!(p.image_url && (p.image_url.startsWith('http') || p.image_url.startsWith('/api/mada-image')));
         // URL phải là http(s)
@@ -1856,8 +2005,15 @@ async function getSuggestedProducts(ragSources: any[], message: string, effectiv
         // → Sản phẩm mà bot này là CHỦ SỞ HỮU CHÍNH (`mada-product-owners.json`)
         //   được ưu tiên; sản phẩm thuộc CHÍNH một bot khác thì bị loại (trừ
         //   khi MADA cũng xếp nó vào danh mục của bot này → đa nhãn hợp lệ).
+        // → Sản phẩm mà bot này là CHỦ SỞ HỮU CHÍNH (`mada-product-owners.json`)
+        //   được ưu tiên; sản phẩm thuộc CHÍNH một bot khác thì bị loại (trừ
+        //   khi MADA cũng xếp nó vào danh mục của bot này → đa nhãn hợp lệ).
+        //
+        // ⚠️ bot-regulatory (Thông tin bổ trợ) được xem TẤT CẢ sản phẩm.
+        //   Thiếu ngoại lệ này → 12 sản phẩm thật bị loại sạch (mỗi sản phẩm
+        //   có chủ sở hữu riêng) → bot chỉ còn trả về card tiêu chuẩn.
         const owner = primaryOwnerForProduct(p.product_url || p.source_url);
-        if (owner && agentBotId) {
+        if (owner && agentBotId && !isRegulatoryBot) {
           p.isPrimaryOwner = owner === agentBotId;
           if (
             owner !== agentBotId &&
@@ -2089,7 +2245,21 @@ router.post('/', async (req, res) => {
     // ⚠️ CHỈ đưa catalog khi đã đủ 4 câu hỏi (hoặc user hỏi thẳng về tên
     // sản phẩm cụ thể). Nếu luôn đưa, bot sẽ tự liệt kê sản phẩm ngay ở câu
     // đầu tiên → vi phạm quy tắc "hỏi đủ 4 câu rồi mới tư vấn".
-    const consultedDone = req.body?.consultQuestionsCompleted === true;
+    //
+    // ⭐⭐ SERVER TỰ TÍNH "ĐỦ 4 CÂU" TỪ LỊCH SỬ HỘI THOẠI (nguồn sự thật),
+    // không phụ thuộc hoàn toàn vào cờ của client.
+    //
+    // LÝ DO (bug user báo "hỏi xong câu 4 mà không ra sản phẩm"):
+    // Cờ `consultQuestionsCompleted` của client được tính bằng regex trên lời
+    // nói → khách trả lời kiểu không khớp mẫu → cờ = false → server cấm
+    // catalog → bot bị gỡ tên sản phẩm. Nay server tự phân tích hội thoại
+    // (bao gồm tín hiệu "bot hỏi câu X → khách nói tiếp → đã trả lời X").
+    const serverConsultHistory = (chatHistory.get(convId) || []) as ConsultMessage[];
+    const serverConsultCompleted = analyzeConsultProgress(
+      serverConsultHistory
+    ).completed;
+    const consultedDone =
+      serverConsultCompleted || req.body?.consultQuestionsCompleted === true;
     // ⭐ Server tự nhận diện tên sản phẩm (xem giải thích ở nhánh /stream:
     // cờ của client dựa trên danh sách hardcode nên thiếu tên sản phẩm mới).
     const explicitProductQuery =
@@ -2654,7 +2824,14 @@ router.post('/stream', async (req: any, res: any) => {
     let activeAgentId = agentId;
     // ⭐ Client báo đã hỏi đủ 4 câu tiêu chuẩn chưa + user có hỏi thẳng về
     // tên sản phẩm cụ thể không → quyết định có đưa catalog cho bot hay không.
-    const consultedQuestionsCompleted = req.body?.consultQuestionsCompleted === true;
+    //
+    // ⭐⭐ SERVER TỰ TÍNH "ĐỦ 4 CÂU" TỪ LỊCH SỬ HỘI THOẠI (nguồn sự thật).
+    // Xem giải thích ở nhánh non-streaming (cùng file).
+    const serverConsultCompleted = analyzeConsultProgress(
+      (chatHistory.get(convId) || []) as ConsultMessage[]
+    ).completed;
+    const consultedQuestionsCompleted =
+      serverConsultCompleted || req.body?.consultQuestionsCompleted === true;
     // ⭐ Server TỰ nhận diện tên sản phẩm trong câu hỏi, KHÔNG tin cờ của client.
     //
     // ⚠️ VÌ SAO CẦN: `isExplicitProductQuery` do frontend gửi lên dựa trên danh

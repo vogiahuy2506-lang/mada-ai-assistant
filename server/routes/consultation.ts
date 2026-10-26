@@ -4,6 +4,7 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import db from '../lib/db';
+import { createMailTransport, describeMailError } from '../lib/mailer';
 
 const router = Router();
 
@@ -461,43 +462,14 @@ ${siteUrl}
 `;
 
     // Send email notification if SMTP is configured
+    let emailSent = false;
+    let emailErrorMessage: string | undefined;
+
     if (process.env.MAIL_HOST && process.env.MAIL_USERNAME) {
       try {
-        const nodemailer = await import('nodemailer');
-
-        // Build transporter with connection settings
-        const mailPort = parseInt(process.env.MAIL_PORT || '465', 10);
-        const isSSLMail = mailPort === 465;
-        
-        const transporter = nodemailer.createTransport({
-          host: process.env.MAIL_HOST,
-          port: mailPort,
-          secure: isSSLMail, // true for port 465 (implicit SSL)
-          requireTLS: !isSSLMail && process.env.MAIL_TLS === 'true', // STARTTLS for other ports
-          tls: {
-            rejectUnauthorized: process.env.MAIL_TLS_REJECT_UNAUTHORIZED !== 'false',
-          },
-          auth: {
-            user: process.env.MAIL_USERNAME,
-            pass: process.env.MAIL_PASSWORD,
-          },
-          connectionTimeout: 10000,
-          greetingTimeout: 10000,
-          socketTimeout: 30000,
-          pool: true,
-          maxConnections: 5,
-          maxMessages: 100,
-          rateLimit: 10, // max 10 emails per second
-        });
-
-        // Always verify connection before sending (not just in debug mode)
-        try {
-          await transporter.verify();
-          console.log('✅ [EMAIL] SMTP connection verified');
-        } catch (verifyErr) {
-          console.error('⚠️ [EMAIL] SMTP connection verification failed:', verifyErr);
-          // Continue anyway - some servers don't allow verification before first mail
-        }
+        // Dùng mailer chung (server/lib/mailer.ts) — 1 nơi duy nhất tạo transporter,
+        // chuẩn hoá password, và chuẩn hoá lỗi 535 thành message dễ hiểu.
+        const transporter = await createMailTransport();
 
         // Resolve MAIL_FROM from env, fallback to admin email
         const mailFrom =
@@ -535,12 +507,12 @@ ${siteUrl}
           console.log(`✅ [EMAIL] Admin notification sent to ${adminEmail}, messageId: ${adminInfo.messageId}`);
         } catch (sendErr: any) {
           adminEmailError = sendErr;
-          console.error('⚠️ [EMAIL] Failed to send admin notification:', sendErr?.message || sendErr);
+          console.error('⚠️ [EMAIL] Failed to send admin notification:', describeMailError(sendErr));
           // Log detailed error for debugging
           if (process.env.NODE_ENV === 'development') {
             console.error('📧 [EMAIL ERROR DETAILS]', {
               host: process.env.MAIL_HOST,
-              port: mailPort,
+              port: process.env.MAIL_PORT,
               user: process.env.MAIL_USERNAME,
               to: adminEmail,
               hasAttachments: emailAttachments.length,
@@ -573,7 +545,7 @@ ${siteUrl}
             console.log(`✅ [EMAIL] Auto-reply sent to user ${email}, messageId: ${userInfo.messageId}`);
           } catch (userEmailErr: any) {
             // Don't fail the whole request if user auto-reply fails
-            console.warn('⚠️ [EMAIL] Failed to send auto-reply to user:', userEmailErr?.message || userEmailErr);
+            console.warn('⚠️ [EMAIL] Failed to send auto-reply to user:', describeMailError(userEmailErr));
           }
         } else {
           console.log('📧 [EMAIL] Skipping user auto-reply: no valid email provided');
@@ -581,6 +553,7 @@ ${siteUrl}
 
         // Log system event
         if (!adminEmailSent) {
+          emailErrorMessage = describeMailError(adminEmailError);
           // Log failure
           db.prepare(`
             INSERT INTO admin_system_logs (id, level, source, message, details, timestamp)
@@ -588,10 +561,11 @@ ${siteUrl}
           `).run(
             uuidv4(),
             `Email notification failed for consultation ${id} from ${email}`,
-            JSON.stringify({ id, email, error: adminEmailError?.message, refCode }),
+            JSON.stringify({ id, email, error: emailErrorMessage, refCode }),
             now
           );
         } else {
+          emailSent = true;
           db.prepare(`
             INSERT INTO admin_system_logs (id, level, source, message, details, timestamp)
             VALUES (?, 'info', 'consultation', ?, ?, ?)
@@ -610,24 +584,30 @@ ${siteUrl}
           );
         }
       } catch (emailError: any) {
-        console.error('⚠️ [EMAIL] Critical error in email module:', emailError?.message || emailError);
+        emailErrorMessage = describeMailError(emailError);
+        console.error('⚠️ [EMAIL] Critical error in email module:', emailErrorMessage);
         // Don't fail the consultation request if email module fails
         // The consultation is already saved to database above
       }
     } else {
+      emailErrorMessage = 'SMTP chưa cấu hình (thiếu MAIL_HOST/MAIL_USERNAME/MAIL_PASSWORD)';
       console.log(`📧 [EMAIL] SMTP not configured (MAIL_HOST not set). Admin email would be: ${adminEmail}`);
       console.log(`📧 [EMAIL] User auto-reply would be sent to: ${email}`);
       console.log(`📧 [EMAIL] To enable emails, set MAIL_HOST, MAIL_USERNAME, MAIL_PASSWORD in .env`);
     }
     // ========== END EMAIL NOTIFICATION ==========
-    
-    res.status(201).json({ 
-      success: true, 
-      data: { 
-        id, 
+
+    res.status(201).json({
+      success: true,
+      data: {
+        id,
         message: 'Consultation request submitted successfully',
         attachments: attachments.map((a: any) => ({ id: a.id, filename: a.filename, url: a.url, size: a.size })),
-      } 
+        // ⚠️ emailSent=false nghĩa là yêu cầu ĐÃ lưu vào DB nhưng mail KHÔNG gửi được.
+        // Frontend dùng cờ này để báo admin/người dùng biết cần kiểm tra lại SMTP.
+        emailSent,
+        emailError: emailErrorMessage,
+      }
     });
   } catch (error: any) {
     console.error('Error creating consultation:', error);

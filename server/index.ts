@@ -100,6 +100,7 @@ import widgetRoutes from './routes/widget';
 
 // Chat context (shared state)
 import { setRagInitialized } from './lib/chat-context';
+import { createMailTransport, describeMailError, getMailStatus, verifyMailConnection } from './lib/mailer';
 
 // Load .env from project root (mada-ai-assistant/.env), not just cwd
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
@@ -952,6 +953,22 @@ async function syncKnowledgeBaseToVectorStore(): Promise<void> {
 
 async function initializeServices() {
   try {
+    // ⭐ Verify SMTP NGAY LÚC BOOT.
+    // VÌ SAO CẦN: trước đây lỗi "535 authentication failed" chỉ hiện khi có
+    // request thực tế → admin tưởng mail đã gửi (API vẫn trả 201).
+    // Verify lúc boot in ra log rõ ràng + /api/health phản ánh đúng trạng thái.
+    verifyMailConnection()
+      .then((status) => {
+        if (!status.verified) {
+          console.error(
+            '❌ [MAIL] Mail thông báo sẽ KHÔNG gửi được. Kiểm tra MAIL_USERNAME/MAIL_PASSWORD.'
+          );
+        }
+      })
+      .catch(() => {
+        // verifyMailConnection đã tự xử lý lỗi, không cần throw.
+      });
+
     await vectorStore.initialize();
     ragEngine.initialize();
     guardrails.initialize();
@@ -2359,6 +2376,9 @@ app.get('/api/health', (_req, res) => {
     geminiConfigured: !!process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'your_gemini_api_key_here',
     authEnabled: true,
     mailConfigured: !!(process.env.MAIL_HOST && process.env.MAIL_USERNAME && process.env.MAIL_PASSWORD),
+    // Trạng thái SMTP chi tiết: đã đăng nhập được chưa + lỗi gần nhất.
+    // Giúp phân biệt "chưa cấu hình" với "cấu hình sai (535)".
+    mail: getMailStatus(),
     endpoints: {
       auth: ['POST /api/auth/register', 'POST /api/auth/login', 'POST /api/auth/logout', 'GET /api/auth/me', 'POST /api/auth/refresh', 'PUT /api/auth/profile', 'PUT /api/auth/password'],
       users: ['GET /api/users', 'GET /api/users/:id', 'POST /api/users', 'PATCH /api/users/:id', 'DELETE /api/users/:id', 'GET /api/users/stats/overview'],
@@ -2396,27 +2416,7 @@ app.post('/api/test-email', async (req, res) => {
       });
     }
 
-    const nodemailer = await import('nodemailer');
-    // mail.digiso.vn uses SSL on port 465
-    const mailPort = parseInt(process.env.MAIL_PORT || '465', 10);
-    const isSSLMail = mailPort === 465;
-    
-    const transporter = nodemailer.createTransport({
-      host: process.env.MAIL_HOST,
-      port: mailPort,
-      secure: isSSLMail, // true for port 465 (implicit SSL)
-      requireTLS: !isSSLMail && process.env.MAIL_TLS === 'true', // STARTTLS for other ports
-      tls: {
-        rejectUnauthorized: process.env.MAIL_TLS_REJECT_UNAUTHORIZED !== 'false',
-      },
-      auth: {
-        user: process.env.MAIL_USERNAME,
-        pass: process.env.MAIL_PASSWORD,
-      },
-      connectionTimeout: 10000,
-      greetingTimeout: 10000,
-      socketTimeout: 30000,
-    });
+    const transporter = await createMailTransport();
 
     await transporter.sendMail({
       from: process.env.MAIL_FROM || process.env.MAIL_USERNAME,
@@ -2428,10 +2428,10 @@ app.post('/api/test-email', async (req, res) => {
 
     res.json({ success: true, message: 'Email sent successfully!' });
   } catch (error: any) {
-    console.error('Test email error:', error);
+    console.error('Test email error:', describeMailError(error));
     res.status(500).json({
       success: false,
-      error: error.message || 'Failed to send email'
+      error: describeMailError(error)
     });
   }
 });

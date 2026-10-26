@@ -832,8 +832,15 @@ function ConsultationModal({
       });
       
       const data = await response.json();
-      
+
       if (data.success) {
+        // ⚠️ Yêu cầu ĐÃ được lưu vào DB, nhưng nếu mail không gửi được
+        // (SMTP sai cấu hình) thì admin sẽ không nhận được thông báo.
+        // → Báo rõ cho người dùng biết và hướng dẫn liên hệ trực tiếp.
+        if (data.data?.emailSent === false) {
+          console.error('Consultation saved but email not sent:', data.data?.emailError);
+          alert(t('consult.savedButNoEmail'));
+        }
         onSubmit(formData);
         setFormData({ name: '', email: '', phone: '', message: '', attachments: [] });
         setSelectedFiles([]);

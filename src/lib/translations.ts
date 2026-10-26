@@ -224,6 +224,7 @@ export const translations = {
     'consult.placeholder': 'Mô tả chi tiết nhu cầu về thiết bị công nghệ hỗ trợ...',
     'consult.note': 'Chuyên gia AT sẽ liên hệ trong 24-48 giờ',
     'consult.button': 'Tư vấn Chuyên gia',
+    'consult.savedButNoEmail': 'Yêu cầu của bạn đã được lưu thành công. Tuy nhiên, email xác nhận chưa gửi được do lỗi hệ thống. Vui lòng liên hệ trực tiếp hotline để được hỗ trợ nhanh hơn.',
     
     // Common
     'common.save': 'Lưu',
@@ -1389,6 +1390,7 @@ export const translations = {
     'consult.placeholder': 'Describe your assistive technology needs in detail...',
     'consult.note': 'AT expert will contact you within 24-48 hours',
     'consult.button': 'Expert Consultation',
+    'consult.savedButNoEmail': 'Your request was saved successfully. However, the confirmation email could not be sent due to a system error. Please contact the hotline directly for faster support.',
     
     // Common
     'common.save': 'Save',
@@ -2554,6 +2556,7 @@ export const translations = {
     'consult.placeholder': 'صف احتياجاتك من تقنية المساعدة بالتفصيل...',
     'consult.note': 'سيتواصل معك خبير AT خلال 24-48 ساعة',
     'consult.button': 'استشارة خبير',
+    'consult.savedButNoEmail': 'تم حفظ طلبك بنجاح. Однако، لم يتم إرسال رسالة التأكيد بسبب خطأ في النظام. يرجى التواصل مباشرة مع الخط الساخن للحصول على دعم أسرع.',
     
     // Common
     'common.save': 'حفظ',
@@ -3719,6 +3722,7 @@ export const translations = {
     'consult.placeholder': "Décrivez vos besoins en technologie d'assistance en détail...",
     'consult.note': "L'expert AT vous contactera sous 24-48 heures",
     'consult.button': 'Consultation d expert',
+    'consult.savedButNoEmail': "Votre demande a bien été enregistrée. Toutefois, l'e-mail de confirmation n'a pas pu être envoyé en raison d'une erreur système. Veuillez contacter directement la hotline pour une assistance plus rapide.",
     
     // Common
     'common.save': 'Enregistrer',

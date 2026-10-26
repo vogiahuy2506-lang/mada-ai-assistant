@@ -7,6 +7,7 @@
  */
 
 import db, { UserRow } from './db';
+import { createMailTransport, describeMailError } from './mailer';
 import { logActivity } from '../index';
 
 interface ApprovalResult {
@@ -18,37 +19,14 @@ interface ApprovalResult {
 // ============== EMAIL NOTIFICATION ==============
 
 async function sendApprovalEmail(user: UserRow, approved: boolean): Promise<void> {
-  const nodemailer = await import('nodemailer');
-  
   // Check if email is configured
   if (!process.env.MAIL_HOST || !process.env.MAIL_USERNAME) {
     console.log(`📧 Email not configured, skipping notification for ${user.email}`);
     return;
   }
 
-  // mail.digiso.vn uses SSL on port 465
-  // - Port 465: implicit SSL, use secure: true
-  // - Port 587: STARTTLS, use requireTLS: true
-  const mailPort = parseInt(process.env.MAIL_PORT || '465', 10);
-  const isSSLMail = mailPort === 465;
-  
-  const transporter = nodemailer.createTransport({
-    host: process.env.MAIL_HOST,
-    port: mailPort,
-    secure: isSSLMail, // true for port 465 (implicit SSL)
-    requireTLS: !isSSLMail && process.env.MAIL_TLS === 'true', // STARTTLS for other ports
-    tls: {
-      // For SSL connections, allow self-signed certs if needed
-      rejectUnauthorized: process.env.MAIL_TLS_REJECT_UNAUTHORIZED !== 'false',
-    },
-    auth: {
-      user: process.env.MAIL_USERNAME,
-      pass: process.env.MAIL_PASSWORD,
-    },
-    connectionTimeout: 10000,
-    greetingTimeout: 10000,
-    socketTimeout: 30000,
-  });
+  // Dùng mailer chung (chuẩn hoá password + lỗi 535 dễ hiểu)
+  const transporter = await createMailTransport();
 
   const statusText = approved ? 'has been approved' : 'has been rejected';
   const statusColor = approved ? '#10B981' : '#EF4444';
@@ -118,7 +96,11 @@ async function sendApprovalEmail(user: UserRow, approved: boolean): Promise<void
 
     logActivity('success', `Email ${approved ? 'approval' : 'rejection'} sent to ${user.email}`, 'UserApproval');
   } catch (error) {
-    logActivity('warn', `Failed to send email to ${user.email}: ${error}`, 'UserApproval');
+    logActivity(
+      'warn',
+      `Failed to send email to ${user.email}: ${describeMailError(error)}`,
+      'UserApproval'
+    );
   }
 }
 
